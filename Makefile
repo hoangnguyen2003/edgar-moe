@@ -1,7 +1,7 @@
 .PHONY: install install-research demo api web test lint build
 
 install:
-	uv sync --extra dev
+	uv sync --extra dev --extra research
 	npm --prefix apps/web install
 
 install-research:

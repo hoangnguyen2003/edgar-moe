@@ -48,7 +48,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync
+      - run: uv sync --extra research
       - name: Check authenticated-source configuration
         id: credentials
         env:

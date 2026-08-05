@@ -13,6 +13,7 @@ build/
 *.egg-info/
 node_modules/
 apps/web/dist/
+public/
 data/raw/
 data/interim/
 data/processed/
@@ -23,3 +24,5 @@ mlflow.db
 *.duckdb.wal
 !data/demo/*.json
 !data/demo/*.sqlite
+.vercel
+.env*

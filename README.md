@@ -57,6 +57,17 @@ Open `http://localhost:5173`. API documentation is at `http://localhost:8000/api
 
 The demo trains the real PyTorch MoE against a deterministic synthetic dataset with genuine regime-dependent modality effects. It verifies the complete model → backtest → export → API → UI path without suggesting that synthetic performance is market evidence.
 
+## Deployment
+
+The public demo deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes the snapshot-backed FastAPI application as one Python Function in Singapore (`sin1`). The function installs only the serving dependencies; the `research` extra remains available for local training and the scheduled GitHub workflow.
+
+```bash
+npx vercel@latest
+npx vercel@latest --prod
+```
+
+The bundled snapshot requires no database, secrets, or paid data service. Vercel's generated `vercel.app` domain is sufficient; a custom domain is optional.
+
 ## Authenticated data setup
 
 Create free Alpaca and FRED API keys and set the values in `.env`. Set `SEC_USER_AGENT` to a descriptive application name and contact email.
