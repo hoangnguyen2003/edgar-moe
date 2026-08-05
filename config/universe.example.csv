@@ -1,0 +1,6 @@
+cik,symbol,security_id,company_name
+0000320193,AAPL,alpaca:AAPL,Apple Inc.
+0000789019,MSFT,alpaca:MSFT,Microsoft Corporation
+0001018724,AMZN,alpaca:AMZN,Amazon.com Inc.
+0001045810,NVDA,alpaca:NVDA,NVIDIA Corporation
+0001652044,GOOGL,alpaca:GOOGL,Alphabet Inc.

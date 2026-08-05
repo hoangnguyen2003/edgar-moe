@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --extra dev --extra research
+      - run: uv run ruff check .
+      - run: uv run mypy src
+      - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+        working-directory: apps/web
+      - run: npm run lint
+        working-directory: apps/web
+      - run: npm run test
+        working-directory: apps/web
+      - run: npm run build
+        working-directory: apps/web

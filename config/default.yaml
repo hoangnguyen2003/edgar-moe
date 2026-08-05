@@ -1,0 +1,51 @@
+project:
+  name: EDGAR-MoE
+  timezone: America/New_York
+  random_seed: 42
+
+data:
+  start_date: "2016-01-01"
+  universe_size: 1000
+  minimum_price: 5.0
+  minimum_history_sessions: 252
+  liquidity_lookback_sessions: 60
+  sec_forms: ["10-K", "10-Q"]
+  sec_requests_per_second: 8
+  mapping_confidence_threshold: 0.85
+
+features:
+  text_sections: ["risk_factors", "management_discussion"]
+  momentum_windows: [5, 21, 63, 126, 252]
+  volatility_windows: [21, 63]
+  beta_window: 252
+  embedding_model: "ProsusAI/finbert"
+  embedding_chunk_tokens: 384
+
+model:
+  hidden_dim: 64
+  expert_dim: 32
+  dropout: 0.15
+  learning_rate: 0.001
+  weight_decay: 0.0001
+  batch_size: 256
+  max_epochs: 80
+  patience: 10
+
+evaluation:
+  development_end: "2022-12-31"
+  validation_start: "2023-01-01"
+  validation_end: "2024-12-31"
+  test_start: "2025-01-01"
+  horizon_sessions: 20
+  embargo_sessions: 20
+
+portfolio:
+  gross_exposure: 1.0
+  maximum_net_exposure: 0.02
+  maximum_beta_exposure: 0.05
+  maximum_industry_exposure: 0.05
+  maximum_name_weight: 0.02
+  long_quantile: 0.9
+  short_quantile: 0.1
+  base_transaction_cost_bps: 10
+  base_borrow_cost_annual: 0.02

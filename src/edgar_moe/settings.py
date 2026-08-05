@@ -1,0 +1,100 @@
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+
+import yaml  # type: ignore[import-untyped]
+from pydantic import BaseModel, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class DataConfig(BaseModel):
+    start_date: str = "2016-01-01"
+    universe_size: int = 1000
+    minimum_price: float = 5.0
+    minimum_history_sessions: int = 252
+    liquidity_lookback_sessions: int = 60
+    sec_forms: list[str] = Field(default_factory=lambda: ["10-K", "10-Q"])
+    sec_requests_per_second: int = 8
+    mapping_confidence_threshold: float = 0.85
+
+
+class FeatureConfig(BaseModel):
+    text_sections: list[str] = Field(
+        default_factory=lambda: ["risk_factors", "management_discussion"]
+    )
+    momentum_windows: list[int] = Field(default_factory=lambda: [5, 21, 63, 126, 252])
+    volatility_windows: list[int] = Field(default_factory=lambda: [21, 63])
+    beta_window: int = 252
+    embedding_model: str = "ProsusAI/finbert"
+    embedding_chunk_tokens: int = 384
+
+
+class ModelConfig(BaseModel):
+    hidden_dim: int = 64
+    expert_dim: int = 32
+    dropout: float = 0.15
+    learning_rate: float = 1e-3
+    weight_decay: float = 1e-4
+    batch_size: int = 256
+    max_epochs: int = 80
+    patience: int = 10
+
+
+class EvaluationConfig(BaseModel):
+    development_end: str = "2022-12-31"
+    validation_start: str = "2023-01-01"
+    validation_end: str = "2024-12-31"
+    test_start: str = "2025-01-01"
+    horizon_sessions: int = 20
+    embargo_sessions: int = 20
+
+
+class PortfolioConfig(BaseModel):
+    gross_exposure: float = 1.0
+    maximum_net_exposure: float = 0.02
+    maximum_beta_exposure: float = 0.05
+    maximum_industry_exposure: float = 0.05
+    maximum_name_weight: float = 0.02
+    long_quantile: float = 0.9
+    short_quantile: float = 0.1
+    base_transaction_cost_bps: float = 10.0
+    base_borrow_cost_annual: float = 0.02
+
+
+class ProjectMetadata(BaseModel):
+    name: str = "EDGAR-MoE"
+    timezone: str = "America/New_York"
+    random_seed: int = 42
+
+
+class ResearchConfig(BaseModel):
+    project: ProjectMetadata = Field(default_factory=ProjectMetadata)
+    data: DataConfig = Field(default_factory=DataConfig)
+    features: FeatureConfig = Field(default_factory=FeatureConfig)
+    model: ModelConfig = Field(default_factory=ModelConfig)
+    evaluation: EvaluationConfig = Field(default_factory=EvaluationConfig)
+    portfolio: PortfolioConfig = Field(default_factory=PortfolioConfig)
+
+    @classmethod
+    def from_yaml(cls, path: str | Path) -> ResearchConfig:
+        with Path(path).open("r", encoding="utf-8") as stream:
+            payload = yaml.safe_load(stream) or {}
+        return cls.model_validate(payload)
+
+
+class RuntimeSettings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    sec_user_agent: str = "EDGAR-MoE Research research@example.com"
+    alpaca_api_key: str = ""
+    alpaca_api_secret: str = ""
+    fred_api_key: str = ""
+    edgar_moe_data_dir: Path = Path("data")
+    edgar_moe_demo_snapshot: Path = Path("data/demo/snapshot.json")
+    edgar_moe_log_level: str = "INFO"
+
+
+@lru_cache
+def runtime_settings() -> RuntimeSettings:
+    return RuntimeSettings()

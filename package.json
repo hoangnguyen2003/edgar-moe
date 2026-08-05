@@ -1,0 +1,14 @@
+{
+  "name": "edgar-moe",
+  "private": true,
+  "packageManager": "npm@11",
+  "scripts": {
+    "dev": "npm --prefix apps/web run dev",
+    "build": "npm --prefix apps/web run build",
+    "test": "npm --prefix apps/web run test",
+    "lint": "npm --prefix apps/web run lint"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}
