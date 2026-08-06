@@ -29,16 +29,51 @@ def fixture_snapshot() -> dict:
         "filing_url": "https://www.sec.gov/example",
     }
     return {
-        "metadata": {"project": "EDGAR-MoE", "version": "0.1.0", "generated_at": "2026-01-01T00:00:00Z", "as_of": "2026-01-01", "data_mode": "test", "research_only": True, "disclaimer": "test"},
-        "summary": {"title": "Test", "thesis": "Test thesis", "universe": "Test", "horizon_sessions": 20, "events": 1, "issuers": 1, "development_events": 1, "validation_events": 1, "test_events": 1, "latest_signal_count": 1},
+        "metadata": {
+            "project": "EDGAR-MoE",
+            "version": "0.1.0",
+            "generated_at": "2026-01-01T00:00:00Z",
+            "as_of": "2026-01-01",
+            "data_mode": "test",
+            "research_only": True,
+            "disclaimer": "test",
+        },
+        "summary": {
+            "title": "Test",
+            "thesis": "Test thesis",
+            "universe": "Test",
+            "horizon_sessions": 20,
+            "events": 1,
+            "issuers": 1,
+            "development_events": 1,
+            "validation_events": 1,
+            "test_events": 1,
+            "latest_signal_count": 1,
+        },
         "predictive_metrics": {"validation": {"rank_ic": 0.1}, "locked_test": {"rank_ic": 0.2}},
         "portfolio_scenarios": [{"cost_bps": 10, "sharpe": 1.0}],
-        "experiments": [{"name": "MoE", "family": "multimodal", "validation_rmse": 0.1, "selected": True}],
-        "equity_curves": {"cost_10bps": [{"date": "2026-01-01", "equity": 1.0, "drawdown": 0.0, "turnover": 0.0}]},
+        "experiments": [
+            {"name": "MoE", "family": "multimodal", "validation_rmse": 0.1, "selected": True}
+        ],
+        "equity_curves": {
+            "cost_10bps": [{"date": "2026-01-01", "equity": 1.0, "drawdown": 0.0, "turnover": 0.0}]
+        },
         "events": [event],
         "latest_signals": [event],
-        "methodology": {"target": "20D", "split": "time", "model": "MoE", "portfolio": "neutral", "costs": "10bps", "limitations": ["test"]},
-        "freshness": {"status": "ok", "last_successful_update": "2026-01-01T00:00:00Z", "next_scheduled_update": None, "message": "ok"},
+        "methodology": {
+            "target": "20D",
+            "split": "time",
+            "model": "MoE",
+            "portfolio": "neutral",
+            "costs": "10bps",
+            "limitations": ["test"],
+        },
+        "freshness": {
+            "status": "ok",
+            "last_successful_update": "2026-01-01T00:00:00Z",
+            "next_scheduled_update": None,
+            "message": "ok",
+        },
     }
 
 

@@ -19,14 +19,23 @@ features:
   volatility_windows: [21, 63]
   beta_window: 252
   embedding_model: "ProsusAI/finbert"
-  embedding_chunk_tokens: 384
+  embedding_chunk_tokens: 510
+  embedding_max_chunks: 12
 
 model:
   hidden_dim: 64
   expert_dim: 32
   dropout: 0.15
+  gate_strength: 0.25
+  candidate_hidden_dims: [32, 64]
+  candidate_dropouts: [0.10, 0.20]
+  candidate_gate_strengths: [0.0, 0.25, 1.0]
+  fundamental_anchor_weight: 0.75
   learning_rate: 0.001
   weight_decay: 0.0001
+  entropy_regularization: 0.002
+  expert_auxiliary_weight: 0.25
+  correlation_regularization: 0.05
   batch_size: 256
   max_epochs: 80
   patience: 10
@@ -36,8 +45,11 @@ evaluation:
   validation_start: "2023-01-01"
   validation_end: "2024-12-31"
   test_start: "2025-01-01"
+  walk_forward_years: [2023, 2024]
   horizon_sessions: 20
   embargo_sessions: 20
+  minimum_split_events: 30
+  bootstrap_samples: 1000
 
 portfolio:
   gross_exposure: 1.0

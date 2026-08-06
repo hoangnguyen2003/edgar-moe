@@ -9,23 +9,24 @@
 5. Model preprocessing is fitted independently inside each training fold.
 6. The locked test is evaluated after the model family, features, costs, and constraints are frozen.
 7. Deployed services read an immutable derived snapshot and never need raw licensed market data.
+8. The one-time evaluator requires the exact walk-forward selection hash and refuses locked-artifact overwrites.
 
 ## Storage layers
 
 - `raw`: cached source responses, ignored by Git.
 - `interim`: parsed filings, security mappings, and normalized facts.
-- `processed`: partitioned Parquet feature and label tables.
+- `processed`: Parquet event/availability/return tables plus compressed feature arrays.
 - `artifacts`: model states, preprocessors, experiment manifests, and reports.
 - `demo`: small public snapshot consumed by FastAPI and React.
 
-DuckDB acts as the local catalog and query engine. Each written asset records its path, row count, SHA-256 digest, and creation timestamp.
+Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. The public service deliberately avoids a mutable database: it reads one validated, immutable derived snapshot.
 
 ## Failure behavior
 
 - SEC requests identify the application, run below the published maximum rate, retry transient failures, and cache filing HTML.
 - Ambiguous CIK/security mappings receive a confidence status; low-confidence events are excluded from primary results.
 - Missing text or fundamentals activate a modality mask rather than zero-valued evidence.
-- Missing or unresolved terminal corporate actions censor the primary label and appear in an attrition report.
+- Missing market sessions censor the primary label and appear in the attrition report; corporate-action records are retained for mapping and return-quality review.
 - A failed weekly refresh leaves the last successful public snapshot intact and marks it stale.
 
 ## Deployment boundary

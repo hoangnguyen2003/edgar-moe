@@ -103,12 +103,17 @@ def allocate_neutral(
             if len(inactive):
                 constraints.append(variable[inactive] == 0)
             for industry in sorted(candidates["industry_code"].astype(str).unique()):
-                mask = np.flatnonzero(candidates["industry_code"].astype(str).to_numpy() == industry)
+                mask = np.flatnonzero(
+                    candidates["industry_code"].astype(str).to_numpy() == industry
+                )
                 constraints.append(cvx.abs(cvx.sum(variable[mask])) <= maximum_industry_exposure)
             objective = cvx.Minimize(cvx.sum_squares(variable - target))
             problem = cvx.Problem(objective, constraints)
             problem.solve(solver=cvx.CLARABEL, verbose=False)
-            if variable.value is None or problem.status not in {cvx.OPTIMAL, cvx.OPTIMAL_INACCURATE}:
+            if variable.value is None or problem.status not in {
+                cvx.OPTIMAL,
+                cvx.OPTIMAL_INACCURATE,
+            }:
                 raise RuntimeError(f"Portfolio optimization failed: {problem.status}")
             weights = np.asarray(variable.value).reshape(-1)
             solver_name = "cvxpy-clarabel"

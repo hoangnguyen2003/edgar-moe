@@ -27,15 +27,24 @@ class FeatureConfig(BaseModel):
     volatility_windows: list[int] = Field(default_factory=lambda: [21, 63])
     beta_window: int = 252
     embedding_model: str = "ProsusAI/finbert"
-    embedding_chunk_tokens: int = 384
+    embedding_chunk_tokens: int = 510
+    embedding_max_chunks: int = 12
 
 
 class ModelConfig(BaseModel):
     hidden_dim: int = 64
     expert_dim: int = 32
     dropout: float = 0.15
+    gate_strength: float = 0.25
+    candidate_hidden_dims: list[int] = Field(default_factory=lambda: [32, 64])
+    candidate_dropouts: list[float] = Field(default_factory=lambda: [0.1, 0.2])
+    candidate_gate_strengths: list[float] = Field(default_factory=lambda: [0.0, 0.25, 1.0])
+    fundamental_anchor_weight: float = 0.75
     learning_rate: float = 1e-3
     weight_decay: float = 1e-4
+    entropy_regularization: float = 0.002
+    expert_auxiliary_weight: float = 0.25
+    correlation_regularization: float = 0.05
     batch_size: int = 256
     max_epochs: int = 80
     patience: int = 10
@@ -46,8 +55,11 @@ class EvaluationConfig(BaseModel):
     validation_start: str = "2023-01-01"
     validation_end: str = "2024-12-31"
     test_start: str = "2025-01-01"
+    walk_forward_years: list[int] = Field(default_factory=lambda: [2023, 2024])
     horizon_sessions: int = 20
     embargo_sessions: int = 20
+    minimum_split_events: int = 30
+    bootstrap_samples: int = 1000
 
 
 class PortfolioConfig(BaseModel):
@@ -84,7 +96,11 @@ class ResearchConfig(BaseModel):
 
 
 class RuntimeSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", ".env.local"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     sec_user_agent: str = "EDGAR-MoE Research research@example.com"
     alpaca_api_key: str = ""

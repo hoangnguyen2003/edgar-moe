@@ -25,8 +25,11 @@ def train_baselines(
     models = {
         "Elastic Net": ElasticNet(alpha=0.02, l1_ratio=0.2, max_iter=10_000, random_state=seed),
         "Gradient Boosting": HistGradientBoostingRegressor(
-            max_iter=180, learning_rate=0.04, max_leaf_nodes=15, l2_regularization=1.0,
-            random_state=seed
+            max_iter=180,
+            learning_rate=0.04,
+            max_leaf_nodes=15,
+            l2_regularization=1.0,
+            random_state=seed,
         ),
     }
     results: list[BaselineResult] = []

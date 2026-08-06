@@ -23,6 +23,30 @@ def test_gate_weights_sum_to_one_and_mask_missing_expert() -> None:
     assert weights[0, 1].item() == 0.0
 
 
+def test_zero_gate_strength_shrinks_weights_to_static_prior() -> None:
+    model = RegimeGatedMoE(
+        4,
+        3,
+        2,
+        2,
+        hidden_dim=8,
+        expert_dim=4,
+        dropout=0,
+        gate_strength=0.0,
+    )
+    missing = torch.zeros((2, 3))
+    _, weights, _ = model(
+        torch.randn(2, 4),
+        torch.randn(2, 3),
+        torch.randn(2, 2),
+        torch.tensor([[-100.0, 200.0], [300.0, -400.0]]),
+        missing,
+    )
+
+    assert torch.allclose(weights[0], weights[1])
+    assert torch.allclose(weights, torch.full((2, 3), 1 / 3))
+
+
 def test_training_and_prediction_are_deterministic() -> None:
     generator = np.random.default_rng(4)
 
@@ -47,6 +71,8 @@ def test_training_and_prediction_are_deterministic() -> None:
         max_epochs=3,
         patience=3,
         batch_size=16,
+        expert_auxiliary_weight=0.25,
+        correlation_regularization=0.05,
         seed=4,
         device="cpu",
     )

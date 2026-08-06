@@ -1,23 +1,49 @@
 from __future__ import annotations
 
 import asyncio
+import csv
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
+import numpy as np
+import orjson
 import typer
 
 from edgar_moe.data.alpaca import AlpacaDataClient
 from edgar_moe.data.demo import build_demo_snapshot
 from edgar_moe.data.fred import FredClient
 from edgar_moe.data.refresh import (
-    collect_authenticated_data,
     load_universe_csv,
-    write_authenticated_bundle,
+    refresh_authenticated_to_disk,
 )
 from edgar_moe.data.sec import SecClient
-from edgar_moe.settings import ResearchConfig, runtime_settings
+from edgar_moe.data.security_master import build_security_master
+from edgar_moe.data.universe import screen_liquid_universe
+from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
+from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
+from edgar_moe.modeling.experiment import (
+    run_authenticated_experiment,
+    save_study_artifacts,
+)
+from edgar_moe.modeling.frozen import (
+    evaluate_frozen_selection,
+    save_frozen_evaluation,
+)
+from edgar_moe.modeling.walk_forward import (
+    run_walk_forward_study,
+    save_walk_forward_artifacts,
+)
+from edgar_moe.reporting import (
+    build_authenticated_snapshot,
+    build_frozen_snapshot,
+    write_frozen_evaluation_report,
+    write_research_report,
+    write_validation_report,
+    write_walk_forward_report,
+)
+from edgar_moe.settings import ResearchConfig, RuntimeSettings, runtime_settings
 
 app = typer.Typer(
     name="edgar-moe",
@@ -36,7 +62,9 @@ def demo(
 ) -> None:
     """Train the real MoE on deterministic synthetic fixtures and export the app snapshot."""
     config = ResearchConfig.from_yaml(config_path)
-    snapshot = build_demo_snapshot(output, config=config, seed=config.project.random_seed, max_epochs=epochs)
+    snapshot = build_demo_snapshot(
+        output, config=config, seed=config.project.random_seed, max_epochs=epochs
+    )
     typer.echo(
         f"Wrote {output} with {snapshot['summary']['events']:,} synthetic events and "
         f"{snapshot['summary']['test_events']:,} locked-test events."
@@ -87,7 +115,9 @@ def ingest_assets(
 
     async def run() -> list[dict[str, object]]:
         async with AlpacaDataClient(settings.alpaca_api_key, settings.alpaca_api_secret) as client:
-            active, inactive = await asyncio.gather(client.assets("active"), client.assets("inactive"))
+            active, inactive = await asyncio.gather(
+                client.assets("active"), client.assets("inactive")
+            )
         return [*active, *inactive]
 
     assets = asyncio.run(run())
@@ -96,20 +126,108 @@ def ingest_assets(
     typer.echo(f"Wrote {len(assets):,} assets to {output}")
 
 
+@app.command("build-universe")
+def build_universe(
+    output: Annotated[Path, typer.Option()] = Path("config/universe.csv"),
+    review_output: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-mapping-review.json"
+    ),
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
+) -> None:
+    """Build a reviewed SEC-to-Alpaca security master including inactive assets."""
+    settings = runtime_settings()
+    config = ResearchConfig.from_yaml(config_path)
+    _require_source_configuration(settings, needs_fred=False)
+
+    async def run() -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+        async with (
+            SecClient(
+                settings.sec_user_agent,
+                settings.edgar_moe_data_dir / "raw" / "sec" / "cache",
+                requests_per_second=config.data.sec_requests_per_second,
+                cache_filings=False,
+            ) as sec,
+            AlpacaDataClient(settings.alpaca_api_key, settings.alpaca_api_secret) as market,
+        ):
+            sec_companies, active_assets, inactive_assets = await asyncio.gather(
+                sec.company_tickers_exchange(),
+                market.assets("active"),
+                market.assets("inactive"),
+            )
+        mappings = build_security_master(
+            sec_companies,
+            [*active_assets, *inactive_assets],
+            threshold=config.data.mapping_confidence_threshold,
+        )
+        confident = [
+            {
+                "cik": item.cik,
+                "symbol": item.symbol,
+                "security_id": item.security_id,
+                "company_name": item.company_name,
+                "exchange": item.exchange,
+                "industry_code": "",
+            }
+            for item in mappings
+            if item.status.value == "confident"
+            and item.exchange.upper() in {"AMEX", "NASDAQ", "NYSE", "NYSEARCA", "ARCA"}
+        ]
+        review = [item.model_dump(mode="json") for item in mappings]
+        return confident, review
+
+    confident_rows, review_rows = asyncio.run(run())
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    with temporary_output.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(
+            stream,
+            fieldnames=[
+                "cik",
+                "symbol",
+                "security_id",
+                "company_name",
+                "exchange",
+                "industry_code",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(confident_rows)
+    temporary_output.replace(output)
+    review_output.parent.mkdir(parents=True, exist_ok=True)
+    review_output.write_bytes(
+        orjson.dumps(review_rows, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    )
+    typer.echo(
+        f"Wrote {len(confident_rows):,} confident mappings to {output}; "
+        f"review evidence for {len(review_rows):,} mappings is at {review_output}."
+    )
+
+
 @app.command("refresh-data")
 def refresh_data(
     universe: Annotated[Path, typer.Option(help="CSV with cik and symbol columns.")] = Path(
         "config/universe.example.csv"
     ),
     output_dir: Annotated[Path, typer.Option()] = Path("data/raw/authenticated"),
-    start: Annotated[str, typer.Option(help="First market/macro date (YYYY-MM-DD).")] = "2016-01-01",
-    end: Annotated[str | None, typer.Option(help="Last observation date; defaults to as-of.")] = None,
+    start: Annotated[
+        str, typer.Option(help="First market/macro date (YYYY-MM-DD).")
+    ] = "2016-01-01",
+    end: Annotated[
+        str | None, typer.Option(help="Last observation date; defaults to as-of.")
+    ] = None,
     as_of: Annotated[str | None, typer.Option(help="Point-in-time vintage date.")] = None,
     macro_series: Annotated[str, typer.Option()] = "VIXCLS,DGS10,DFF,BAA10Y",
     feed: Annotated[str, typer.Option(help="Alpaca feed; IEX works on free plans.")] = "iex",
+    maximum_filings_per_issuer: Annotated[
+        int | None, typer.Option(min=1, help="Optional connectivity-run cap per issuer.")
+    ] = None,
+    resume: Annotated[bool, typer.Option(help="Resume an incomplete dated checkpoint.")] = False,
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
-    """Collect an authenticated, hashed SEC/market/macro research input bundle."""
+    """Collect a resumable, hashed SEC filing/market/macro research checkpoint."""
     settings = runtime_settings()
+    config = ResearchConfig.from_yaml(config_path)
+    _require_source_configuration(settings, needs_fred=True)
     members = load_universe_csv(universe)
     as_of_date = date.fromisoformat(as_of) if as_of else date.today()
     end_date = date.fromisoformat(end) if end else as_of_date
@@ -118,28 +236,341 @@ def refresh_data(
 
     async def run() -> Path:
         async with (
-            SecClient(settings.sec_user_agent, output_dir / "cache" / "sec") as sec,
+            SecClient(
+                settings.sec_user_agent,
+                output_dir / "cache" / "sec",
+                requests_per_second=config.data.sec_requests_per_second,
+                cache_filings=False,
+            ) as sec,
             AlpacaDataClient(settings.alpaca_api_key, settings.alpaca_api_secret) as market,
             FredClient(settings.fred_api_key) as macro,
         ):
-            bundle = await collect_authenticated_data(
+            return await refresh_authenticated_to_disk(
                 sec,
                 market,
                 macro,
                 members,
+                output_root=output_dir,
                 start=start_date,
                 end=end_date,
                 as_of=as_of_date,
                 macro_series=series,
                 feed=feed,
+                forms=config.data.sec_forms,
+                maximum_filings_per_issuer=maximum_filings_per_issuer,
+                resume=resume,
+                progress=typer.echo,
             )
-        return write_authenticated_bundle(bundle, output_dir)
 
     destination = asyncio.run(run())
     typer.echo(
-        f"Wrote authenticated research inputs for {len(members)} symbols to {destination}. "
-        "No credentials were stored."
+        f"Wrote and verified authenticated research inputs for {len(members)} symbols "
+        f"to {destination}. No credentials were stored."
     )
+
+
+@app.command("screen-universe")
+def screen_universe(
+    source: Annotated[Path, typer.Option(help="Reviewed broad-universe CSV.")] = Path(
+        "config/universe.csv"
+    ),
+    output: Annotated[Path, typer.Option()] = Path("config/universe.research.csv"),
+    audit_output: Annotated[Path, typer.Option()] = Path("data/interim/universe-screen.json"),
+    as_of: Annotated[str | None, typer.Option(help="Screen cutoff (YYYY-MM-DD).")] = None,
+    lookback_days: Annotated[int, typer.Option(min=60)] = 120,
+    candidate_count: Annotated[int, typer.Option(min=50)] = 500,
+    minimum_sessions: Annotated[int, typer.Option(min=20)] = 40,
+    minimum_price: Annotated[float, typer.Option(min=0.01)] = 5.0,
+    feed: Annotated[str, typer.Option()] = "iex",
+    batch_size: Annotated[int, typer.Option(min=1, max=500)] = 200,
+) -> None:
+    """Create a free-tier research candidate set using trailing IEX liquidity."""
+    settings = runtime_settings()
+    _require_source_configuration(settings, needs_fred=False)
+    members = load_universe_csv(source)
+    cutoff = date.fromisoformat(as_of) if as_of else date.today() - timedelta(days=1)
+    start = cutoff - timedelta(days=lookback_days)
+
+    async def run() -> dict[str, list[dict[str, Any]]]:
+        combined: dict[str, list[dict[str, Any]]] = {}
+        async with AlpacaDataClient(settings.alpaca_api_key, settings.alpaca_api_secret) as market:
+            for offset in range(0, len(members), batch_size):
+                batch = [member.symbol for member in members[offset : offset + batch_size]]
+                payload = await market.daily_bars(batch, start, cutoff, feed=feed)
+                for symbol, rows in payload.items():
+                    combined.setdefault(symbol, []).extend(rows)
+                typer.echo(
+                    f"Screened {min(offset + batch_size, len(members)):,}/{len(members):,} mappings"
+                )
+        return combined
+
+    bars = asyncio.run(run())
+    selected, exclusions = screen_liquid_universe(
+        members,
+        bars,
+        candidate_count=candidate_count,
+        minimum_sessions=minimum_sessions,
+        minimum_price=minimum_price,
+    )
+    if len(selected) < candidate_count:
+        raise typer.BadParameter(
+            f"Only {len(selected)} symbols passed the screen; requested {candidate_count}"
+        )
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    fieldnames = [
+        "cik",
+        "symbol",
+        "security_id",
+        "company_name",
+        "exchange",
+        "industry_code",
+        "screen_sessions",
+        "screen_last_price",
+        "screen_median_dollar_volume",
+        "screen_liquidity_rank",
+    ]
+    with temporary_output.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(selected)
+    temporary_output.replace(output)
+    audit = {
+        "as_of": cutoff.isoformat(),
+        "lookback_start": start.isoformat(),
+        "source_universe": str(source),
+        "source_members": len(members),
+        "candidate_count": candidate_count,
+        "minimum_sessions": minimum_sessions,
+        "minimum_price": minimum_price,
+        "feed": feed,
+        "exclusions": exclusions,
+    }
+    audit_output.parent.mkdir(parents=True, exist_ok=True)
+    audit_output.write_bytes(orjson.dumps(audit, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+    typer.echo(
+        f"Wrote {len(selected):,} liquidity-ranked candidates to {output}; audit: {audit_output}"
+    )
+
+
+@app.command("build-dataset")
+def build_dataset(
+    checkpoint: Annotated[Path, typer.Option(help="Authenticated dated checkpoint directory.")],
+    output_dir: Annotated[Path, typer.Option()] = Path("data/processed"),
+    embedding_cache: Annotated[Path, typer.Option()] = Path("data/artifacts/embedding-cache"),
+    embedder: Annotated[
+        str,
+        typer.Option(help="Use 'finbert' for research or 'hashing' only for offline verification."),
+    ] = "finbert",
+    device: Annotated[
+        str,
+        typer.Option(help="FinBERT device: 'cpu', 'mps', or 'auto'."),
+    ] = "cpu",
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
+) -> None:
+    """Convert an authenticated checkpoint into a point-in-time model dataset."""
+    config = ResearchConfig.from_yaml(config_path)
+    text_encoder: FinBertEmbedder | HashingTextEmbedder
+    if embedder == "finbert":
+        if device not in {"cpu", "mps", "auto"}:
+            raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
+        text_encoder = FinBertEmbedder(
+            model_name=config.features.embedding_model,
+            chunk_tokens=config.features.embedding_chunk_tokens,
+            max_chunks=config.features.embedding_max_chunks,
+            device=None if device == "auto" else device,
+        )
+    elif embedder == "hashing":
+        text_encoder = HashingTextEmbedder()
+    else:
+        raise typer.BadParameter("embedder must be 'finbert' or 'hashing'")
+    dataset = build_research_dataset(
+        checkpoint,
+        config=config,
+        embedder=text_encoder,
+        embedding_cache=embedding_cache,
+    )
+    destination = dataset.save(output_dir)
+    typer.echo(
+        f"Wrote {len(dataset.events):,} audited filing events to {destination}; "
+        f"{int(np.isfinite(dataset.target).sum()):,} labels are mature."
+    )
+
+
+@app.command("run-study")
+def run_study(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
+    output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/studies"),
+    open_locked_test: Annotated[
+        bool,
+        typer.Option(
+            "--open-locked-test",
+            help="Explicitly evaluate the frozen test period after validation selection.",
+        ),
+    ] = False,
+    publish_snapshot: Annotated[Path | None, typer.Option()] = None,
+    report_output: Annotated[Path, typer.Option()] = Path(
+        "reports/authenticated_research_report.md"
+    ),
+    validation_report_output: Annotated[Path, typer.Option()] = Path(
+        "reports/validation_report.md"
+    ),
+    max_epochs: Annotated[int | None, typer.Option(min=1)] = None,
+    maximum_candidates: Annotated[int | None, typer.Option(min=1)] = None,
+    force: Annotated[
+        bool,
+        typer.Option(help="Acknowledge and overwrite an existing locked-test artifact."),
+    ] = False,
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
+) -> None:
+    """Select models on validation and optionally open the locked test exactly once."""
+    config = ResearchConfig.from_yaml(config_path)
+    dataset = ResearchDataset.load(dataset_dir)
+    artifact_directory = output_dir / dataset.dataset_id
+    locked_path = artifact_directory / "locked-test.json"
+    if open_locked_test and locked_path.exists() and not force:
+        raise typer.BadParameter(
+            f"Locked test already exists at {locked_path}; pass --force only with an audit reason"
+        )
+    if publish_snapshot is not None and not open_locked_test:
+        raise typer.BadParameter("--publish-snapshot requires --open-locked-test")
+    result = run_authenticated_experiment(
+        dataset,
+        config=config,
+        evaluate_locked_test=open_locked_test,
+        max_epochs=max_epochs,
+        maximum_candidates=maximum_candidates,
+    )
+    destination = save_study_artifacts(
+        result,
+        output_dir,
+        config=config,
+        force=force,
+    )
+    typer.echo(
+        f"Selected {result.selected_candidate.name} on validation "
+        f"(RMSE={result.validation_metrics['rmse']:.6f}); artifacts: {destination}"
+    )
+    write_validation_report(
+        dataset,
+        result,
+        validation_report_output,
+        config=config,
+    )
+    typer.echo(f"Wrote validation report to {validation_report_output}")
+    if open_locked_test:
+        write_research_report(
+            dataset,
+            result,
+            report_output,
+            config=config,
+        )
+        typer.echo(f"Wrote locked research report to {report_output}")
+        if publish_snapshot is not None:
+            build_authenticated_snapshot(
+                dataset,
+                result,
+                publish_snapshot,
+                config=config,
+            )
+            typer.echo(f"Published authenticated snapshot to {publish_snapshot}")
+
+
+@app.command("walk-forward-study")
+def walk_forward_study(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
+    output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/walk-forward"),
+    report_output: Annotated[Path, typer.Option()] = Path("reports/walk_forward_report.md"),
+    max_epochs: Annotated[int | None, typer.Option(min=1)] = None,
+    maximum_candidates: Annotated[int | None, typer.Option(min=1)] = None,
+    device: Annotated[
+        str,
+        typer.Option(help="Training device: 'cpu', 'mps', or 'auto'."),
+    ] = "cpu",
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
+) -> None:
+    """Choose a stable champion on expanding pre-test folds; never score the test."""
+    if device not in {"cpu", "mps", "auto"}:
+        raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
+    config = ResearchConfig.from_yaml(config_path)
+    dataset = ResearchDataset.load(dataset_dir)
+    result = run_walk_forward_study(
+        dataset,
+        config=config,
+        max_epochs=max_epochs,
+        maximum_candidates=maximum_candidates,
+        device=None if device == "auto" else device,
+    )
+    destination = save_walk_forward_artifacts(
+        result,
+        output_dir,
+        config=config,
+    )
+    selection_payload = orjson.loads((destination / "walk-forward-selection.json").read_bytes())
+    write_walk_forward_report(
+        dataset,
+        result,
+        report_output,
+        config=config,
+        selection_hash=str(selection_payload["selection_hash"]),
+    )
+    typer.echo(
+        f"Selected {result.champion.name} by worst-fold rank IC "
+        f"({result.champion.worst_fold_rank_ic:.6f}); artifacts: {destination}"
+    )
+    typer.echo(f"Wrote {report_output}; locked-test predictions: 0")
+
+
+@app.command("open-frozen-test")
+def open_frozen_test(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
+    selection_path: Annotated[
+        Path, typer.Option("--selection", help="Frozen walk-forward selection JSON.")
+    ],
+    confirmation_hash: Annotated[
+        str,
+        typer.Option(
+            "--confirm-selection-hash",
+            help="Exact SHA-256 recorded in the reviewed selection artifact.",
+        ),
+    ],
+    output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/frozen-studies"),
+    report_output: Annotated[Path, typer.Option()] = Path(
+        "reports/authenticated_research_report.md"
+    ),
+    publish_snapshot: Annotated[Path | None, typer.Option()] = None,
+    device: Annotated[
+        str,
+        typer.Option(help="Training device: 'cpu', 'mps', or 'auto'."),
+    ] = "cpu",
+) -> None:
+    """Open the locked period once using only the hash-confirmed frozen champion."""
+    if device not in {"cpu", "mps", "auto"}:
+        raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
+    dataset = ResearchDataset.load(dataset_dir)
+    locked_path = output_dir / dataset.dataset_id / "locked-test.json"
+    if locked_path.exists():
+        raise typer.BadParameter(
+            f"Locked test already exists at {locked_path}; refusing to evaluate again"
+        )
+    result = evaluate_frozen_selection(
+        dataset,
+        selection_path,
+        confirmation_hash=confirmation_hash,
+        device=None if device == "auto" else device,
+    )
+    destination = save_frozen_evaluation(result, output_dir)
+    write_frozen_evaluation_report(dataset, result, report_output)
+    if publish_snapshot is not None:
+        build_frozen_snapshot(dataset, result, publish_snapshot)
+    typer.echo(
+        f"Opened the locked test once for {result.champion_name}: "
+        f"rank IC={result.test_metrics['rank_ic']:.6f}, "
+        f"RMSE={result.test_metrics['rmse']:.6f}; artifacts: {destination}"
+    )
+    typer.echo(f"Wrote immutable locked report to {report_output}")
+    if publish_snapshot is not None:
+        typer.echo(f"Published authenticated snapshot to {publish_snapshot}")
 
 
 @app.command()
@@ -151,6 +582,22 @@ def serve(
     import uvicorn
 
     uvicorn.run("edgar_moe.api.app:app", host=host, port=port, reload=False)
+
+
+def _require_source_configuration(settings: RuntimeSettings, *, needs_fred: bool) -> None:
+    missing: list[str] = []
+    if not settings.alpaca_api_key:
+        missing.append("ALPACA_API_KEY")
+    if not settings.alpaca_api_secret:
+        missing.append("ALPACA_API_SECRET")
+    if needs_fred and not settings.fred_api_key:
+        missing.append("FRED_API_KEY")
+    if not settings.sec_user_agent or "example.com" in settings.sec_user_agent.lower():
+        missing.append("SEC_USER_AGENT with your real contact email")
+    if missing:
+        raise typer.BadParameter(
+            "Missing authenticated-source configuration: " + ", ".join(missing)
+        )
 
 
 if __name__ == "__main__":

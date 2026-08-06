@@ -74,7 +74,8 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
     events = pd.DataFrame(event_rows).sort_values("accepted_at").reset_index(drop=True)
     accepted_utc = pd.to_datetime(events["accepted_at"], utc=True)
     events = events.loc[
-        accepted_utc <= DEMO_AS_OF.tz_localize("UTC") + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
+        accepted_utc
+        <= DEMO_AS_OF.tz_localize("UTC") + pd.Timedelta(days=1) - pd.Timedelta(microseconds=1)
     ].reset_index(drop=True)
     rows = len(events)
 
@@ -82,8 +83,10 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
     fundamental = generator.normal(size=(rows, 10))
     market = generator.normal(size=(rows, 8))
     date_index = pd.to_datetime(events["accepted_at"], utc=True)
-    year_phase = ((date_index.dt.dayofyear.to_numpy() / 365.25) * 2 * np.pi)
-    crisis = ((date_index.dt.year.to_numpy() == 2020) | (date_index.dt.year.to_numpy() == 2022)).astype(float)
+    year_phase = (date_index.dt.dayofyear.to_numpy() / 365.25) * 2 * np.pi
+    crisis = (
+        (date_index.dt.year.to_numpy() == 2020) | (date_index.dt.year.to_numpy() == 2022)
+    ).astype(float)
     regime = np.column_stack(
         [
             np.sin(year_phase),
@@ -93,7 +96,9 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
         ]
     )
     text_signal = 0.8 * text[:, 0] - 0.45 * text[:, 1] + 0.25 * text[:, 2]
-    fundamental_signal = 0.7 * fundamental[:, 0] + 0.5 * fundamental[:, 1] - 0.35 * fundamental[:, 3]
+    fundamental_signal = (
+        0.7 * fundamental[:, 0] + 0.5 * fundamental[:, 1] - 0.35 * fundamental[:, 3]
+    )
     market_signal = 0.9 * market[:, 0] - 0.55 * market[:, 2] + 0.2 * market[:, 4]
     logits = np.column_stack(
         [
@@ -117,9 +122,8 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
 
     daily_dates = pd.bdate_range("2025-01-01", DEMO_AS_OF)
     market_returns = generator.normal(0.00025, 0.009, len(daily_dates))
-    return_matrix = (
-        market_returns[:, None] * betas[None, :]
-        + generator.normal(0, 0.011, size=(len(daily_dates), securities))
+    return_matrix = market_returns[:, None] * betas[None, :] + generator.normal(
+        0, 0.011, size=(len(daily_dates), securities)
     )
     date_positions = {pd.Timestamp(day).normalize(): index for index, day in enumerate(daily_dates)}
     test_mask = pd.to_datetime(events["entry_date"]) >= pd.Timestamp("2025-01-01")
@@ -206,6 +210,7 @@ def build_demo_snapshot(
         hidden_dim=config.model.hidden_dim,
         expert_dim=config.model.expert_dim,
         dropout=config.model.dropout,
+        gate_strength=config.model.gate_strength,
     )
     trained = train_moe(
         model,
@@ -213,6 +218,9 @@ def build_demo_snapshot(
         validation_values,
         learning_rate=config.model.learning_rate,
         weight_decay=config.model.weight_decay,
+        entropy_regularization=config.model.entropy_regularization,
+        expert_auxiliary_weight=config.model.expert_auxiliary_weight,
+        correlation_regularization=config.model.correlation_regularization,
         batch_size=config.model.batch_size,
         max_epochs=max_epochs,
         patience=min(config.model.patience, 7),
@@ -224,13 +232,20 @@ def build_demo_snapshot(
     validation_scores = validation_prediction.scores * target_std + target_mean
     test_scores = test_prediction.scores * target_std + target_mean
     validation_metrics = predictive_metrics(dataset.target[validation], validation_scores)
-    test_horizon_dates = pd.to_datetime(dataset.events.loc[test, "exit_date"]).reset_index(drop=True)
+    test_horizon_dates = pd.to_datetime(dataset.events.loc[test, "exit_date"]).reset_index(
+        drop=True
+    )
     matured_test = (test_horizon_dates <= DEMO_AS_OF).to_numpy()
     test_targets = dataset.target[test]
     test_metrics = predictive_metrics(test_targets[matured_test], test_scores[matured_test])
 
     baseline_train = np.column_stack(
-        [train_values["text"], train_values["fundamental"], train_values["market"], train_values["regime"]]
+        [
+            train_values["text"],
+            train_values["fundamental"],
+            train_values["market"],
+            train_values["regime"],
+        ]
     )
     baseline_validation = np.column_stack(
         [
@@ -342,7 +357,10 @@ def build_demo_snapshot(
     latest = pd.concat([latest.nlargest(6, "score"), latest.nsmallest(6, "score")]).drop_duplicates(
         "event_id"
     )
-    latest_records = [_event_record(row, pending=True) for _, row in latest.sort_values("score", ascending=False).iterrows()]
+    latest_records = [
+        _event_record(row, pending=True)
+        for _, row in latest.sort_values("score", ascending=False).iterrows()
+    ]
     explorer = pd.concat(
         [
             test_events.nlargest(80, "score"),

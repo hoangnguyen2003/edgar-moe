@@ -42,15 +42,24 @@ def run_event_backtest(
     signals["exit_date"] = pd.to_datetime(signals["exit_date"]).dt.normalize()
     returns["date"] = pd.to_datetime(returns["date"]).dt.normalize()
     return_matrix = returns.pivot(index="date", columns="security_id", values="return").sort_index()
+    has_return_components = {"overnight_return", "intraday_return"}.issubset(returns.columns)
+    overnight_matrix = (
+        returns.pivot(index="date", columns="security_id", values="overnight_return").sort_index()
+        if has_return_components
+        else None
+    )
+    intraday_matrix = (
+        returns.pivot(index="date", columns="security_id", values="intraday_return").sort_index()
+        if has_return_components
+        else None
+    )
 
     previous_weights: dict[str, float] = {}
     daily_rows: list[dict[str, float | pd.Timestamp | str]] = []
     position_rows: list[dict[str, float | pd.Timestamp | str]] = []
     equity = 1.0
     for day, return_row in return_matrix.iterrows():
-        active = signals.loc[
-            (signals["entry_date"] <= day) & (signals["exit_date"] >= day)
-        ].copy()
+        active = signals.loc[(signals["entry_date"] <= day) & (signals["exit_date"] >= day)].copy()
         if not active.empty:
             active = active.sort_values("entry_date").groupby("security_id", as_index=False).tail(1)
             weights, diagnostics = allocate_neutral(
@@ -73,10 +82,25 @@ def run_event_backtest(
             abs(current_weights.get(security, 0.0) - previous_weights.get(security, 0.0))
             for security in securities
         )
-        gross_return = sum(
-            weight * float(return_row.get(security, 0.0) or 0.0)
-            for security, weight in current_weights.items()
-        )
+        if overnight_matrix is not None and intraday_matrix is not None:
+            overnight_row = overnight_matrix.loc[day]
+            intraday_row = intraday_matrix.loc[day]
+            overnight_return = sum(
+                weight * _finite_return(overnight_row.get(security, 0.0))
+                for security, weight in previous_weights.items()
+            )
+            intraday_return = sum(
+                weight * _finite_return(intraday_row.get(security, 0.0))
+                for security, weight in current_weights.items()
+            )
+            gross_return = overnight_return + intraday_return
+        else:
+            overnight_return = 0.0
+            intraday_return = sum(
+                weight * _finite_return(return_row.get(security, 0.0))
+                for security, weight in current_weights.items()
+            )
+            gross_return = intraday_return
         transaction_cost = turnover * config.base_transaction_cost_bps / 10_000
         short_exposure = sum(abs(weight) for weight in current_weights.values() if weight < 0)
         borrow_cost = short_exposure * config.base_borrow_cost_annual / 252
@@ -86,6 +110,8 @@ def run_event_backtest(
             {
                 "date": day,
                 "gross_return": gross_return,
+                "overnight_return": overnight_return,
+                "intraday_return": intraday_return,
                 "transaction_cost": transaction_cost,
                 "borrow_cost": borrow_cost,
                 "net_return": net_return,
@@ -113,3 +139,8 @@ def run_event_backtest(
                     )
         previous_weights = current_weights
     return BacktestResult(pd.DataFrame(daily_rows), pd.DataFrame(position_rows))
+
+
+def _finite_return(value: object) -> float:
+    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
+    return float(numeric) if pd.notna(numeric) else 0.0

@@ -3,7 +3,12 @@ import pandas as pd
 import pytest
 
 from edgar_moe.features.tabular import build_fundamental_ratios, cross_sectional_winsorize
-from edgar_moe.features.text import HashingTextEmbedder, filing_change_features
+from edgar_moe.features.text import (
+    HashingTextEmbedder,
+    _canonical_sentiment_indices,
+    _uniform_chunk_sample,
+    filing_change_features,
+)
 
 
 def test_fundamental_ratios_are_missing_aware() -> None:
@@ -42,9 +47,21 @@ def test_hashing_text_features_are_deterministic_and_comparable() -> None:
     previous = embedder.encode("Weak decline and adverse loss risk.")
 
     assert current.token_count == 7
+    assert embedder.cache_identity == "hashing-blake2b-v1:dimensions=16"
     assert np.allclose(current.embedding, repeated.embedding)
     assert current.sentiment[-1] > current.sentiment[0]
     changes = filing_change_features(current, previous)
     assert changes["has_prior_filing"] == 1
     assert changes["embedding_cosine_change"] > 0
     assert filing_change_features(current, None)["has_prior_filing"] == 0
+
+
+def test_finbert_labels_are_reordered_to_project_convention() -> None:
+    assert _canonical_sentiment_indices({0: "positive", 1: "negative", 2: "neutral"}) == (1, 2, 0)
+
+
+def test_finbert_uniformly_samples_long_filings() -> None:
+    chunks = [[index] for index in range(20)]
+    sampled = _uniform_chunk_sample(chunks, 4)
+
+    assert sampled == [[0], [6], [13], [19]]

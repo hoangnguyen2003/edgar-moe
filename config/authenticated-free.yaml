@@ -1,0 +1,7 @@
+# Tractable authenticated study for free IEX data and local/free-notebook compute.
+data:
+  universe_size: 300
+
+features:
+  embedding_chunk_tokens: 510
+  embedding_max_chunks: 4

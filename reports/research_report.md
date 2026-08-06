@@ -1,10 +1,10 @@
 # EDGAR-MoE Research Report
 
-> Status: software implementation complete; authenticated market study pending. Do not replace placeholders until the locked-test run is finalized.
+> Status: authenticated collection, frozen-FinBERT feature construction, and expanding-window model development are complete for dataset `research-2026-07-31-3553e7ad78dd`. The frozen pre-test champion is a 75% fundamental / 25% MoE hybrid; the locked test remains sealed. See `reports/walk_forward_report.md`. Do not replace the placeholders below unless the hash-confirmed locked-test protocol is explicitly opened and finalized.
 
 ## Abstract
 
-This study tests whether the predictive usefulness of SEC filing text, XBRL fundamentals, and market features changes with observable market regimes. It compares a regime-gated Mixture-of-Experts model against linear, tree-based, single-modality, and static-fusion baselines under chronological validation and a locked out-of-sample test.
+This study tests whether the predictive usefulness of SEC filing text, XBRL fundamentals, and market features changes with observable market regimes. It compares standalone experts and fusion models with a fundamental-anchored regime-gated Mixture-of-Experts model under expanding chronological development folds and a locked out-of-sample test.
 
 ## Hypotheses
 
@@ -14,18 +14,18 @@ This study tests whether the predictive usefulness of SEC filing text, XBRL fund
 
 ## Dataset and attrition
 
-Populate after the authenticated build:
+Authenticated build summary (the final locked report should reproduce these values):
 
-- Retrieved filings: `[N]`
-- Mapped issuers: `[N]`
-- Mapping exclusions: `[N and reasons]`
-- Parsing failures: `[N and reasons]`
-- Label censoring: `[N and reasons]`
-- Final events by split: `[development / validation / test]`
+- Retrieved periodic filings: `17,998`
+- Included issuers: `421`
+- Included audited events: `5,961`
+- Text parsing failures: `663`
+- Immature labels: `133`
+- Final events by split: `1,647 / 2,331 / 1,794`
 
 ## Experimental protocol
 
-Record the immutable dataset ID, Git commit, configuration digest, seeds, hardware, model artifact digest, and the time at which the locked test was opened.
+The dataset ID, source-manifest hash, configuration, seed, 33-candidate comparison, fold metrics, and frozen selection SHA-256 are recorded in `reports/walk_forward_report.md`. The selected hybrid achieved pre-test rank IC 0.0617 in 2023 and 0.0648 in 2024 across 2,305 out-of-fold events. These are iterative development results, not independent confirmation. Record the Git commit, hardware, locked artifact hash, and opening timestamp only if `open-frozen-test` is explicitly run with the reviewed selection hash.
 
 ## Results
 

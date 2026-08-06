@@ -7,6 +7,8 @@ from edgar_moe.data.refresh import (
     UniverseMember,
     collect_authenticated_data,
     load_universe_csv,
+    refresh_authenticated_to_disk,
+    verify_authenticated_bundle,
     write_authenticated_bundle,
 )
 
@@ -22,6 +24,15 @@ class FakeSec:
 class FakeMarket:
     async def daily_bars(self, symbols, start, end, feed="iex") -> dict:
         return {symbol: [{"t": start.isoformat(), "c": 100.0}] for symbol in symbols}
+
+    async def corporate_actions(self, start, end, symbols=None) -> dict:
+        return {
+            "corporate_actions": {
+                "cash_dividends": [
+                    {"symbol": symbol, "ex_date": start.isoformat()} for symbol in (symbols or [])
+                ]
+            }
+        }
 
 
 class FakeMacro:
@@ -76,3 +87,97 @@ async def test_authenticated_refresh_rejects_future_end_date() -> None:
             as_of=date(2026, 7, 31),
             macro_series=["VIXCLS"],
         )
+
+
+class StreamingFakeSec(FakeSec):
+    async def complete_submissions(self, cik: str, start=None) -> dict:
+        return {
+            "cik": cik,
+            "name": "Example Inc.",
+            "sic": "3571",
+            "filings": {
+                "recent": {
+                    "accessionNumber": ["0000000001-25-000001"],
+                    "acceptanceDateTime": ["2025-05-01T17:30:00-04:00"],
+                    "reportDate": ["2025-03-31"],
+                    "form": ["10-Q"],
+                    "primaryDocument": ["example.htm"],
+                }
+            },
+        }
+
+    async def filing_html(self, cik: str, accession: str, primary_document: str) -> str:
+        return "<html><body>Item 1A. Risk Factors " + "risk " * 100 + " Item 1B.</body></html>"
+
+
+async def test_streaming_refresh_downloads_filings_and_verifies_hashes(tmp_path) -> None:
+    destination = await refresh_authenticated_to_disk(
+        StreamingFakeSec(),
+        FakeMarket(),
+        FakeMacro(),
+        [UniverseMember(cik="1", symbol="TEST")],
+        output_root=tmp_path,
+        start=date(2025, 1, 1),
+        end=date(2025, 12, 31),
+        as_of=date(2025, 12, 31),
+        macro_series=["VIXCLS"],
+    )
+
+    manifest = verify_authenticated_bundle(destination)
+    filing_index = orjson.loads((destination / "sec" / "filing-index.json").read_bytes())
+
+    assert manifest.row_counts["filing_documents"] == 1
+    assert manifest.row_counts["daily_bars"] == 2
+    assert manifest.row_counts["corporate_actions"] == 2
+    assert filing_index[0]["status"] == "ok"
+    assert (destination / filing_index[0]["localPath"]).exists()
+
+
+class EligibilitySec(StreamingFakeSec):
+    async def complete_submissions(self, cik: str, start=None) -> dict:
+        if cik.endswith("2"):
+            return {
+                "cik": cik,
+                "name": "Foreign Example",
+                "sic": "9999",
+                "filings": {
+                    "recent": {
+                        "accessionNumber": ["0000000002-25-000001"],
+                        "acceptanceDateTime": ["2025-05-01T17:30:00-04:00"],
+                        "reportDate": ["2024-12-31"],
+                        "form": ["20-F"],
+                        "primaryDocument": ["foreign.htm"],
+                    }
+                },
+            }
+        return await super().complete_submissions(cik, start)
+
+
+async def test_streaming_refresh_excludes_issuers_without_periodic_forms(tmp_path) -> None:
+    destination = await refresh_authenticated_to_disk(
+        EligibilitySec(),
+        FakeMarket(),
+        FakeMacro(),
+        [
+            UniverseMember(cik="1", symbol="TEST"),
+            UniverseMember(cik="2", symbol="FOREIGN"),
+        ],
+        output_root=tmp_path,
+        start=date(2025, 1, 1),
+        end=date(2025, 12, 31),
+        as_of=date(2025, 12, 31),
+        macro_series=["VIXCLS"],
+    )
+
+    manifest = verify_authenticated_bundle(destination)
+    universe = orjson.loads((destination / "universe.json").read_bytes())
+    bar_symbols = {
+        orjson.loads(line)["symbol"]
+        for line in (destination / "market" / "daily-bars.ndjson").read_bytes().splitlines()
+    }
+
+    assert manifest.row_counts["requested_universe_members"] == 2
+    assert manifest.row_counts["universe_members"] == 1
+    assert manifest.row_counts["ineligible_form_issuers"] == 1
+    assert [row["symbol"] for row in universe] == ["TEST"]
+    assert bar_symbols == {"SPY", "TEST"}

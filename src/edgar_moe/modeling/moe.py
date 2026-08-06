@@ -16,7 +16,9 @@ except ImportError:  # pragma: no cover - optional dependency path
 if nn is not None:
 
     class Expert(nn.Module):
-        def __init__(self, input_dim: int, hidden_dim: int, expert_dim: int, dropout: float) -> None:
+        def __init__(
+            self, input_dim: int, hidden_dim: int, expert_dim: int, dropout: float
+        ) -> None:
             super().__init__()
             self.encoder = nn.Sequential(
                 nn.Linear(input_dim, hidden_dim),
@@ -32,7 +34,6 @@ if nn is not None:
             state = self.encoder(values)
             return self.head(state).squeeze(-1), state
 
-
     class RegimeGatedMoE(nn.Module):
         """Missing-aware learned mixture of text, fundamental, and market experts."""
 
@@ -47,14 +48,18 @@ if nn is not None:
             hidden_dim: int = 64,
             expert_dim: int = 32,
             dropout: float = 0.15,
+            gate_strength: float = 1.0,
         ) -> None:
             super().__init__()
+            if gate_strength < 0:
+                raise ValueError("gate_strength must be non-negative")
             self.dimensions = {
                 "text": text_dim,
                 "fundamental": fundamental_dim,
                 "market": market_dim,
                 "regime": regime_dim,
             }
+            self.gate_strength = float(gate_strength)
             self.experts = nn.ModuleDict(
                 {
                     "text": Expert(text_dim, hidden_dim, expert_dim, dropout),
@@ -62,7 +67,10 @@ if nn is not None:
                     "market": Expert(market_dim, hidden_dim, expert_dim, dropout),
                 }
             )
-            self.gate = nn.Sequential(
+            self.static_gate_logits = nn.Parameter(
+                torch.zeros(len(self.modality_names), dtype=torch.float32)
+            )
+            self.regime_gate = nn.Sequential(
                 nn.Linear(regime_dim + len(self.modality_names), hidden_dim),
                 nn.GELU(),
                 nn.Dropout(dropout),
@@ -85,17 +93,22 @@ if nn is not None:
                 predictions.append(prediction)
                 states.append(state)
             expert_predictions = torch.stack(predictions, dim=1)
-            gate_logits = self.gate(torch.cat([regime, missing_mask], dim=1))
+            residual_logits = self.regime_gate(torch.cat([regime, missing_mask], dim=1))
+            gate_logits = self.static_gate_logits.unsqueeze(0) + (
+                self.gate_strength * residual_logits
+            )
             gate_logits = gate_logits.masked_fill(missing_mask.bool(), -1e9)
             all_missing = missing_mask.bool().all(dim=1)
             if all_missing.any():
-                gate_logits[all_missing] = 0.0
+                gate_logits = torch.where(
+                    all_missing.unsqueeze(1), torch.zeros_like(gate_logits), gate_logits
+                )
             weights = torch.softmax(gate_logits, dim=1)
             output = (expert_predictions * weights).sum(dim=1)
             return output, weights, expert_predictions
 
         def export_config(self) -> dict[str, Any]:
-            return dict(self.dimensions)
+            return {**self.dimensions, "gate_strength": self.gate_strength}
 
 else:
 

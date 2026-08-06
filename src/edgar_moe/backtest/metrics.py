@@ -78,7 +78,9 @@ def block_bootstrap_sharpe_interval(
     maximum_start = len(values) - block_size
     for _ in range(samples):
         starts = generator.integers(0, maximum_start + 1, size=blocks_needed)
-        sample = np.concatenate([values[start : start + block_size] for start in starts])[: len(values)]
+        sample = np.concatenate([values[start : start + block_size] for start in starts])[
+            : len(values)
+        ]
         volatility = sample.std(ddof=1)
         sharpes.append(float(sample.mean() / volatility * np.sqrt(252)) if volatility else 0.0)
     low, high = np.quantile(sharpes, [0.025, 0.975])

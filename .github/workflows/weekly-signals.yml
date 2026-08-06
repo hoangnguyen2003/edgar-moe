@@ -40,8 +40,9 @@ jobs:
           git push
 
   authenticated-data:
-    if: github.event_name == 'schedule' || inputs.mode == 'authenticated-data'
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'authenticated-data'
     runs-on: ubuntu-latest
+    timeout-minutes: 330
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
@@ -49,6 +50,8 @@ jobs:
           python-version: "3.12"
           enable-cache: true
       - run: uv sync --extra research
+      - name: Require reviewed research universe
+        run: test -f config/universe.research.csv
       - name: Check authenticated-source configuration
         id: credentials
         env:
@@ -70,7 +73,11 @@ jobs:
           ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
-        run: uv run edgar-moe refresh-data --universe config/universe.example.csv
+        run: >-
+          uv run edgar-moe refresh-data
+          --universe config/universe.research.csv
+          --config config/authenticated-free.yaml
+          --resume
       - name: Retain private authenticated bundle
         if: steps.credentials.outputs.available == 'true'
         uses: actions/upload-artifact@v4

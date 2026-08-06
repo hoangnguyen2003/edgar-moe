@@ -80,9 +80,7 @@ class PointInTimeFeatureRow(BaseModel):
     def reject_future_information(self) -> PointInTimeFeatureRow:
         cutoff = ensure_utc(self.event.accepted_at)
         violations = [
-            name
-            for name, item in self.numeric.items()
-            if ensure_utc(item.available_at) > cutoff
+            name for name, item in self.numeric.items() if ensure_utc(item.available_at) > cutoff
         ]
         if ensure_utc(self.text_available_at) > cutoff:
             violations.append("text_embedding")

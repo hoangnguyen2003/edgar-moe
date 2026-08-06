@@ -61,7 +61,11 @@ class AlpacaDataClient:
             "timeframe": "1Day",
             "start": start.isoformat(),
             "end": end.isoformat(),
-            "adjustment": "all",
+            # Split adjustment removes mechanical price jumps while avoiding
+            # dividend/spin-off restatements in historical feature levels.
+            "adjustment": "split",
+            # Resolve symbol changes as they were known at the research cutoff.
+            "asof": end.isoformat(),
             "feed": feed,
             "limit": 10_000,
         }
@@ -87,4 +91,30 @@ class AlpacaDataClient:
         }
         if symbols:
             params["symbols"] = ",".join(symbols)
-        return await self._get(f"{self.BASE_URL}/v1/corporate-actions", params)
+        combined: dict[str, Any] = {}
+        while True:
+            payload = await self._get(f"{self.BASE_URL}/v1/corporate-actions", params)
+            for key, value in payload.items():
+                if key == "next_page_token":
+                    continue
+                _merge_payload_value(combined, key, value)
+            token = payload.get("next_page_token")
+            if not token:
+                break
+            params["page_token"] = token
+        return combined
+
+
+def _merge_payload_value(destination: dict[str, Any], key: str, value: Any) -> None:
+    if isinstance(value, list):
+        destination.setdefault(key, []).extend(value)
+        return
+    if isinstance(value, dict):
+        nested = destination.setdefault(key, {})
+        if not isinstance(nested, dict):
+            raise ValueError(f"Corporate-action response changed type for {key}")
+        for nested_key, nested_value in value.items():
+            _merge_payload_value(nested, nested_key, nested_value)
+        return
+    if key not in destination:
+        destination[key] = value

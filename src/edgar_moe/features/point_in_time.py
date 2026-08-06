@@ -38,9 +38,7 @@ def audit_feature_availability(frame: pd.DataFrame) -> list[AvailabilityViolatio
 def assert_point_in_time(frame: pd.DataFrame) -> None:
     violations = audit_feature_availability(frame)
     if violations:
-        preview = ", ".join(
-            f"{item.event_id}:{item.feature_name}" for item in violations[:5]
-        )
+        preview = ", ".join(f"{item.event_id}:{item.feature_name}" for item in violations[:5])
         raise ValueError(f"Point-in-time audit failed ({len(violations)} rows): {preview}")
 
 
@@ -63,16 +61,16 @@ def build_market_features(
     frame["return_1d"] = grouped["close"].pct_change(fill_method=None)
     frame["dollar_volume"] = frame["close"] * frame["volume"]
     for window in momentum_windows:
-        frame[f"momentum_{window}d"] = grouped["close"].pct_change(
-            periods=window, fill_method=None
-        )
+        frame[f"momentum_{window}d"] = grouped["close"].pct_change(periods=window, fill_method=None)
     for window in volatility_windows:
-        frame[f"volatility_{window}d"] = (
-            grouped["return_1d"].rolling(window, min_periods=window).std().reset_index(level=0, drop=True)
-            * np.sqrt(252)
-        )
+        frame[f"volatility_{window}d"] = grouped["return_1d"].rolling(
+            window, min_periods=window
+        ).std().reset_index(level=0, drop=True) * np.sqrt(252)
     frame["median_dollar_volume_60d"] = (
-        grouped["dollar_volume"].rolling(60, min_periods=20).median().reset_index(level=0, drop=True)
+        grouped["dollar_volume"]
+        .rolling(60, min_periods=20)
+        .median()
+        .reset_index(level=0, drop=True)
     )
 
     benchmark = (
@@ -81,15 +79,17 @@ def build_market_features(
         .drop_duplicates("date")
         .sort_values("date")
     )
-    benchmark["benchmark_variance"] = benchmark["benchmark_return"].rolling(
-        beta_window, min_periods=63
-    ).var()
+    benchmark["benchmark_variance"] = (
+        benchmark["benchmark_return"].rolling(beta_window, min_periods=63).var()
+    )
     frame = frame.merge(benchmark, on="date", how="left", validate="many_to_one")
     rolling_cov = (
         frame.groupby("symbol", sort=False)
         .apply(
-            lambda group: group["return_1d"].rolling(beta_window, min_periods=63).cov(
-                group["benchmark_return"]
+            lambda group: (
+                group["return_1d"]
+                .rolling(beta_window, min_periods=63)
+                .cov(group["benchmark_return"])
             ),
             include_groups=False,
         )
@@ -109,16 +109,16 @@ def build_dynamic_universe(
     """Select liquid securities monthly using only data available at selection time."""
     frame = market_features.copy().sort_values(["symbol", "date"])
     frame["history_sessions"] = frame.groupby("symbol").cumcount() + 1
-    frame["month"] = frame["date"].dt.to_period("M")
+    frame["month"] = frame["date"].dt.tz_localize(None).dt.to_period("M")
     month_end_rows = frame.groupby(["symbol", "month"], observed=True).tail(1)
     eligible = month_end_rows.loc[
         (month_end_rows["close"] >= minimum_price)
         & (month_end_rows["history_sessions"] >= minimum_history_sessions)
         & month_end_rows["median_dollar_volume_60d"].notna()
     ].copy()
-    eligible["liquidity_rank"] = eligible.groupby("month")[
-        "median_dollar_volume_60d"
-    ].rank(method="first", ascending=False)
+    eligible["liquidity_rank"] = eligible.groupby("month")["median_dollar_volume_60d"].rank(
+        method="first", ascending=False
+    )
     eligible = eligible.loc[eligible["liquidity_rank"] <= universe_size]
     return eligible[["month", "symbol", "liquidity_rank", "median_dollar_volume_60d"]]
 

@@ -40,11 +40,15 @@ def train_moe(
     *,
     learning_rate: float = 1e-3,
     weight_decay: float = 1e-4,
+    entropy_regularization: float = 0.002,
+    expert_auxiliary_weight: float = 0.0,
+    correlation_regularization: float = 0.0,
     batch_size: int = 256,
     max_epochs: int = 80,
     patience: int = 10,
     seed: int = 42,
     device: str | None = None,
+    restore_best: bool = True,
 ) -> TrainingResult:
     if torch is None:
         raise RuntimeError("Install research dependencies with `uv sync --extra research`")
@@ -52,9 +56,7 @@ def train_moe(
     if device is None:
         device = "mps" if torch.backends.mps.is_available() else "cpu"
     model = model.to(device)
-    optimizer = torch.optim.AdamW(
-        model.parameters(), lr=learning_rate, weight_decay=weight_decay
-    )
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
     loss_function = torch.nn.HuberLoss(delta=1.0)
     row_count = len(train["target"])
     train_losses: list[float] = []
@@ -72,7 +74,7 @@ def train_moe(
         for start in range(0, row_count, batch_size):
             indices = order[start : start + batch_size]
             optimizer.zero_grad(set_to_none=True)
-            output, weights, _ = model(
+            output, weights, expert_predictions = model(
                 _tensor(train["text"][indices], device),
                 _tensor(train["fundamental"][indices], device),
                 _tensor(train["market"][indices], device),
@@ -83,7 +85,22 @@ def train_moe(
             prediction_loss = loss_function(output, target)
             # Mild entropy regularization prevents gate collapse while preserving specialization.
             entropy = -(weights.clamp_min(1e-8) * weights.clamp_min(1e-8).log()).sum(dim=1).mean()
-            loss = prediction_loss - 0.002 * entropy
+            available = 1.0 - _tensor(train["missing_mask"][indices], device)
+            expert_target = target.unsqueeze(1).expand_as(expert_predictions)
+            expert_losses = torch.nn.functional.huber_loss(
+                expert_predictions,
+                expert_target,
+                reduction="none",
+                delta=1.0,
+            )
+            expert_loss = (expert_losses * available).sum() / available.sum().clamp_min(1.0)
+            correlation_loss = _correlation_loss(output, target)
+            loss = (
+                prediction_loss
+                + expert_auxiliary_weight * expert_loss
+                + correlation_regularization * correlation_loss
+                - entropy_regularization * entropy
+            )
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=5.0)
             optimizer.step()
@@ -113,9 +130,19 @@ def train_moe(
             if stale_epochs >= patience:
                 break
 
-    if best_state is not None:
+    if restore_best and best_state is not None:
         model.load_state_dict(best_state)
     return TrainingResult(model, train_losses, validation_losses, best_epoch)
+
+
+def _correlation_loss(prediction: Any, target: Any) -> Any:
+    prediction_centered = prediction - prediction.mean()
+    target_centered = target - target.mean()
+    denominator = torch.sqrt(
+        prediction_centered.square().sum() * target_centered.square().sum()
+    ).clamp_min(1e-8)
+    correlation = (prediction_centered * target_centered).sum() / denominator
+    return 1.0 - correlation
 
 
 def predict_moe(
