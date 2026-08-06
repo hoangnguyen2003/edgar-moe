@@ -6,6 +6,8 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 
 > Research software only. It does not provide investment advice, assess suitability, or submit orders.
 
+[Live research terminal](https://edgar-moe.vercel.app) · [API docs](https://edgar-moe.vercel.app/api/docs) · [Frozen locked-test report](reports/authenticated_research_report.md)
+
 > **Authenticated-study status (cutoff 2026-07-31):** complete. The frozen 75%
 > fundamental / 25% MoE hybrid achieved rank IC 0.0632 across 2,305 pre-test
 > out-of-fold events and 0.0316 across 1,794 locked 2025–2026 events. Its
