@@ -539,6 +539,15 @@ def open_frozen_test(
         "reports/authenticated_research_report.md"
     ),
     publish_snapshot: Annotated[Path | None, typer.Option()] = None,
+    recovery_note: Annotated[
+        str | None,
+        typer.Option(
+            help=(
+                "Audit disclosure when an earlier opening attempt failed before persistence; "
+                "the note is included in the immutable result hash and report."
+            )
+        ),
+    ] = None,
     device: Annotated[
         str,
         typer.Option(help="Training device: 'cpu', 'mps', or 'auto'."),
@@ -559,8 +568,13 @@ def open_frozen_test(
         confirmation_hash=confirmation_hash,
         device=None if device == "auto" else device,
     )
-    destination = save_frozen_evaluation(result, output_dir)
-    write_frozen_evaluation_report(dataset, result, report_output)
+    destination = save_frozen_evaluation(result, output_dir, recovery_note=recovery_note)
+    write_frozen_evaluation_report(
+        dataset,
+        result,
+        report_output,
+        recovery_note=recovery_note,
+    )
     if publish_snapshot is not None:
         build_frozen_snapshot(dataset, result, publish_snapshot)
     typer.echo(

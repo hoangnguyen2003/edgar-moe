@@ -268,6 +268,8 @@ def evaluate_frozen_selection(
 def save_frozen_evaluation(
     result: FrozenEvaluationResult,
     output_root: str | Path,
+    *,
+    recovery_note: str | None = None,
 ) -> Path:
     """Persist the one-time locked result and refuse every overwrite."""
     output = Path(output_root) / result.dataset_id
@@ -335,6 +337,10 @@ def save_frozen_evaluation(
             name: _finite_mapping(metrics) for name, metrics in result.component_metrics.items()
         },
         "portfolio_scenarios": result.portfolio_scenarios,
+        "opening_audit": {
+            "completed_attempt": 2 if recovery_note else 1,
+            "recovery_note": recovery_note,
+        },
         "model_sha256": sha256_file(model_path),
         "scores_sha256": sha256_file(scores_path),
     }

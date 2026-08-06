@@ -275,9 +275,19 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
         confirmation_hash=str(payload["selection_hash"]),
         device="cpu",
     )
-    frozen_directory = save_frozen_evaluation(frozen, tmp_path / "frozen")
+    recovery_note = "First attempt stopped before persistence because of a timezone mismatch."
+    frozen_directory = save_frozen_evaluation(
+        frozen,
+        tmp_path / "frozen",
+        recovery_note=recovery_note,
+    )
     frozen_report = tmp_path / "frozen.md"
-    write_frozen_evaluation_report(dataset, frozen, frozen_report)
+    write_frozen_evaluation_report(
+        dataset,
+        frozen,
+        frozen_report,
+        recovery_note=recovery_note,
+    )
 
     assert len(frozen.split.train) == 90
     assert len(frozen.split.test) == 30
@@ -286,7 +296,14 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     assert np.isfinite(frozen.test_metrics["rank_ic"])
     assert (frozen_directory / "locked-test.json").exists()
     assert (frozen_directory / "frozen-model.pt").exists()
-    assert "Frozen Locked-Test Report" in frozen_report.read_text(encoding="utf-8")
+    frozen_payload = orjson.loads((frozen_directory / "locked-test.json").read_bytes())
+    assert frozen_payload["opening_audit"] == {
+        "completed_attempt": 2,
+        "recovery_note": recovery_note,
+    }
+    report_text = frozen_report.read_text(encoding="utf-8")
+    assert "Frozen Locked-Test Report" in report_text
+    assert recovery_note in report_text
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         save_frozen_evaluation(frozen, tmp_path / "frozen")
 

@@ -38,9 +38,9 @@ def run_event_backtest(
 
     signals = signals.copy()
     returns = daily_returns.copy()
-    signals["entry_date"] = pd.to_datetime(signals["entry_date"]).dt.normalize()
-    signals["exit_date"] = pd.to_datetime(signals["exit_date"]).dt.normalize()
-    returns["date"] = pd.to_datetime(returns["date"]).dt.normalize()
+    signals["entry_date"] = _normalized_utc_dates(signals["entry_date"])
+    signals["exit_date"] = _normalized_utc_dates(signals["exit_date"])
+    returns["date"] = _normalized_utc_dates(returns["date"])
     return_matrix = returns.pivot(index="date", columns="security_id", values="return").sort_index()
     has_return_components = {"overnight_return", "intraday_return"}.issubset(returns.columns)
     overnight_matrix = (
@@ -144,3 +144,8 @@ def run_event_backtest(
 def _finite_return(value: object) -> float:
     numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
     return float(numeric) if pd.notna(numeric) else 0.0
+
+
+def _normalized_utc_dates(values: pd.Series) -> pd.Series:
+    """Return normalized, timezone-naive UTC dates for safe comparisons."""
+    return pd.to_datetime(values, utc=True).dt.tz_localize(None).dt.normalize()

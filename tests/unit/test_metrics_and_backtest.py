@@ -76,6 +76,44 @@ def test_event_backtest_holds_overlapping_signals() -> None:
     assert result.daily.iloc[-1]["gross_exposure"] == 0
 
 
+def test_event_backtest_normalizes_timezone_aware_signal_dates() -> None:
+    securities = ["short", "low", "high", "long"]
+    signals = pd.DataFrame(
+        {
+            "entry_date": pd.Timestamp("2026-01-02", tz="UTC"),
+            "exit_date": pd.Timestamp("2026-01-05", tz="UTC"),
+            "security_id": securities,
+            "ticker": ["S", "L", "H", "W"],
+            "score": [-2.0, -1.0, 1.0, 2.0],
+            "beta": 0.0,
+            "industry_code": ["a", "b", "c", "d"],
+        }
+    )
+    returns = pd.DataFrame(
+        [
+            {
+                "date": day,
+                "security_id": security,
+                "return": 0.01 if security == "long" else -0.01 if security == "short" else 0.0,
+            }
+            for day in pd.bdate_range("2026-01-02", "2026-01-05")
+            for security in securities
+        ]
+    )
+    config = PortfolioConfig(
+        maximum_name_weight=0.5,
+        maximum_industry_exposure=0.5,
+        base_transaction_cost_bps=0,
+        base_borrow_cost_annual=0,
+    )
+
+    result = run_event_backtest(signals, returns, config)
+
+    assert not result.positions.empty
+    assert result.daily["date"].dt.tz is None
+    assert result.daily.iloc[-1]["gross_return"] == pytest.approx(0.01)
+
+
 def test_backtest_rejects_missing_signal_columns() -> None:
     with pytest.raises(ValueError, match="Missing signal columns"):
         run_event_backtest(pd.DataFrame({"score": [1.0]}), pd.DataFrame())

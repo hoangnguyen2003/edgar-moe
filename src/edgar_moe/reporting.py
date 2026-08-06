@@ -654,6 +654,8 @@ def write_frozen_evaluation_report(
     dataset: ResearchDataset,
     result: FrozenEvaluationResult,
     output: str | Path,
+    *,
+    recovery_note: str | None = None,
 ) -> Path:
     """Write the one-time report tied to a verified walk-forward selection hash."""
     development = result.selection_payload["champion"]["aggregate_metrics"]
@@ -674,6 +676,15 @@ def write_frozen_evaluation_report(
         f"- Frozen champion: {result.champion_name}",
         f"- Final pre-test training events: {len(result.split.train):,}",
         f"- Locked-test events: {len(result.split.test):,}",
+        "",
+        "## Opening audit",
+        "",
+        f"- Completed attempt: {2 if recovery_note else 1}",
+        *(
+            [f"- Recovery disclosure: {recovery_note}"]
+            if recovery_note
+            else ["- Recovery disclosure: None; the first attempt completed successfully."]
+        ),
         "",
         "## Predictive result",
         "",
@@ -723,7 +734,7 @@ def write_frozen_evaluation_report(
         "## Interpretation",
         "",
         (
-            "This is the sole locked evaluation tied to the recorded selection hash. "
+            "This is the only completed locked evaluation tied to the recorded selection hash. "
             "It must be reported whether positive, negative, or inconclusive."
         ),
         "",
