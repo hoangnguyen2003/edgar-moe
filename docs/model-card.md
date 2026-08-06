@@ -30,7 +30,9 @@ Huber regression loss on training-period standardized returns, with auxiliary Hu
 
 Prediction: RMSE, MAE, rank information coefficient, and directional diagnostics.
 
-Selection uses expanding folds: train through 2022 / validate 2023, then train through 2023 / validate 2024. The primary criterion maximizes the worst fold's rank IC, followed by validation-count-weighted rank IC and pooled out-of-fold RMSE. The selected hybrid recorded rank IC 0.0617 and 0.0648 in the two folds. Because the anchored family was introduced during pre-test iteration, those figures are development evidence rather than independent confirmation; the 2025+ test remains sealed.
+Selection uses expanding folds: train through 2022 / validate 2023, then train through 2023 / validate 2024. The primary criterion maximizes the worst fold's rank IC, followed by validation-count-weighted rank IC and pooled out-of-fold RMSE. The selected hybrid recorded rank IC 0.0617 and 0.0648 in the two folds. Because the anchored family was introduced during pre-test iteration, those figures are development evidence rather than independent confirmation.
+
+The hash-frozen champion was subsequently evaluated on 1,794 events accepted from 2025 through the 2026-07-31 cutoff. Locked-test rank IC was 0.0316, RMSE was 0.0916, and MAE was 0.0658. At the base 10 bps cost assumption the portfolio returned -3.28% annualized with 5.18% volatility, a -0.63 Sharpe (95% block-bootstrap interval [-2.31, 0.94]), and a -12.05% maximum drawdown. The predictive ordering remained weakly positive, but the economic hypothesis was unsupported.
 
 Portfolio: annualized return and volatility, Sharpe, Sortino, maximum drawdown, turnover, hit rate, factor exposures, Newey–West t-statistic, and block-bootstrap confidence intervals.
 

@@ -6,13 +6,13 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 
 > Research software only. It does not provide investment advice, assess suitability, or submit orders.
 
-> **Authenticated-study status (cutoff 2026-07-31):** the source checkpoint,
-> frozen-FinBERT dataset, and pre-test walk-forward study are complete. A 75%
-> fundamental / 25% MoE hybrid achieved rank IC 0.0617 in 2023 and 0.0648 in
-> 2024 across 2,305 out-of-fold events. These are development results: the
-> 2025–2026 locked test remains sealed, its prediction count is zero, and no
-> authenticated performance snapshot is published. See the
-> [walk-forward report](reports/walk_forward_report.md).
+> **Authenticated-study status (cutoff 2026-07-31):** complete. The frozen 75%
+> fundamental / 25% MoE hybrid achieved rank IC 0.0632 across 2,305 pre-test
+> out-of-fold events and 0.0316 across 1,794 locked 2025–2026 events. Its
+> cost-aware portfolio was not profitable: at 10 bps, annualized return was
+> -3.28% and Sharpe was -0.63 (95% block-bootstrap interval [-2.31, 0.94]). The
+> positive predictive relationship weakened out of sample and did not survive
+> implementation costs. See the [locked report](reports/authenticated_research_report.md).
 
 ## What makes this a quant project
 
@@ -20,7 +20,7 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 - Development, validation, and locked-test periods are chronological and separated by an embargo.
 - The portfolio constrains gross, net, beta, industry, and individual-name exposure.
 - Results include baselines, ablations, transaction costs, borrow costs, confidence intervals, and failed hypotheses.
-- The bundled demo is explicitly synthetic. Real conclusions are produced only by the authenticated point-in-time pipeline.
+- The bundled public snapshot is derived from the frozen authenticated study; the optional synthetic generator remains explicitly labeled for software verification.
 
 ## Architecture
 
@@ -53,7 +53,6 @@ Requirements: Python 3.12, Node.js 24 LTS, `uv`, and npm.
 cp .env.example .env
 uv sync --extra research --extra dev
 npm --prefix apps/web install
-uv run edgar-moe demo --epochs 12
 ```
 
 Start the API and web app in separate terminals:
@@ -63,9 +62,14 @@ uv run edgar-moe serve
 npm --prefix apps/web run dev
 ```
 
-Open `http://localhost:5173`. API documentation is at `http://localhost:8000/api/docs`.
+Open `http://localhost:5173`. API documentation is at `http://localhost:8000/api/docs`. The committed snapshot is the authenticated frozen result, so serving the app requires no data credentials.
 
-The demo trains the real PyTorch MoE against a deterministic synthetic dataset with genuine regime-dependent modality effects. It verifies the complete model → backtest → export → API → UI path without suggesting that synthetic performance is market evidence.
+To verify the model → backtest → export path without touching the authenticated snapshot, write a deterministic synthetic fixture to a separate file:
+
+```bash
+uv run edgar-moe demo --epochs 12 --output /tmp/edgar-moe-synthetic.json
+uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
+```
 
 ## Deployment
 
@@ -133,17 +137,18 @@ uv run edgar-moe open-frozen-test \
 `build-dataset` constructs a prior-month liquid universe, attaches an availability record to every feature, rejects look-ahead violations, caches text embeddings, and censors labels that have not matured. `walk-forward-study` refits preprocessing and models independently in expanding 2023 and 2024 folds, compares 33 standalone and anchored candidates, and freezes the champion by worst-fold rank IC. It writes content-hashed out-of-fold predictions and never transforms, predicts, or evaluates the locked rows.
 
 The earlier single-window diagnostic remains in `reports/validation_report.md`;
-the walk-forward report supersedes it for model selection. Test-period scores,
-gate weights, expert predictions, and comparison predictions remain absent.
-`open-frozen-test` verifies the selection and OOF-prediction hashes before it can
-access locked outcomes, refits only the frozen champion, and refuses to overwrite
-an existing locked artifact. It has not been run on the authenticated dataset.
+the walk-forward report supersedes it for model selection. `open-frozen-test`
+verified the selection and OOF-prediction hashes before accessing locked outcomes,
+refit only the frozen champion, and wrote a non-overwritable result. The public
+snapshot and final report disclose the complete outcome, including the negative
+cost-aware portfolio result and the recovery audit for an initial pre-persistence
+timezone failure.
 
 The five-company `config/universe.example.csv` and `--embedder hashing` are connectivity fixtures only. They must never be used to claim market performance. A credible run uses the reviewed broad universe and the configured FinBERT encoder.
 
 Raw, processed, and model artifacts are ignored by Git. Public snapshots contain derived research output only; they do not redistribute source market data. No database is required for the deployed site because it reads one immutable, versioned snapshot; local research tables remain Parquet/NPZ files with hash manifests.
 
-The scheduled GitHub job refreshes only the transparent synthetic demo. The authenticated checkpoint job is manual, requires all four repository secrets plus a reviewed `config/universe.csv`, and retains its private bundle for seven days. It never opens the locked test or publishes signals automatically.
+The scheduled GitHub job builds and validates a temporary synthetic fixture without changing the frozen public snapshot. The authenticated checkpoint job is manual, requires all four repository secrets plus a reviewed `config/universe.csv`, and retains its private bundle for seven days. It never opens the locked test or publishes signals automatically.
 
 ## Repository map
 

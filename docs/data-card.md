@@ -36,9 +36,9 @@ The dataset builder stores the source timestamp beside every feature and rejects
 - Split-adjusted daily bars exclude dividend total return and cannot model intraday slippage.
 - Public snapshots contain derived values only and are not a redistribution of raw market data.
 
-## Bundled fixture
+## Public snapshot and synthetic fixture
 
-`data/demo/snapshot.json` is generated from synthetic companies and explicitly marked `synthetic_fixture`. It validates software behavior only.
+`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
 
 ## Authenticated refresh bundle
 

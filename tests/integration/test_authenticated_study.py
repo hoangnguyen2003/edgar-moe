@@ -281,12 +281,14 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
         tmp_path / "frozen",
         recovery_note=recovery_note,
     )
+    frozen_payload = orjson.loads((frozen_directory / "locked-test.json").read_bytes())
     frozen_report = tmp_path / "frozen.md"
     write_frozen_evaluation_report(
         dataset,
         frozen,
         frozen_report,
         recovery_note=recovery_note,
+        locked_test_hash=str(frozen_payload["locked_test_hash"]),
     )
 
     assert len(frozen.split.train) == 90
@@ -296,7 +298,6 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     assert np.isfinite(frozen.test_metrics["rank_ic"])
     assert (frozen_directory / "locked-test.json").exists()
     assert (frozen_directory / "frozen-model.pt").exists()
-    frozen_payload = orjson.loads((frozen_directory / "locked-test.json").read_bytes())
     assert frozen_payload["opening_audit"] == {
         "completed_attempt": 2,
         "recovery_note": recovery_note,
@@ -304,6 +305,7 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     report_text = frozen_report.read_text(encoding="utf-8")
     assert "Frozen Locked-Test Report" in report_text
     assert recovery_note in report_text
+    assert str(frozen_payload["locked_test_hash"]) in report_text
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         save_frozen_evaluation(frozen, tmp_path / "frozen")
 
@@ -327,7 +329,13 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
         device="cpu",
     )
     frozen_snapshot_path = tmp_path / "frozen-snapshot.json"
-    build_frozen_snapshot(dataset, anchored_frozen, frozen_snapshot_path)
+    build_frozen_snapshot(
+        dataset,
+        anchored_frozen,
+        frozen_snapshot_path,
+        locked_test_hash="f" * 64,
+        recovery_note=recovery_note,
+    )
     frozen_snapshot = SnapshotRepository(frozen_snapshot_path).load()
     SummaryResponse.model_validate(
         {
@@ -338,3 +346,6 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
         }
     )
     EventRecord.model_validate(frozen_snapshot["events"][0])
+    assert frozen_snapshot["metadata"]["selection_hash"] == anchored_frozen.selection_hash
+    assert frozen_snapshot["metadata"]["locked_test_hash"] == "f" * 64
+    assert frozen_snapshot["metadata"]["opening_attempt"] == 2

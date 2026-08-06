@@ -26,7 +26,7 @@ export function OverviewPage() {
         </div>
         <div className="status-strip">
           <span className={`status-pill status-pill--${data.metadata.data_mode === "synthetic_fixture" ? "demo" : "live"}`}>
-            {data.metadata.data_mode === "synthetic_fixture" ? "Synthetic verification snapshot" : "Point-in-time research data"}
+            {data.metadata.data_mode === "synthetic_fixture" ? "Synthetic verification snapshot" : "Authenticated locked-test snapshot"}
           </span>
           <span>As of {data.metadata.as_of}</span>
           <span>{freshness.data?.message ?? "Checking data freshness…"}</span>

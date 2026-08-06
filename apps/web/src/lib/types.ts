@@ -6,6 +6,10 @@ export interface SnapshotMetadata {
   data_mode: string;
   research_only: boolean;
   disclaimer: string;
+  selection_hash?: string | null;
+  locked_test_hash?: string | null;
+  opening_attempt?: number | null;
+  recovery_note?: string | null;
 }
 
 export interface ResearchSummary {

@@ -13,7 +13,7 @@ export function PortfolioPage() {
   const data = curve.data!;
   return (
     <div className="page">
-      <header className="page-header page-header--inline"><div><span>Cost-aware backtest</span><h1>Alpha after friction.</h1><p>Overlapping 20-session signals are rebalanced under gross, net, beta, industry, and name constraints.</p></div><div className="segmented" aria-label="Transaction cost scenario">{[10, 25, 50].map((value) => <button className={cost === value ? "active" : ""} onClick={() => setCost(value)} key={value}>{value} bps</button>)}</div></header>
+      <header className="page-header page-header--inline"><div><span>Cost-aware backtest</span><h1>Returns after friction.</h1><p>Overlapping 20-session signals are rebalanced under gross, net, beta, industry, and name constraints. Negative outcomes remain visible.</p></div><div className="segmented" aria-label="Transaction cost scenario">{[10, 25, 50].map((value) => <button className={cost === value ? "active" : ""} onClick={() => setCost(value)} key={value}>{value} bps</button>)}</div></header>
       <section className="metric-strip">
         <Metric label="Annual return" value={percent(data.metrics.annualized_return)} />
         <Metric label="Volatility" value={percent(data.metrics.annualized_volatility)} />

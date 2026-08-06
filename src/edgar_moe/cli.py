@@ -569,16 +569,25 @@ def open_frozen_test(
         device=None if device == "auto" else device,
     )
     destination = save_frozen_evaluation(result, output_dir, recovery_note=recovery_note)
+    locked_payload = orjson.loads((destination / "locked-test.json").read_bytes())
+    locked_test_hash = str(locked_payload["locked_test_hash"])
     write_frozen_evaluation_report(
         dataset,
         result,
         report_output,
         recovery_note=recovery_note,
+        locked_test_hash=locked_test_hash,
     )
     if publish_snapshot is not None:
-        build_frozen_snapshot(dataset, result, publish_snapshot)
+        build_frozen_snapshot(
+            dataset,
+            result,
+            publish_snapshot,
+            locked_test_hash=locked_test_hash,
+            recovery_note=recovery_note,
+        )
     typer.echo(
-        f"Opened the locked test once for {result.champion_name}: "
+        f"Completed the locked test for {result.champion_name}: "
         f"rank IC={result.test_metrics['rank_ic']:.6f}, "
         f"RMSE={result.test_metrics['rmse']:.6f}; artifacts: {destination}"
     )

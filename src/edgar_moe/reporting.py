@@ -189,6 +189,9 @@ def build_frozen_snapshot(
     dataset: ResearchDataset,
     result: FrozenEvaluationResult,
     output: str | Path,
+    *,
+    locked_test_hash: str | None = None,
+    recovery_note: str | None = None,
 ) -> dict[str, Any]:
     """Export the hash-verified anchored champion through the public API contract."""
     if result.champion_family != "anchored_multimodal":
@@ -274,6 +277,10 @@ def build_frozen_snapshot(
                 "Frozen historical research results; not investment advice and not "
                 "evidence of future performance."
             ),
+            "selection_hash": result.selection_hash,
+            "locked_test_hash": locked_test_hash,
+            "opening_attempt": 2 if recovery_note else 1,
+            "recovery_note": recovery_note,
         },
         "summary": {
             "title": "Fundamental-Anchored Multimodal Filing Alpha",
@@ -329,7 +336,7 @@ def build_frozen_snapshot(
             "next_scheduled_update": None,
             "message": (
                 f"Frozen run {result.run_id}; selection {result.selection_hash}; "
-                "locked artifacts are content hashed."
+                f"locked result {locked_test_hash or 'hash stored with private artifacts'}."
             ),
         },
     }
@@ -656,6 +663,7 @@ def write_frozen_evaluation_report(
     output: str | Path,
     *,
     recovery_note: str | None = None,
+    locked_test_hash: str | None = None,
 ) -> Path:
     """Write the one-time report tied to a verified walk-forward selection hash."""
     development = result.selection_payload["champion"]["aggregate_metrics"]
@@ -673,6 +681,7 @@ def write_frozen_evaluation_report(
         "",
         f"- Dataset ID: `{result.dataset_id}`",
         f"- Walk-forward selection SHA-256: `{result.selection_hash}`",
+        f"- Locked-result SHA-256: `{locked_test_hash or 'not supplied'}`",
         f"- Frozen champion: {result.champion_name}",
         f"- Final pre-test training events: {len(result.split.train):,}",
         f"- Locked-test events: {len(result.split.test):,}",

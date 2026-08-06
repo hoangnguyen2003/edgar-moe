@@ -14,6 +14,10 @@ class SnapshotMetadata(BaseModel):
     data_mode: str
     research_only: bool
     disclaimer: str
+    selection_hash: str | None = None
+    locked_test_hash: str | None = None
+    opening_attempt: int | None = None
+    recovery_note: str | None = None
 
 
 class ResearchSummary(BaseModel):

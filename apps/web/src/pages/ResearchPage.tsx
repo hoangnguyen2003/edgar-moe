@@ -14,7 +14,7 @@ export function ResearchPage() {
   const selected = rows.find((row) => row.selected);
   return (
     <div className="page">
-      <PageHeader kicker="Experiment registry" title="Models earn their place." description="All candidates use identical chronological splits. Hyperparameters are selected on validation data; the final period remains untouched." />
+      <PageHeader kicker="Experiment registry" title="Models earn their place." description="All candidates use identical chronological splits. Selection uses pre-test folds only; the frozen locked result is reported separately." />
       <section className="content-grid content-grid--three">
         <article className="metric-card metric-card--green"><div className="metric-card__top"><span>Selected model</span><CheckCircle2 size={18} /></div><strong className="metric-card__model">{selected?.name}</strong><small>Epoch {selected?.best_epoch ?? "—"}</small></article>
         <article className="metric-card metric-card--blue"><div className="metric-card__top"><span>Validation RMSE</span><GitCompareArrows size={18} /></div><strong>{decimal(selected?.validation_rmse, 4)}</strong><small>Lower is better</small></article>
