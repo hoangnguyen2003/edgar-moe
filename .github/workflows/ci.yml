@@ -39,3 +39,5 @@ jobs:
         working-directory: apps/web
       - run: npm run build
         working-directory: apps/web
+      - run: npm run build:public
+      - run: git diff --exit-code -- public

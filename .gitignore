@@ -13,7 +13,6 @@ build/
 *.egg-info/
 node_modules/
 apps/web/dist/
-public/
 data/raw/
 data/interim/
 data/processed/

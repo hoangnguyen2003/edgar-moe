@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "npm --prefix apps/web run dev",
     "build": "npm --prefix apps/web run build",
+    "build:public": "npm --prefix apps/web run build -- --outDir ../../public --emptyOutDir",
     "test": "npm --prefix apps/web run test",
     "lint": "npm --prefix apps/web run lint"
   },

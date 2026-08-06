@@ -76,11 +76,12 @@ uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
 The public demo deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes the snapshot-backed FastAPI application as one Python Function in Singapore (`sin1`). The function installs only the serving dependencies; the `research` extra remains available for local training and the scheduled GitHub workflow.
 
 ```bash
+npm run build:public
 npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The bundled snapshot requires no database, secrets, or paid data service. Vercel's generated `vercel.app` domain is sufficient; a custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it and rejects source/bundle drift. The snapshot requires no database, secrets, or paid data service. Vercel's generated `vercel.app` domain is sufficient; a custom domain is optional.
 
 ## Authenticated research run
 
