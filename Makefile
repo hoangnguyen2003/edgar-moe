@@ -1,11 +1,11 @@
-.PHONY: install install-research demo api web test lint build
+.PHONY: install install-research demo api web test lint build forward-init forward-status
 
 install:
-	uv sync --extra dev --extra research
+	uv sync --extra dev --extra research --extra operations
 	npm --prefix apps/web install
 
 install-research:
-	uv sync --extra dev --extra research
+	uv sync --extra dev --extra research --extra operations
 
 demo:
 	uv run edgar-moe demo --output data/demo/snapshot.json
@@ -27,3 +27,9 @@ lint:
 
 build:
 	npm --prefix apps/web run build
+
+forward-init:
+	uv run edgar-moe forward-init
+
+forward-status:
+	uv run edgar-moe forward-status

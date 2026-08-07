@@ -17,6 +17,7 @@ data/raw/
 data/interim/
 data/processed/
 data/artifacts/
+data/forward/
 mlruns/
 mlflow.db
 *.duckdb

@@ -4,7 +4,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from edgar_moe.api.app import SpaStaticFiles, app, get_repository
+from edgar_moe.api.app import SpaStaticFiles, app, get_forward_registry, get_repository
 from edgar_moe.api.repository import SnapshotRepository
 
 
@@ -82,6 +82,7 @@ def test_api_contracts(tmp_path: Path) -> None:
     path.write_text(json.dumps(fixture_snapshot()), encoding="utf-8")
     repo = SnapshotRepository(path)
     app.dependency_overrides[get_repository] = lambda: repo
+    app.dependency_overrides[get_forward_registry] = lambda: None
     with TestClient(app) as client:
         assert client.get("/api/v1/health").json()["status"] == "ok"
         assert client.get("/api/v1/summary").status_code == 200
@@ -89,6 +90,10 @@ def test_api_contracts(tmp_path: Path) -> None:
         assert events["total"] == 1
         assert client.get("/api/v1/events/0000000000-26-000001").json()["ticker"] == "TEST"
         assert client.get("/api/v1/equity-curves?cost_bps=17").status_code == 422
+        status = client.get("/api/v1/forward/status")
+        assert status.json()["configured"] is False
+        assert status.headers["x-content-type-options"] == "nosniff"
+        assert status.headers["x-frame-options"] == "DENY"
     app.dependency_overrides.clear()
 
 

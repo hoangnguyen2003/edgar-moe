@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -109,6 +109,13 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_data_dir: Path = Path("data")
     edgar_moe_demo_snapshot: Path = Path("data/demo/snapshot.json")
     edgar_moe_log_level: str = "INFO"
+    edgar_moe_registry_database_url: str = ""
+    edgar_moe_artifact_backend: str = "local"
+    edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")
+    edgar_moe_r2_endpoint_url: str = ""
+    edgar_moe_r2_bucket: str = ""
+    edgar_moe_r2_access_key_id: str = ""
+    edgar_moe_r2_secret_access_key: str = ""
 
 
 @lru_cache

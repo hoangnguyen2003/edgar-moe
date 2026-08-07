@@ -1,0 +1,138 @@
+from __future__ import annotations
+
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+import pytest
+import torch
+
+from edgar_moe.data.storage import sha256_file
+from edgar_moe.features.dataset import ResearchDataset
+from edgar_moe.forward.inference import FrozenPredictor
+from edgar_moe.modeling.moe import RegimeGatedMoE
+
+
+def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(tmp_path: Path) -> None:
+    model = RegimeGatedMoE(
+        text_dim=2,
+        fundamental_dim=2,
+        market_dim=2,
+        regime_dim=1,
+        hidden_dim=4,
+        expert_dim=3,
+        dropout=0.0,
+        gate_strength=0.5,
+    )
+    artifact = tmp_path / "frozen-model.pt"
+    torch.save(
+        {
+            "selection_hash": "a" * 64,
+            "champion_family": "anchored_multimodal",
+            "champion_parameters": {
+                "fundamental_anchor_weight": 0.75,
+                "moe_residual_weight": 0.25,
+            },
+            "target_mean": 0.01,
+            "target_std": 0.1,
+            "moe_state_dict": model.state_dict(),
+            "moe_config": model.export_config(),
+            "preprocessor": {
+                name: {
+                    "medians": np.zeros(2),
+                    "mean": np.zeros(2),
+                    "scale": np.ones(2),
+                }
+                for name in ("text", "fundamental", "market")
+            },
+            "regime": {
+                "medians": np.zeros(1),
+                "mean": np.zeros(1),
+                "scale": np.ones(1),
+            },
+            "fundamental_elastic_net": {
+                "coef": np.array([0.1, -0.2]),
+                "intercept": 0.03,
+            },
+        },
+        artifact,
+    )
+    digest = sha256_file(artifact)
+    predictor = FrozenPredictor.load(
+        artifact,
+        expected_sha256=digest,
+        expected_selection_hash="a" * 64,
+    )
+    forecast_as_of = datetime(2026, 8, 7, 1, 0, tzinfo=UTC)
+    events = pd.DataFrame(
+        [
+            event("event-1", "AAA", forecast_as_of, entry_offset_hours=12),
+            event("event-2", "BBB", forecast_as_of, entry_offset_hours=14),
+            event("event-too-late", "OLD", forecast_as_of, entry_offset_hours=-1),
+        ]
+    )
+    dataset = ResearchDataset(
+        dataset_id="fixture",
+        as_of=date(2026, 8, 7),
+        events=events,
+        modalities={
+            "text": np.array([[0.1, 0.2], [0.3, 0.1], [0.0, 0.0]], dtype=np.float32),
+            "fundamental": np.array(
+                [[0.2, -0.1], [-0.3, 0.4], [0.0, 0.0]], dtype=np.float32
+            ),
+            "market": np.array([[0.4, 0.2], [0.1, -0.2], [0.0, 0.0]], dtype=np.float32),
+        },
+        regime=np.array([[0.2], [-0.1], [0.0]], dtype=np.float32),
+        target=np.array([99.0, 99.0, 99.0]),
+        daily_returns=pd.DataFrame(),
+        availability=pd.DataFrame(
+            {
+                "event_id": ["event-1", "event-2"],
+                "feature_name": ["fixture", "fixture"],
+                "available_at": [forecast_as_of - timedelta(hours=1)] * 2,
+                "prediction_at": [forecast_as_of] * 2,
+            }
+        ),
+        feature_names={},
+        attrition={},
+        source_manifest_hash="b" * 64,
+    )
+
+    batch = predictor.forecast(dataset, as_of=forecast_as_of)
+
+    assert [item.ticker for item in batch.forecasts] == ["AAA", "BBB"]
+    assert sorted(item.rank for item in batch.forecasts) == [0.5, 1.0]
+    assert all(sum(item.expert_weights.values()) == pytest.approx(1.0) for item in batch.forecasts)
+    assert all(item.fundamental_score is not None for item in batch.forecasts)
+    assert batch.checks[0].status == "passed"
+
+    with pytest.raises(ValueError, match="unexpected SHA-256"):
+        FrozenPredictor.load(
+            artifact,
+            expected_sha256="f" * 64,
+            expected_selection_hash="a" * 64,
+        )
+
+
+def event(
+    event_id: str,
+    ticker: str,
+    forecast_as_of: datetime,
+    *,
+    entry_offset_hours: int,
+) -> dict[str, object]:
+    entry_at = forecast_as_of + timedelta(hours=entry_offset_hours)
+    return {
+        "event_id": event_id,
+        "accession_number": f"0000000000-26-{len(event_id):0>6}",
+        "security_id": f"asset-{ticker}",
+        "ticker": ticker,
+        "company_name": f"{ticker} Corp",
+        "form": "10-Q",
+        "accepted_at": forecast_as_of - timedelta(hours=1),
+        "entry_at": entry_at,
+        "entry_date": entry_at.date(),
+        "horizon_at": forecast_as_of + timedelta(days=30),
+        "industry_code": "3571",
+    }

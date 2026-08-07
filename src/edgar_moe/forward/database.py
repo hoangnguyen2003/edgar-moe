@@ -1,0 +1,104 @@
+from __future__ import annotations
+
+from collections.abc import Generator
+from contextlib import contextmanager
+from pathlib import Path
+from typing import Any
+
+from sqlalchemy import Engine, create_engine, event
+from sqlalchemy.engine import make_url
+from sqlalchemy.orm import Session, sessionmaker
+
+from edgar_moe.forward.models import IMMUTABLE_RECORD_TYPES, Base
+
+
+class ImmutableRecordError(RuntimeError):
+    """Raised when append-only registry evidence would be changed or deleted."""
+
+
+@event.listens_for(Session, "before_flush")
+def _protect_immutable_records(
+    session: Session,
+    _flush_context: Any,
+    _instances: Any,
+) -> None:
+    for instance in session.deleted:
+        if isinstance(instance, IMMUTABLE_RECORD_TYPES):
+            raise ImmutableRecordError(
+                f"{type(instance).__name__} is append-only and cannot be deleted"
+            )
+    for instance in session.dirty:
+        if isinstance(instance, IMMUTABLE_RECORD_TYPES) and session.is_modified(
+            instance, include_collections=True
+        ):
+            raise ImmutableRecordError(
+                f"{type(instance).__name__} is append-only and cannot be updated"
+            )
+
+
+class RegistryDatabase:
+    """SQLAlchemy database boundary shared by SQLite development and Postgres production."""
+
+    def __init__(self, database_url: str, *, echo: bool = False) -> None:
+        if not database_url.strip():
+            raise ValueError("A forward registry database URL is required")
+        normalized = normalize_database_url(database_url)
+        _prepare_sqlite_directory(normalized)
+        connect_args: dict[str, object] = {}
+        if normalized.startswith("sqlite"):
+            connect_args["check_same_thread"] = False
+        self.url = normalized
+        self.engine: Engine = create_engine(
+            normalized,
+            echo=echo,
+            pool_pre_ping=True,
+            connect_args=connect_args,
+        )
+        if normalized.startswith("sqlite"):
+            event.listen(self.engine, "connect", _enable_sqlite_foreign_keys)
+        self._sessions = sessionmaker(
+            bind=self.engine,
+            expire_on_commit=False,
+            class_=Session,
+        )
+
+    def create_schema(self) -> None:
+        """Create tables for local development and tests; production uses Alembic."""
+        Base.metadata.create_all(self.engine)
+
+    @contextmanager
+    def session(self) -> Generator[Session, None, None]:
+        database_session = self._sessions()
+        try:
+            yield database_session
+            database_session.commit()
+        except Exception:
+            database_session.rollback()
+            raise
+        finally:
+            database_session.close()
+
+    def dispose(self) -> None:
+        self.engine.dispose()
+
+
+def normalize_database_url(database_url: str) -> str:
+    value = database_url.strip()
+    if value.startswith("postgres://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgres://")
+    if value.startswith("postgresql://"):
+        return "postgresql+psycopg://" + value.removeprefix("postgresql://")
+    return value
+
+
+def _prepare_sqlite_directory(database_url: str) -> None:
+    url = make_url(database_url)
+    if not url.drivername.startswith("sqlite") or not url.database or url.database == ":memory:":
+        return
+    Path(url.database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+
+
+def _enable_sqlite_foreign_keys(dbapi_connection: Any, _connection_record: Any) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()

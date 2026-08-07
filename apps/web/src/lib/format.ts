@@ -15,3 +15,16 @@ export function shortDate(value: string): string {
     new Date(`${value}T00:00:00Z`),
   );
 }
+
+export function dateTime(value: string | null | undefined): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "UTC",
+    timeZoneName: "short",
+  }).format(new Date(value));
+}

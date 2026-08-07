@@ -23,6 +23,7 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 - The portfolio constrains gross, net, beta, industry, and individual-name exposure.
 - Results include baselines, ablations, transaction costs, borrow costs, confidence intervals, and failed hypotheses.
 - The bundled public snapshot is derived from the frozen authenticated study; the optional synthetic generator remains explicitly labeled for software verification.
+- A separate append-only registry records new forecasts before their tradable entry and appends outcomes only after maturity; it never rewrites the frozen v1 study.
 
 ## Architecture
 
@@ -44,6 +45,9 @@ flowchart LR
   SCORE --> PORT[Neutral portfolio]
   PORT --> SNAP[Versioned public snapshot]
   SNAP --> API[FastAPI]
+  ANCHOR --> FWD[Pre-entry forward forecast]
+  FWD --> REG[(Append-only registry)]
+  REG --> API
   API --> WEB[React research terminal]
 ```
 
@@ -53,7 +57,7 @@ Requirements: Python 3.12, Node.js 24 LTS, `uv`, and npm.
 
 ```bash
 cp .env.example .env
-uv sync --extra research --extra dev
+uv sync --extra research --extra dev --extra operations
 npm --prefix apps/web install
 ```
 
@@ -75,7 +79,7 @@ uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
 
 ## Deployment
 
-The public demo deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes the snapshot-backed FastAPI application as one Python Function in Singapore (`sin1`). The function installs only the serving dependencies; the `research` extra remains available for local training and the scheduled GitHub workflow.
+The public terminal deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes FastAPI as one Python Function in Singapore (`sin1`). The frozen v1 snapshot remains stateless. The optional Forward Lab reads from Postgres when `EDGAR_MOE_REGISTRY_DATABASE_URL` is configured; without it, the UI explicitly reports that prospective evidence is not connected.
 
 ```bash
 npm run build:public
@@ -83,7 +87,33 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it and rejects source/bundle drift. The snapshot requires no database, secrets, or paid data service. Vercel's generated `vercel.app` domain is sufficient; a custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it and rejects source/bundle drift. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+
+## Prospective forward testing
+
+The production-quality v2 layer is deliberately separate from the historical locked test. It adds SQLAlchemy models and Alembic migrations for datasets, frozen models, runs, forecasts, labels, quality checks, artifacts, and audit events. Immutable records are protected against update/delete operations, batch writes are idempotent, and evidence artifacts use content-addressed SHA-256 keys locally or in Cloudflare R2.
+
+Initialize a free local SQLite registry and inspect it:
+
+```bash
+uv run edgar-moe forward-init
+uv run edgar-moe forward-status
+```
+
+After building a current point-in-time dataset, run the frozen model. The timestamp defaults to the current UTC clock and cannot be backdated by more than 15 minutes. An event is eligible only when `accepted_at <= forecast_as_of < entry_at < horizon_at`.
+
+```bash
+uv run edgar-moe forward-forecast \
+  --dataset-dir data/processed/<current-dataset-id> \
+  --model-config config/forward.yaml
+
+# After the 20-session outcomes mature and a later dataset is built:
+uv run edgar-moe forward-settle \
+  --dataset-dir data/processed/<later-dataset-id> \
+  --model-config config/forward.yaml
+```
+
+For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: set `EDGAR_MOE_ARTIFACT_BACKEND=r2` plus its endpoint, bucket, and credentials on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
 
@@ -149,7 +179,7 @@ timezone failure.
 
 The five-company `config/universe.example.csv` and `--embedder hashing` are connectivity fixtures only. They must never be used to claim market performance. A credible run uses the reviewed broad universe and the configured FinBERT encoder.
 
-Raw, processed, and model artifacts are ignored by Git. Public snapshots contain derived research output only; they do not redistribute source market data. No database is required for the deployed site because it reads one immutable, versioned snapshot; local research tables remain Parquet/NPZ files with hash manifests.
+Raw, processed, and model artifacts are ignored by Git. Public snapshots contain derived research output only; they do not redistribute source market data. The historical site can still run from one immutable snapshot; Postgres is used only for the optional prospective registry. Local research tables remain Parquet/NPZ files with hash manifests.
 
 The scheduled GitHub job builds and validates a temporary synthetic fixture without changing the frozen public snapshot. The authenticated checkpoint job is manual, requires all four repository secrets plus a reviewed `config/universe.csv`, and retains its private bundle for seven days. It never opens the locked test or publishes signals automatically.
 
@@ -162,6 +192,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 | `src/edgar_moe/modeling` | Fold-only preprocessing, baselines, shrinkage-gated PyTorch MoE, anchored hybrids, deterministic walk-forward selection |
 | `src/edgar_moe/backtest` | Neutral allocation, event-driven accounting, costs, and inference metrics |
 | `src/edgar_moe/api` | Versioned, snapshot-backed FastAPI contract |
+| `src/edgar_moe/forward` | Frozen inference, append-only registry, label settlement, artifact storage, and forward metrics |
 | `apps/web` | React/TypeScript research terminal |
 
 ## Research contract
