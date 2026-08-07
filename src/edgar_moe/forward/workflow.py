@@ -242,10 +242,16 @@ class ForwardWorkflow:
         dataset_dir: str | Path,
     ) -> dict[str, Any]:
         locked = self.model_spec.verify_locked_evidence()
-        training_dataset = ResearchDataset.load(self.model_spec.training_dataset_dir)
-        self.registry.register_dataset(
-            dataset_registration(training_dataset, self.model_spec.training_dataset_dir)
-        )
+        if not self.registry.has_dataset(self.model_spec.training_dataset_id):
+            if not self.model_spec.training_dataset_dir.is_dir():
+                raise FileNotFoundError(
+                    "The frozen training dataset is not registered and its local bundle is "
+                    f"unavailable: {self.model_spec.training_dataset_dir}"
+                )
+            training_dataset = ResearchDataset.load(self.model_spec.training_dataset_dir)
+            self.registry.register_dataset(
+                dataset_registration(training_dataset, self.model_spec.training_dataset_dir)
+            )
         self.registry.register_dataset(dataset_registration(dataset, dataset_dir))
         reference = self.artifact_store.put_file(
             self.model_spec.model_path, logical_name="frozen-model.pt"

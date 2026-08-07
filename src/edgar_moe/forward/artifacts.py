@@ -185,18 +185,105 @@ class R2ArtifactStore:
         return True
 
 
+class MirroredArtifactStore:
+    """Write through to a primary store and a hash-equivalent durable mirror."""
+
+    def __init__(self, primary: ArtifactStore, mirror: ArtifactStore) -> None:
+        self.primary = primary
+        self.mirror = mirror
+
+    def put_file(
+        self,
+        source: str | Path,
+        *,
+        logical_name: str | None = None,
+    ) -> ArtifactReference:
+        primary = self.primary.put_file(source, logical_name=logical_name)
+        mirror = self.mirror.put_file(source, logical_name=logical_name)
+        _require_equivalent_references(primary, mirror)
+        return primary
+
+    def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
+        primary = self.primary.put_bytes(content, logical_name=logical_name)
+        mirror = self.mirror.put_bytes(content, logical_name=logical_name)
+        _require_equivalent_references(primary, mirror)
+        return primary
+
+    def read_bytes(self, reference: ArtifactReference) -> bytes:
+        try:
+            return self.primary.read_bytes(reference)
+        except (FileNotFoundError, OSError):
+            return self.mirror.read_bytes(reference)
+
+
 def artifact_store_from_settings(settings: RuntimeSettings) -> ArtifactStore:
     backend = settings.edgar_moe_artifact_backend.strip().lower()
     if backend == "local":
-        return LocalArtifactStore(settings.edgar_moe_artifact_dir)
+        primary: ArtifactStore = LocalArtifactStore(settings.edgar_moe_artifact_dir)
+    elif backend == "r2":
+        primary = _r2_store(settings)
+    else:
+        raise ValueError(f"Unsupported artifact backend: {backend}")
+
+    mirror_backend = settings.edgar_moe_artifact_mirror_backend.strip().lower()
+    if mirror_backend in {"", "none"}:
+        return primary
+    if mirror_backend != "r2":
+        raise ValueError(f"Unsupported artifact mirror backend: {mirror_backend}")
     if backend == "r2":
-        return R2ArtifactStore(
-            endpoint_url=settings.edgar_moe_r2_endpoint_url,
-            bucket=settings.edgar_moe_r2_bucket,
-            access_key_id=settings.edgar_moe_r2_access_key_id,
-            secret_access_key=settings.edgar_moe_r2_secret_access_key,
+        raise ValueError("Primary and mirror artifact backends must be different")
+    return MirroredArtifactStore(primary, _r2_store(settings))
+
+
+def mirror_local_artifacts(
+    local: LocalArtifactStore,
+    mirror: ArtifactStore,
+) -> dict[str, int]:
+    """Copy every valid local content-addressed object to a verified mirror."""
+    objects = 0
+    bytes_mirrored = 0
+    content_root = local.root / "sha256"
+    if not content_root.exists():
+        return {"objects": 0, "bytes": 0}
+    for source in sorted(path for path in content_root.rglob("*") if path.is_file()):
+        relative = source.relative_to(local.root)
+        parts = relative.parts
+        if len(parts) != 4 or parts[0] != "sha256":
+            raise ValueError(f"Unexpected local artifact path: {relative}")
+        expected_digest = parts[2]
+        digest, size_bytes = _hash_file(source)
+        if len(expected_digest) != 64 or digest != expected_digest:
+            raise ValueError(f"Local artifact path/hash mismatch: {relative}")
+        local_reference = ArtifactReference(
+            uri=f"local://{relative.as_posix()}",
+            sha256=digest,
+            size_bytes=size_bytes,
+            key=relative.as_posix(),
         )
-    raise ValueError(f"Unsupported artifact backend: {backend}")
+        mirror_reference = mirror.put_file(source, logical_name=source.name)
+        _require_equivalent_references(local_reference, mirror_reference)
+        objects += 1
+        bytes_mirrored += size_bytes
+    return {"objects": objects, "bytes": bytes_mirrored}
+
+
+def _r2_store(settings: RuntimeSettings) -> R2ArtifactStore:
+    return R2ArtifactStore(
+        endpoint_url=settings.edgar_moe_r2_endpoint_url,
+        bucket=settings.edgar_moe_r2_bucket,
+        access_key_id=settings.edgar_moe_r2_access_key_id,
+        secret_access_key=settings.edgar_moe_r2_secret_access_key,
+    )
+
+
+def _require_equivalent_references(
+    primary: ArtifactReference,
+    mirror: ArtifactReference,
+) -> None:
+    expected = (primary.sha256, primary.size_bytes, primary.key)
+    observed = (mirror.sha256, mirror.size_bytes, mirror.key)
+    if observed != expected:
+        raise ValueError("Artifact mirror returned a different content identity")
 
 
 def _content_key(digest: str, logical_name: str) -> str:

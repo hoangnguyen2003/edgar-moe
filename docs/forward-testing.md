@@ -54,11 +54,24 @@ Production environment variables:
 
 ```text
 EDGAR_MOE_REGISTRY_DATABASE_URL=postgresql://...?...sslmode=require
-EDGAR_MOE_ARTIFACT_BACKEND=r2
+EDGAR_MOE_ARTIFACT_BACKEND=local
+EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2
 EDGAR_MOE_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
 EDGAR_MOE_R2_BUCKET=<private-bucket>
 EDGAR_MOE_R2_ACCESS_KEY_ID=<scoped-key>
 EDGAR_MOE_R2_SECRET_ACCESS_KEY=<scoped-secret>
+```
+
+Keeping `local` as the primary backend preserves the immutable `local://` model
+identity created by the first production run. The mirror writes the same key,
+digest, and byte count to R2 and fails the run if R2 returns a different content
+identity. Only the private runner needs R2 credentials; do not add them to Vercel.
+
+After first enabling R2, mirror and verify evidence created before the scheduled
+runner existed:
+
+```bash
+uv run edgar-moe forward-mirror-artifacts
 ```
 
 Run migrations from a trusted machine before connecting the API:
@@ -66,6 +79,42 @@ Run migrations from a trusted machine before connecting the API:
 ```bash
 EDGAR_MOE_REGISTRY_DATABASE_URL='<postgres-url>' uv run edgar-moe forward-init
 ```
+
+## Scheduled production runner
+
+`.github/workflows/forward-production.yml` runs at 07:17 UTC Tuesday through
+Saturday. That is after the prior SEC acceptance window in both U.S. daylight and
+standard time and leaves several hours before the next regular NYSE open. The
+workflow uses `scripts/run_forward_cycle.py`; manual dispatch can provide an
+explicit source cutoff for recovery, but the script refuses a date later than the
+current `America/New_York` date.
+
+Configure these GitHub Actions repository secrets before merging the workflow to
+the default branch:
+
+```text
+ALPACA_API_KEY
+ALPACA_API_SECRET
+FRED_API_KEY
+SEC_USER_AGENT
+EDGAR_MOE_REGISTRY_DATABASE_URL
+EDGAR_MOE_R2_ENDPOINT_URL
+EDGAR_MOE_R2_BUCKET
+EDGAR_MOE_R2_ACCESS_KEY_ID
+EDGAR_MOE_R2_SECRET_ACCESS_KEY
+```
+
+Use the pooled Neon URL for the scheduled application connection. Apply Alembic
+migrations separately with a direct URL. Create a private R2 bucket and restrict
+the S3 token to object read/write access for that bucket only.
+
+The job restores a bounded cache containing immutable filing bodies, FinBERT
+embeddings, and Hugging Face weights. Submissions, XBRL facts, daily bars,
+corporate actions, and ALFRED vintages are downloaded fresh on every cycle. The
+reviewed 1.6 MB inference artifact and locked-result binding live under
+`ops/frozen/` and are SHA-256 verified before use; processed training data is not
+committed. A new empty registry must therefore be bootstrapped once from the
+trusted machine so its immutable training-dataset identity is registered.
 
 ## Forecast run
 

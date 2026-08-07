@@ -103,7 +103,9 @@ def prepare_forecast_run(registry_service: ForwardRegistry) -> str:
 
 def test_registry_is_idempotent_and_append_only(tmp_path: Path) -> None:
     database, registry_service = registry(tmp_path)
+    assert not registry_service.has_dataset("dataset-v2")
     run_id = prepare_forecast_run(registry_service)
+    assert registry_service.has_dataset("dataset-v2")
 
     first = registry_service.append_forecasts(run_id, [forecast("event-001")])
     second = registry_service.append_forecasts(run_id, [forecast("event-001")])

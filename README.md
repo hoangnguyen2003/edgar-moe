@@ -93,6 +93,13 @@ The deterministic `public/` bundle is committed because Vercel serves that direc
 
 The production-quality v2 layer is deliberately separate from the historical locked test. It adds SQLAlchemy models and Alembic migrations for datasets, frozen models, runs, forecasts, labels, quality checks, artifacts, and audit events. Immutable records are protected against update/delete operations, batch writes are idempotent, and evidence artifacts use content-addressed SHA-256 keys locally or in Cloudflare R2.
 
+The `Prospective forward cycle` GitHub Actions workflow runs at 07:17 UTC Tuesday
+through Saturday. It resolves the cutoff in `America/New_York`, restores only
+immutable filing/embedding caches, refreshes current source data, rebuilds the
+point-in-time dataset, forecasts before the next NYSE entry, settles any matured
+labels, and mirrors the exact local content identities into private Cloudflare R2.
+It never retrains or reselects the frozen model.
+
 Initialize a free local SQLite registry and inspect it:
 
 ```bash
@@ -113,7 +120,7 @@ uv run edgar-moe forward-settle \
   --model-config config/forward.yaml
 ```
 
-For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: set `EDGAR_MOE_ARTIFACT_BACKEND=r2` plus its endpoint, bucket, and credentials on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
+For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
 

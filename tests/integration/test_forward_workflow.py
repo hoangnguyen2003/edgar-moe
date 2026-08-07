@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
@@ -122,6 +123,7 @@ def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) 
 
     settlement_as_of = forecast_as_of + timedelta(days=31)
     clock[0] = settlement_as_of
+    shutil.rmtree(training_dir)
     settlement_dir = save_dataset(
         tmp_path / "datasets",
         dataset_id="settlement-dataset",

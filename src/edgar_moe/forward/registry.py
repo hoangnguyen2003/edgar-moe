@@ -74,6 +74,11 @@ class ForwardRegistry:
             )
             return record
 
+    def has_dataset(self, dataset_id: str) -> bool:
+        """Return whether an immutable dataset identity is already registered."""
+        with self.database.session() as session:
+            return session.get(DatasetRecord, dataset_id) is not None
+
     def register_model(self, registration: ModelRegistration) -> RegisteredModel:
         payload = registration.model_dump(mode="json")
         payload_hash = _payload_hash(payload)
