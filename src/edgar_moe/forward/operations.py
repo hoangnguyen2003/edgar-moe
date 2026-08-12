@@ -4,11 +4,12 @@ import hashlib
 import json
 import os
 import shutil
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 SOURCE_TIMEZONE = ZoneInfo("America/New_York")
+MINIMUM_FORWARD_LOOKBACK_DAYS = 400
 
 
 def source_cutoff(now: datetime | None = None) -> str:
@@ -30,6 +31,17 @@ def validate_cutoff(cutoff: str, *, now: datetime | None = None) -> str:
             f"{current.isoformat()}"
         )
     return parsed.isoformat()
+
+
+def rolling_source_start(cutoff: str, *, lookback_days: int) -> str:
+    """Return a bounded inference start date with enough history for 252-session features."""
+    if lookback_days < MINIMUM_FORWARD_LOOKBACK_DAYS:
+        raise ValueError(
+            "Forward lookback must be at least "
+            f"{MINIMUM_FORWARD_LOOKBACK_DAYS} days; received {lookback_days}"
+        )
+    parsed = date.fromisoformat(cutoff)
+    return (parsed - timedelta(days=lookback_days)).isoformat()
 
 
 def seed_filing_documents(

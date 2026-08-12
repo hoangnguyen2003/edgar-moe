@@ -165,11 +165,13 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     config.features.beta_window = 63
     config.evaluation.horizon_sessions = 5
 
+    progress: list[str] = []
     dataset = build_research_dataset(
         checkpoint,
         config=config,
         embedder=HashingTextEmbedder(dimensions=16),
         embedding_cache=tmp_path / "embedding-cache",
+        progress=progress.append,
     )
     saved = dataset.save(tmp_path / "processed")
     restored = ResearchDataset.load(saved)
@@ -182,3 +184,15 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     assert restored.dataset_id == dataset.dataset_id
     assert restored.provenance["text_encoder"].startswith("hashing-blake2b-v1")
     assert np.allclose(restored.target, dataset.target)
+    assert progress[0].startswith("Dataset filings 0/3")
+    assert progress[-1].endswith("text cache hits 2; encoded 1")
+
+    cached_progress: list[str] = []
+    build_research_dataset(
+        checkpoint,
+        config=config,
+        embedder=HashingTextEmbedder(dimensions=16),
+        embedding_cache=tmp_path / "embedding-cache",
+        progress=cached_progress.append,
+    )
+    assert cached_progress[-1].endswith("text cache hits 3; encoded 0")

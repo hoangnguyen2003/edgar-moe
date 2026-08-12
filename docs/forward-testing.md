@@ -87,7 +87,12 @@ Saturday. That is after the prior SEC acceptance window in both U.S. daylight an
 standard time and leaves several hours before the next regular NYSE open. The
 workflow uses `scripts/run_forward_cycle.py`; manual dispatch can provide an
 explicit source cutoff for recovery, but the script refuses a date later than the
-current `America/New_York` date.
+current `America/New_York` date. Production refreshes use a 730-day rolling source
+window rather than the 2016-present model-development history. This preserves more
+than the 252 sessions required by the longest market feature, includes prior annual
+filings for text deltas, and keeps frozen-model inference tractable on a free CPU
+runner. `--lookback-days` can increase the window but cannot reduce it below 400
+calendar days.
 
 Configure these GitHub Actions repository secrets before merging the workflow to
 the default branch:
@@ -115,6 +120,15 @@ reviewed 1.6 MB inference artifact and locked-result binding live under
 `ops/frozen/` and are SHA-256 verified before use; processed training data is not
 committed. A new empty registry must therefore be bootstrapped once from the
 trusted machine so its immutable training-dataset identity is registered.
+
+Verified filing bodies are promoted into the reusable cache immediately after the
+source checkpoint passes hash verification. FinBERT then reports filing, cache-hit,
+and newly encoded counts every 250 records and writes every `.npz` entry through an
+atomic rename. The compute command has a 300-minute deadline inside a 360-minute
+job. Whether the command succeeds or reaches that internal deadline, GitHub saves
+the filing, embedding, and Hugging Face caches under a unique run-attempt key. A
+timed-out attempt still fails visibly, but the next attempt restores its completed
+work instead of starting from zero.
 
 ## Forecast run
 

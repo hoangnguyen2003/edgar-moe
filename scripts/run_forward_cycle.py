@@ -9,6 +9,7 @@ from pathlib import Path
 
 from edgar_moe.forward.operations import (
     find_processed_dataset,
+    rolling_source_start,
     seed_filing_documents,
     source_cutoff,
     update_filing_cache,
@@ -37,6 +38,12 @@ def main() -> None:
     parser.add_argument("--research-config", type=Path, default=Path("config/authenticated-free.yaml"))
     parser.add_argument("--model-config", type=Path, default=Path("config/forward.yaml"))
     parser.add_argument("--universe", type=Path, default=Path("config/universe.research.csv"))
+    parser.add_argument(
+        "--lookback-days",
+        type=int,
+        default=730,
+        help="Bounded prospective source window; must retain at least 400 calendar days.",
+    )
     parser.add_argument("--device", choices=("cpu", "mps", "auto"), default="cpu")
     args = parser.parse_args()
 
@@ -44,6 +51,8 @@ def main() -> None:
     if args.print_cutoff:
         print(cutoff)
         return
+    source_start = rolling_source_start(cutoff, lookback_days=args.lookback_days)
+    print(f"Prospective source window: {source_start} through {cutoff}.")
 
     executable = shutil.which("edgar-moe")
     if executable is None:
@@ -65,12 +74,16 @@ def main() -> None:
         str(args.raw_root),
         "--as-of",
         cutoff,
+        "--start",
+        source_start,
         "--end",
         cutoff,
         "--config",
         str(args.research_config),
         "--resume",
     )
+    cached = update_filing_cache(checkpoint=checkpoint, filing_cache=args.filing_cache)
+    print(f"Checkpointed {cached:,} new immutable filing document(s) before embedding.")
     _run(
         executable,
         "build-dataset",
@@ -110,7 +123,6 @@ def main() -> None:
         "--model-config",
         str(args.model_config),
     )
-    cached = update_filing_cache(checkpoint=checkpoint, filing_cache=args.filing_cache)
     _run(executable, "forward-status")
     print(
         json.dumps(

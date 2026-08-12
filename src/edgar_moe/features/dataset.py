@@ -3,6 +3,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -157,6 +158,7 @@ def build_research_dataset(
     config: ResearchConfig | None = None,
     embedder: TextEncoder | None = None,
     embedding_cache: str | Path | None = None,
+    progress: Callable[[str], None] | None = None,
 ) -> ResearchDataset:
     """Build the real point-in-time event matrix from an authenticated checkpoint."""
     config = config or ResearchConfig()
@@ -260,8 +262,22 @@ def build_research_dataset(
     ordered_filings = sorted(
         filing_index, key=lambda item: str(item.get("acceptanceDateTime") or "")
     )
+    text_cache_hits = 0
+    text_cache_misses = 0
+
+    def report_progress(processed: int) -> None:
+        if progress is not None:
+            progress(
+                f"Dataset filings {processed:,}/{len(ordered_filings):,}; "
+                f"included {attrition['included_events']:,}; "
+                f"text cache hits {text_cache_hits:,}; encoded {text_cache_misses:,}"
+            )
+
+    report_progress(0)
     text_dimension: int | None = None
-    for filing in ordered_filings:
+    for filing_number, filing in enumerate(ordered_filings, start=1):
+        if filing_number > 1 and (filing_number - 1) % 250 == 0:
+            report_progress(filing_number - 1)
         if filing.get("status") != "ok" or not filing.get("localPath"):
             attrition["download_failures"] += 1
             continue
@@ -300,7 +316,13 @@ def build_research_dataset(
         )
         text_vector: np.ndarray | None = None
         if section_text:
-            current_text = _cached_text_features(text_encoder, section_text, cache_directory)
+            current_text, cache_hit = _cached_text_features(
+                text_encoder, section_text, cache_directory
+            )
+            if cache_hit:
+                text_cache_hits += 1
+            else:
+                text_cache_misses += 1
             previous = previous_text.get((security_id, str(filing["form"])))
             changes = filing_change_features(current_text, previous)
             text_vector = np.concatenate(
@@ -418,6 +440,8 @@ def build_research_dataset(
         regime_rows.append(regime_vector)
         targets.append(target)
         attrition["included_events"] += 1
+
+    report_progress(len(ordered_filings))
 
     if not event_rows:
         raise ValueError("No filing events survived the authenticated dataset build")
@@ -766,19 +790,22 @@ def _abnormal_return_target(
 
 def _cached_text_features(
     embedder: TextEncoder, text: str, cache_directory: Path | None
-) -> TextFeatures:
+) -> tuple[TextFeatures, bool]:
     identity = embedder.cache_identity
     cache_key = hashlib.sha256(f"{identity}\0{text}".encode()).hexdigest()
     if cache_directory is None:
-        return embedder.encode(text)
+        return embedder.encode(text), False
     cache_path = cache_directory / f"{cache_key}.npz"
     if cache_path.exists():
-        values = np.load(cache_path, allow_pickle=False)
-        return TextFeatures(
-            embedding=values["embedding"],
-            sentiment=values["sentiment"],
-            token_count=int(values["token_count"]),
-        )
+        with np.load(cache_path, allow_pickle=False) as values:
+            return (
+                TextFeatures(
+                    embedding=values["embedding"],
+                    sentiment=values["sentiment"],
+                    token_count=int(values["token_count"]),
+                ),
+                True,
+            )
     features = embedder.encode(text)
     temporary = cache_path.with_suffix(".npz.tmp")
     with temporary.open("wb") as stream:
@@ -789,7 +816,7 @@ def _cached_text_features(
             token_count=np.asarray(features.token_count),
         )
     temporary.replace(cache_path)
-    return features
+    return features, False
 
 
 def _availability_records(

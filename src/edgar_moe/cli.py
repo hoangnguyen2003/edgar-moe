@@ -409,6 +409,7 @@ def build_dataset(
         config=config,
         embedder=text_encoder,
         embedding_cache=embedding_cache,
+        progress=typer.echo,
     )
     destination = dataset.save(output_dir)
     typer.echo(
