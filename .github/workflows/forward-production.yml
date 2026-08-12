@@ -1,0 +1,137 @@
+name: Prospective forward cycle
+
+on:
+  schedule:
+    # 07:17 UTC Tuesday-Saturday is after the prior U.S. SEC acceptance window
+    # and leaves at least six hours before the next regular NYSE open.
+    - cron: "17 7 * * 2-6"
+  workflow_dispatch:
+    inputs:
+      cutoff:
+        description: Optional source-system cutoff (YYYY-MM-DD)
+        required: false
+        type: string
+      device:
+        description: Inference device
+        required: true
+        default: cpu
+        type: choice
+        options: [cpu]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgar-moe-forward-production
+  cancel-in-progress: false
+
+jobs:
+  forecast-and-settle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+      ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+      EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+      EDGAR_MOE_ARTIFACT_BACKEND: local
+      EDGAR_MOE_ARTIFACT_MIRROR_BACKEND: r2
+      EDGAR_MOE_ARTIFACT_DIR: data/forward/artifacts
+      EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+      EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+      EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+      EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+      HF_HOME: ${{ github.workspace }}/data/cache/huggingface
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - name: Install frozen research and operations runtime
+        run: uv sync --extra research --extra operations
+
+      - name: Require every private runtime secret
+        shell: bash
+        run: |
+          required=(
+            ALPACA_API_KEY ALPACA_API_SECRET FRED_API_KEY SEC_USER_AGENT
+            EDGAR_MOE_REGISTRY_DATABASE_URL EDGAR_MOE_R2_ENDPOINT_URL
+            EDGAR_MOE_R2_BUCKET EDGAR_MOE_R2_ACCESS_KEY_ID
+            EDGAR_MOE_R2_SECRET_ACCESS_KEY
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if (( ${#missing[@]} )); then
+            printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}" >&2
+            exit 1
+          fi
+
+      - name: Resolve the U.S. source cutoff
+        id: cutoff
+        shell: bash
+        env:
+          REQUESTED_CUTOFF: ${{ inputs.cutoff }}
+        run: |
+          if [[ -n "$REQUESTED_CUTOFF" ]]; then
+            cutoff="$(uv run python scripts/run_forward_cycle.py --print-cutoff --cutoff "$REQUESTED_CUTOFF")"
+          else
+            cutoff="$(uv run python scripts/run_forward_cycle.py --print-cutoff)"
+          fi
+          echo "date=$cutoff" >> "$GITHUB_OUTPUT"
+          echo "Source cutoff: $cutoff"
+
+      - name: Restore immutable filing and embedding caches
+        id: runtime-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/cache/forward-filings
+            data/artifacts/embedding-cache-finbert
+            ${{ env.HF_HOME }}
+          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
+          restore-keys: |
+            forward-runtime-${{ runner.os }}-
+
+      - name: Restore and verify the reviewed frozen model
+        shell: bash
+        run: |
+          sha256sum -c ops/frozen/SHA256SUMS
+          destination=data/artifacts/frozen-studies/research-2026-07-31-3553e7ad78dd
+          mkdir -p "$destination"
+          install -m 0644 ops/frozen/frozen-model.pt "$destination/frozen-model.pt"
+          install -m 0644 ops/frozen/locked-test.json "$destination/locked-test.json"
+
+      - name: Refresh, forecast, and settle append-only evidence
+        run: >-
+          uv run python scripts/run_forward_cycle.py
+          --cutoff "${{ steps.cutoff.outputs.date }}"
+          --device "${{ inputs.device || 'cpu' }}"
+
+      - name: Save verified filing and embedding caches
+        if: success()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            data/cache/forward-filings
+            data/artifacts/embedding-cache-finbert
+            ${{ env.HF_HOME }}
+          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-${{ github.run_id }}-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
+
+      - name: Publish registry summary
+        if: success()
+        shell: bash
+        run: |
+          {
+            echo '## Prospective registry status'
+            echo '```json'
+            uv run edgar-moe forward-status
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

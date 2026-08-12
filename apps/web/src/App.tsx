@@ -9,6 +9,7 @@ const PortfolioPage = lazy(() => import("./pages/PortfolioPage").then((module) =
 const FilingsPage = lazy(() => import("./pages/FilingsPage").then((module) => ({ default: module.FilingsPage })));
 const SignalsPage = lazy(() => import("./pages/SignalsPage").then((module) => ({ default: module.SignalsPage })));
 const MethodologyPage = lazy(() => import("./pages/MethodologyPage").then((module) => ({ default: module.MethodologyPage })));
+const ForwardPage = lazy(() => import("./pages/ForwardPage").then((module) => ({ default: module.ForwardPage })));
 
 const routes = {
   "/": OverviewPage,
@@ -16,6 +17,7 @@ const routes = {
   "/portfolio": PortfolioPage,
   "/filings": FilingsPage,
   "/signals": SignalsPage,
+  "/forward": ForwardPage,
   "/methodology": MethodologyPage,
 };
 

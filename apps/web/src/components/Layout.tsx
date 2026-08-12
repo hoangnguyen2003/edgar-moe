@@ -6,6 +6,7 @@ import {
   FileSearch,
   FlaskConical,
   Menu,
+  Orbit,
   RadioTower,
   X,
 } from "lucide-react";
@@ -19,6 +20,7 @@ const navigation = [
   { to: "/portfolio", label: "Portfolio", icon: BarChart3 },
   { to: "/filings", label: "Filing explorer", icon: FileSearch },
   { to: "/signals", label: "Weekly signals", icon: RadioTower },
+  { to: "/forward", label: "Forward lab", icon: Orbit },
   { to: "/methodology", label: "Methodology", icon: BookOpenText },
 ];
 

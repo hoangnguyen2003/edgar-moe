@@ -3,9 +3,11 @@ from __future__ import annotations
 import asyncio
 import csv
 import json
-from datetime import date, timedelta
+import subprocess
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
 import numpy as np
 import orjson
@@ -23,6 +25,16 @@ from edgar_moe.data.security_master import build_security_master
 from edgar_moe.data.universe import screen_liquid_universe
 from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
 from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
+from edgar_moe.forward.artifacts import (
+    LocalArtifactStore,
+    R2ArtifactStore,
+    artifact_store_from_settings,
+    mirror_local_artifacts,
+)
+from edgar_moe.forward.config import FrozenModelSpec
+from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
+from edgar_moe.forward.registry import ForwardRegistry
+from edgar_moe.forward.workflow import ForwardWorkflow
 from edgar_moe.modeling.experiment import (
     run_authenticated_experiment,
     save_study_artifacts,
@@ -229,7 +241,11 @@ def refresh_data(
     config = ResearchConfig.from_yaml(config_path)
     _require_source_configuration(settings, needs_fred=True)
     members = load_universe_csv(universe)
-    as_of_date = date.fromisoformat(as_of) if as_of else date.today()
+    as_of_date = (
+        date.fromisoformat(as_of)
+        if as_of
+        else datetime.now(ZoneInfo(config.project.timezone)).date()
+    )
     end_date = date.fromisoformat(end) if end else as_of_date
     start_date = date.fromisoformat(start)
     series = [item.strip() for item in macro_series.split(",") if item.strip()]
@@ -288,7 +304,11 @@ def screen_universe(
     settings = runtime_settings()
     _require_source_configuration(settings, needs_fred=False)
     members = load_universe_csv(source)
-    cutoff = date.fromisoformat(as_of) if as_of else date.today() - timedelta(days=1)
+    cutoff = (
+        date.fromisoformat(as_of)
+        if as_of
+        else datetime.now(ZoneInfo("America/New_York")).date() - timedelta(days=1)
+    )
     start = cutoff - timedelta(days=lookback_days)
 
     async def run() -> dict[str, list[dict[str, Any]]]:
@@ -596,6 +616,147 @@ def open_frozen_test(
         typer.echo(f"Published authenticated snapshot to {publish_snapshot}")
 
 
+@app.command("forward-init")
+def forward_init(
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            envvar="EDGAR_MOE_REGISTRY_DATABASE_URL",
+            help="SQLite or Postgres registry URL.",
+        ),
+    ] = None,
+) -> None:
+    """Apply all forward-registry migrations to a local or production database."""
+    from alembic import command
+    from alembic.config import Config
+
+    resolved_url = _forward_database_url(runtime_settings(), database_url)
+    bootstrap_database = RegistryDatabase(resolved_url)
+    bootstrap_database.dispose()
+    alembic_config = Config("alembic.ini")
+    alembic_config.set_main_option("sqlalchemy.url", normalize_database_url(resolved_url))
+    command.upgrade(alembic_config, "head")
+    typer.echo(f"Forward registry is at schema head ({_safe_database_label(resolved_url)}).")
+
+
+@app.command("forward-mirror-artifacts")
+def forward_mirror_artifacts() -> None:
+    """Copy and verify all local content-addressed evidence in Cloudflare R2."""
+    settings = runtime_settings()
+    local = LocalArtifactStore(settings.edgar_moe_artifact_dir)
+    mirror = R2ArtifactStore(
+        endpoint_url=settings.edgar_moe_r2_endpoint_url,
+        bucket=settings.edgar_moe_r2_bucket,
+        access_key_id=settings.edgar_moe_r2_access_key_id,
+        secret_access_key=settings.edgar_moe_r2_secret_access_key,
+    )
+    result = mirror_local_artifacts(local, mirror)
+    typer.echo(
+        f"Mirrored and verified {result['objects']:,} artifact(s) "
+        f"({result['bytes']:,} bytes) in R2."
+    )
+
+
+@app.command("forward-forecast")
+def forward_forecast(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed point-in-time dataset directory.")],
+    as_of: Annotated[
+        str | None,
+        typer.Option(help="Timezone-aware recording timestamp; defaults to the current UTC clock."),
+    ] = None,
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
+        "config/forward.yaml"
+    ),
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    device: Annotated[str, typer.Option(help="Inference device: cpu, mps, or auto.")] = "cpu",
+) -> None:
+    """Score only not-yet-tradable events with the immutable frozen model."""
+    if device not in {"cpu", "mps", "auto"}:
+        raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
+    settings = runtime_settings()
+    database = RegistryDatabase(_forward_database_url(settings, database_url))
+    registry = ForwardRegistry(database, actor="edgar-moe-cli")
+    workflow = ForwardWorkflow(
+        registry,
+        artifact_store_from_settings(settings),
+        FrozenModelSpec.from_yaml(model_config),
+    )
+    try:
+        result = workflow.forecast(
+            dataset_dir,
+            as_of=_parse_timestamp(as_of),
+            code_revision=_code_revision(),
+            device="cpu" if device == "auto" else device,
+        )
+    finally:
+        database.dispose()
+    typer.echo(
+        f"Forward run {result.run_id} {result.status}: "
+        f"{result.counts['forecasts_inserted']} new forecast(s); evidence {result.artifact_uri}"
+    )
+
+
+@app.command("forward-settle")
+def forward_settle(
+    dataset_dir: Annotated[
+        Path, typer.Option(help="Later processed dataset containing newly matured labels.")
+    ],
+    as_of: Annotated[
+        str | None,
+        typer.Option(help="Timezone-aware settlement cutoff; defaults to the current UTC clock."),
+    ] = None,
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
+        "config/forward.yaml"
+    ),
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+) -> None:
+    """Append matured outcomes without changing any recorded forecast."""
+    settings = runtime_settings()
+    database = RegistryDatabase(_forward_database_url(settings, database_url))
+    registry = ForwardRegistry(database, actor="edgar-moe-cli")
+    workflow = ForwardWorkflow(
+        registry,
+        artifact_store_from_settings(settings),
+        FrozenModelSpec.from_yaml(model_config),
+    )
+    try:
+        result = workflow.settle(
+            dataset_dir,
+            as_of=_parse_timestamp(as_of),
+            code_revision=_code_revision(),
+        )
+    finally:
+        database.dispose()
+    typer.echo(
+        f"Settlement run {result.run_id} {result.status}: "
+        f"{result.counts['labels_inserted']} new label(s); evidence {result.artifact_uri}"
+    )
+
+
+@app.command("forward-status")
+def forward_status(
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+) -> None:
+    """Print registry coverage and prospective performance as JSON."""
+    database = RegistryDatabase(_forward_database_url(runtime_settings(), database_url))
+    registry = ForwardRegistry(database, actor="edgar-moe-cli")
+    try:
+        payload = {"status": registry.status(), "performance": registry.performance()}
+    finally:
+        database.dispose()
+    typer.echo(orjson.dumps(payload, option=orjson.OPT_INDENT_2).decode())
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
@@ -621,6 +782,46 @@ def _require_source_configuration(settings: RuntimeSettings, *, needs_fred: bool
         raise typer.BadParameter(
             "Missing authenticated-source configuration: " + ", ".join(missing)
         )
+
+
+def _forward_database_url(settings: RuntimeSettings, override: str | None) -> str:
+    return (
+        override
+        or settings.edgar_moe_registry_database_url
+        or "sqlite:///data/forward/registry.sqlite3"
+    )
+
+
+def _parse_timestamp(value: str | None) -> datetime:
+    if value is None:
+        return datetime.now(UTC)
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise typer.BadParameter("Timestamp must be ISO-8601") from error
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise typer.BadParameter("Timestamp must include a timezone")
+    return parsed.astimezone(UTC)
+
+
+def _code_revision() -> str:
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--verify", "HEAD"],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
+def _safe_database_label(database_url: str) -> str:
+    if database_url.startswith("sqlite"):
+        return database_url
+    return "configured Postgres database"
 
 
 if __name__ == "__main__":

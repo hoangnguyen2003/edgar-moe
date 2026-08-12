@@ -122,6 +122,84 @@ class HealthResponse(BaseModel):
     as_of: date | None
 
 
+class ForwardStatusResponse(BaseModel):
+    configured: bool
+    available: bool
+    model_count: int = 0
+    run_count: int = 0
+    forecast_count: int = 0
+    matured_count: int = 0
+    pending_count: int = 0
+    latest_successful_run_at: datetime | None = None
+    message: str
+
+
+class ForwardRunRecord(BaseModel):
+    run_id: str
+    run_type: Literal["forecast", "settlement", "backfill", "verification"]
+    status: Literal["running", "succeeded", "failed"]
+    dataset_id: str | None
+    model_id: str | None
+    as_of: datetime
+    code_revision: str
+    result_counts: dict[str, int]
+    error_message: str | None
+    started_at: datetime
+    finished_at: datetime | None
+
+
+class ForwardForecastRecord(BaseModel):
+    forecast_id: str
+    run_id: str
+    model_id: str
+    event_id: str
+    accession_number: str
+    ticker: str
+    company_name: str
+    form: str
+    accepted_at: datetime
+    entry_at: datetime
+    entry_date: date
+    horizon_at: datetime
+    forecast_as_of: datetime
+    score: float
+    rank: float = Field(ge=0, le=1)
+    fundamental_score: float | None
+    expert_weights: dict[str, float]
+    realized_abnormal_return: float | None
+    label_recorded_at: datetime | None
+
+
+class ForwardForecastPage(BaseModel):
+    items: list[ForwardForecastRecord]
+    total: int
+    offset: int
+    limit: int
+
+
+class ForwardPerformanceResponse(BaseModel):
+    model_id: str | None
+    forecast_count: int
+    matured_count: int
+    pending_count: int
+    coverage: float = Field(ge=0, le=1)
+    rank_ic: float | None
+    rmse: float | None
+    mae: float | None
+    directional_accuracy: float | None
+
+
+class ForwardQualityRecord(BaseModel):
+    check_id: str
+    run_id: str
+    name: str
+    status: Literal["passed", "warning", "failed"]
+    observed_value: float | None
+    threshold: float | None
+    details: dict[str, Any]
+    created_at: datetime
+
+
 class ErrorResponse(BaseModel):
     detail: str
     context: dict[str, Any] | None = None

@@ -1,0 +1,113 @@
+{
+  "champion_family": "anchored_multimodal",
+  "champion_name": "Fundamental-Anchored MoE h=64 dropout=0.10 gate=1.00 moe=0.25",
+  "champion_parameters": {
+    "best_epoch_2023": 1,
+    "best_epoch_2024": 0,
+    "dropout": 0.1,
+    "fundamental_anchor_weight": 0.75,
+    "gate_strength": 1.0,
+    "hidden_dim": 64,
+    "moe_residual_weight": 0.25
+  },
+  "components": {
+    "Elastic Net": {
+      "mae": 0.06615637261256475,
+      "rank_ic": -0.023766539869180946,
+      "rmse": 0.09196560594618435
+    },
+    "Equal-Weight Expert Ensemble": {
+      "mae": 0.06579123622494341,
+      "rank_ic": 0.06583273081135636,
+      "rmse": 0.09165022300616646
+    },
+    "Frozen MoE Component": {
+      "mae": 0.06604617924480968,
+      "rank_ic": 0.026754170491989356,
+      "rmse": 0.0917850333407577
+    },
+    "Fundamental-Only Expert": {
+      "mae": 0.06580786692299818,
+      "rank_ic": 0.02154524859381911,
+      "rmse": 0.09165695513920027
+    },
+    "Gradient-Boosted Tabular": {
+      "mae": 0.07030639811720837,
+      "rank_ic": -0.061115198760633226,
+      "rmse": 0.09656004152337555
+    },
+    "Market-Only Expert": {
+      "mae": 0.06577175925197834,
+      "rank_ic": 0.08299147047685189,
+      "rmse": 0.09163994880571251
+    },
+    "Static Early-Fusion MLP": {
+      "mae": 0.14212845181456918,
+      "rank_ic": 0.006350450373601936,
+      "rmse": 0.1896415282004477
+    },
+    "Text-Only Expert": {
+      "mae": 0.06579940651514789,
+      "rank_ic": null,
+      "rmse": 0.09166484910819027
+    }
+  },
+  "dataset_id": "research-2026-07-31-3553e7ad78dd",
+  "locked_test_events": 1794,
+  "locked_test_hash": "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987",
+  "model_sha256": "5cf77b2a8de255eb959236a48caac1f6c5d429767e250976c0c31324ef0bcd2c",
+  "opening_audit": {
+    "completed_attempt": 2,
+    "recovery_note": "Attempt 1 failed after in-memory scoring and before artifact persistence because event dates were timezone-aware while return dates were timezone-naive; attempt 2 reran the identical frozen selection after date normalization."
+  },
+  "portfolio_scenarios": [
+    {
+      "annualized_return": -0.03276881943427257,
+      "annualized_volatility": 0.05181859029672095,
+      "average_turnover": 0.06893210659736203,
+      "cost_bps": 10,
+      "hit_rate": 0.46582278481012657,
+      "maximum_drawdown": -0.12051465827137497,
+      "newey_west_t_stat": -0.7584251191671241,
+      "sharpe": -0.6323757409577033,
+      "sharpe_ci_high": 0.944960630060802,
+      "sharpe_ci_low": -2.3132422219691864,
+      "sortino": -1.0605601844992436
+    },
+    {
+      "annualized_return": -0.05765152865124723,
+      "annualized_volatility": 0.0518391950773204,
+      "average_turnover": 0.06893210659736203,
+      "cost_bps": 25,
+      "hit_rate": 0.4481012658227848,
+      "maximum_drawdown": -0.1399966847740901,
+      "newey_west_t_stat": -1.3705336327030693,
+      "sharpe": -1.1121223731436702,
+      "sharpe_ci_high": 0.44592077955489023,
+      "sharpe_ci_low": -2.8245232882498414,
+      "sortino": -1.8275343826161583
+    },
+    {
+      "annualized_return": -0.0977183532479563,
+      "annualized_volatility": 0.05197159097539704,
+      "average_turnover": 0.06893210659736203,
+      "cost_bps": 50,
+      "hit_rate": 0.41012658227848103,
+      "maximum_drawdown": -0.17657625449473435,
+      "newey_west_t_stat": -2.365230798211819,
+      "sharpe": -1.8802263200719684,
+      "sharpe_ci_high": -0.35647380766653153,
+      "sharpe_ci_low": -3.7189746900196705,
+      "sortino": -2.9920173739933
+    }
+  ],
+  "primary_model": {
+    "mae": 0.06581338616316937,
+    "rank_ic": 0.03162415620680004,
+    "rmse": 0.09164098617392025
+  },
+  "run_id": "research-2026-07-31-3553e7ad78dd-walk-forward-5f8671b78d3e-locked",
+  "scores_sha256": "f6b18472d43d2b5e40df90b8a200ef162a1c6dd865ae47688220c9b0c3b55ddd",
+  "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
+  "train_events": 4003
+}

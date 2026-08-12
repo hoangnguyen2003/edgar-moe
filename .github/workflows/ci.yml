@@ -17,10 +17,16 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra dev --extra research
+      - run: uv sync --extra dev --extra research --extra operations
       - run: uv run ruff check .
       - run: uv run mypy src
       - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
+      - name: Verify forward-registry migrations match the ORM schema
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: sqlite:////tmp/edgar-moe-migration-check.sqlite3
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
 
   web:
     runs-on: ubuntu-latest
