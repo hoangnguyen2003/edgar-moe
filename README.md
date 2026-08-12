@@ -96,9 +96,16 @@ The production-quality v2 layer is deliberately separate from the historical loc
 The `Prospective forward cycle` GitHub Actions workflow runs at 07:17 UTC Tuesday
 through Saturday. It resolves the cutoff in `America/New_York`, restores only
 immutable filing/embedding caches, refreshes current source data, rebuilds the
-point-in-time dataset, forecasts before the next NYSE entry, settles any matured
-labels, and mirrors the exact local content identities into private Cloudflare R2.
-It never retrains or reselects the frozen model.
+point-in-time dataset from a bounded 730-day prospective window, forecasts before
+the next NYSE entry, settles any matured labels, and mirrors the exact local
+content identities into private Cloudflare R2. The window retains the history
+needed for 252-session market features and prior annual filings without rebuilding
+the 2016-present training corpus. It never retrains or reselects the frozen model.
+
+The runner checkpoints verified filing bodies before FinBERT starts and writes
+each embedding atomically. A five-hour inner compute deadline leaves GitHub one
+hour to save those reusable caches, including after an incomplete attempt; the
+next run resumes from the newest attempt-specific cache.
 
 Initialize a free local SQLite registry and inspect it:
 

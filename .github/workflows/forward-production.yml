@@ -28,7 +28,8 @@ concurrency:
 jobs:
   forecast-and-settle:
     runs-on: ubuntu-latest
-    timeout-minutes: 300
+    # The inner compute deadline leaves a full hour to persist resumable caches.
+    timeout-minutes: 360
     env:
       ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
       ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
@@ -43,6 +44,7 @@ jobs:
       EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
       EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
       HF_HOME: ${{ github.workspace }}/data/cache/huggingface
+      PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -89,7 +91,7 @@ jobs:
           echo "Source cutoff: $cutoff"
 
       - name: Restore immutable filing and embedding caches
-        id: runtime-cache
+        id: runtime_cache
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -110,20 +112,22 @@ jobs:
           install -m 0644 ops/frozen/locked-test.json "$destination/locked-test.json"
 
       - name: Refresh, forecast, and settle append-only evidence
+        id: forward_cycle
         run: >-
+          timeout --signal=INT --kill-after=30s 300m
           uv run python scripts/run_forward_cycle.py
           --cutoff "${{ steps.cutoff.outputs.date }}"
           --device "${{ inputs.device || 'cpu' }}"
 
-      - name: Save verified filing and embedding caches
-        if: success()
+      - name: Save resumable filing and embedding caches
+        if: ${{ always() && steps.runtime_cache.outcome == 'success' }}
         uses: actions/cache/save@v4
         with:
           path: |
             data/cache/forward-filings
             data/artifacts/embedding-cache-finbert
             ${{ env.HF_HOME }}
-          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-${{ github.run_id }}-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
+          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
 
       - name: Publish registry summary
         if: success()

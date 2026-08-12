@@ -9,6 +9,7 @@ import pytest
 
 from edgar_moe.forward.operations import (
     find_processed_dataset,
+    rolling_source_start,
     seed_filing_documents,
     source_cutoff,
     update_filing_cache,
@@ -22,6 +23,12 @@ def test_source_cutoff_uses_new_york_date() -> None:
     assert validate_cutoff("2026-08-06", now=clock) == "2026-08-06"
     with pytest.raises(ValueError, match="after the source-system date"):
         validate_cutoff("2026-08-07", now=clock)
+
+
+def test_rolling_source_start_keeps_a_safe_inference_window() -> None:
+    assert rolling_source_start("2026-08-12", lookback_days=730) == "2024-08-12"
+    with pytest.raises(ValueError, match="at least 400 days"):
+        rolling_source_start("2026-08-12", lookback_days=399)
 
 
 def test_filing_cache_seeds_and_updates_without_overwrite(tmp_path: Path) -> None:
