@@ -198,6 +198,30 @@ def test_label_settlement_and_forward_performance(tmp_path: Path) -> None:
     database.dispose()
 
 
+def test_registry_status_reports_freshness_and_quality_health(tmp_path: Path) -> None:
+    database, registry_service = registry(tmp_path)
+    run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        run_id,
+        [QualityCheckDraft(name="availability", status="passed")],
+    )
+    registry_service.complete_run(run_id, result_counts={"forecasts": 0})
+
+    recent = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+    assert recent["health_status"] == "ok"
+    assert recent["latest_run_status"] == "succeeded"
+    assert recent["latest_quality_failures"] == 0
+    assert recent["latest_quality_warnings"] == 0
+    assert recent["age_seconds"] is not None
+
+    stale = registry_service.status(
+        now=datetime.now(UTC) + timedelta(days=5),
+    )
+    assert stale["health_status"] == "degraded"
+    assert "freshness window" in stale["health_message"]
+    database.dispose()
+
+
 def test_local_artifacts_are_content_addressed_and_verified(tmp_path: Path) -> None:
     store = LocalArtifactStore(tmp_path / "artifacts")
     first = store.put_bytes(b"frozen evidence", logical_name="result.json")

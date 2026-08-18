@@ -131,6 +131,16 @@ class ForwardStatusResponse(BaseModel):
     matured_count: int = 0
     pending_count: int = 0
     latest_successful_run_at: datetime | None = None
+    health_status: Literal["ok", "warning", "degraded"] = "degraded"
+    health_message: str | None = None
+    latest_run_at: datetime | None = None
+    latest_run_status: Literal["running", "succeeded", "failed"] | None = None
+    latest_failed_run_at: datetime | None = None
+    age_seconds: int | None = Field(default=None, ge=0)
+    stale_after_seconds: int = Field(default=96 * 60 * 60, ge=0)
+    running_run_count: int = Field(default=0, ge=0)
+    latest_quality_warnings: int = Field(default=0, ge=0)
+    latest_quality_failures: int = Field(default=0, ge=0)
     message: str
 
 

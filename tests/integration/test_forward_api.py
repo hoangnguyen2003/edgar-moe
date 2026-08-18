@@ -94,6 +94,9 @@ def test_forward_api_contracts(tmp_path: Path) -> None:
             status = client.get("/api/v1/forward/status").json()
             assert status["available"] is True
             assert status["forecast_count"] == 1
+            assert status["health_status"] == "ok"
+            assert status["latest_run_status"] == "succeeded"
+            assert status["latest_quality_failures"] == 0
             assert client.get("/api/v1/forward/runs").json()[0]["run_id"] == "run-1"
             page = client.get("/api/v1/forward/forecasts?ticker=test").json()
             assert page["total"] == 1

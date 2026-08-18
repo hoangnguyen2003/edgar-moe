@@ -169,6 +169,14 @@ The command matches by immutable `event_id`, verifies maturity, appends at most 
 uv run edgar-moe forward-status
 ```
 
+The `status` object includes a machine-readable `health_status` (`ok`, `warning`,
+or `degraded`), the latest run state, the age of the latest successful run, the
+freshness threshold, active-run count, and quality-gate counts. The same payload
+is exposed by the read-only `GET /api/v1/forward/status` endpoint and rendered in
+Forward Lab, so the dashboard and the scheduled job summary use the same health
+decision. The default freshness window is 96 hours, which allows for the
+Tuesday–Saturday schedule and its weekend gap.
+
 Monitor failed runs, failed/warning quality checks, dataset freshness, unmatched settlements, registry availability, and the age of the latest successful run. Failed runs remain in the ledger. Fix the source problem and start a new run; never delete or repurpose the failed identity.
 
 Back up Postgres using the provider's export/restore process and periodically verify that downloaded R2 objects match their recorded SHA-256. Rotate database and R2 credentials immediately after suspected exposure.

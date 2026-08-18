@@ -53,6 +53,16 @@ describe("Forward Lab", () => {
         matured_count: 0,
         pending_count: 0,
         latest_successful_run_at: "2026-08-07T00:00:00Z",
+        health_status: "ok",
+        health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-08-07T00:00:00Z",
+        latest_run_status: "succeeded",
+        latest_failed_run_at: null,
+        age_seconds: 120,
+        stale_after_seconds: 345600,
+        running_run_count: 0,
+        latest_quality_warnings: 0,
+        latest_quality_failures: 0,
         message: "available",
       });
       if (url.includes("/performance")) return jsonResponse({
@@ -74,6 +84,7 @@ describe("Forward Lab", () => {
     renderPage();
 
     expect(await screen.findByText("Registry ready; first qualifying batch pending")).toBeInTheDocument();
+    expect(screen.getByText("Forward runner is healthy and within its freshness window.")).toBeInTheDocument();
     expect(screen.getByText("No forward runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("No qualifying pre-entry forecasts have been recorded.")).toBeInTheDocument();
   });

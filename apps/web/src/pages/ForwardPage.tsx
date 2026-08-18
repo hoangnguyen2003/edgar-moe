@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import {
+  Activity,
   CheckCircle2,
   Clock3,
   DatabaseZap,
@@ -13,7 +14,7 @@ import { MetricCard } from "../components/MetricCard";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
 import { compact, dateTime, decimal, percent } from "../lib/format";
-import type { ForwardQualityRecord } from "../lib/types";
+import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 export function ForwardPage() {
   const status = useQuery({ queryKey: ["forward-status"], queryFn: api.forwardStatus });
@@ -66,6 +67,8 @@ export function ForwardPage() {
         <span><DatabaseZap size={14} /> Append-only outcome</span>
       </div>
 
+      <ForwardHealthBanner status={status.data} />
+
       <section className="metric-grid">
         <MetricCard label="Recorded forecasts" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} awaiting maturity`} icon={Orbit} />
         <MetricCard label="Forward rank IC" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} label coverage`} icon={ShieldCheck} tone="blue" />
@@ -97,6 +100,40 @@ export function ForwardPage() {
       </section>
     </div>
   );
+}
+
+function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
+  const healthy = status.health_status === "ok";
+  const warning = status.health_status === "warning";
+  const Icon = healthy ? CheckCircle2 : warning ? Activity : TriangleAlert;
+  const tone = healthy ? "notice--forward" : "notice--warning";
+  const age = status.age_seconds == null
+    ? "no successful run recorded"
+    : `age ${formatAge(status.age_seconds)}`;
+  const running = status.running_run_count === 1
+    ? "1 run currently active"
+    : `${status.running_run_count} runs currently active`;
+
+  return (
+    <div className={`notice ${tone} forward-health-banner`}>
+      <Icon size={18} />
+      <div>
+        <strong>{status.health_message ?? status.message}</strong>
+        <span>
+          Latest success: {dateTime(status.latest_successful_run_at)} · {age} · {running}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function formatAge(seconds: number): string {
+  if (seconds < 60) return "less than a minute";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours}h`;
+  return `${Math.floor(hours / 24)}d`;
 }
 
 function PageHeader() {

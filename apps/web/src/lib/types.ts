@@ -105,6 +105,16 @@ export interface ForwardStatusResponse {
   matured_count: number;
   pending_count: number;
   latest_successful_run_at: string | null;
+  health_status: "ok" | "warning" | "degraded";
+  health_message: string | null;
+  latest_run_at: string | null;
+  latest_run_status: "running" | "succeeded" | "failed" | null;
+  latest_failed_run_at: string | null;
+  age_seconds: number | null;
+  stale_after_seconds: number;
+  running_run_count: number;
+  latest_quality_warnings: number;
+  latest_quality_failures: number;
   message: string;
 }
 

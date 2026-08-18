@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
@@ -44,6 +44,10 @@ class RegistryStateError(RuntimeError):
 
 class ForwardRegistry:
     """Transactional service for prospective forecasts and immutable outcomes."""
+
+    # The scheduled runner is intentionally paused on Sunday and Monday. Four days
+    # therefore leaves room for the weekend gap while still flagging a missed cycle.
+    DEFAULT_STALE_AFTER = timedelta(hours=96)
 
     def __init__(self, database: RegistryDatabase, *, actor: str = "edgar-moe") -> None:
         self.database = database
@@ -367,7 +371,19 @@ class ForwardRegistry:
             )
             return record
 
-    def status(self) -> dict[str, Any]:
+    def status(
+        self,
+        *,
+        now: datetime | None = None,
+        stale_after: timedelta = DEFAULT_STALE_AFTER,
+    ) -> dict[str, Any]:
+        """Return coverage plus operational health for the prospective runner.
+
+        ``stale_after`` is deliberately configurable for deterministic tests and
+        operator-specific schedules. The default accommodates the Tuesday–Saturday
+        production cadence without masking a missed multi-day run.
+        """
+        observed_at = _as_utc(now or utc_now())
         with self.database.session() as session:
             forecast_count = int(
                 session.scalar(select(func.count(ForecastRecord.forecast_id))) or 0
@@ -381,6 +397,52 @@ class ForwardRegistry:
                 .order_by(RunRecord.finished_at.desc())
                 .limit(1)
             )
+            latest_run = session.scalar(
+                select(RunRecord).order_by(RunRecord.started_at.desc()).limit(1)
+            )
+            latest_failed = session.scalar(
+                select(RunRecord)
+                .where(RunRecord.status == "failed")
+                .order_by(RunRecord.finished_at.desc())
+                .limit(1)
+            )
+            latest_quality_statuses = (
+                session.scalars(
+                    select(DataQualityRecord.status).where(
+                        DataQualityRecord.run_id == latest_run.run_id
+                    )
+                ).all()
+                if latest_run is not None
+                else []
+            )
+            quality_failures = sum(status == "failed" for status in latest_quality_statuses)
+            quality_warnings = sum(status == "warning" for status in latest_quality_statuses)
+            age_seconds = (
+                max(0, int((observed_at - _as_utc(latest.finished_at)).total_seconds()))
+                if latest is not None and latest.finished_at is not None
+                else None
+            )
+            stale_after_seconds = max(0, int(stale_after.total_seconds()))
+            if latest is None:
+                health_status = "degraded"
+                health_message = "No successful forward run has been recorded."
+            elif latest_run is not None and latest_run.status == "failed":
+                health_status = "degraded"
+                health_message = "The latest forward run failed; inspect its run details."
+            elif quality_failures:
+                health_status = "degraded"
+                health_message = f"The latest run has {quality_failures} failed quality gate(s)."
+            elif age_seconds is not None and age_seconds > stale_after_seconds:
+                health_status = "degraded"
+                health_message = (
+                    "No successful forward run completed within the configured freshness window."
+                )
+            elif quality_warnings:
+                health_status = "warning"
+                health_message = f"The latest run has {quality_warnings} quality warning(s)."
+            else:
+                health_status = "ok"
+                health_message = "Forward runner is healthy and within its freshness window."
             return {
                 "configured": True,
                 "model_count": model_count,
@@ -389,6 +451,21 @@ class ForwardRegistry:
                 "matured_count": matured_count,
                 "pending_count": max(forecast_count - matured_count, 0),
                 "latest_successful_run_at": _iso(latest.finished_at) if latest else None,
+                "health_status": health_status,
+                "health_message": health_message,
+                "latest_run_at": _iso(latest_run.started_at) if latest_run else None,
+                "latest_run_status": latest_run.status if latest_run else None,
+                "latest_failed_run_at": _iso(latest_failed.finished_at) if latest_failed else None,
+                "age_seconds": age_seconds,
+                "stale_after_seconds": stale_after_seconds,
+                "running_run_count": int(
+                    session.scalar(
+                        select(func.count(RunRecord.run_id)).where(RunRecord.status == "running")
+                    )
+                    or 0
+                ),
+                "latest_quality_warnings": quality_warnings,
+                "latest_quality_failures": quality_failures,
             }
 
     def list_runs(self, *, limit: int = 25) -> list[dict[str, Any]]:
