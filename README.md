@@ -87,7 +87,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
 
 ## Prospective forward testing
 
