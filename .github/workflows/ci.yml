@@ -46,4 +46,8 @@ jobs:
       - run: npm run build
         working-directory: apps/web
       - run: npm run build:public
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/validate_public_bundle.py
       - run: git diff --exit-code -- public

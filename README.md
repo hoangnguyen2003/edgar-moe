@@ -87,7 +87,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it and rejects source/bundle drift. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
 
 ## Prospective forward testing
 
@@ -229,6 +229,7 @@ For a concise, accurate project description tailored to a one-page résumé, see
 uv run pytest
 uv run ruff check .
 uv run mypy src
+python scripts/validate_public_bundle.py
 npm --prefix apps/web run test
 npm --prefix apps/web run build
 ```
