@@ -741,6 +741,56 @@ def forward_settle(
     )
 
 
+@app.command("forward-diagnostic")
+def forward_diagnostic(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed point-in-time dataset directory.")],
+    horizon_sessions: Annotated[
+        int,
+        typer.Option(
+            "--horizon-sessions",
+            min=2,
+            max=19,
+            help="Short diagnostic horizon; the official target remains 20 sessions.",
+        ),
+    ] = 5,
+    as_of: Annotated[
+        str | None,
+        typer.Option(help="As-of timestamp; defaults to the current UTC clock."),
+    ] = None,
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report destination."),
+    ] = None,
+) -> None:
+    """Report short-horizon diagnostics without mutating forward evidence."""
+    from edgar_moe.forward.diagnostics import diagnostic_report
+
+    settings = runtime_settings()
+    database = RegistryDatabase(_forward_database_url(settings, database_url))
+    try:
+        dataset = ResearchDataset.load(dataset_dir)
+        registry = ForwardRegistry(database, actor="edgar-moe-cli")
+        forecasts = registry.list_forecasts(limit=100_000)["items"]
+        report = diagnostic_report(
+            dataset,
+            forecasts,
+            as_of=_parse_timestamp(as_of),
+            horizon_sessions=horizon_sessions,
+        )
+    finally:
+        database.dispose()
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(serialized)
+        typer.echo(f"Wrote diagnostic report to {output}")
+    typer.echo(serialized.decode())
+
+
 @app.command("forward-status")
 def forward_status(
     database_url: Annotated[

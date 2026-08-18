@@ -118,6 +118,17 @@ jobs:
           uv run python scripts/run_forward_cycle.py
           --cutoff "${{ steps.cutoff.outputs.date }}"
           --device "${{ inputs.device || 'cpu' }}"
+          --diagnostic-output
+          "data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json"
+
+      - name: Upload short-horizon diagnostic
+        if: ${{ always() && steps.forward_cycle.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: forward-diagnostic-${{ steps.cutoff.outputs.date }}
+          path: data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Save resumable filing and embedding caches
         if: ${{ always() && steps.runtime_cache.outcome == 'success' }}

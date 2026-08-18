@@ -163,6 +163,25 @@ uv run edgar-moe forward-settle \
 
 The command matches by immutable `event_id`, verifies maturity, appends at most one label per forecast, records unmatched due forecasts as a quality warning, and recomputes read-time metrics from forecast/label joins.
 
+## Short-horizon diagnostic
+
+The official forward target remains the 20-session beta-adjusted abnormal return.
+When faster engineering feedback is useful, generate a read-only diagnostic from
+the same pre-entry forecast scores and the dataset's daily return components:
+
+```bash
+uv run edgar-moe forward-diagnostic \
+  --dataset-dir data/processed/<later-dataset-id> \
+  --horizon-sessions 5 \
+  --output reports/forward-diagnostic.json
+```
+
+The command does not create a run, append labels, or alter the registry. It is a
+short-horizon observation of the frozen score, not a replacement for the primary
+20-session evaluation. Keep its results separate from the résumé/CV evidence. The
+scheduled production workflow generates this report after each successful cycle
+and uploads it as a GitHub Actions artifact retained for 30 days.
+
 ## Monitoring and recovery
 
 ```bash

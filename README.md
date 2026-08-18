@@ -127,6 +127,19 @@ uv run edgar-moe forward-settle \
   --model-config config/forward.yaml
 ```
 
+For faster engineering feedback, a read-only five-session diagnostic can be
+generated from the same immutable scores and daily-return components:
+
+```bash
+uv run edgar-moe forward-diagnostic \
+  --dataset-dir data/processed/<later-dataset-id> \
+  --horizon-sessions 5 \
+  --output reports/forward-diagnostic.json
+```
+
+This report never writes labels to the registry and must not replace the official
+20-session evaluation or be presented as a résumé performance claim.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run

@@ -39,6 +39,11 @@ def main() -> None:
     parser.add_argument("--model-config", type=Path, default=Path("config/forward.yaml"))
     parser.add_argument("--universe", type=Path, default=Path("config/universe.research.csv"))
     parser.add_argument(
+        "--diagnostic-output",
+        type=Path,
+        help="Optional output path for a read-only short-horizon diagnostic report.",
+    )
+    parser.add_argument(
         "--lookback-days",
         type=int,
         default=730,
@@ -123,6 +128,17 @@ def main() -> None:
         "--model-config",
         str(args.model_config),
     )
+    if args.diagnostic_output is not None:
+        _run(
+            executable,
+            "forward-diagnostic",
+            "--dataset-dir",
+            str(dataset),
+            "--horizon-sessions",
+            "5",
+            "--output",
+            str(args.diagnostic_output),
+        )
     _run(executable, "forward-status")
     print(
         json.dumps(
@@ -131,6 +147,9 @@ def main() -> None:
                 "checkpoint": str(checkpoint),
                 "dataset": str(dataset),
                 "new_cached_filings": cached,
+                "diagnostic_output": (
+                    str(args.diagnostic_output) if args.diagnostic_output is not None else None
+                ),
             },
             sort_keys=True,
         )
