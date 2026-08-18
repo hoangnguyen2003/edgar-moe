@@ -130,6 +130,11 @@ the filing, embedding, and Hugging Face caches under a unique run-attempt key. A
 timed-out attempt still fails visibly, but the next attempt restores its completed
 work instead of starting from zero.
 
+Each processed dataset ID includes the verified source-manifest digest. If a
+manual retry refreshes the same cutoff with different source evidence, it creates
+a new immutable dataset identity instead of overwriting or conflicting with the
+previous attempt in the registry.
+
 ## Forecast run
 
 Refresh and build a dataset whose cutoff includes newly accepted filings but whose next-session entries have not occurred. Then run:

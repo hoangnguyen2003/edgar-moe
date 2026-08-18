@@ -167,6 +167,7 @@ def build_research_dataset(
     assets = source_manifest.configuration["assets"]
     as_of = date.fromisoformat(str(source_manifest.configuration["as_of"]))
     source_manifest_path = checkpoint_root / "manifest.json"
+    source_manifest_hash = sha256_file(source_manifest_path)
     universe = _read_json(checkpoint_root / str(assets["universe"]))
     filing_index = _read_json(checkpoint_root / str(assets["filing_index"]))
     macro_payload = _read_json(checkpoint_root / str(assets["macro"]))
@@ -466,6 +467,11 @@ def build_research_dataset(
     daily_returns = build_daily_return_components(bars, security_by_symbol)
     dataset_identity = {
         "source": source_manifest.dataset_id,
+        # The source-system ID is date-scoped and is reused when a checkpoint
+        # is refreshed. Include the verified manifest digest so a changed
+        # checkpoint receives a new immutable identity instead of overwriting
+        # a previously registered dataset with the same date/configuration.
+        "source_manifest_hash": source_manifest_hash,
         "config": config.model_dump(),
         "text_encoder": text_encoder.cache_identity,
     }
@@ -486,7 +492,7 @@ def build_research_dataset(
             "regime": regime_columns,
         },
         attrition=attrition,
-        source_manifest_hash=sha256_file(source_manifest_path),
+        source_manifest_hash=source_manifest_hash,
         provenance={
             "text_encoder": text_encoder.cache_identity,
             "market_adjustment": "split",

@@ -2,6 +2,7 @@ from datetime import date
 from pathlib import Path
 
 import numpy as np
+import orjson
 import pandas as pd
 import pandas_market_calendars as mcal
 
@@ -196,3 +197,20 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
         progress=cached_progress.append,
     )
     assert cached_progress[-1].endswith("text cache hits 3; encoded 0")
+
+    # A refreshed checkpoint can retain the same date-scoped source ID while
+    # changing its verified manifest. The processed dataset identity must
+    # follow that manifest so the append-only forward registry never receives
+    # a conflicting payload under the old ID.
+    manifest_path = checkpoint / "manifest.json"
+    manifest = orjson.loads(manifest_path.read_bytes())
+    manifest["created_at"] = "2026-08-01T00:00:00Z"
+    manifest_path.write_bytes(orjson.dumps(manifest))
+    refreshed = build_research_dataset(
+        checkpoint,
+        config=config,
+        embedder=HashingTextEmbedder(dimensions=16),
+        embedding_cache=tmp_path / "embedding-cache",
+    )
+    assert refreshed.source_manifest_hash != dataset.source_manifest_hash
+    assert refreshed.dataset_id != dataset.dataset_id

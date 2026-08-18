@@ -107,6 +107,10 @@ each embedding atomically. A five-hour inner compute deadline leaves GitHub one
 hour to save those reusable caches, including after an incomplete attempt; the
 next run resumes from the newest attempt-specific cache.
 
+Processed dataset IDs include the verified source-manifest digest, so retrying a
+cutoff after the source checkpoint changes creates a new immutable identity rather
+than mutating a previously registered dataset.
+
 Initialize a free local SQLite registry and inspect it:
 
 ```bash
