@@ -92,7 +92,7 @@ jobs:
 
       - name: Restore immutable filing and embedding caches
         id: runtime_cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: |
             data/cache/forward-filings
@@ -121,7 +121,7 @@ jobs:
 
       - name: Save resumable filing and embedding caches
         if: ${{ always() && steps.runtime_cache.outcome == 'success' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: |
             data/cache/forward-filings
