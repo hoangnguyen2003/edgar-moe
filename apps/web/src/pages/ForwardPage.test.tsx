@@ -76,6 +76,16 @@ describe("Forward Lab", () => {
         mae: null,
         directional_accuracy: null,
       });
+      if (url.includes("/data-quality")) return jsonResponse([{
+        check_id: "old-warning",
+        run_id: "run-old",
+        name: "prospective_candidate_count",
+        status: "warning",
+        observed_value: 0,
+        threshold: 1,
+        details: {},
+        created_at: "2026-08-14T08:46:00Z",
+      }]);
       if (url.includes("/runs")) return jsonResponse([]);
       if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 0, offset: 0, limit: 50 });
       return jsonResponse([]);
@@ -85,6 +95,9 @@ describe("Forward Lab", () => {
 
     expect(await screen.findByText("Registry ready; first qualifying batch pending")).toBeInTheDocument();
     expect(screen.getByText("Forward runner is healthy and within its freshness window.")).toBeInTheDocument();
+    expect(screen.getByText("Latest quality status")).toBeInTheDocument();
+    expect(screen.getByText("Passing")).toBeInTheDocument();
+    expect(screen.getByText(/1 historical warn/)).toBeInTheDocument();
     expect(screen.getByText("No forward runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("No qualifying pre-entry forecasts have been recorded.")).toBeInTheDocument();
   });

@@ -53,8 +53,23 @@ export function ForwardPage() {
 
   const metrics = performance.data!;
   const checks = quality.data!;
-  const failedChecks = checks.filter((check) => check.status === "failed").length;
-  const warningChecks = checks.filter((check) => check.status === "warning").length;
+  const historicalFailedChecks = checks.filter((check) => check.status === "failed").length;
+  const historicalWarningChecks = checks.filter((check) => check.status === "warning").length;
+  const latestQualityLabel = status.data.latest_quality_failures
+    ? `${status.data.latest_quality_failures} failed`
+    : status.data.latest_quality_warnings
+      ? `${status.data.latest_quality_warnings} warn`
+      : "Passing";
+  const latestQualityIcon = status.data.latest_quality_failures
+    ? TriangleAlert
+    : status.data.latest_quality_warnings
+      ? Activity
+      : CheckCircle2;
+  const historicalQualityDetail = [
+    `${checks.length} immutable checks`,
+    historicalFailedChecks ? `${historicalFailedChecks} historical failed` : "",
+    historicalWarningChecks ? `${historicalWarningChecks} historical warn` : "",
+  ].filter(Boolean).join(" · ");
 
   return (
     <div className="page">
@@ -73,7 +88,7 @@ export function ForwardPage() {
         <MetricCard label="Recorded forecasts" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} awaiting maturity`} icon={Orbit} />
         <MetricCard label="Forward rank IC" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} label coverage`} icon={ShieldCheck} tone="blue" />
         <MetricCard label="Forward RMSE" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} matured outcomes`} icon={DatabaseZap} tone="amber" />
-        <MetricCard label="Quality status" value={failedChecks ? `${failedChecks} failed` : warningChecks ? `${warningChecks} warn` : "Passing"} detail={`${checks.length} immutable checks`} icon={failedChecks ? TriangleAlert : CheckCircle2} />
+        <MetricCard label="Latest quality status" value={latestQualityLabel} detail={historicalQualityDetail} icon={latestQualityIcon} />
       </section>
 
       {metrics.forecast_count === 0 && (
