@@ -522,6 +522,7 @@ class ForwardRegistry:
                     "model_id": forecast.model_id,
                     "event_id": forecast.event_id,
                     "accession_number": forecast.accession_number,
+                    "security_id": forecast.security_id,
                     "ticker": forecast.ticker,
                     "company_name": forecast.company_name,
                     "form": forecast.form,

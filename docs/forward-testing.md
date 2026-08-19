@@ -187,6 +187,11 @@ short-horizon observation of the frozen score, not a replacement for the primary
 scheduled production workflow generates this report after each successful cycle
 and uploads it as a GitHub Actions artifact retained for 30 days.
 
+If a rolling dataset no longer contains an older event row, the report uses the
+forecast's immutable security and entry metadata and reports total, matched,
+pending, and unmatched counts separately. Unmatched rows are excluded from
+diagnostic coverage rather than being treated as pending outcomes.
+
 ## Monitoring and recovery
 
 ```bash

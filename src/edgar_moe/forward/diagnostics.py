@@ -45,17 +45,28 @@ def diagnostic_report(
         if "horizon_at" in dataset.events
         else pd.Series(dtype="object")
     )
-    schedule = _schedule(returns, end_date=max(event_horizons, default=None))
+    forecast_horizons: list[date] = []
+    for forecast in forecasts:
+        horizon_date = _forecast_horizon_date(forecast)
+        if horizon_date is not None:
+            forecast_horizons.append(horizon_date)
+    horizon_dates = [*event_horizons.tolist(), *forecast_horizons]
+    schedule = _schedule(returns, end_date=max(horizon_dates, default=None))
     matured: list[dict[str, Any]] = []
     unmatched = 0
     pending_horizons: list[datetime] = []
 
     for forecast in forecasts:
         event = event_rows.get(str(forecast.get("event_id", "")))
-        if event is None:
+        security_id = str(
+            getattr(event, "security_id", "") or forecast.get("security_id", "")
+        )
+        entry_date = (
+            _forecast_entry_date(forecast) if event is None else _event_entry_date(event)
+        )
+        if not security_id or entry_date is None:
             unmatched += 1
             continue
-        entry_date = _event_entry_date(event)
         horizon_at = _diagnostic_horizon(schedule, entry_date, horizon_sessions)
         if horizon_at is None:
             unmatched += 1
@@ -63,9 +74,16 @@ def diagnostic_report(
         if horizon_at > observed_at:
             pending_horizons.append(horizon_at)
             continue
+        beta, beta_source = _resolve_beta(
+            event,
+            returns,
+            security_id=security_id,
+            entry_date=entry_date,
+        )
         target = _abnormal_return(
             returns,
-            event,
+            security_id=security_id,
+            beta=beta,
             entry_date=entry_date,
             horizon_date=horizon_at.date(),
             expected_dates=schedule.loc[
@@ -84,28 +102,38 @@ def diagnostic_report(
                 "ticker": str(forecast.get("ticker", getattr(event, "ticker", ""))),
                 "score": float(forecast.get("score", float("nan"))),
                 "rank": float(forecast.get("rank", float("nan"))),
+                "beta": beta,
+                "beta_source": beta_source,
                 "horizon_at": horizon_at,
                 "realized_abnormal_return": target,
             }
         )
 
+    matched_count = len(matured) + len(pending_horizons)
     metrics = forward_metrics(
         [float(item["score"]) for item in matured],
         [float(item["realized_abnormal_return"]) for item in matured],
-        forecast_count=len(forecasts),
+        forecast_count=matched_count,
     )
+    if metrics.matured_count:
+        status = "ready"
+    elif pending_horizons:
+        status = "awaiting_maturity"
+    else:
+        status = "insufficient_coverage"
     return {
         "diagnostic": True,
         "official_horizon_sessions": 20,
         "horizon_sessions": horizon_sessions,
         "as_of": observed_at,
-        "status": "ready" if metrics.matured_count else "awaiting_maturity",
+        "status": status,
         "unmatched_count": unmatched,
         "next_maturity_at": min(pending_horizons, default=None),
         "latest_maturity_at": max(pending_horizons, default=None),
-        "forecast_count": metrics.forecast_count,
+        "forecast_count": len(forecasts),
+        "matched_count": matched_count,
         "matured_count": metrics.matured_count,
-        "pending_count": metrics.pending_count,
+        "pending_count": len(pending_horizons),
         "coverage": metrics.coverage,
         "rank_ic": metrics.rank_ic,
         "rmse": metrics.rmse,
@@ -157,6 +185,74 @@ def _event_entry_date(event: Any) -> date:
     return date.fromisoformat(str(value)[:10])
 
 
+def _forecast_entry_date(forecast: Mapping[str, Any]) -> date | None:
+    value = forecast.get("entry_date") or forecast.get("entry_at")
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _forecast_horizon_date(forecast: Mapping[str, Any]) -> date | None:
+    value = forecast.get("horizon_at")
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return cast(date, pd.Timestamp(value).date())
+    except (TypeError, ValueError):
+        return None
+
+
+def _resolve_beta(
+    event: Any | None,
+    returns: pd.DataFrame,
+    *,
+    security_id: str,
+    entry_date: date,
+) -> tuple[float, str]:
+    if event is not None:
+        value = float(getattr(event, "beta", float("nan")))
+        if math.isfinite(value):
+            return value, "event_snapshot"
+    return _estimate_beta(returns, security_id=security_id, entry_date=entry_date)
+
+
+def _estimate_beta(
+    returns: pd.DataFrame,
+    *,
+    security_id: str,
+    entry_date: date,
+    window: int = 252,
+) -> tuple[float, str]:
+    asset = returns.loc[
+        (returns["security_id"].astype(str).eq(security_id))
+        & (returns["date"] < entry_date),
+        ["date", "return"],
+    ].rename(columns={"return": "asset_return"})
+    benchmark = returns.loc[
+        (returns["symbol"].astype(str).str.upper().eq("SPY"))
+        & (returns["date"] < entry_date),
+        ["date", "return"],
+    ].rename(columns={"return": "benchmark_return"})
+    joined = asset.merge(benchmark, on="date", how="inner").dropna().tail(window)
+    if len(joined) < 63:
+        return 1.0, "default"
+    variance = float(joined["benchmark_return"].var())
+    covariance = float(joined["asset_return"].cov(joined["benchmark_return"]))
+    beta = covariance / variance if variance > 0 else float("nan")
+    return (beta, "daily_returns") if math.isfinite(beta) else (1.0, "default")
+
+
 def _diagnostic_horizon(
     schedule: pd.DataFrame,
     entry_date: date,
@@ -175,13 +271,13 @@ def _diagnostic_horizon(
 
 def _abnormal_return(
     returns: pd.DataFrame,
-    event: Any,
     *,
+    security_id: str,
+    beta: float,
     entry_date: date,
     horizon_date: date,
     expected_dates: Sequence[date],
 ) -> float | None:
-    security_id = str(getattr(event, "security_id", ""))
     asset = returns.loc[returns["security_id"].astype(str).eq(security_id)].set_index("date")
     benchmark = returns.loc[returns["symbol"].astype(str).str.upper().eq("SPY")].set_index("date")
     if asset.empty or benchmark.empty:
@@ -190,9 +286,6 @@ def _abnormal_return(
     benchmark_growth = _open_to_close_growth(benchmark, entry_date, horizon_date, expected_dates)
     if asset_growth is None or benchmark_growth is None:
         return None
-    beta = float(getattr(event, "beta", 1.0) or 1.0)
-    if not math.isfinite(beta):
-        beta = 1.0
     return (asset_growth - 1.0) - beta * (benchmark_growth - 1.0)
 
 

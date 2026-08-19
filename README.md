@@ -144,6 +144,10 @@ uv run edgar-moe forward-diagnostic \
 This report never writes labels to the registry and must not replace the official
 20-session evaluation or be presented as a résumé performance claim.
 
+If a rolling dataset no longer contains an older event row, the diagnostic uses
+the forecast's immutable security and entry metadata and reports matched and
+unmatched coverage separately.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run

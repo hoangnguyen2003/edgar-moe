@@ -164,6 +164,7 @@ class ForwardForecastRecord(BaseModel):
     model_id: str
     event_id: str
     accession_number: str
+    security_id: str
     ticker: str
     company_name: str
     form: str

@@ -53,7 +53,10 @@ def forecast() -> dict[str, object]:
     return {
         "forecast_id": "forecast-1",
         "event_id": "event-1",
+        "security_id": "asset-1",
         "ticker": "TEST",
+        "entry_date": "2026-08-03",
+        "horizon_at": "2026-08-28T20:00:00Z",
         "score": 0.12,
         "rank": 0.9,
     }
@@ -75,6 +78,23 @@ def test_diagnostic_report_computes_matured_short_horizon() -> None:
         (1.01 * 1.02 * 1.01 * 1.0 * 1.03 - 1.0)
         - (1.005 * 1.01 * 1.0 * 1.01 * 1.005 - 1.0)
     )
+
+
+def test_diagnostic_uses_registry_metadata_when_event_is_not_in_latest_dataset() -> None:
+    dataset = diagnostic_fixture()
+    dataset.events = dataset.events.iloc[0:0].copy()
+    report = diagnostic_report(
+        dataset,
+        [forecast()],
+        as_of=datetime(2026, 8, 8, tzinfo=UTC),
+    )
+
+    assert report["status"] == "ready"
+    assert report["forecast_count"] == 1
+    assert report["matched_count"] == 1
+    assert report["unmatched_count"] == 0
+    assert report["matured_count"] == 1
+    assert report["observations"][0]["beta_source"] == "default"
 
 
 def test_diagnostic_report_keeps_unmatured_outcomes_pending() -> None:
