@@ -52,6 +52,8 @@ def diagnostic_fixture() -> SimpleNamespace:
 def forecast() -> dict[str, object]:
     return {
         "forecast_id": "forecast-1",
+        "model_id": "model-1",
+        "forecast_as_of": "2026-08-03T10:00:00Z",
         "event_id": "event-1",
         "security_id": "asset-1",
         "ticker": "TEST",
@@ -143,3 +145,50 @@ def test_coverage_includes_unmatched_forecasts_in_denominator() -> None:
     assert report["unmatched_count"] == 1
     assert report["coverage"] == 0.5
     assert report["unmatched_reasons"] == {"missing_or_invalid_horizon_returns": 1}
+
+
+def test_unique_events_select_earliest_forecast_independent_of_input_order() -> None:
+    early = forecast()
+    later = {**early, "forecast_id": "forecast-2", "score": -0.8,
+             "forecast_as_of": "2026-08-03T12:00:00Z"}
+    other_model = {**early, "model_id": "model-2", "forecast_id": "forecast-3"}
+    reports = [diagnostic_report(
+        diagnostic_fixture(), rows, as_of=datetime(2026, 8, 8, tzinfo=UTC)
+    ) for rows in ([later, other_model, early], [early, other_model, later])]
+    unique = reports[0]["unique_event_evaluation"]
+    assert unique == reports[1]["unique_event_evaluation"]
+    assert reports[0]["matured_count"] == 3
+    assert unique["matured_count"] == 2
+    assert unique["event_count"] == 2
+    assert unique["repeated_forecast_count"] == 1
+    assert unique["selected_forecast_ids"] == ["forecast-1", "forecast-3"]
+    assert unique["observations"][0]["score"] == early["score"]
+
+
+def test_unique_events_do_not_replace_unmatched_first_forecast() -> None:
+    early = {**forecast(), "event_id": "absent", "security_id": "absent"}
+    later = {**early, "forecast_id": "later", "security_id": "asset-1",
+             "forecast_as_of": "2026-08-03T12:00:00Z"}
+    report = diagnostic_report(
+        diagnostic_fixture(), [later, early], as_of=datetime(2026, 8, 8, tzinfo=UTC)
+    )
+    assert report["matured_count"] == 1
+    unique = report["unique_event_evaluation"]
+    assert unique["matured_count"] == 0
+    assert unique["unmatched_count"] == 1
+    assert unique["coverage"] == 0.0
+
+
+def test_unique_events_tie_break_and_missing_timestamp() -> None:
+    first = forecast()
+    tied = {**first, "forecast_id": "forecast-0"}
+    report = diagnostic_report(
+        diagnostic_fixture(), [first, tied], as_of=datetime(2026, 8, 8, tzinfo=UTC)
+    )
+    assert report["unique_event_evaluation"]["selected_forecast_ids"] == ["forecast-0"]
+    for timestamp in (None, "2026-08-03T10:00:00", "invalid"):
+        report = diagnostic_report(
+            diagnostic_fixture(), [{**first, "forecast_as_of": timestamp}],
+            as_of=datetime(2026, 8, 8, tzinfo=UTC),
+        )
+        assert report["unique_event_evaluation"]["status"] == "unavailable"
