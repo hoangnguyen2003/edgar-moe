@@ -45,7 +45,12 @@ flowchart LR
   API --> UI[Forward Lab]
 ```
 
-- Use a Postgres database such as Neon for the registry. Keep its connection string only in the private runner and Vercel environment; require TLS.
+- Use a Postgres database such as Neon for the registry and require TLS. Keep the
+  writer URL (`EDGAR_MOE_REGISTRY_DATABASE_URL`) only in the private runner and
+  migration environment. Configure a separate SELECT-only reader URL
+  (`EDGAR_MOE_REGISTRY_READ_DATABASE_URL`) in the API host; the API prefers it and
+  falls back to a writer URL only when that URL is local SQLite. A missing reader
+  URL never causes a hosted API to use the Postgres writer credential.
 - Use Cloudflare R2 only for non-public model/run evidence. Create a scoped token for one bucket; do not expose R2 credentials to the browser.
 - Vercel serves the React bundle and read-only GET endpoints. It never trains, forecasts, settles labels, or holds market-data credentials.
 - The application remains useful without Postgres: historical v1 pages load normally and Forward Lab reports that its registry is disconnected.
@@ -53,7 +58,10 @@ flowchart LR
 Production environment variables:
 
 ```text
-EDGAR_MOE_REGISTRY_DATABASE_URL=postgresql://...?...sslmode=require
+# Private runner and trusted migration environment only:
+EDGAR_MOE_REGISTRY_DATABASE_URL=postgresql://writer:...?...sslmode=require
+# API host only (for example Vercel):
+EDGAR_MOE_REGISTRY_READ_DATABASE_URL=postgresql://reader:...?...sslmode=require
 EDGAR_MOE_ARTIFACT_BACKEND=local
 EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2
 EDGAR_MOE_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
@@ -74,7 +82,8 @@ runner existed:
 uv run edgar-moe forward-mirror-artifacts
 ```
 
-Run migrations from a trusted machine before connecting the API:
+Run migrations from a trusted machine before connecting the API. The migration
+URL must be the writer role; do not use the API reader URL for schema changes:
 
 ```bash
 EDGAR_MOE_REGISTRY_DATABASE_URL='<postgres-url>' uv run edgar-moe forward-init

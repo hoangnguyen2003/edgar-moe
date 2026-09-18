@@ -93,9 +93,11 @@ earliest-event audits are supplementary and must be labeled as such.
 
 - Browser → API: anonymous public reads. CORS is not authorization. Pagination
   bounds response sizes, but does not by itself prevent scraping or request floods.
-- API → database: GET-only routes reduce exposure, but do not prove that the
-  deployed database credential is SELECT-only. The shared database session helper
-  can commit. Verify separate reader, writer, and migration roles before claiming
+- API → database: GET-only routes reduce exposure. The API now prefers
+  `EDGAR_MOE_REGISTRY_READ_DATABASE_URL`; local SQLite compatibility falls back to
+  the writer URL, while a missing reader URL never falls back to a hosted Postgres
+  writer. The shared database session helper can commit, so the deployed reader
+  role must still be granted SELECT-only privileges and verified before claiming
   database-enforced least privilege.
 - Runner → providers/database/R2: high-trust execution with source and write
   credentials. Workflow permissions are `contents: read`, but job secrets remain

@@ -9,11 +9,11 @@ scope and access. No paid services are authorized by this plan.
 
 | Priority | Work item | Why / acceptance evidence |
 | --- | --- | --- |
-| P0 | Database least privilege | Separate API reader, batch writer, migration owner. Disposable Postgres tests prove the reader cannot INSERT/UPDATE/DELETE or change schema; verify actual deployed grants without exposing secrets. |
+| P0 | Database least privilege | Application support now separates the API reader URL from the private writer/migration URL and refuses to use a hosted Postgres writer as an API fallback. Still required: separate API reader, batch writer, and migration roles; disposable Postgres tests proving the reader cannot INSERT/UPDATE/DELETE or change schema; and verification of actual deployed grants without exposing secrets. |
 | P0 | Restore rehearsal | Restore a database backup to an isolated target, verify counts and sampled evidence hashes, and record time and missing data. Never rehearse by overwriting production. |
 | P0 | Partial-write reconciliation | Run the Go [evidence auditor](evidence-auditor.md) after an injected object-store failure. Demonstrate failed-run visibility, detection of missing evidence, and safe retry/reconciliation without changing original forecasts. |
 | P1 | Alert delivery | Distinguish unavailable API, stale runner, failed runs, and quality warnings. Trigger a controlled failure and prove an alert reaches an agreed recipient; UI status is not notification. |
-| P1 | Release gates | Protect main and use task branch → PR → green CI → merge. Verify deployment ordering so committed public assets cannot be released while required validation fails. Existing local merges are not evidence of enforced PR review. |
+| P1 | Release gates | Use task branch → PR → green CI → self-review → merge. Branch protection is optional for this personal private repository; the lightweight PR policy is the current cost-free control. Verify deployment ordering so committed public assets cannot be released while required validation fails. |
 | P1 | Public surface review | Review source-data redistribution rights, exposed forecast fields and error messages, abuse limits, and secret scanning. Static JavaScript is public; secrets must never enter its build inputs. |
 | P1 | Cost and capacity baseline | Record cold/warm job runtime, cache size, API latency, DB connections, object storage, and account quotas. Set a documented stop/approval threshold before paid usage or larger experiments. |
 | P2 | Research drift observability | Compare training versus prospective feature missingness/distributions and component outputs. Keep research drift separate from service availability; do not automatically retrain v1. |
@@ -53,7 +53,9 @@ For each task, record: requirement → constraints → options → decision → 
 behavior → verification → cost → revisit condition. Explain which part is enforced
 by code, which depends on infrastructure configuration, and which is only a goal.
 
-The recommended first implementation is a least-privilege database role contract
-with disposable Postgres tests. It reduces the impact of a serving-tier compromise
-without requiring a new hosting provider. Production role changes follow only
-after the tests, migration procedure, and rollback steps are reviewed.
+The first application implementation is a least-privilege database role contract:
+the API can receive a dedicated reader URL while the private runner retains the
+writer URL. This reduces the impact of a serving-tier compromise without requiring
+a new hosting provider. Production role grants, disposable Postgres tests,
+migration procedure, restore/rollback steps, and an operator verification record
+remain before the control can be called complete.

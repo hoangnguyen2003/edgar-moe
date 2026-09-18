@@ -110,6 +110,9 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_demo_snapshot: Path = Path("data/demo/snapshot.json")
     edgar_moe_log_level: str = "INFO"
     edgar_moe_registry_database_url: str = ""
+    # The API prefers this SELECT-only connection; the writer URL remains for
+    # the private forecast runner and migrations.
+    edgar_moe_registry_read_database_url: str = ""
     edgar_moe_artifact_backend: str = "local"
     edgar_moe_artifact_mirror_backend: str = "none"
     edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")

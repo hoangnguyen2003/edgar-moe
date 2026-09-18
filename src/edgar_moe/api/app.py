@@ -33,13 +33,33 @@ from edgar_moe.api.models import (
 from edgar_moe.api.repository import SnapshotNotFoundError, SnapshotRepository
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.registry import ForwardRegistry
-from edgar_moe.settings import runtime_settings
+from edgar_moe.settings import RuntimeSettings, runtime_settings
 
 settings = runtime_settings()
 repository = SnapshotRepository(settings.edgar_moe_demo_snapshot)
+
+
+def _api_registry_database_url(settings: RuntimeSettings) -> str:
+    """Select the API URL without silently exposing a production writer secret.
+
+    A dedicated reader URL is mandatory for a hosted Postgres deployment. The
+    writer URL is retained only for local SQLite development, where it is a
+    file path rather than a network credential.
+    """
+    reader_url = settings.edgar_moe_registry_read_database_url.strip()
+    if reader_url:
+        return reader_url
+
+    writer_url = settings.edgar_moe_registry_database_url.strip()
+    if writer_url.lower().startswith("sqlite"):
+        return writer_url
+    return ""
+
+
+api_registry_database_url = _api_registry_database_url(settings)
 forward_database = (
-    RegistryDatabase(settings.edgar_moe_registry_database_url)
-    if settings.edgar_moe_registry_database_url
+    RegistryDatabase(api_registry_database_url)
+    if api_registry_database_url
     else None
 )
 forward_registry = ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
