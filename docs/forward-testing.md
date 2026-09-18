@@ -51,6 +51,11 @@ flowchart LR
   (`EDGAR_MOE_REGISTRY_READ_DATABASE_URL`) in the API host; the API prefers it and
   falls back to a writer URL only when that URL is local SQLite. A missing reader
   URL never causes a hosted API to use the Postgres writer credential.
+- Provision the API/auditor role from the trusted migration connection with
+  [`ops/postgres/provision-reader.sql`](../ops/postgres/provision-reader.sql), then
+  run `scripts/verify_postgres_reader.py` with the reader URL. The verifier checks
+  effective privileges and rolled-back UPDATE, DELETE, and DDL probes; a green
+  application test is not evidence that the provider grants are correct.
 - Use Cloudflare R2 only for non-public model/run evidence. Create a scoped token for one bucket; do not expose R2 credentials to the browser.
 - Vercel serves the React bundle and read-only GET endpoints. It never trains, forecasts, settles labels, or holds market-data credentials.
 - The application remains useful without Postgres: historical v1 pages load normally and Forward Lab reports that its registry is disconnected.
@@ -88,6 +93,29 @@ URL must be the writer role; do not use the API reader URL for schema changes:
 ```bash
 EDGAR_MOE_REGISTRY_DATABASE_URL='<postgres-url>' uv run edgar-moe forward-init
 ```
+
+Create the reader role once as a database owner, preferably entering its password
+interactively rather than placing it in a shell history:
+
+```sql
+CREATE ROLE edgar_moe_api_reader LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+\password edgar_moe_api_reader
+```
+
+Then apply the checked-in grant contract as the migration owner:
+
+```bash
+psql "$EDGAR_MOE_REGISTRY_DATABASE_URL" \
+  -v api_reader_role=edgar_moe_api_reader \
+  -v migration_owner=edgar_moe_migrator \
+  -f ops/postgres/provision-reader.sql
+EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$READER_URL" \
+  uv run python scripts/verify_postgres_reader.py
+```
+
+The verifier must pass before putting the reader URL in Vercel. Keep the writer
+URL out of the API host; if the reader is unavailable, the API intentionally
+reports the registry as disconnected rather than using a more powerful credential.
 
 ## Scheduled production runner
 
