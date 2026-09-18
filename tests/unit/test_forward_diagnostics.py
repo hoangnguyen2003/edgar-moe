@@ -118,3 +118,28 @@ def test_diagnostic_report_rejects_non_short_horizon() -> None:
             as_of=datetime(2026, 8, 8, tzinfo=UTC),
             horizon_sessions=20,
         )
+
+
+def test_missing_benchmark_is_reported_as_data_gap_not_waiting() -> None:
+    dataset = diagnostic_fixture()
+    dataset.daily_returns = dataset.daily_returns.query("symbol != 'SPY'")
+    future = {**forecast(), "event_id": "future", "entry_date": "2026-08-10"}
+    report = diagnostic_report(
+        dataset, [forecast(), future], as_of=datetime(2026, 8, 8, tzinfo=UTC)
+    )
+    assert report["status"] == "insufficient_coverage"
+    assert report["pending_count"] == 1
+    assert report["unmatched_reasons"] == {"missing_benchmark_returns": 1}
+    assert report["unmatched_forecasts"][0]["forecast_id"] == "forecast-1"
+
+
+def test_coverage_includes_unmatched_forecasts_in_denominator() -> None:
+    missing = {**forecast(), "event_id": "missing", "security_id": "missing"}
+    report = diagnostic_report(
+        diagnostic_fixture(), [forecast(), missing],
+        as_of=datetime(2026, 8, 8, tzinfo=UTC),
+    )
+    assert report["matured_count"] == 1
+    assert report["unmatched_count"] == 1
+    assert report["coverage"] == 0.5
+    assert report["unmatched_reasons"] == {"missing_or_invalid_horizon_returns": 1}

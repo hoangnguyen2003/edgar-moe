@@ -54,6 +54,17 @@ def diagnostic_report(
     schedule = _schedule(returns, end_date=max(horizon_dates, default=None))
     matured: list[dict[str, Any]] = []
     unmatched = 0
+    unmatched_reasons: dict[str, int] = {}
+    unmatched_forecasts: list[dict[str, str]] = []
+
+    def record_unmatched(forecast: Mapping[str, Any], reason: str) -> None:
+        unmatched_reasons[reason] = unmatched_reasons.get(reason, 0) + 1
+        unmatched_forecasts.append({
+            "forecast_id": str(forecast.get("forecast_id", "")),
+            "ticker": str(forecast.get("ticker", "")),
+            "reason": reason,
+        })
+
     pending_horizons: list[datetime] = []
 
     for forecast in forecasts:
@@ -66,10 +77,12 @@ def diagnostic_report(
         )
         if not security_id or entry_date is None:
             unmatched += 1
+            record_unmatched(forecast, "missing_event_metadata")
             continue
         horizon_at = _diagnostic_horizon(schedule, entry_date, horizon_sessions)
         if horizon_at is None:
             unmatched += 1
+            record_unmatched(forecast, "missing_trading_calendar")
             continue
         if horizon_at > observed_at:
             pending_horizons.append(horizon_at)
@@ -94,6 +107,12 @@ def diagnostic_report(
         )
         if target is None:
             unmatched += 1
+            reason = (
+                "missing_benchmark_returns"
+                if not returns["symbol"].astype(str).str.upper().eq("SPY").any()
+                else "missing_or_invalid_horizon_returns"
+            )
+            record_unmatched(forecast, reason)
             continue
         matured.append(
             {
@@ -113,10 +132,12 @@ def diagnostic_report(
     metrics = forward_metrics(
         [float(item["score"]) for item in matured],
         [float(item["realized_abnormal_return"]) for item in matured],
-        forecast_count=matched_count,
+        forecast_count=len(forecasts),
     )
     if metrics.matured_count:
         status = "ready"
+    elif unmatched:
+        status = "insufficient_coverage"
     elif pending_horizons:
         status = "awaiting_maturity"
     else:
@@ -128,6 +149,8 @@ def diagnostic_report(
         "as_of": observed_at,
         "status": status,
         "unmatched_count": unmatched,
+        "unmatched_reasons": unmatched_reasons,
+        "unmatched_forecasts": unmatched_forecasts,
         "next_maturity_at": min(pending_horizons, default=None),
         "latest_maturity_at": max(pending_horizons, default=None),
         "forecast_count": len(forecasts),
@@ -307,7 +330,7 @@ def _open_to_close_growth(
     if any(item not in rows.index for item in expected_later_dates):
         return None
     later = rows.loc[expected_later_dates, "return"]
-    if later.isna().any():
+    if not all(math.isfinite(float(value)) for value in later):
         return None
     return (1.0 + intraday) * math.prod(1.0 + float(value) for value in later)
 

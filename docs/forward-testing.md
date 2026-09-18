@@ -189,8 +189,17 @@ and uploads it as a GitHub Actions artifact retained for 30 days.
 
 If a rolling dataset no longer contains an older event row, the report uses the
 forecast's immutable security and entry metadata and reports total, matched,
-pending, and unmatched counts separately. Unmatched rows are excluded from
-diagnostic coverage rather than being treated as pending outcomes.
+pending, and unmatched counts separately. Coverage is evaluated observations
+divided by all forecasts, including unmatched rows in the denominator. Unmatched
+rows are not counted as pending. `unmatched_reasons` and `unmatched_forecasts`
+identify missing metadata, calendar dates, benchmark returns, or incomplete
+return windows. With no evaluated observations and any unmatched rows, status is
+`insufficient_coverage`; waiting alone is not evidence that the data gap will resolve.
+
+New dataset builds retain SPY daily return components even though the benchmark
+is outside the filing-issuer universe. Existing processed bundles must be rebuilt
+from their source checkpoints to gain those components. Builder version 2 gives
+the rebuilt bundle a distinct identity, preserving registered historical bundles.
 
 ## Monitoring and recovery
 

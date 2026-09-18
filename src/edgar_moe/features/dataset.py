@@ -466,6 +466,7 @@ def build_research_dataset(
     target_values = np.asarray(targets, dtype=np.float32)
     daily_returns = build_daily_return_components(bars, security_by_symbol)
     dataset_identity = {
+        "builder_version": 2,
         "source": source_manifest.dataset_id,
         # The source-system ID is date-scoped and is reused when a checkpoint
         # is refreshed. Include the verified manifest digest so a changed
@@ -545,6 +546,9 @@ def normalize_alpaca_bars(path: str | Path) -> pd.DataFrame:
 def build_daily_return_components(
     bars: pd.DataFrame, security_by_symbol: dict[str, str]
 ) -> pd.DataFrame:
+    # SPY is fetched as a benchmark, but is not a filing issuer in the stock
+    # universe. Preserve its returns for diagnostic abnormal-return calculations.
+    security_by_symbol = {"SPY": "benchmark:SPY", **security_by_symbol}
     frame = bars.loc[bars["symbol"].isin(security_by_symbol)].copy()
     frame = frame.sort_values(["symbol", "date"])
     previous_close = frame.groupby("symbol", sort=False)["close"].shift(1)

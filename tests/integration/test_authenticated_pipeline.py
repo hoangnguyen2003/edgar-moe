@@ -9,6 +9,7 @@ import pandas_market_calendars as mcal
 from edgar_moe.data.refresh import UniverseMember, refresh_authenticated_to_disk
 from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
 from edgar_moe.features.text import HashingTextEmbedder
+from edgar_moe.forward.diagnostics import diagnostic_report
 from edgar_moe.settings import ResearchConfig
 
 ACCESSIONS = [
@@ -185,6 +186,21 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     assert restored.dataset_id == dataset.dataset_id
     assert restored.provenance["text_encoder"].startswith("hashing-blake2b-v1")
     assert np.allclose(restored.target, dataset.target)
+    assert "SPY" in set(restored.daily_returns["symbol"])
+    diagnostic = diagnostic_report(
+        restored,
+        [dict(row, forecast_id=row["event_id"], score=0.1, rank=1.0)
+         for row in restored.events.to_dict("records")],
+        as_of=pd.Timestamp("2026-08-01", tz="UTC").to_pydatetime(),
+    )
+    assert diagnostic["matured_count"] == 3
+    assert diagnostic["unmatched_count"] == 0
+    np.testing.assert_allclose(
+        [item["realized_abnormal_return"] for item in diagnostic["observations"]],
+        restored.target,
+        rtol=1e-5,
+        atol=1e-7,
+    )
     assert progress[0].startswith("Dataset filings 0/3")
     assert progress[-1].endswith("text cache hits 2; encoded 1")
 
