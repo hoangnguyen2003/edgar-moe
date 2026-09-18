@@ -121,8 +121,46 @@ jobs:
           --diagnostic-output
           "data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json"
 
+      - name: Capture failed-cycle context
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        env:
+          CUTOFF: ${{ steps.cutoff.outputs.date }}
+          CYCLE_OUTCOME: ${{ steps.forward_cycle.outcome }}
+          DEVICE: ${{ inputs.device || 'cpu' }}
+          EDGAR_MOE_FAILURE_CONTEXT_PATH: data/forward/diagnostics/forward-failure-context.json
+        shell: bash
+        run: |
+          uv run python scripts/write_forward_failure_context.py
+
+      - name: Upload failure evidence
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: forward-failure-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/forward/diagnostics/forward-failure-context.json
+            data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Publish failure summary
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        shell: bash
+        env:
+          CUTOFF: ${{ steps.cutoff.outputs.date }}
+          CYCLE_OUTCOME: ${{ steps.forward_cycle.outcome }}
+        run: |
+          {
+            echo '## Prospective cycle failure'
+            echo "- Cutoff: \`$CUTOFF\`"
+            echo "- Cycle outcome: \`$CYCLE_OUTCOME\`"
+            echo "- Run: \`${GITHUB_RUN_ID}\` (attempt \`${GITHUB_RUN_ATTEMPT}\`)"
+            echo '- Failure context was uploaded as a 30-day artifact.'
+            echo '- The registry run remains immutable; investigate and retry with a new run identity.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Upload short-horizon diagnostic
-        if: ${{ always() && steps.forward_cycle.outcome == 'success' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: forward-diagnostic-${{ steps.cutoff.outputs.date }}

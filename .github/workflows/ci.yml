@@ -25,6 +25,8 @@ jobs:
         run: uv run python scripts/verify_postgres_reader.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
+      - name: Check forward failure context writer is runnable
+        run: uv run python scripts/write_forward_failure_context.py
       - name: Verify forward-registry migrations match the ORM schema
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: sqlite:////tmp/edgar-moe-migration-check.sqlite3

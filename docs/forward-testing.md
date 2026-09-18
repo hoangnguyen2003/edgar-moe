@@ -167,6 +167,12 @@ the filing, embedding, and Hugging Face caches under a unique run-attempt key. A
 timed-out attempt still fails visibly, but the next attempt restores its completed
 work instead of starting from zero.
 
+If refresh, inference, or settlement fails, the workflow writes a redacted
+`forward-failure-context.json` containing the commit, cutoff, attempt, and step
+outcome, uploads it with any diagnostic already produced, and adds a failure
+summary to the run. This is durable investigation evidence, not a claim that an
+external alert recipient has been configured.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the
