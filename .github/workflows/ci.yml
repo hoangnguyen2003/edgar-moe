@@ -51,3 +51,18 @@ jobs:
           python-version: "3.12"
       - run: python scripts/validate_public_bundle.py
       - run: git diff --exit-code -- public
+
+  evidence-auditor:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: tools/evidence-auditor
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
+      - run: test -z "$(gofmt -l .)"
+      - run: go vet ./...
+      - run: go test -race ./...

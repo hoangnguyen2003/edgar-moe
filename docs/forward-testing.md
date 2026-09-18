@@ -213,6 +213,11 @@ Observation rows include model ID and forecast timestamp for auditability.
 
 ## Monitoring and recovery
 
+The independent Go [evidence auditor](evidence-auditor.md) verifies registry
+artifact references and object bytes without importing the Python research stack.
+Run it with a SELECT-only database role and read-only R2 credentials during a
+recovery check. Its findings are diagnostic; it never repairs evidence.
+
 ```bash
 uv run edgar-moe forward-status
 ```
