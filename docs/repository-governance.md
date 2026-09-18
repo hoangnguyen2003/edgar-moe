@@ -54,6 +54,14 @@ description and CI results as the durable review record.
 ## Current state and gap
 
 The repository contains the PR template, branch-policy workflow, CI checks, and
-this documented policy. As of this change, branch protection settings themselves
-have not been independently verified through the GitHub account. Enable and test
-the rule before claiming that direct pushes are technically blocked.
+this documented policy. On September 18, 2026, the GitHub API reported that branch
+protection for this private repository requires GitHub Pro or making the
+repository public. Therefore the required-check list above is the target control,
+not an active technical guarantee on the current plan. Do not make the private
+research repository public merely to obtain protection.
+
+Until the account plan changes, the practical controls are the open PR, required
+CI jobs, branch-policy check, review checklist, and a maintainer commitment not to
+push directly to `main`. If protected `main` is a hard requirement, upgrade the
+private-repository plan or move the project to an organization with an appropriate
+plan, then enable and test the rule before claiming that direct pushes are blocked.
