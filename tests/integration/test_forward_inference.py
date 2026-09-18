@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -14,7 +15,9 @@ from edgar_moe.forward.inference import FrozenPredictor
 from edgar_moe.modeling.moe import RegimeGatedMoE
 
 
-def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(tmp_path: Path) -> None:
+def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
     model = RegimeGatedMoE(
         text_dim=2,
         fundamental_dim=2,
@@ -106,6 +109,27 @@ def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(tmp_path: Pat
     assert all(sum(item.expert_weights.values()) == pytest.approx(1.0) for item in batch.forecasts)
     assert all(item.fundamental_score is not None for item in batch.forecasts)
     assert batch.checks[0].status == "passed"
+
+    # Known standardized neural outputs isolate normalization from the network.
+    # The fundamental expert already predicts raw returns and must not be
+    # de-standardized a second time.
+    monkeypatch.setattr(
+        "edgar_moe.forward.inference.predict_moe",
+        lambda *args, **kwargs: SimpleNamespace(
+            scores=np.array([2.0, -1.0]),
+            expert_predictions=np.array([[2.0, 2.0, 2.0], [-1.0, -1.0, -1.0]]),
+            expert_weights=np.full((2, 3), 1 / 3),
+        ),
+    )
+    known_batch = predictor.forecast(dataset, as_of=forecast_as_of)
+    expected_anchor = [0.07, -0.08]
+    expected_neural = [0.21, -0.09]
+    for row, anchor, neural in zip(
+        known_batch.forecasts, expected_anchor, expected_neural, strict=True,
+    ):
+        assert row.fundamental_score == pytest.approx(anchor)
+        assert row.score == pytest.approx(0.75 * anchor + 0.25 * neural)
+        assert all(value == pytest.approx(neural) for value in row.expert_predictions.values())
 
     with pytest.raises(ValueError, match="unexpected SHA-256"):
         FrozenPredictor.load(
