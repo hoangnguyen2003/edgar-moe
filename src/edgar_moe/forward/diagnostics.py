@@ -23,6 +23,60 @@ def diagnostic_report(
     as_of: datetime,
     horizon_sessions: int = DEFAULT_DIAGNOSTIC_HORIZON_SESSIONS,
 ) -> dict[str, Any]:
+    """Return forecast-level and earliest-per-model/event diagnostic results."""
+    report = _diagnostic_report(
+        dataset, forecasts, as_of=as_of, horizon_sessions=horizon_sessions
+    )
+    selection = _first_event_forecasts(forecasts)
+    if selection is None:
+        report["unique_event_evaluation"] = {
+            "status": "unavailable",
+            "reason": "Missing model/event/forecast identity or aware forecast_as_of timestamp",
+            "selection_rule": "earliest_forecast_per_model_and_event",
+        }
+    else:
+        unique_report = _diagnostic_report(
+            dataset, selection, as_of=as_of, horizon_sessions=horizon_sessions
+        )
+        unique_report.update({
+            "selection_rule": "earliest_forecast_per_model_and_event",
+            "tie_breaker": "forecast_id_ascending",
+            "event_count": len(selection),
+            "repeated_forecast_count": len(forecasts) - len(selection),
+            "selected_forecast_ids": [str(item["forecast_id"]) for item in selection],
+        })
+        report["unique_event_evaluation"] = unique_report
+    return report
+
+
+def _first_event_forecasts(
+    forecasts: Sequence[Mapping[str, Any]],
+) -> list[Mapping[str, Any]] | None:
+    # Choose before looking at outcomes: a later successful observation must
+    # never replace an earlier forecast merely because it is easier to evaluate.
+    selected: dict[tuple[str, str], tuple[datetime, str, Mapping[str, Any]]] = {}
+    for forecast in forecasts:
+        if any(not forecast.get(key) for key in ("model_id", "event_id", "forecast_id")):
+            return None
+        try:
+            timestamp = datetime.fromisoformat(str(forecast.get("forecast_as_of", "")))
+            timestamp = _aware_utc(timestamp)
+        except (TypeError, ValueError):
+            return None
+        key = (str(forecast["model_id"]), str(forecast["event_id"]))
+        candidate = (timestamp, str(forecast["forecast_id"]), forecast)
+        if key not in selected or candidate[:2] < selected[key][:2]:
+            selected[key] = candidate
+    return [selected[key][2] for key in sorted(selected)]
+
+
+def _diagnostic_report(
+    dataset: ResearchDataset,
+    forecasts: Sequence[Mapping[str, Any]],
+    *,
+    as_of: datetime,
+    horizon_sessions: int,
+) -> dict[str, Any]:
     """Evaluate short-horizon outcomes without writing to the official registry.
 
     The production registry's 20-session labels remain the official evaluation. This
@@ -118,6 +172,8 @@ def diagnostic_report(
             {
                 "forecast_id": str(forecast.get("forecast_id", "")),
                 "event_id": str(forecast.get("event_id", "")),
+                "model_id": str(forecast.get("model_id", "")),
+                "forecast_as_of": forecast.get("forecast_as_of"),
                 "ticker": str(forecast.get("ticker", getattr(event, "ticker", ""))),
                 "score": float(forecast.get("score", float("nan"))),
                 "rank": float(forecast.get("rank", float("nan"))),

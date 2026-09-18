@@ -201,6 +201,16 @@ is outside the filing-issuer universe. Existing processed bundles must be rebuil
 from their source checkpoints to gain those components. Builder version 2 gives
 the rebuilt bundle a distinct identity, preserving registered historical bundles.
 
+Each diagnostic also includes `unique_event_evaluation`, selecting the earliest
+`forecast_as_of` for each `(model_id, event_id)` before looking at outcome
+availability. Ties use ascending `forecast_id`. This avoids giving repeated
+workflow forecasts extra weight; different models remain separate. The original
+top-level metrics still describe every recorded forecast. The nested report
+includes selected IDs, repeated forecast count, observations, and coverage across
+all selected events, including those pending or unmatched. If selection metadata
+is missing, that evaluation is marked unavailable instead of guessing chronology.
+Observation rows include model ID and forecast timestamp for auditability.
+
 ## Monitoring and recovery
 
 ```bash
