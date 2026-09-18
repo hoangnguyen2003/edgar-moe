@@ -27,7 +27,7 @@ concurrency:
 
 jobs:
   forecast-and-settle:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # The inner compute deadline leaves a full hour to persist resumable caches.
     timeout-minutes: 360
     env:
@@ -46,9 +46,9 @@ jobs:
       HF_HOME: ${{ github.workspace }}/data/cache/huggingface
       PYTHONUNBUFFERED: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.12"
           enable-cache: true
@@ -123,7 +123,7 @@ jobs:
 
       - name: Upload short-horizon diagnostic
         if: ${{ always() && steps.forward_cycle.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: forward-diagnostic-${{ steps.cutoff.outputs.date }}
           path: data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
