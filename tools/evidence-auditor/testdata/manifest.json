@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "runs": [{"run_id":"golden-run","run_type":"forecast","status":"succeeded","started_at":"2026-01-01T00:00:00Z"}],
+  "artifacts": [{
+    "artifact_id":"golden-artifact",
+    "run_id":"golden-run",
+    "kind":"forecast_batch",
+    "uri":"local://sha256/5f/5f9a0df6afe56a1cf072fed79184511e131d36eff0d5dff17312691fe6a54388/forecast-batch.json",
+    "sha256":"5f9a0df6afe56a1cf072fed79184511e131d36eff0d5dff17312691fe6a54388",
+    "size_bytes":59
+  }]
+}

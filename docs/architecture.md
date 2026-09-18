@@ -68,6 +68,8 @@ flowchart LR
   Runner --> DB
   Runner --> R2[(Private R2 evidence mirror)]
   Runner --> Diagnostic[Diagnostic workflow artifact]
+  Auditor[Go read-only auditor] --> DB
+  Auditor --> R2
 ```
 
 | Component | Responsibility | Boundary / source of truth |
@@ -79,6 +81,7 @@ flowchart LR
 | `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins |
 | Local artifacts + R2 mirror | Content-addressed evidence bytes | Mirrored identity checks; bucket access/retention still require account verification |
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup |
+| Go evidence auditor | Cross-check registry rows against object bytes | Read-only operational boundary; no repair or write authority |
 
 Production workflow sequence: restore caches and verify model → refresh inputs →
 build dataset → commit pre-entry forecasts → settle mature outcomes → produce

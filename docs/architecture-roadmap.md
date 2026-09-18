@@ -11,7 +11,7 @@ scope and access. No paid services are authorized by this plan.
 | --- | --- | --- |
 | P0 | Database least privilege | Separate API reader, batch writer, migration owner. Disposable Postgres tests prove the reader cannot INSERT/UPDATE/DELETE or change schema; verify actual deployed grants without exposing secrets. |
 | P0 | Restore rehearsal | Restore a database backup to an isolated target, verify counts and sampled evidence hashes, and record time and missing data. Never rehearse by overwriting production. |
-| P0 | Partial-write reconciliation | Inject object-store failure after forecast commit. Demonstrate failed-run visibility, detection of missing evidence, and safe retry/reconciliation without changing original forecasts. |
+| P0 | Partial-write reconciliation | Run the Go [evidence auditor](evidence-auditor.md) after an injected object-store failure. Demonstrate failed-run visibility, detection of missing evidence, and safe retry/reconciliation without changing original forecasts. |
 | P1 | Alert delivery | Distinguish unavailable API, stale runner, failed runs, and quality warnings. Trigger a controlled failure and prove an alert reaches an agreed recipient; UI status is not notification. |
 | P1 | Release gates | Protect main and use task branch → PR → green CI → merge. Verify deployment ordering so committed public assets cannot be released while required validation fails. Existing local merges are not evidence of enforced PR review. |
 | P1 | Public surface review | Review source-data redistribution rights, exposed forecast fields and error messages, abuse limits, and secret scanning. Static JavaScript is public; secrets must never enter its build inputs. |
