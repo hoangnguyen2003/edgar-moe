@@ -1,13 +1,16 @@
 # Repository governance
 
-The intended enterprise-style workflow is **branch → pull request → required CI
-→ review → GitHub merge → branch deletion**. Local merges are not the normal path.
+The intended lightweight workflow is **branch → pull request → CI → self-review
+→ GitHub merge → branch deletion**. Local merges are not the normal path. This
+keeps the project private and avoids paying for controls that are disproportionate
+to a personal repository.
 This document records the settings that must be enabled in GitHub; repository
 administrative settings are external state and are not represented by files alone.
 
-## `main` branch protection
+## Optional `main` branch protection
 
-In the repository’s Settings → Branches → Branch protection rules (or Rulesets),
+If the project later gains collaborators or a stronger audit requirement, the
+repository’s Settings → Branches → Branch protection rules (or Rulesets) can
 protect `main` with:
 
 - Require a pull request before merging.
@@ -24,8 +27,8 @@ protect `main` with:
   repository’s account tier permits it.
 
 The exact check labels can change if workflow or job names change. Update this
-list and the rule together. A configured rule is the enforcement mechanism; the
-workflow files and this document are not proof that the rule is active.
+list and the rule together. This is an optional future control, not a prerequisite
+for the current personal-project workflow.
 
 ## Pull requests
 
@@ -51,17 +54,11 @@ description and CI results as the durable review record.
 - Keep the Vercel/public bundle and private forward runner as separate deployment
   boundaries. The browser must never receive database or R2 credentials.
 
-## Current state and gap
+## Current personal-project mode
 
-The repository contains the PR template, branch-policy workflow, CI checks, and
-this documented policy. On September 18, 2026, the GitHub API reported that branch
-protection for this private repository requires GitHub Pro or making the
-repository public. Therefore the required-check list above is the target control,
-not an active technical guarantee on the current plan. Do not make the private
-research repository public merely to obtain protection.
-
-Until the account plan changes, the practical controls are the open PR, required
-CI jobs, branch-policy check, review checklist, and a maintainer commitment not to
-push directly to `main`. If protected `main` is a hard requirement, upgrade the
-private-repository plan or move the project to an organization with an appropriate
-plan, then enable and test the rule before claiming that direct pushes are blocked.
+The repository contains the PR template, branch-policy workflow, and CI checks.
+Branch protection is intentionally not enabled: the repository is personal,
+private, and cost-sensitive. The practical controls are an open PR, green CI,
+the branch-policy check, a short self-review using the template, and a deliberate
+commitment not to push directly to `main`. If collaborators or regulated evidence
+are introduced later, revisit paid protection or an organization plan.

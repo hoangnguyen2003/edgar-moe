@@ -35,8 +35,10 @@ Every change follows this sequence:
 7. Delete the remote head branch after merge. Start the next task from the
    updated `main`.
 
-The repository settings should enforce this flow. See
-`docs/repository-governance.md` for the required branch-protection configuration.
+For this personal project, the repository can remain private and unprotected to
+avoid paid plan requirements. The pull request, CI checks, template, and branch
+policy still provide a useful lightweight review record. See
+`docs/repository-governance.md` for the intentionally minimal governance model.
 
 ## Review expectations
 
