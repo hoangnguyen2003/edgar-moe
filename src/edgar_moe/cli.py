@@ -24,6 +24,7 @@ from edgar_moe.data.sec import SecClient
 from edgar_moe.data.security_master import build_security_master
 from edgar_moe.data.universe import screen_liquid_universe
 from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
+from edgar_moe.features.drift import build_research_drift_report
 from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
 from edgar_moe.forward.artifacts import (
     LocalArtifactStore,
@@ -33,6 +34,7 @@ from edgar_moe.forward.artifacts import (
 )
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
+from edgar_moe.forward.inference import FrozenPredictor
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.forward.workflow import ForwardWorkflow
 from edgar_moe.modeling.experiment import (
@@ -415,6 +417,76 @@ def build_dataset(
     typer.echo(
         f"Wrote {len(dataset.events):,} audited filing events to {destination}; "
         f"{int(np.isfinite(dataset.target).sum()):,} labels are mature."
+    )
+
+
+@app.command("research-drift")
+def research_drift(
+    baseline_dataset_dir: Annotated[
+        Path,
+        typer.Option(
+            "--baseline-dataset",
+            help="Frozen training dataset directory used as the comparison baseline.",
+        ),
+    ],
+    prospective_dataset_dir: Annotated[
+        Path,
+        typer.Option(
+            "--prospective-dataset",
+            help="Later processed dataset to inspect prospectively.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="JSON drift report destination."),
+    ] = Path("reports/research-drift.json"),
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
+        "config/forward.yaml"
+    ),
+    device: Annotated[
+        str,
+        typer.Option(help="Frozen predictor device: 'cpu' or 'mps'."),
+    ] = "cpu",
+) -> None:
+    """Measure prospective feature and frozen-component drift without retraining."""
+    if device not in {"cpu", "mps"}:
+        raise typer.BadParameter("device must be 'cpu' or 'mps'")
+    spec = FrozenModelSpec.from_yaml(model_config)
+    baseline = ResearchDataset.load(baseline_dataset_dir)
+    prospective = ResearchDataset.load(prospective_dataset_dir)
+    if baseline.dataset_id != spec.training_dataset_id:
+        raise typer.BadParameter(
+            "Baseline dataset identity does not match the frozen model specification: "
+            f"expected {spec.training_dataset_id}, observed {baseline.dataset_id}"
+        )
+    spec.verify_locked_evidence()
+    predictor = FrozenPredictor.load(
+        spec.model_path,
+        expected_sha256=spec.artifact_sha256,
+        expected_selection_hash=spec.selection_hash,
+        device=device,
+    )
+    report = build_research_drift_report(
+        baseline,
+        prospective,
+        baseline_components=predictor.component_outputs(baseline, device=device),
+        prospective_components=predictor.component_outputs(prospective, device=device),
+        context={
+            "model_id": spec.model_id,
+            "model_version": spec.version,
+            "artifact_sha256": spec.artifact_sha256,
+            "selection_hash": spec.selection_hash,
+            "frozen_at": spec.frozen_at.isoformat(),
+        },
+    )
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    temporary_output.write_bytes(serialized)
+    temporary_output.replace(output)
+    typer.echo(
+        f"Research drift status: {report['status']}; "
+        f"report hash: {report['report_hash']}; wrote {output}"
     )
 
 

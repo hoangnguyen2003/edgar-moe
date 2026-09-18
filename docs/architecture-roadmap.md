@@ -16,7 +16,7 @@ scope and access. No paid services are authorized by this plan.
 | P1 | Release gates | Use task branch → PR → green CI → self-review → merge. Branch protection is optional for this personal private repository; the lightweight PR policy is the current cost-free control. Verify deployment ordering so committed public assets cannot be released while required validation fails. |
 | P1 | Public surface review | Review source-data redistribution rights, exposed forecast fields and error messages, abuse limits, and secret scanning. Static JavaScript is public; secrets must never enter its build inputs. |
 | P1 | Cost and capacity baseline | Record cold/warm job runtime, cache size, API latency, DB connections, object storage, and account quotas. Set a documented stop/approval threshold before paid usage or larger experiments. |
-| P2 | Research drift observability | Compare training versus prospective feature missingness/distributions and component outputs. Keep research drift separate from service availability; do not automatically retrain v1. |
+| P2 | Research drift observability | The `research-drift` command now compares the frozen training dataset with a later prospective dataset, including missingness/distribution statistics and hash-pinned frozen component outputs. It records a content hash and explicitly avoids targets, labels, registry state, and automatic retraining. Still required: run it on a representative later dataset, review threshold policy, and retain the report with the corresponding forward-cycle evidence. |
 
 P0 means highest next-work priority, not a confirmed active incident. Current role
 grants, backups, provider alert settings, and billing controls are unknown until

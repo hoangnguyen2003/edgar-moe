@@ -110,6 +110,14 @@ def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(
     assert all(item.fundamental_score is not None for item in batch.forecasts)
     assert batch.checks[0].status == "passed"
 
+    drift_outputs = predictor.component_outputs(dataset)
+    dataset.target[:] = np.array([999.0, -999.0, 123.0])
+    changed_target_outputs = predictor.component_outputs(dataset)
+    assert {"moe_score", "final_score", "expert_weight:text"}.issubset(drift_outputs)
+    assert all(len(values) == len(dataset.events) for values in drift_outputs.values())
+    for name in drift_outputs:
+        np.testing.assert_array_equal(drift_outputs[name], changed_target_outputs[name])
+
     # Known standardized neural outputs isolate normalization from the network.
     # The fundamental expert already predicts raw returns and must not be
     # de-standardized a second time.

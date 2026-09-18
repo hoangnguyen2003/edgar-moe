@@ -173,6 +173,27 @@ outcome, uploads it with any diagnostic already produced, and adds a failure
 summary to the run. This is durable investigation evidence, not a claim that an
 external alert recipient has been configured.
 
+## Research drift review
+
+The frozen training dataset can be compared with a later processed dataset without
+opening the locked test or changing the model. The command verifies the reviewed
+model and locked-result hashes, scores both datasets through the inference-only
+component path, and writes a content-hashed report:
+
+```bash
+uv run edgar-moe research-drift \
+  --baseline-dataset data/processed/finbert/<frozen-training-dataset-id> \
+  --prospective-dataset data/processed/finbert/<later-dataset-id> \
+  --output reports/research-drift.json
+```
+
+The report measures per-feature missingness, quantiles, standardized mean shift,
+population-stability index, and frozen expert/component outputs. A warning is a
+research review signal, not an availability incident or an automatic retraining
+trigger. The report records the dataset/source identities, frozen artifact and
+selection hashes, and an immutable-report hash. It intentionally does not read
+targets, labels, daily returns, or registry state.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the
