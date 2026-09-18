@@ -67,6 +67,10 @@ contract. The offline manifest is a test fixture, not a production backup export
 
 ## Failure response
 
+For the complete isolated database restore and read-path rehearsal, follow the
+[restore-rehearsal runbook](restore-rehearsal.md) before treating a backup as
+recovery evidence.
+
 Use the report to decide whether the issue is a missing mirror object, a hash or
 size mismatch, a partially completed run, or an unavailable dependency. Do not
 automatically reconcile by deleting rows or overwriting objects. For a confirmed

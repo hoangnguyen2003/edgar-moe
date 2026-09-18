@@ -270,3 +270,7 @@ Tuesday–Saturday schedule and its weekend gap.
 Monitor failed runs, failed/warning quality checks, dataset freshness, unmatched settlements, registry availability, and the age of the latest successful run. Failed runs remain in the ledger. Fix the source problem and start a new run; never delete or repurpose the failed identity.
 
 Back up Postgres using the provider's export/restore process and periodically verify that downloaded R2 objects match their recorded SHA-256. Rotate database and R2 credentials immediately after suspected exposure.
+
+Use the [restore-rehearsal runbook](restore-rehearsal.md) for an isolated
+database restore, table-count comparison, evidence audit, and local API read-path
+check. A backup that has not been restored and verified is not recovery evidence.

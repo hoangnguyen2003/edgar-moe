@@ -133,5 +133,7 @@ the registry or scheduler is healthy.
 No independently verified restore drill, end-to-end alert delivery, cloud-role
 audit, or capacity benchmark is established by this baseline. The checked-in
 reader-role grant contract and verifier make least-privilege verification
-repeatable, but no provider grant has been independently verified yet. The roadmap defines
-the evidence needed to close those gaps without adding unnecessary services.
+repeatable, but no provider grant has been independently verified yet. The
+[restore-rehearsal runbook](restore-rehearsal.md) defines an isolated recovery
+procedure, but no restore result has been recorded. The roadmap defines the
+evidence needed to close those gaps without adding unnecessary services.
