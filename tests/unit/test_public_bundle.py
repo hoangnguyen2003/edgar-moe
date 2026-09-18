@@ -42,3 +42,11 @@ def test_public_bundle_rejects_credentials_without_printing_values(tmp_path: Pat
     errors = validate_public_bundle(tmp_path)
 
     assert errors == ["database URL with password pattern found: assets/main.js"]
+
+
+def test_public_bundle_rejects_reader_runtime_variable_name(tmp_path: Path) -> None:
+    write_bundle(tmp_path, main="const setting = 'EDGAR_MOE_REGISTRY_READ_DATABASE_URL';")
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert errors == ["private runtime variable name found: assets/main.js"]

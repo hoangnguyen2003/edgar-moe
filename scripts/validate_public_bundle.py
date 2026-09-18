@@ -24,7 +24,7 @@ _CREDENTIAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 _PRIVATE_RUNTIME_NAMES = re.compile(
     r"\b(?:ALPACA_API_(?:KEY|SECRET)|FRED_API_KEY|SEC_USER_AGENT|"
-    r"EDGAR_MOE_(?:REGISTRY_DATABASE_URL|R2_[A-Z_]+))\b"
+    r"EDGAR_MOE_(?:REGISTRY_(?:DATABASE_URL|READ_DATABASE_URL)|R2_[A-Z_]+))\b"
 )
 _SOURCE_MAP_REFERENCE = re.compile(r"sourceMappingURL|[A-Za-z0-9._/-]+\.(?:js|css)\.map")
 _ASSET_REFERENCE = re.compile(r"[\"`]((?:/|\./)?(?:assets/)?[A-Za-z0-9._/-]+\.(?:js|css))[\"`]")
