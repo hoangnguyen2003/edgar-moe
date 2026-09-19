@@ -272,7 +272,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 - Base portfolio: 100% gross, ≤2% net, ≤0.05 beta, ≤5% SIC-industry, ≤2% per name.
 - Cost scenarios: 10/25/50 bps plus 2%/5% annual borrow sensitivity.
 
-See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
+See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [repository governance](docs/repository-governance.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
 
 For a concise, accurate project description tailored to a one-page résumé, see the [CV entry](docs/cv-entry.md).
 
