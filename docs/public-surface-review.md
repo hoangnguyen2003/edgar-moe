@@ -54,8 +54,10 @@ git diff --exit-code -- public
 uv run pytest -q tests/integration/test_api.py
 ```
 
-After a deployment, run the manual GitHub Actions `Deployment smoke check`
-workflow with the HTTPS origin. It performs only bounded `GET` requests to the
+After a successful Production deployment, GitHub automatically runs the
+`Deployment smoke check` workflow against the deployment status target URL. The
+same workflow keeps a manual HTTPS-origin trigger for rechecks and non-GitHub
+deployments. It performs only bounded `GET` requests to the
 homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`, and
 `/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
 any mismatch in the full security-header contract (including a one-year HSTS

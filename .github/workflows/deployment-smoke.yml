@@ -1,6 +1,7 @@
 name: Deployment smoke check
 
 on:
+  deployment_status:
   workflow_dispatch:
     inputs:
       deployment_url:
@@ -17,6 +18,12 @@ concurrency:
 
 jobs:
   smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'deployment_status' &&
+      github.event.deployment_status.state == 'success' &&
+      github.event.deployment.environment == 'Production' &&
+      startsWith(github.event.deployment_status.target_url, 'https://'))
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -28,7 +35,9 @@ jobs:
       - run: uv sync --locked --extra dev
       - name: Probe the public deployment boundary
         env:
-          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+          DEPLOYMENT_URL: >-
+            ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_url ||
+            github.event.deployment_status.target_url }}
         run: |
           mkdir -p reports/deployment-smoke
           uv run python scripts/smoke_deployment.py \
