@@ -27,6 +27,10 @@ jobs:
         run: uv run python scripts/compare_restore_reports.py --help
       - name: Check local restore rehearsal command is runnable
         run: uv run python scripts/rehearse_sqlite_restore.py --help
+      - name: Check PostgreSQL restore fixture commands are runnable
+        run: |
+          uv run python scripts/seed_forward_restore_fixture.py --help
+          uv run python scripts/export_forward_registry_counts.py --help
       - name: Check forward failure context writer is runnable
         run: uv run python scripts/write_forward_failure_context.py
       - name: Check optional forward alert notifier is runnable
@@ -91,6 +95,127 @@ jobs:
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe
         run: uv run python scripts/verify_postgres_reader.py
+
+  postgres-restore-rehearsal:
+    runs-on: ubuntu-24.04
+    env:
+      SOURCE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
+      RESTORE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe_restored
+      REHEARSAL_DIR: ${{ github.workspace }}/reports/postgres-restore
+      RESTORE_ARTIFACT_ROOT: ${{ github.workspace }}/reports/postgres-restore/artifacts
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edgar_moe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d edgar_moe"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
+      - run: uv sync --extra dev
+      - name: Prepare isolated rehearsal directories
+        run: mkdir -p "$REHEARSAL_DIR" "$RESTORE_ARTIFACT_ROOT"
+      - name: Apply schema and seed a representative registry
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          uv run alembic upgrade head
+          uv run python scripts/seed_forward_restore_fixture.py \
+            --database-url "$SOURCE_DATABASE_URL" \
+            --artifact-root "$RESTORE_ARTIFACT_ROOT" \
+            --allow-synthetic \
+            > "$REHEARSAL_DIR/seed.json"
+      - name: Export source table counts
+        run: uv run python scripts/export_forward_registry_counts.py --database-url "$SOURCE_DATABASE_URL" --output "$REHEARSAL_DIR/source-counts.json"
+      - name: Audit source registry and evidence
+        working-directory: tools/evidence-auditor
+        env:
+          AUDITOR_DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
+        run: go run . -local-root "$RESTORE_ARTIFACT_ROOT" -timeout 5m -stale-after 96h > "$REHEARSAL_DIR/source-evidence-audit.json"
+      - name: Dump source and restore into a new database
+        shell: bash
+        run: |
+          set -euo pipefail
+          pg_dump --format=custom --no-owner \
+            --file="$REHEARSAL_DIR/registry.dump" "$SOURCE_DATABASE_URL"
+          psql "$SOURCE_DATABASE_URL" --set ON_ERROR_STOP=1 \
+            --command "CREATE DATABASE edgar_moe_restored"
+          restore_started="$(date +%s)"
+          pg_restore --no-owner --exit-on-error \
+            --dbname="$RESTORE_DATABASE_URL" "$REHEARSAL_DIR/registry.dump"
+          restore_finished="$(date +%s)"
+          printf '{"restore_elapsed_seconds":%s}\n' \
+            "$((restore_finished - restore_started))" \
+            > "$REHEARSAL_DIR/timing.json"
+      - name: Check restored schema and export counts
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          uv run alembic check
+          uv run python scripts/export_forward_registry_counts.py \
+            --database-url "$RESTORE_DATABASE_URL" \
+            --output "$REHEARSAL_DIR/restored-counts.json"
+      - name: Audit restored registry and evidence
+        working-directory: tools/evidence-auditor
+        env:
+          AUDITOR_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
+        run: go run . -local-root "$RESTORE_ARTIFACT_ROOT" -timeout 5m -stale-after 96h > "$REHEARSAL_DIR/restored-evidence-audit.json"
+      - name: Compare source and restored evidence
+        run: |
+          set -euo pipefail
+          uv run python scripts/compare_restore_reports.py \
+            --source-counts "$REHEARSAL_DIR/source-counts.json" \
+            --restored-counts "$REHEARSAL_DIR/restored-counts.json" \
+            --source-audit "$REHEARSAL_DIR/source-evidence-audit.json" \
+            --restored-audit "$REHEARSAL_DIR/restored-evidence-audit.json" \
+            | tee "$REHEARSAL_DIR/restore-comparison.json"
+      - name: Probe the restored read path
+        env:
+          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
+        run: |
+          uv run python - <<'PY'
+          import os
+
+          from edgar_moe.forward.database import RegistryDatabase
+          from edgar_moe.forward.registry import ForwardRegistry
+
+          database = RegistryDatabase(os.environ["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"])
+          try:
+              registry = ForwardRegistry(database, actor="restore-rehearsal-read-probe")
+              status = registry.status()
+              forecasts = registry.list_forecasts(limit=1)
+              assert status["health_status"] == "ok", status
+              assert status["run_count"] == 1, status
+              assert forecasts["total"] == 1, forecasts
+              assert registry.performance()["forecast_count"] == 1
+          finally:
+              database.dispose()
+          PY
+      - name: Upload restore rehearsal evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: postgres-restore-rehearsal-${{ github.run_id }}
+          path: reports/postgres-restore/
+          if-no-files-found: ignore
+          retention-days: 30
 
   web:
     runs-on: ubuntu-24.04

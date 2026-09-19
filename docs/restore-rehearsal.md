@@ -35,6 +35,15 @@ operational procedure, not evidence that a restore has already succeeded. The
 maintainer records the outputs in a private incident/recovery note and never
 uses the production database as the rehearsal target.
 
+Pull-request CI also runs a fully disposable PostgreSQL 16 version of this
+exercise. It seeds an explicit synthetic fixture (only when the workflow passes
+`--allow-synthetic`), creates a custom-format dump, restores it into a different
+database, compares all registry-table counts, runs the Go auditor against the
+restored database and local evidence, checks migrations, and probes the read
+path. The uploaded report is useful regression evidence, but it does not replace
+the provider-specific rehearsal below: it cannot validate a managed backup job,
+R2 credentials, network policy, or production RPO/RTO.
+
 ## Safety contract
 
 - Use a provider-created branch, disposable database, or isolated project with
