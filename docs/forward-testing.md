@@ -232,7 +232,21 @@ machine-readable classification; database URLs, R2 credentials, raw exception
 messages, and source data are never copied. Without the optional secret the
 steps skip delivery at no cost. When configured, the workflow retains a
 redacted delivery receipt with the alert dedupe key and HTTP result for 30 days;
-the receipt never contains the webhook URL.
+the receipt never contains the webhook URL. Receipts include a payload hash and
+their own SHA-256 content hash. A local, non-delivery rehearsal can inspect the
+redaction and verify the retained receipt without contacting a recipient:
+
+```bash
+uv run python scripts/notify_forward_alert.py \
+  --dry-run \
+  --failure-context data/forward/diagnostics/forward-failure-context.json \
+  --receipt /tmp/edgar-moe-alert-receipt.json
+uv run python scripts/verify_forward_alert_receipt.py \
+  --receipt /tmp/edgar-moe-alert-receipt.json
+```
+
+This proves the local payload and receipt contract only; it does not prove that
+an external alert channel accepted a message.
 
 If `EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL` is configured, the same scheduled
 job runs the independent Go auditor against the R2 mirror after the cycle. It

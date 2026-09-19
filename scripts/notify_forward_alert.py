@@ -14,6 +14,7 @@ import orjson
 from edgar_moe.forward.alerts import (
     build_failure_alert,
     build_status_alert,
+    hash_alert_payload,
     send_webhook,
 )
 
@@ -71,6 +72,16 @@ def main() -> int:
         print("Forward status is healthy; no alert is required.")
         return 0
     if args.dry_run:
+        _write_receipt(
+            args.receipt,
+            {
+                "delivered": False,
+                "dry_run": True,
+                "kind": payload["kind"],
+                "dedupe_key": payload["dedupe_key"],
+                "payload_sha256": hash_alert_payload(payload),
+            },
+        )
         print(orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
         return 0
     try:
@@ -83,6 +94,7 @@ def main() -> int:
                 "error_type": type(error).__name__,
                 "kind": payload["kind"],
                 "dedupe_key": payload["dedupe_key"],
+                "payload_sha256": hash_alert_payload(payload),
             },
         )
         print(f"Forward alert delivery failed: {type(error).__name__}", file=sys.stderr)
@@ -94,6 +106,7 @@ def main() -> int:
             "http_status": status,
             "kind": payload["kind"],
             "dedupe_key": payload["dedupe_key"],
+            "payload_sha256": hash_alert_payload(payload),
         },
     )
     print(f"Forward alert delivered (HTTP {status}).")
@@ -132,10 +145,17 @@ def _write_receipt(path: Path, result: dict[str, Any]) -> None:
         "observed_at": datetime.now(UTC).isoformat(),
         **result,
     }
+    receipt["receipt_hash"] = _receipt_hash(receipt)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")
     temporary.write_bytes(orjson.dumps(receipt, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
     temporary.replace(path)
+
+
+def _receipt_hash(receipt: dict[str, Any]) -> str:
+    unsigned = dict(receipt)
+    unsigned.pop("receipt_hash", None)
+    return hash_alert_payload(unsigned)
 
 
 if __name__ == "__main__":

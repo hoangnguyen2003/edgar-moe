@@ -37,6 +37,8 @@ jobs:
         run: uv run python scripts/write_forward_failure_context.py
       - name: Check optional forward alert notifier is runnable
         run: uv run python scripts/notify_forward_alert.py --help
+      - name: Check forward alert receipt verifier is runnable
+        run: uv run python scripts/verify_forward_alert_receipt.py --help
       - name: Check artifact reconciliation command is runnable
         run: uv run edgar-moe forward-reconcile-artifacts --help
       - name: Check capacity baseline command is runnable

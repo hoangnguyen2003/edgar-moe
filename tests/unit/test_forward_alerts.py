@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import UTC, datetime
 from urllib.request import Request
 
+import orjson
 import pytest
 
 from edgar_moe.forward.alerts import (
@@ -11,6 +13,7 @@ from edgar_moe.forward.alerts import (
     build_status_alert,
     classify_forward_status,
     send_webhook,
+    verify_alert_receipt,
 )
 
 
@@ -122,3 +125,22 @@ def test_webhook_non_success_is_reported(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr("edgar_moe.forward.alerts.urlopen", lambda *args, **kwargs: Response())
     with pytest.raises(AlertDeliveryError, match="HTTP 503"):
         send_webhook("https://example.test/hook", {"kind": "failed_run"})
+
+
+def test_alert_receipt_hash_rejects_tampering() -> None:
+    receipt = {
+        "schema_version": 1,
+        "observed_at": "2026-09-19T01:02:03+00:00",
+        "delivered": False,
+        "dry_run": True,
+        "kind": "failed_run",
+        "dedupe_key": "a" * 24,
+        "payload_sha256": "b" * 64,
+    }
+    receipt["receipt_hash"] = hashlib.sha256(
+        orjson.dumps(receipt, option=orjson.OPT_SORT_KEYS)
+    ).hexdigest()
+    verify_alert_receipt(receipt)
+    receipt["kind"] = "quality_warning"
+    with pytest.raises(ValueError, match="does not match"):
+        verify_alert_receipt(receipt)
