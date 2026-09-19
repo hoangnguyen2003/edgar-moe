@@ -223,6 +223,14 @@ outcome, uploads it with any diagnostic already produced, and adds a failure
 summary to the run. This is durable investigation evidence, not a claim that an
 external alert recipient has been configured.
 
+Every forward attempt also writes `forward-evidence-manifest.json`. It records
+the safe workflow context, the relative paths declared for diagnostics/status/
+alert evidence, each file's size and SHA-256 when present, and explicit missing
+files when a prior step did not produce them. The workflow verifies the
+manifest before uploading a consolidated 30-day evidence artifact. A missing
+optional diagnostic is therefore visible rather than silently treated as a
+successful run.
+
 If `EDGAR_MOE_ALERT_WEBHOOK_URL` is configured, the runner sends a redacted
 HTTPS JSON alert after a failed cycle and after a successful cycle whose status
 is stale, unavailable, or has quality warnings/failures. Delivery is

@@ -248,6 +248,47 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      - name: Write and verify forward evidence manifest
+        if: ${{ always() && !cancelled() }}
+        env:
+          WORKFLOW: forward-production
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+          COMMIT: ${{ github.sha }}
+          REF: ${{ github.ref }}
+          CUTOFF: ${{ steps.cutoff.outputs.date }}
+          CYCLE_OUTCOME: ${{ steps.evidence_audit.outcome == 'failure' && 'evidence_audit_failure' || steps.forward_cycle.outcome }}
+          DEVICE: ${{ inputs.device || 'cpu' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run python scripts/write_forward_evidence_manifest.py \
+            --root . \
+            --output data/forward/diagnostics/forward-evidence-manifest.json \
+            --path data/forward/diagnostics/forward-failure-context.json \
+            --path "data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json" \
+            --path data/forward/diagnostics/evidence-audit.json \
+            --path data/forward/diagnostics/forward-status.json \
+            --path data/forward/diagnostics/forward-alert-receipt.json
+          uv run python scripts/verify_forward_evidence_manifest.py \
+            --root . \
+            --manifest data/forward/diagnostics/forward-evidence-manifest.json
+
+      - name: Upload forward evidence manifest
+        if: ${{ always() && !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: forward-evidence-manifest-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/forward/diagnostics/forward-evidence-manifest.json
+            data/forward/diagnostics/forward-failure-context.json
+            data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
+            data/forward/diagnostics/evidence-audit.json
+            data/forward/diagnostics/forward-status.json
+            data/forward/diagnostics/forward-alert-receipt.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Save resumable filing and embedding caches
         if: ${{ always() && steps.runtime_cache.outcome == 'success' }}
         uses: actions/cache/save@v5
