@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 EXPECTED_BUILD_COMMAND = (
+    "npm --prefix apps/web ci && npm run build:public && "
     "python3 scripts/verify_public_snapshot_lock.py && "
     "python3 scripts/validate_deployment_contract.py && "
     "python3 scripts/validate_public_bundle.py"

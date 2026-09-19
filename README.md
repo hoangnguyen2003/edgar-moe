@@ -87,7 +87,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. The content-addressed `config/public_snapshot.lock.json` is verified in CI and the Vercel build, so changing the frozen v1 snapshot is an explicit reviewed decision. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds it from `apps/web`, checks its asset graph for publishable secrets/source maps, and validates the disclosure files; CI separately rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. The content-addressed `config/public_snapshot.lock.json` is verified in CI and the Vercel build, so changing the frozen v1 snapshot is an explicit reviewed decision. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
 
 The repository also ships a provider-neutral container path for a future host:
 
