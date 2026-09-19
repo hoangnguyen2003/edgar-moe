@@ -27,6 +27,18 @@ class FakeResponse:
                 "Content-Type": content_type,
                 "X-Content-Type-Options": "nosniff",
                 "X-Frame-Options": "DENY",
+                "Referrer-Policy": "strict-origin-when-cross-origin",
+                "Cross-Origin-Opener-Policy": "same-origin",
+                "Cross-Origin-Resource-Policy": "same-site",
+                "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+                "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+                "Content-Security-Policy": (
+                    "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
+                    "form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+                    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+                    "font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; "
+                    "connect-src 'self'"
+                ),
             }
         )
         self._url = url
@@ -170,3 +182,26 @@ def test_smoke_rejects_missing_security_header(monkeypatch: pytest.MonkeyPatch) 
     assert report["status"] == "failed"
     assert report["checks"][0]["error"] == "required_security_header_missing"
     assert report["checks"][0]["missing_headers"] == ["x-frame-options"]
+
+
+def test_smoke_rejects_invalid_content_security_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/"].headers["Content-Security-Policy"] = "default-src *"
+    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    assert report["checks"][0]["error"] == "required_security_header_missing"
+    assert "content-security-policy" in report["checks"][0]["missing_headers"]
+
+
+def test_smoke_requires_exact_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/"].headers["Content-Type"] = "text/html-malicious"
+    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    assert report["checks"][0]["error"] == "unexpected_content_type"

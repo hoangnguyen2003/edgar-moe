@@ -57,8 +57,8 @@ uv run pytest -q tests/integration/test_api.py
 After a deployment, run the manual GitHub Actions `Deployment smoke check`
 workflow with the HTTPS origin. It performs only bounded `GET` requests to the
 homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`, and
-`/api/v1/health`; it
-rejects cross-origin redirects, unexpected content types, degraded health, and
+`/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
+any mismatch in the full security-header contract, degraded health, and
 oversized responses. The retained report contains paths, statuses, and health
 state but never response bodies or credentials. This is a runtime observation,
 not proof of provider-side rate limits, backups, or database grants.

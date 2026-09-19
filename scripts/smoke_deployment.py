@@ -18,6 +18,18 @@ _REQUIRED_SECURITY_FIELDS = ("Contact:", "Policy:", "Preferred-Languages:", "Exp
 _REQUIRED_SECURITY_HEADERS = {
     "x-content-type-options": "nosniff",
     "x-frame-options": "deny",
+    "referrer-policy": "strict-origin-when-cross-origin",
+    "cross-origin-opener-policy": "same-origin",
+    "cross-origin-resource-policy": "same-site",
+    "strict-transport-security": "max-age=31536000; includesubdomains",
+    "permissions-policy": "camera=(), microphone=(), geolocation=()",
+    "content-security-policy": (
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
+        "form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+        "font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; "
+        "connect-src 'self'"
+    ),
 }
 
 
@@ -142,7 +154,8 @@ def _check_endpoint(
             }
             final_parts = urlsplit(response.geturl())
             final_origin = (final_parts.scheme.lower(), final_parts.netloc.lower())
-            check.update(http_status=status_code, content_type=content_type.split(";", 1)[0])
+            media_type = content_type.split(";", 1)[0].strip()
+            check.update(http_status=status_code, content_type=media_type)
             if final_origin != origin:
                 check["error"] = "redirected_to_different_origin"
                 return check
@@ -152,7 +165,7 @@ def _check_endpoint(
             if len(body) > _MAX_BODY_BYTES:
                 check["error"] = "response_too_large"
                 return check
-            if not content_type.startswith(expected_content_type):
+            if media_type != expected_content_type:
                 check["error"] = "unexpected_content_type"
                 return check
             missing_headers = [
