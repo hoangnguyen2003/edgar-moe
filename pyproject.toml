@@ -19,6 +19,7 @@ dependencies = [
   "psycopg[binary]>=3.2,<4",
   "pyyaml>=6,<7",
   "sqlalchemy>=2,<3",
+  "typer>=0.16,<1",
   "uvicorn>=0.35,<1",
 ]
 
@@ -39,7 +40,6 @@ research = [
   "tenacity>=9,<10",
   "torch>=2.7,<3",
   "transformers>=4.53,<5",
-  "typer>=0.16,<1",
 ]
 dev = [
   "mypy>=1.17,<2",

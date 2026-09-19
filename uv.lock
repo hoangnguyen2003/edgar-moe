@@ -395,6 +395,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "pyyaml" },
     { name = "sqlalchemy" },
+    { name = "typer" },
     { name = "uvicorn" },
 ]
 
@@ -427,7 +428,6 @@ research = [
     { name = "tenacity" },
     { name = "torch" },
     { name = "transformers" },
-    { name = "typer" },
 ]
 
 [package.metadata]
@@ -462,7 +462,7 @@ requires-dist = [
     { name = "tenacity", marker = "extra == 'research'", specifier = ">=9,<10" },
     { name = "torch", marker = "extra == 'research'", specifier = ">=2.7,<3" },
     { name = "transformers", marker = "extra == 'research'", specifier = ">=4.53,<5" },
-    { name = "typer", marker = "extra == 'research'", specifier = ">=0.16,<1" },
+    { name = "typer", specifier = ">=0.16,<1" },
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12,<7" },
     { name = "uvicorn", specifier = ">=0.35,<1" },
 ]
