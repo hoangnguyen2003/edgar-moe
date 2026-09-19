@@ -38,7 +38,8 @@ approved redistribution.
 - A missing or unavailable forward registry returns an explicit disconnected or
   `503` response; the API never falls back to a hosted writer credential.
 - Oversized or malformed query inputs fail with `422` before an unbounded scan.
-- Database failures return generic public errors; the server logs remain the
+- Database failures return generic public errors, and forward-run error records
+  use provider-neutral, value-redacted messages; the server logs remain the
   private operator channel and must not be copied into public responses.
 
 ## Verification

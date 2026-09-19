@@ -236,6 +236,12 @@ outcome, uploads it with any diagnostic already produced, and adds a failure
 summary to the run. This is durable investigation evidence, not a claim that an
 external alert recipient has been configured.
 
+The registry's public `error_message` field is provider-neutral: third-party
+database/object-store/request exceptions are recorded by type, while
+application state-machine details are compacted and credential-bearing URLs or
+assignments are redacted. Detailed provider diagnostics remain in the private
+workflow error artifact rather than the anonymous API response.
+
 Every forward attempt also writes `forward-evidence-manifest.json`. It records
 the safe workflow context, the relative paths declared for diagnostics/status/
 alert evidence, each file's size and SHA-256 when present, and explicit missing

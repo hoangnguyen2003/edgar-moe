@@ -21,6 +21,7 @@ from edgar_moe.forward.domain import (
     QualityCheckDraft,
     RunRegistration,
 )
+from edgar_moe.forward.failure_context import safe_exception_message
 from edgar_moe.forward.inference import ForecastBatch, FrozenPredictor
 from edgar_moe.forward.models import utc_now
 from edgar_moe.forward.registry import ForwardRegistry
@@ -147,7 +148,7 @@ class ForwardWorkflow:
             )
             raise
         except Exception as error:
-            self.registry.fail_run(run.run_id, error_message=f"{type(error).__name__}: {error}")
+            self.registry.fail_run(run.run_id, error_message=safe_exception_message(error))
             raise
 
     def settle(
@@ -246,7 +247,7 @@ class ForwardWorkflow:
             )
             raise
         except Exception as error:
-            self.registry.fail_run(run.run_id, error_message=f"{type(error).__name__}: {error}")
+            self.registry.fail_run(run.run_id, error_message=safe_exception_message(error))
             raise
 
     def _record_partial_artifact(

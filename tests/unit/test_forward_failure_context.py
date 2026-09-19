@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from edgar_moe.forward.failure_context import build_failure_context
+import psycopg
+
+from edgar_moe.forward.failure_context import build_failure_context, safe_exception_message
+from edgar_moe.forward.registry import RegistryStateError
 
 
 def test_failure_context_is_allowlisted_and_redacted() -> None:
@@ -33,3 +36,30 @@ def test_failure_context_is_allowlisted_and_redacted() -> None:
         "device": "cpu",
         "cycle_outcome": "failure",
     }
+
+
+def test_external_driver_errors_are_reduced_to_type_only() -> None:
+    error = psycopg.OperationalError(
+        "connection failed for postgresql://reader:super-secret@example.test/registry"
+    )
+
+    message = safe_exception_message(error)
+
+    assert message == "OperationalError"
+    assert "super-secret" not in message
+
+
+def test_internal_error_details_redact_urls_and_secret_assignments() -> None:
+    error = RegistryStateError(
+        "provider rejected postgresql://reader:super-secret@example.test/registry "
+        "api_key=abcdef123 password='another-secret'"
+    )
+
+    message = safe_exception_message(error)
+
+    assert message.startswith("RegistryStateError: provider rejected")
+    assert "super-secret" not in message
+    assert "example.test" not in message
+    assert "abcdef123" not in message
+    assert "another-secret" not in message
+    assert "<redacted>" in message

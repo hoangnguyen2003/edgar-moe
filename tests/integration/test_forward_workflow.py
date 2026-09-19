@@ -8,6 +8,7 @@ from pathlib import Path
 import numpy as np
 import orjson
 import pandas as pd
+import psycopg
 import pytest
 
 from edgar_moe.features.dataset import ResearchDataset
@@ -60,6 +61,20 @@ class FixturePredictor:
             forecasts=[draft],
             checks=[QualityCheckDraft(name="point_in_time_availability", status="passed")],
             candidate_indices=np.array([0]),
+        )
+
+
+class ExternalFailurePredictor:
+    def forecast(
+        self,
+        dataset: ResearchDataset,
+        *,
+        as_of: datetime,
+        device: str = "cpu",
+    ) -> ForecastBatch:
+        del dataset, as_of, device
+        raise psycopg.OperationalError(
+            "connection failed for postgresql://reader:super-secret@example.test/registry"
         )
 
 
@@ -236,6 +251,23 @@ def test_mirror_failure_records_primary_for_reconciliation_and_retry(tmp_path: P
     assert retry.counts["forecasts_idempotent"] == 1
     assert len(registry.list_artifacts()) == 2
     assert registry.list_runs(limit=1)[0]["status"] == "succeeded"
+    database.dispose()
+
+
+def test_external_failure_is_redacted_in_public_run_record(tmp_path: Path) -> None:
+    workflow, registry, database, training_dir, forecast_as_of, _ = build_workflow_fixture(tmp_path)
+
+    with pytest.raises(psycopg.OperationalError):
+        workflow.forecast(
+            training_dir,
+            as_of=forecast_as_of,
+            code_revision="deadbeef",
+            predictor=ExternalFailurePredictor(),
+        )
+
+    failed_run = registry.list_runs(limit=1)[0]
+    assert failed_run["error_message"] == "OperationalError"
+    assert "super-secret" not in str(failed_run)
     database.dispose()
 
 
