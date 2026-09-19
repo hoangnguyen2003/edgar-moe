@@ -56,6 +56,13 @@ flowchart LR
   run `scripts/verify_postgres_reader.py` with the reader URL. The verifier checks
   effective privileges and rolled-back UPDATE, DELETE, and DDL probes; a green
   application test is not evidence that the provider grants are correct.
+- For a repeatable hosted check, add the exact SELECT-only URL as the
+  `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` GitHub Actions secret, then manually run
+  **Provider reader contract audit** from the Actions tab. The job never prints the
+  URL, retains the redacted role report, failure output, run metadata, and SHA-256
+  file list for 30 days, and fails when the secret is absent or any forbidden probe
+  succeeds. A successful local CI service test is not a substitute for this
+  provider-specific run; do not configure the writer URL as the secret.
 - Use Cloudflare R2 only for non-public model/run evidence. Create a scoped token for one bucket; do not expose R2 credentials to the browser.
 - Vercel serves the React bundle and read-only GET endpoints. It never trains, forecasts, settles labels, or holds market-data credentials.
 - The application remains useful without Postgres: historical v1 pages load normally and Forward Lab reports that its registry is disconnected.
