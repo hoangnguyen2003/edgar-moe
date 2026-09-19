@@ -37,6 +37,7 @@ jobs:
         env:
           DEPLOYMENT_URL: >-
             ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_url ||
+            vars.EDGAR_MOE_PUBLIC_DEPLOYMENT_URL ||
             github.event.deployment_status.target_url }}
         run: |
           mkdir -p reports/deployment-smoke

@@ -55,9 +55,12 @@ uv run pytest -q tests/integration/test_api.py
 ```
 
 After a successful Production deployment, GitHub automatically runs the
-`Deployment smoke check` workflow against the deployment status target URL. The
-same workflow keeps a manual HTTPS-origin trigger for rechecks and non-GitHub
-deployments. It performs only bounded `GET` requests to the
+`Deployment smoke check` workflow against the HTTPS origin in the
+`EDGAR_MOE_PUBLIC_DEPLOYMENT_URL` repository variable. This explicit public
+origin is important when the hosting provider protects per-deployment URLs;
+the workflow falls back to the deployment status target when the variable is
+absent. The same workflow keeps a manual HTTPS-origin trigger for rechecks and
+non-GitHub deployments. It performs only bounded `GET` requests to the
 homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`, and
 `/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
 any mismatch in the full security-header contract (including a one-year HSTS

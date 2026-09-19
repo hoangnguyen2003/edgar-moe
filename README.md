@@ -87,7 +87,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app into both supported output directories and checks the disclosure files; CI remains the gate for source/bundle and snapshot-lock validation. After a successful Production deployment, the `Deployment smoke check` GitHub workflow automatically probes the public origin and retains a redacted report; it can also be triggered manually for rechecks. Vercel applies browser security headers to the static response, while FastAPI applies the same policy to API responses. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app into both supported output directories and checks the disclosure files; CI remains the gate for source/bundle and snapshot-lock validation. After a successful Production deployment, the `Deployment smoke check` GitHub workflow automatically probes the configured `EDGAR_MOE_PUBLIC_DEPLOYMENT_URL` repository variable (falling back to the deployment target when the variable is absent) and retains a redacted report; it can also be triggered manually for rechecks. Vercel applies browser security headers to the static response, while FastAPI applies the same policy to API responses. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
 
 The repository also ships a provider-neutral container path for a future host:
 
