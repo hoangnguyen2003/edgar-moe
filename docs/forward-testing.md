@@ -144,6 +144,10 @@ EDGAR_MOE_R2_ENDPOINT_URL
 EDGAR_MOE_R2_BUCKET
 EDGAR_MOE_R2_ACCESS_KEY_ID
 EDGAR_MOE_R2_SECRET_ACCESS_KEY
+# Optional independent Go audit (SELECT-only DB role and read-only R2 token):
+EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL
+EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID
+EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY
 # Optional HTTPS webhook for redacted failure/health alerts:
 EDGAR_MOE_ALERT_WEBHOOK_URL
 ```
@@ -185,6 +189,13 @@ messages, and source data are never copied. Without the optional secret the
 steps skip delivery at no cost. When configured, the workflow retains a
 redacted delivery receipt with the alert dedupe key and HTTP result for 30 days;
 the receipt never contains the webhook URL.
+
+If `EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL` is configured, the same scheduled
+job runs the independent Go auditor against the R2 mirror after the cycle. It
+uses the separate `EDGAR_MOE_R2_AUDITOR_*` read-only token, uploads the JSON
+report for 30 days, and fails the workflow on an integrity finding or an
+unavailable dependency. A missing optional auditor URL skips this step; it does
+not prove that the production mirror was audited.
 
 ## Research drift review
 

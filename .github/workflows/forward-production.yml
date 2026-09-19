@@ -43,6 +43,9 @@ jobs:
       EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
       EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
       EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+      EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+      EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+      EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
       EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
       HF_HOME: ${{ github.workspace }}/data/cache/huggingface
       PYTHONUNBUFFERED: "1"
@@ -53,6 +56,13 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+
+      - name: Set up Go evidence auditor (optional)
+        if: ${{ env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL != '' }}
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
 
       - name: Install frozen research and operations runtime
         run: uv sync --extra research --extra operations
@@ -122,11 +132,39 @@ jobs:
           --diagnostic-output
           "data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json"
 
+      - name: Audit R2 evidence after cycle (optional)
+        id: evidence_audit
+        if: ${{ always() && !cancelled() && env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL != '' }}
+        working-directory: tools/evidence-auditor
+        env:
+          AUDITOR_DATABASE_URL: ${{ env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ env.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ env.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ env.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ env.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+        shell: bash
+        run: |
+          mkdir -p ../../data/forward/diagnostics
+          set +e
+          go run . -timeout 5m -stale-after 96h > ../../data/forward/diagnostics/evidence-audit.json
+          audit_code=$?
+          cat ../../data/forward/diagnostics/evidence-audit.json
+          exit "$audit_code"
+
+      - name: Upload evidence-audit report (optional)
+        if: ${{ always() && !cancelled() && steps.evidence_audit.outcome != 'skipped' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: forward-evidence-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: data/forward/diagnostics/evidence-audit.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Capture failed-cycle context
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') }}
         env:
           CUTOFF: ${{ steps.cutoff.outputs.date }}
-          CYCLE_OUTCOME: ${{ steps.forward_cycle.outcome }}
+          CYCLE_OUTCOME: ${{ steps.evidence_audit.outcome == 'failure' && 'evidence_audit_failure' || steps.forward_cycle.outcome }}
           DEVICE: ${{ inputs.device || 'cpu' }}
           EDGAR_MOE_FAILURE_CONTEXT_PATH: data/forward/diagnostics/forward-failure-context.json
         shell: bash
@@ -134,7 +172,7 @@ jobs:
           uv run python scripts/write_forward_failure_context.py
 
       - name: Notify failed cycle (optional)
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
         continue-on-error: true
         env:
           EDGAR_MOE_FAILURE_CONTEXT_PATH: data/forward/diagnostics/forward-failure-context.json
@@ -143,7 +181,7 @@ jobs:
         run: uv run python scripts/notify_forward_alert.py
 
       - name: Upload failure evidence
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') }}
         uses: actions/upload-artifact@v7
         with:
           name: forward-failure-${{ github.run_id }}-${{ github.run_attempt }}
@@ -151,11 +189,12 @@ jobs:
             data/forward/diagnostics/forward-failure-context.json
             data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
             data/forward/diagnostics/forward-alert-receipt.json
+            data/forward/diagnostics/evidence-audit.json
           if-no-files-found: ignore
           retention-days: 30
 
       - name: Publish failure summary
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
+        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') }}
         shell: bash
         env:
           CUTOFF: ${{ steps.cutoff.outputs.date }}
@@ -165,13 +204,14 @@ jobs:
             echo '## Prospective cycle failure'
             echo "- Cutoff: \`$CUTOFF\`"
             echo "- Cycle outcome: \`$CYCLE_OUTCOME\`"
+            echo "- Evidence audit outcome: \`${{ steps.evidence_audit.outcome }}\`"
             echo "- Run: \`${GITHUB_RUN_ID}\` (attempt \`${GITHUB_RUN_ATTEMPT}\`)"
             echo '- Failure context was uploaded as a 30-day artifact.'
             echo '- The registry run remains immutable; investigate and retry with a new run identity.'
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload short-horizon diagnostic
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' }}
         uses: actions/upload-artifact@v7
         with:
           name: forward-diagnostic-${{ steps.cutoff.outputs.date }}
@@ -180,7 +220,7 @@ jobs:
           retention-days: 30
 
       - name: Capture registry health status (optional)
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
         shell: bash
         run: |
           status_path=data/forward/diagnostics/forward-status.json
@@ -190,7 +230,7 @@ jobs:
           fi
 
       - name: Notify registry health (optional)
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
         continue-on-error: true
         env:
           EDGAR_MOE_ALERT_RECEIPT_PATH: data/forward/diagnostics/forward-alert-receipt.json
@@ -198,7 +238,7 @@ jobs:
         run: uv run python scripts/notify_forward_alert.py --status-file data/forward/diagnostics/forward-status.json
 
       - name: Upload optional health alert evidence
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: forward-health-alert-${{ github.run_id }}-${{ github.run_attempt }}
