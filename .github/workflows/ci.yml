@@ -47,6 +47,7 @@ jobs:
         run: |
           uv run python scripts/write_operator_evidence_packet.py --help
           uv run python scripts/verify_operator_evidence_packet.py --help
+          uv run python scripts/check_operator_readiness.py --help
       - name: Check retained evidence redaction command is runnable
         run: uv run python scripts/validate_redacted_artifacts.py --help
       - name: Check artifact reconciliation command is runnable

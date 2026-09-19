@@ -20,6 +20,10 @@ uv run python scripts/write_operator_evidence_packet.py \
 
 uv run python scripts/verify_operator_evidence_packet.py \
   --packet /tmp/operator-evidence-packet.json
+
+uv run python scripts/check_operator_readiness.py \
+  --packet /tmp/operator-evidence-packet.json \
+  --max-age-days 30
 ```
 
 The writer validates the draft, adds `packet_sha256`, and publishes the finished
@@ -28,6 +32,14 @@ the hash, timestamps, check coverage, artifact hashes, and redaction contract
 without printing packet contents. It rejects URLs, connection strings,
 secret-like assignments, private-key material, absolute/path-traversal artifact
 names, unknown fields, and passed/failed checks without evidence references.
+
+The readiness command is a separate, read-only release aid. It requires the
+three P0 provider checks (`database_least_privilege`, `restore_rehearsal`, and
+`partial_write_reconciliation`) to be explicitly `passed`, backed by evidence
+references, and observed within the requested freshness window. It exits `0`
+only for `ready`; incomplete evidence returns `blocked`, and old otherwise
+passed evidence returns `stale`. It never changes packet status or creates
+provider evidence.
 
 ## Required operator evidence
 

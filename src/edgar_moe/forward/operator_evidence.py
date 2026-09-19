@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import orjson
@@ -20,6 +20,11 @@ _CHECK_IDS = frozenset(
         "capacity_baseline",
         "drift_history",
     }
+)
+REQUIRED_PROVIDER_CHECKS = (
+    "database_least_privilege",
+    "restore_rehearsal",
+    "partial_write_reconciliation",
 )
 _STATUSES = frozenset({"passed", "failed", "not_run", "not_applicable"})
 _PACKET_KEYS = frozenset(
@@ -100,6 +105,74 @@ def packet_summary(payload: Mapping[str, Any]) -> dict[str, Any]:
         "packet_sha256": payload["packet_sha256"],
         "check_counts": counts,
         "artifact_count": len(payload["artifacts"]),
+    }
+
+
+def operator_readiness(
+    payload: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+    max_age: timedelta = timedelta(days=30),
+) -> dict[str, Any]:
+    """Summarize whether required provider controls are passed and current.
+
+    This is intentionally a read-only decision aid. It verifies the packet but
+    never upgrades ``not_run`` or ``failed`` checks and never treats a packet
+    as evidence that was not referenced by the packet itself.
+    """
+    if max_age <= timedelta(0):
+        raise ValueError("max_age must be positive")
+    verify_operator_evidence_packet(payload)
+    observed_now = now or datetime.now(UTC)
+    if observed_now.tzinfo is None or observed_now.utcoffset() is None:
+        raise ValueError("now must include a UTC offset")
+    observed_now = observed_now.astimezone(UTC)
+
+    checks = payload["checks"]
+    assert isinstance(checks, list)
+    by_id = {
+        str(check["check_id"]): check
+        for check in checks
+        if isinstance(check, Mapping)
+    }
+    results: list[dict[str, Any]] = []
+    blocked: list[str] = []
+    stale: list[str] = []
+    for check_id in REQUIRED_PROVIDER_CHECKS:
+        check = by_id.get(check_id)
+        if check is None:
+            results.append({"check_id": check_id, "status": "missing", "fresh": False})
+            blocked.append(check_id)
+            continue
+        status = str(check["status"])
+        observed_at = _parse_timestamp(check["observed_at"], f"{check_id}.observed_at")
+        age = observed_now - observed_at
+        age_seconds = int(age.total_seconds())
+        fresh = timedelta(0) <= age <= max_age
+        result = {
+            "check_id": check_id,
+            "status": status,
+            "observed_at": observed_at.isoformat().replace("+00:00", "Z"),
+            "age_seconds": age_seconds,
+            "fresh": fresh,
+            "evidence_ref_count": len(check["evidence_refs"]),
+        }
+        results.append(result)
+        if status != "passed" or age_seconds < 0:
+            blocked.append(check_id)
+        elif not fresh:
+            stale.append(check_id)
+
+    readiness_status = "blocked" if blocked else "stale" if stale else "ready"
+    return {
+        "status": readiness_status,
+        "packet_id": payload["packet_id"],
+        "packet_sha256": payload["packet_sha256"],
+        "captured_at": payload["captured_at"],
+        "max_age_seconds": int(max_age.total_seconds()),
+        "required_checks": results,
+        "blocked_checks": blocked,
+        "stale_checks": stale,
     }
 
 
@@ -253,7 +326,7 @@ def _require_identifier(value: Any, field: str) -> None:
         raise OperatorEvidenceError(f"{field} must match {_PACKET_ID.pattern}")
 
 
-def _require_timestamp(value: Any, field: str) -> None:
+def _parse_timestamp(value: Any, field: str) -> datetime:
     if not isinstance(value, str):
         raise OperatorEvidenceError(f"{field} must be an ISO-8601 timestamp")
     try:
@@ -262,6 +335,11 @@ def _require_timestamp(value: Any, field: str) -> None:
         raise OperatorEvidenceError(f"{field} must be an ISO-8601 timestamp") from error
     if parsed.tzinfo is None or parsed.utcoffset() != UTC.utcoffset(parsed):
         raise OperatorEvidenceError(f"{field} must include a UTC offset")
+    return parsed.astimezone(UTC)
+
+
+def _require_timestamp(value: Any, field: str) -> None:
+    _parse_timestamp(value, field)
 
 
 def _require_text(value: Any, field: str, *, maximum: int) -> None:
