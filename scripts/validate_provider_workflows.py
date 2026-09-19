@@ -10,6 +10,7 @@ from typing import Any, cast
 import yaml
 
 PROVIDER_WORKFLOWS = (
+    "provider-evidence-preflight.yml",
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
@@ -45,11 +46,13 @@ def validate_provider_workflows(
         workflow = cast(dict[str, Any], document)
         errors.extend(_validate_common(name, workflow))
         errors.extend(_validate_secrets(name, workflow))
-        if name == "provider-reader-contract-audit.yml":
+        if name == "provider-evidence-preflight.yml":
+            errors.extend(_validate_preflight(name, workflow))
+        elif name == "provider-reader-contract-audit.yml":
             errors.extend(_validate_reader(name, workflow))
         elif name == "provider-r2-evidence-audit.yml":
             errors.extend(_validate_r2(name, workflow))
-        else:
+        elif name == "provider-restore-rehearsal.yml":
             errors.extend(_validate_restore(name, workflow))
 
     return errors
@@ -184,6 +187,26 @@ def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
     ):
         if forbidden in text:
             errors.append(f"{name}: writer database secret must not enter reader audit")
+    return errors
+
+
+def _validate_preflight(name: str, workflow: dict[str, Any]) -> list[str]:
+    text = _workflow_text(workflow)
+    errors: list[str] = []
+    for required in (
+        "scripts/check_provider_evidence_prerequisites.py",
+        "REPORT_DIR",
+        "SHA256SUMS",
+        "scripts/validate_redacted_artifacts.py",
+        "provider evidence preflight",
+    ):
+        if required not in text:
+            errors.append(f"{name}: missing prerequisite preflight marker {required}")
+    for forbidden in ("--repair", "pg_dump", "pg_restore"):
+        if forbidden in text:
+            errors.append(
+                f"{name}: provider preflight must not execute provider mutations: {forbidden}"
+            )
     return errors
 
 

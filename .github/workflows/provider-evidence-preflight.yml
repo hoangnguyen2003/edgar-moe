@@ -1,0 +1,79 @@
+name: Provider evidence preflight
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: provider-evidence-preflight
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}
+      EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+      EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+      EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+      EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+      EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+      EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
+      EDGAR_MOE_RESTORE_TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
+      EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
+      EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+      EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+      EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+      EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+      REPORT_DIR: reports/provider-evidence-preflight
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - run: uv sync --locked --extra dev
+
+      - name: Run value-redacting prerequisite check
+        id: preflight
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$REPORT_DIR"
+          uv run python scripts/check_provider_evidence_prerequisites.py \
+            --output "$REPORT_DIR/summary.json"
+          exit_code=$?
+          set -e
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
+
+      - name: Hash preflight evidence
+        if: ${{ always() }}
+        shell: bash
+        run: sha256sum "$REPORT_DIR/summary.json" > "$REPORT_DIR/SHA256SUMS"
+
+      - name: Verify retained preflight evidence is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$REPORT_DIR"
+
+      - name: Upload provider evidence preflight
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: provider-evidence-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/provider-evidence-preflight/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless provider evidence prerequisites are configured
+        if: ${{ always() && (steps.preflight.outputs.exit_code != '0' || steps.redaction.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "Provider evidence prerequisites are blocked; inspect the retained redacted artifact." >&2
+          exit 1
