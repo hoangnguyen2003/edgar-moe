@@ -241,6 +241,9 @@ database/object-store/request exceptions are recorded by type, while
 application state-machine details are compacted and credential-bearing URLs or
 assignments are redacted. Detailed provider diagnostics remain in the private
 workflow error artifact rather than the anonymous API response.
+The runner's terminal stderr uses the same provider-neutral policy, so a failed
+refresh cannot copy a driver URL or credential-bearing exception into the
+workflow log.
 
 Every forward attempt also writes `forward-evidence-manifest.json`. It records
 the safe workflow context, the relative paths declared for diagnostics/status/

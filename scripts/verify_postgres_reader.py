@@ -17,6 +17,7 @@ import psycopg
 from psycopg import Connection, sql
 from psycopg.errors import InsufficientPrivilege
 
+from edgar_moe.forward.failure_context import redact_sensitive_text
 from edgar_moe.forward.reader_role import FORBIDDEN_TABLE_PRIVILEGES, READER_TABLES
 
 
@@ -164,7 +165,8 @@ def _safe_error_message(error: BaseException) -> str:
     """Avoid emitting driver text that may contain a connection string."""
     if isinstance(error, psycopg.Error):
         return type(error).__name__
-    return str(error)
+    detail = redact_sensitive_text(str(error))
+    return detail or type(error).__name__
 
 
 if __name__ == "__main__":

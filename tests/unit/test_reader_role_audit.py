@@ -44,3 +44,15 @@ def test_reader_audit_redacts_psycopg_exception_text() -> None:
 
     assert message == "OperationalError"
     assert "super-secret" not in message
+
+
+def test_reader_audit_redacts_non_driver_error_details() -> None:
+    error = _MODULE.ReaderRoleAuditError(
+        "reader failed at https://provider.example/db token=super-secret"
+    )
+
+    message = _MODULE._safe_error_message(error)
+
+    assert "provider.example" not in message
+    assert "super-secret" not in message
+    assert "<redacted>" in message
