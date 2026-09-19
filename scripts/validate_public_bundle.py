@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
@@ -34,6 +35,7 @@ _SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)
 _SECURITY_EXPIRES = re.compile(
     r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$"
 )
+_HTTPS_URL = re.compile(r"^https://\S+$")
 
 
 def validate_public_bundle(root: Path = Path("public")) -> list[str]:
@@ -47,6 +49,7 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
         errors.append("public/index.html is missing")
 
     _validate_disclosure_metadata(root, errors)
+    _validate_provenance_manifest(root, errors)
 
     files = sorted(path for path in root.rglob("*") if path.is_file())
     for path in files:
@@ -110,6 +113,63 @@ def _validate_disclosure_metadata(root: Path, errors: list[str]) -> None:
     ):
         if not pattern.search(security_text):
             errors.append(f"public/.well-known/security.txt is missing a valid {field} field")
+
+
+def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
+    """Require an explicit, conservative source and redistribution contract."""
+    manifest_path = root / "data-provenance.json"
+    if not manifest_path.is_file():
+        errors.append("public/data-provenance.json is missing")
+        return
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        errors.append("public/data-provenance.json is not readable JSON")
+        return
+    if not isinstance(payload, dict):
+        errors.append("public/data-provenance.json must be a JSON object")
+        return
+    if payload.get("schema_version") != 1:
+        errors.append("public/data-provenance.json schema_version must be 1")
+
+    snapshot = payload.get("snapshot")
+    if not isinstance(snapshot, dict):
+        errors.append("public/data-provenance.json snapshot must be an object")
+    else:
+        if snapshot.get("data_mode") != "authenticated_locked_test":
+            errors.append("public provenance data_mode must remain authenticated_locked_test")
+        if snapshot.get("raw_sources_public") is not False:
+            errors.append("public provenance must declare raw_sources_public=false")
+        if snapshot.get("derived_output_public") is not True:
+            errors.append("public provenance must declare derived_output_public=true")
+
+    review = payload.get("review")
+    if not isinstance(review, dict):
+        errors.append("public/data-provenance.json review must be an object")
+    else:
+        if review.get("redistribution_status") != "operator_review_required":
+            errors.append("public provenance redistribution status must require review")
+        if review.get("legal_approval") is not False:
+            errors.append("public provenance legal_approval must remain false")
+
+    sources = payload.get("sources")
+    if not isinstance(sources, list) or not sources:
+        errors.append("public provenance sources must be a non-empty list")
+    else:
+        for index, source in enumerate(sources):
+            if not isinstance(source, dict):
+                errors.append(f"public provenance source {index} must be an object")
+                continue
+            if not all(isinstance(source.get(field), str) and source[field] for field in (
+                "id", "name", "role"
+            )):
+                errors.append(f"public provenance source {index} is missing identity fields")
+            if not _HTTPS_URL.fullmatch(str(source.get("terms_url", ""))):
+                errors.append(f"public provenance source {index} must have an HTTPS terms_url")
+            if source.get("redistribution_status") != "review_required":
+                errors.append(
+                    f"public provenance source {index} redistribution status must require review"
+                )
 
 
 def _resolve_asset_reference(source: Path, root: Path, reference: str) -> Path | None:

@@ -54,6 +54,14 @@ def run_smoke(
             "text/plain",
             timeout,
         ),
+        _check_endpoint(
+            base,
+            origin,
+            "/data-provenance.json",
+            "provenance",
+            "application/json",
+            timeout,
+        ),
         _check_endpoint(base, origin, "/api/v1/health", "health", "application/json", timeout),
     ]
 
@@ -84,6 +92,20 @@ def run_smoke(
                         check.update(status="failed", error="health_status_invalid")
                     elif health_status == "degraded" and not allow_degraded:
                         check.update(status="failed", error="health_status_degraded")
+        elif check["name"] == "provenance":
+            payload = check.pop("_json", None)
+            if check["status"] == "passed":
+                snapshot = payload.get("snapshot") if isinstance(payload, dict) else None
+                review = payload.get("review") if isinstance(payload, dict) else None
+                if not isinstance(snapshot, dict) or not isinstance(review, dict):
+                    check.update(status="failed", error="provenance_contract_invalid")
+                elif (
+                    snapshot.get("raw_sources_public") is not False
+                    or snapshot.get("derived_output_public") is not True
+                    or review.get("redistribution_status") != "operator_review_required"
+                    or review.get("legal_approval") is not False
+                ):
+                    check.update(status="failed", error="provenance_review_contract_invalid")
 
     failed = [check for check in checks if check["status"] != "passed"]
     return {
@@ -143,7 +165,7 @@ def _check_endpoint(
                 check["missing_headers"] = missing_headers
                 return check
             decoded = body.decode("utf-8")
-            if name == "health":
+            if name in {"health", "provenance"}:
                 try:
                     check["_json"] = json.loads(decoded)
                 except json.JSONDecodeError:

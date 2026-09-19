@@ -34,7 +34,7 @@ The dataset builder stores the source timestamp beside every feature and rejects
 - Free-plan historical coverage can begin later than the requested start date;
   report the observed bar range and resulting temporal split dates for every run.
 - Split-adjusted daily bars exclude dividend total return and cannot model intraday slippage.
-- Public snapshots contain derived values only and are not a redistribution of raw market data.
+- Public snapshots contain derived values only and are not a redistribution of raw market data. The deployed bundle exposes `data-provenance.json`, which records the source families and keeps redistribution review explicitly pending.
 
 ## Public snapshot and synthetic fixture
 

@@ -67,6 +67,19 @@ def complete_responses() -> dict[str, FakeResponse]:
             "Preferred-Languages: en, vi\n"
             "Expires: 2027-09-19T00:00:00.000Z\n",
         ),
+        f"{base}/data-provenance.json": FakeResponse(
+            f"{base}/data-provenance.json",
+            json.dumps(
+                {
+                    "snapshot": {"raw_sources_public": False, "derived_output_public": True},
+                    "review": {
+                        "redistribution_status": "operator_review_required",
+                        "legal_approval": False,
+                    },
+                }
+            ),
+            "application/json",
+        ),
         f"{base}/api/v1/health": FakeResponse(
             f"{base}/api/v1/health",
             json.dumps({"status": "ok", "snapshot_loaded": True}),
@@ -95,6 +108,30 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert report["base_url"] == "https://terminal.example"
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
+
+
+def test_smoke_rejects_public_raw_source_contract(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/data-provenance.json"] = FakeResponse(
+        "https://terminal.example/data-provenance.json",
+        json.dumps(
+            {
+                "snapshot": {"raw_sources_public": True, "derived_output_public": True},
+                "review": {
+                    "redistribution_status": "operator_review_required",
+                    "legal_approval": False,
+                },
+            }
+        ),
+        "application/json",
+    )
+    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    provenance = next(check for check in report["checks"] if check["name"] == "provenance")
+    assert provenance["error"] == "provenance_review_contract_invalid"
 
 
 def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

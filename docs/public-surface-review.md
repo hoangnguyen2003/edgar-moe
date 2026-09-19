@@ -22,6 +22,13 @@ same public-bundle validator used by CI and the Vercel build. They do not
 replace provider-side WAF/rate-limit configuration or establish a source-data
 license.
 
+It also publishes `data-provenance.json`, a conservative machine-readable
+contract for the snapshot's source families and redistribution boundary. It
+explicitly declares that raw sources are not public and that legal/provider
+review remains required. CI validates the shape and statuses; this is evidence
+of the repository's disclosure posture, not evidence that any provider has
+approved redistribution.
+
 ## Failure behavior
 
 - A failed public-bundle validation stops the Vercel build before a deployment is
@@ -48,7 +55,8 @@ uv run pytest -q tests/integration/test_api.py
 
 After a deployment, run the manual GitHub Actions `Deployment smoke check`
 workflow with the HTTPS origin. It performs only bounded `GET` requests to the
-homepage, `robots.txt`, `/.well-known/security.txt`, and `/api/v1/health`; it
+homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`, and
+`/api/v1/health`; it
 rejects cross-origin redirects, unexpected content types, degraded health, and
 oversized responses. The retained report contains paths, statuses, and health
 state but never response bodies or credentials. This is a runtime observation,

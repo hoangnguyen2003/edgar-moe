@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "snapshot": {
+    "path": "data/demo/snapshot.json",
+    "data_mode": "authenticated_locked_test",
+    "as_of": "2026-07-31",
+    "raw_sources_public": false,
+    "derived_output_public": true
+  },
+  "review": {
+    "redistribution_status": "operator_review_required",
+    "legal_approval": false,
+    "last_reviewed_at": null
+  },
+  "sources": [
+    {
+      "id": "sec-edgar",
+      "name": "SEC EDGAR",
+      "role": "Filings, submissions, and company facts",
+      "terms_url": "https://www.sec.gov/edgar",
+      "redistribution_status": "review_required"
+    },
+    {
+      "id": "alpaca-iex",
+      "name": "Alpaca market data (IEX feed)",
+      "role": "Split-adjusted daily bars and corporate actions",
+      "terms_url": "https://alpaca.markets/data",
+      "redistribution_status": "review_required"
+    },
+    {
+      "id": "fred-alfred",
+      "name": "FRED/ALFRED",
+      "role": "Macro observations and initial-release vintages",
+      "terms_url": "https://fred.stlouisfed.org/docs/api/terms_of_use.html",
+      "redistribution_status": "review_required"
+    }
+  ],
+  "notice": "This manifest records the public data boundary and review state. It is not legal advice, a license grant, or provider approval."
+}

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 from pathlib import Path
 
 _VALIDATOR_PATH = Path(__file__).parents[2] / "scripts" / "validate_public_bundle.py"
@@ -27,6 +28,32 @@ def write_bundle(root: Path, *, main: str = "") -> None:
         "Policy: https://example.test/policy\n"
         "Preferred-Languages: en, vi\n"
         "Expires: 2027-09-19T00:00:00.000Z\n",
+        encoding="utf-8",
+    )
+    (root / "data-provenance.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "snapshot": {
+                    "data_mode": "authenticated_locked_test",
+                    "raw_sources_public": False,
+                    "derived_output_public": True,
+                },
+                "review": {
+                    "redistribution_status": "operator_review_required",
+                    "legal_approval": False,
+                },
+                "sources": [
+                    {
+                        "id": "fixture",
+                        "name": "Fixture source",
+                        "role": "test data",
+                        "terms_url": "https://example.test/terms",
+                        "redistribution_status": "review_required",
+                    }
+                ],
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -67,11 +94,13 @@ def test_public_bundle_requires_disclosure_metadata(tmp_path: Path) -> None:
     write_bundle(tmp_path)
     (tmp_path / "robots.txt").unlink()
     (tmp_path / ".well-known" / "security.txt").unlink()
+    (tmp_path / "data-provenance.json").unlink()
 
     errors = validate_public_bundle(tmp_path)
 
     assert "public/robots.txt is missing" in errors
     assert "public/.well-known/security.txt is missing" in errors
+    assert "public/data-provenance.json is missing" in errors
 
 
 def test_public_bundle_rejects_incomplete_security_txt(tmp_path: Path) -> None:
@@ -84,3 +113,14 @@ def test_public_bundle_rejects_incomplete_security_txt(tmp_path: Path) -> None:
 
     assert any("valid Policy field" in error for error in errors)
     assert any("valid Expires field" in error for error in errors)
+
+
+def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    manifest = json.loads((tmp_path / "data-provenance.json").read_text(encoding="utf-8"))
+    manifest["snapshot"]["raw_sources_public"] = True
+    (tmp_path / "data-provenance.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert "public provenance must declare raw_sources_public=false" in errors
