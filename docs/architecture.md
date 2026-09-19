@@ -119,12 +119,12 @@ earliest-event audits are supplementary and must be labeled as such.
 
 ### Deployment and operations
 
-`vercel.json` builds the React application into the deterministic `public/`
-output directory, validates the deployment contract and publishable bundle,
-packages the Python API, and requests `sin1`. CI separately rebuilds the React
-assets and checks that committed assets match source. The Vercel build is
-therefore self-contained, but it must not be assumed to wait for CI unless
-account settings enforce that gate.
+`vercel.json` builds the React application into both the framework's native
+`apps/web/dist` directory and the deterministic `public/` output directory,
+checks that the disclosure files exist, packages the Python API, and requests
+`sin1`. CI remains the authoritative deployment-contract and publishable-bundle
+validation gate; the Vercel build itself must not be assumed to wait for CI
+unless account settings enforce that gate.
 
 The forward workflow pins Ubuntu 24.04, runs Tuesday–Saturday at 07:17 UTC,
 serializes production jobs, and has a 300-minute compute deadline inside a
