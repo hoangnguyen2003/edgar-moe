@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import subprocess
 import sys
@@ -211,6 +212,95 @@ def test_cli_writes_and_verifies_packet(tmp_path: Path) -> None:
     summary = json.loads(verified.stdout)
     assert summary["status"] == "verified"
     assert summary["check_counts"]["not_run"] == 1
+
+
+def test_cli_builds_packet_from_declared_redacted_artifacts(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    artifact = artifact_root / "reader-audit.json"
+    artifact.write_text('{"status":"passed"}\n', encoding="utf-8")
+    draft_path = tmp_path / "draft.json"
+    packet_path = tmp_path / "packet.json"
+    draft_path.write_text(json.dumps(_draft(status="passed")), encoding="utf-8")
+
+    built = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_operator_evidence_packet.py",
+            "--input",
+            str(draft_path),
+            "--artifact-root",
+            str(artifact_root),
+            "--output",
+            str(packet_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    result = json.loads(built.stdout)
+    packet = json.loads(packet_path.read_text(encoding="utf-8"))
+    assert result["status"] == "written"
+    assert result["artifact_count"] == 1
+    assert packet["artifacts"] == [
+        {
+            "name": "reader-audit.json",
+            "sha256": hashlib.sha256(artifact.read_bytes()).hexdigest(),
+            "size_bytes": artifact.stat().st_size,
+            "retention_days": 30,
+        }
+    ]
+    verify_operator_evidence_packet(packet)
+    assert not list(tmp_path.glob(".*.staging-*"))
+
+
+def test_cli_rejects_undeclared_or_sensitive_artifacts(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    (artifact_root / "reader-audit.json").write_text('{"status":"passed"}\n', encoding="utf-8")
+    (artifact_root / "unexpected.json").write_text('{}\n', encoding="utf-8")
+    draft_path = tmp_path / "draft.json"
+    draft_path.write_text(json.dumps(_draft(status="passed")), encoding="utf-8")
+    packet_path = tmp_path / "packet.json"
+
+    undeclared = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_operator_evidence_packet.py",
+            "--input",
+            str(draft_path),
+            "--artifact-root",
+            str(artifact_root),
+            "--output",
+            str(packet_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert undeclared.returncode == 2
+    assert not packet_path.exists()
+
+    (artifact_root / "unexpected.json").unlink()
+    (artifact_root / "reader-audit.json").write_text(
+        '{"token":"secret-value"}\n', encoding="utf-8"
+    )
+    sensitive = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_operator_evidence_packet.py",
+            "--input",
+            str(draft_path),
+            "--artifact-root",
+            str(artifact_root),
+            "--output",
+            str(packet_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert sensitive.returncode == 2
+    assert not packet_path.exists()
 
 
 def test_cli_reports_operator_readiness_without_exposing_packet_contents(tmp_path: Path) -> None:
