@@ -28,6 +28,12 @@ _PRIVATE_RUNTIME_NAMES = re.compile(
 )
 _SOURCE_MAP_REFERENCE = re.compile(r"sourceMappingURL|[A-Za-z0-9._/-]+\.(?:js|css)\.map")
 _ASSET_REFERENCE = re.compile(r"[\"`]((?:/|\./)?(?:assets/)?[A-Za-z0-9._/-]+\.(?:js|css))[\"`]")
+_SECURITY_CONTACT = re.compile(r"(?m)^Contact:\s*\S+\s*$")
+_SECURITY_POLICY = re.compile(r"(?m)^Policy:\s*\S+\s*$")
+_SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)*\s*$")
+_SECURITY_EXPIRES = re.compile(
+    r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$"
+)
 
 
 def validate_public_bundle(root: Path = Path("public")) -> list[str]:
@@ -39,6 +45,8 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
     index = root / "index.html"
     if not index.is_file():
         errors.append("public/index.html is missing")
+
+    _validate_disclosure_metadata(root, errors)
 
     files = sorted(path for path in root.rglob("*") if path.is_file())
     for path in files:
@@ -67,6 +75,41 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
                 )
 
     return errors
+
+
+def _validate_disclosure_metadata(root: Path, errors: list[str]) -> None:
+    """Require the low-cost, provider-neutral public disclosure files."""
+    robots = root / "robots.txt"
+    if not robots.is_file():
+        errors.append("public/robots.txt is missing")
+    else:
+        try:
+            robots_text = robots.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            errors.append("public/robots.txt must be UTF-8 text")
+        else:
+            if "User-agent: *" not in robots_text:
+                errors.append("public/robots.txt must define a wildcard user-agent")
+            if "Disallow: /api/" not in robots_text:
+                errors.append("public/robots.txt must disallow /api/ indexing")
+
+    security = root / ".well-known" / "security.txt"
+    if not security.is_file():
+        errors.append("public/.well-known/security.txt is missing")
+        return
+    try:
+        security_text = security.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        errors.append("public/.well-known/security.txt must be UTF-8 text")
+        return
+    for pattern, field in (
+        (_SECURITY_CONTACT, "Contact"),
+        (_SECURITY_POLICY, "Policy"),
+        (_SECURITY_LANGUAGES, "Preferred-Languages"),
+        (_SECURITY_EXPIRES, "Expires"),
+    ):
+        if not pattern.search(security_text):
+            errors.append(f"public/.well-known/security.txt is missing a valid {field} field")
 
 
 def _resolve_asset_reference(source: Path, root: Path, reference: str) -> Path | None:

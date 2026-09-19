@@ -13,11 +13,22 @@ validate_public_bundle = _VALIDATOR_MODULE.validate_public_bundle
 
 def write_bundle(root: Path, *, main: str = "") -> None:
     (root / "assets").mkdir(parents=True)
+    (root / ".well-known").mkdir(parents=True)
     (root / "index.html").write_text(
         '<script type="module" src="/assets/main.js"></script>',
         encoding="utf-8",
     )
     (root / "assets" / "main.js").write_text(main, encoding="utf-8")
+    (root / "robots.txt").write_text(
+        "User-agent: *\nDisallow: /api/\nDisallow: /api/docs\n", encoding="utf-8"
+    )
+    (root / ".well-known" / "security.txt").write_text(
+        "Contact: https://example.test/security\n"
+        "Policy: https://example.test/policy\n"
+        "Preferred-Languages: en, vi\n"
+        "Expires: 2027-09-19T00:00:00.000Z\n",
+        encoding="utf-8",
+    )
 
 
 def test_public_bundle_accepts_hashed_assets_and_dynamic_chunks(tmp_path: Path) -> None:
@@ -50,3 +61,26 @@ def test_public_bundle_rejects_reader_runtime_variable_name(tmp_path: Path) -> N
     errors = validate_public_bundle(tmp_path)
 
     assert errors == ["private runtime variable name found: assets/main.js"]
+
+
+def test_public_bundle_requires_disclosure_metadata(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    (tmp_path / "robots.txt").unlink()
+    (tmp_path / ".well-known" / "security.txt").unlink()
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert "public/robots.txt is missing" in errors
+    assert "public/.well-known/security.txt is missing" in errors
+
+
+def test_public_bundle_rejects_incomplete_security_txt(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    (tmp_path / ".well-known" / "security.txt").write_text(
+        "Contact: https://example.test/security\n", encoding="utf-8"
+    )
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert any("valid Policy field" in error for error in errors)
+    assert any("valid Expires field" in error for error in errors)

@@ -14,6 +14,14 @@ terms have been independently approved.
 | Anonymous traffic | No account/authentication required for the research terminal | Cache headers and compression reduce normal load; request IDs are safe-character allowlisted | Configure CDN/provider rate limits or a WAF if traffic becomes abusive; Python process-local counters would not be reliable across serverless instances |
 | Raw source data and credentials | Not public | Raw filings, market data, model checkpoints, database URLs, R2 credentials, and source maps are excluded from the bundle and deployment inputs | Re-check provider licenses and rotate credentials after any suspected exposure |
 
+The bundle also publishes two low-cost discovery controls: `robots.txt`
+discourages indexing of the read-only API and interactive API docs, while
+`/.well-known/security.txt` points security reports to GitHub's private advisory
+channel and identifies the supported languages. These files are checked by the
+same public-bundle validator used by CI and the Vercel build. They do not
+replace provider-side WAF/rate-limit configuration or establish a source-data
+license.
+
 ## Failure behavior
 
 - A failed public-bundle validation stops the Vercel build before a deployment is
