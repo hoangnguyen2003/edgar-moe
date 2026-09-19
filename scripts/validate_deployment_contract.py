@@ -10,6 +10,7 @@ from typing import Any
 EXPECTED_BUILD_COMMAND = (
     "npm --prefix apps/web ci && npm --prefix apps/web run build && "
     "npm run build:public && "
+    "python3 scripts/verify_public_snapshot_lock.py && "
     "test -f public/robots.txt && test -f public/.well-known/security.txt && "
     "test -f public/data-provenance.json"
 )

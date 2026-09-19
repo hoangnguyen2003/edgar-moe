@@ -82,7 +82,38 @@ def validate_public_snapshot_lock(
     for field in ("data_mode", "as_of", "selection_hash", "locked_test_hash"):
         if lock.get(field) != metadata.get(field):
             errors.append(f"public snapshot metadata does not match lock field: {field}")
+    _validate_public_provenance(root, lock, errors)
     return errors
+
+
+def _validate_public_provenance(
+    root: Path, lock: dict[str, object], errors: list[str]
+) -> None:
+    """Cross-check the published identity without requiring raw source data."""
+    manifest_path = root / "public" / "data-provenance.json"
+    if not manifest_path.is_file():
+        return
+    try:
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        errors.append("public provenance manifest is not readable JSON")
+        return
+    snapshot = payload.get("snapshot") if isinstance(payload, dict) else None
+    if not isinstance(snapshot, dict):
+        errors.append("public provenance snapshot must be an object")
+        return
+    for field in (
+        "path",
+        "data_mode",
+        "as_of",
+        "sha256",
+        "selection_hash",
+        "locked_test_hash",
+    ):
+        if snapshot.get(field) != lock.get(field):
+            errors.append(f"public provenance does not match lock field: {field}")
+    if snapshot.get("research_only") is not True:
+        errors.append("public provenance snapshot research_only must remain true")
 
 
 def _sha256_file(path: Path) -> str:

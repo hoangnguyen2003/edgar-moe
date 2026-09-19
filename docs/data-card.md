@@ -34,11 +34,11 @@ The dataset builder stores the source timestamp beside every feature and rejects
 - Free-plan historical coverage can begin later than the requested start date;
   report the observed bar range and resulting temporal split dates for every run.
 - Split-adjusted daily bars exclude dividend total return and cannot model intraday slippage.
-- Public snapshots contain derived values only and are not a redistribution of raw market data. The deployed bundle exposes `data-provenance.json`, which records the source families and keeps redistribution review explicitly pending.
+- Public snapshots contain derived values only and are not a redistribution of raw market data. The deployed bundle exposes `data-provenance.json`, which records the source families plus the content-addressed snapshot identity; the manifest keeps redistribution review explicitly pending.
 
 ## Public snapshot and synthetic fixture
 
-`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; CI and the Vercel build reject an unreviewed replacement. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
+`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; `public/data-provenance.json` publishes the same identity without raw data, and CI plus the Vercel build reject drift between those records. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
 
 ## Authenticated refresh bundle
 

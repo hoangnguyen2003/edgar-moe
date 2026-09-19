@@ -37,9 +37,14 @@ def write_bundle(root: Path, *, main: str = "") -> None:
             {
                 "schema_version": 1,
                 "snapshot": {
+                    "path": "data/demo/snapshot.json",
                     "data_mode": "authenticated_locked_test",
                     "raw_sources_public": False,
                     "derived_output_public": True,
+                    "sha256": "a" * 64,
+                    "selection_hash": "b" * 64,
+                    "locked_test_hash": "c" * 64,
+                    "research_only": True,
                 },
                 "review": {
                     "redistribution_status": "operator_review_required",
@@ -126,6 +131,19 @@ def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:
     errors = validate_public_bundle(tmp_path)
 
     assert "public provenance must declare raw_sources_public=false" in errors
+
+
+def test_public_bundle_rejects_invalid_snapshot_identity(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    manifest = json.loads((tmp_path / "data-provenance.json").read_text(encoding="utf-8"))
+    manifest["snapshot"]["sha256"] = "not-a-digest"
+    manifest["snapshot"]["research_only"] = False
+    (tmp_path / "data-provenance.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert "public provenance snapshot sha256 must be a lowercase SHA-256 digest" in errors
+    assert "public provenance snapshot research_only must remain true" in errors
 
 
 def test_public_bundle_rejects_symlinked_assets(tmp_path: Path) -> None:
