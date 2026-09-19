@@ -154,10 +154,17 @@ def main() -> int:
     try:
         report = audit_reader_role(args.database_url)
     except (ValueError, ReaderRoleAuditError, psycopg.Error) as error:
-        print(f"Reader-role audit failed: {error}", file=sys.stderr)
+        print(f"Reader-role audit failed: {_safe_error_message(error)}", file=sys.stderr)
         return 1
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
+
+
+def _safe_error_message(error: BaseException) -> str:
+    """Avoid emitting driver text that may contain a connection string."""
+    if isinstance(error, psycopg.Error):
+        return type(error).__name__
+    return str(error)
 
 
 if __name__ == "__main__":
