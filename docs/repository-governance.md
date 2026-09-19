@@ -22,7 +22,9 @@ control, not a prerequisite for the current personal-project workflow.
 `.github/pull_request_template.md` requires a summary, scope, validation, risk,
 rollback, architecture impact, and research-integrity notes.
 `.github/workflows/pr-policy.yml` rejects branches without a descriptive
-approved prefix. Dependabot is allowed to use its standard branch prefix.
+approved prefix. The approved prefixes are `feat/`, `fix/`, `chore/`, `docs/`,
+`research/`, `refactor/`, `test/`, `security/`, and `ops/`. Dependabot is
+allowed to use its standard branch prefix.
 
 After a successful merge, delete the head branch and start new work from the
 updated `main`. Keep the PR description and CI results as the durable review
