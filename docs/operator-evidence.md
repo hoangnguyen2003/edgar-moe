@@ -59,6 +59,14 @@ only for `ready`; incomplete evidence returns `blocked`, and old otherwise
 passed evidence returns `stale`. It never changes packet status or creates
 provider evidence.
 
+CI also runs `scripts/validate_provider_workflows.py`. This static gate keeps
+the provider workflows manual-only with `contents: read`, preserves in-flight
+audit runs, confines secret expressions to environment mappings, requires
+redaction and SHA-256 hashing before artifact upload, and rejects writer or
+repair paths in the read-only R2 audit. The isolated restore workflow must retain
+its explicit confirmation and source/target safety checks. These are repository
+controls, not evidence that the provider workflows have been run.
+
 ## Required operator evidence
 
 The packet is a record format, not proof by itself. For the current roadmap,
