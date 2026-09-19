@@ -23,11 +23,19 @@ uv run python scripts/build_operator_evidence_packet.py \
   --output /tmp/operator-evidence-packet.json
 ```
 
+If the artifact metadata was already computed and independently checked, the
+lower-level writer remains available as an alternative to the builder:
+
 ```bash
 uv run python scripts/write_operator_evidence_packet.py \
   --input docs/operator-evidence-packet.example.json \
-  --output /tmp/operator-evidence-packet.json
+  --output /tmp/operator-evidence-packet-manual.json
+```
 
+Verify the packet produced by the builder (or substitute the manual writer's
+path when using that alternative):
+
+```bash
 uv run python scripts/verify_operator_evidence_packet.py \
   --packet /tmp/operator-evidence-packet.json
 
