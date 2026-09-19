@@ -4,6 +4,7 @@ import importlib.util
 import json
 from pathlib import Path
 from typing import Any
+from urllib.request import Request
 
 import pytest
 
@@ -58,11 +59,14 @@ class FakeResponse:
 
 
 def fake_urlopen_factory(responses: dict[str, FakeResponse]):
-    def fake_urlopen(request: Any, timeout: float) -> FakeResponse:
+    def fake_open(
+        request: Any, *, timeout: float, origin: tuple[str, str]
+    ) -> FakeResponse:
         assert timeout == 2.0
+        assert origin == ("https", "terminal.example")
         return responses[request.full_url]
 
-    return fake_urlopen
+    return fake_open
 
 
 def complete_responses() -> dict[str, FakeResponse]:
@@ -112,7 +116,7 @@ def test_normalize_base_url_rejects_credentials_and_non_https() -> None:
 
 def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example/", timeout=2.0)
 
@@ -137,7 +141,7 @@ def test_smoke_rejects_public_raw_source_contract(monkeypatch: pytest.MonkeyPatc
         ),
         "application/json",
     )
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
@@ -153,7 +157,7 @@ def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatc
         json.dumps({"status": "degraded", "snapshot_loaded": False}),
         "application/json",
     )
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
@@ -164,7 +168,7 @@ def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatc
 def test_smoke_rejects_cross_origin_redirect(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/"].geturl = lambda: "https://other.example/"  # type: ignore[method-assign]
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
@@ -172,10 +176,22 @@ def test_smoke_rejects_cross_origin_redirect(monkeypatch: pytest.MonkeyPatch) ->
     assert report["checks"][0]["error"] == "redirected_to_different_origin"
 
 
+def test_redirect_handler_allows_same_origin_and_rejects_cross_origin() -> None:
+    handler = _MODULE._SameOriginRedirectHandler(("https", "terminal.example"))
+    request = Request("https://terminal.example/")
+
+    same_origin = handler.redirect_request(
+        request, None, 302, "Found", {}, "https://terminal.example/next"
+    )
+    assert same_origin is not None
+    with pytest.raises(ValueError, match="redirected_to_different_origin"):
+        handler.redirect_request(request, None, 302, "Found", {}, "https://other.example/")
+
+
 def test_smoke_rejects_missing_security_header(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/"].headers.pop("X-Frame-Options")
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
@@ -187,7 +203,7 @@ def test_smoke_rejects_missing_security_header(monkeypatch: pytest.MonkeyPatch) 
 def test_smoke_rejects_invalid_content_security_policy(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/"].headers["Content-Security-Policy"] = "default-src *"
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
@@ -199,7 +215,7 @@ def test_smoke_rejects_invalid_content_security_policy(monkeypatch: pytest.Monke
 def test_smoke_requires_exact_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/"].headers["Content-Type"] = "text/html-malicious"
-    monkeypatch.setattr(_MODULE, "urlopen", fake_urlopen_factory(responses))
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 _USER_AGENT = "edgar-moe-deployment-smoke/1.0"
 _MAX_BODY_BYTES = 128 * 1024
@@ -31,6 +31,30 @@ _REQUIRED_SECURITY_HEADERS = {
         "connect-src 'self'"
     ),
 }
+
+
+class _CrossOriginRedirectError(ValueError):
+    """Raised when a smoke request attempts to leave its supplied origin."""
+
+
+class _SameOriginRedirectHandler(HTTPRedirectHandler):
+    def __init__(self, origin: tuple[str, str]) -> None:
+        self._origin = origin
+
+    def redirect_request(
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> Request | None:
+        target = urlsplit(newurl)
+        target_origin = (target.scheme.lower(), target.netloc.lower())
+        if target_origin != self._origin:
+            raise _CrossOriginRedirectError("redirected_to_different_origin")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def normalize_base_url(value: str, *, allow_http: bool = False) -> str:
@@ -144,7 +168,7 @@ def _check_endpoint(
     )
     check: dict[str, Any] = {"name": name, "path": path, "status": "failed"}
     try:
-        with urlopen(request, timeout=timeout) as response:  # noqa: S310 - URL is operator supplied
+        with _open_url(request, timeout=timeout, origin=origin) as response:
             body = response.read(_MAX_BODY_BYTES + 1)
             status_code = int(response.status)
             content_type = response.headers.get("Content-Type", "").lower()
@@ -188,11 +212,24 @@ def _check_endpoint(
                 check["_body"] = decoded
             check["status"] = "passed"
             return check
+    except _CrossOriginRedirectError:
+        check["error"] = "redirected_to_different_origin"
     except HTTPError as error:
         check.update(http_status=error.code, error="unexpected_http_status")
     except (OSError, URLError, UnicodeDecodeError, ValueError) as error:
         check["error"] = type(error).__name__
     return check
+
+
+def _open_url(
+    request: Request,
+    *,
+    timeout: float,
+    origin: tuple[str, str],
+) -> Any:
+    """Open a request while refusing redirects outside the supplied origin."""
+    opener = build_opener(_SameOriginRedirectHandler(origin))
+    return opener.open(request, timeout=timeout)
 
 
 def _parse_args() -> argparse.Namespace:
