@@ -1,5 +1,35 @@
 # Postgres restore rehearsal
 
+## Low-cost local rehearsal
+
+The repository also includes a provider-neutral SQLite rehearsal for laptop or
+CI smoke testing. It copies the registry through SQLite's consistent backup
+API into a **new** destination, compares all forward-registry table counts, and
+exercises the same aggregate read methods used by the API. It never overwrites
+an existing destination or report and leaves the restored file available for
+inspection.
+
+This is useful evidence that the application can read an isolated local copy,
+but it is deliberately **not** PostgreSQL/provider recovery evidence: it does
+not test provider backups, R2/object bytes, the Go auditor, network credentials,
+or an RTO. Run the production procedure below before making recovery claims.
+
+```bash
+set +x
+REHEARSAL_DIR="$(mktemp -d -t edgar-moe-local-restore)"
+chmod 700 "$REHEARSAL_DIR"
+uv run python scripts/rehearse_sqlite_restore.py \
+  --source data/forward/registry.sqlite3 \
+  --destination "$REHEARSAL_DIR/restored.sqlite3" \
+  --output "$REHEARSAL_DIR/restore-report.json"
+```
+
+Exit code `0` means table counts matched and the read probe completed. Exit
+code `1` means the isolated copy completed but the comparison failed. Exit
+code `2` means the command refused an unsafe/malformed input. Preserve the
+destination and report when investigating a failure; the command does not
+delete either one.
+
 This runbook rehearses registry recovery in an isolated target. It is an
 operational procedure, not evidence that a restore has already succeeded. The
 maintainer records the outputs in a private incident/recovery note and never

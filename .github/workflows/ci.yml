@@ -25,6 +25,8 @@ jobs:
         run: uv run python scripts/verify_postgres_reader.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
+      - name: Check local restore rehearsal command is runnable
+        run: uv run python scripts/rehearse_sqlite_restore.py --help
       - name: Check forward failure context writer is runnable
         run: uv run python scripts/write_forward_failure_context.py
       - name: Check optional forward alert notifier is runnable
