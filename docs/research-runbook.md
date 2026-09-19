@@ -57,6 +57,11 @@ uv run edgar-moe open-frozen-test \
 ```
 
 The command verifies both the selection JSON and OOF-prediction hash before it can access locked outcomes, refits only the frozen champion on all pre-2025 matured labels for a fold-derived fixed epoch count, and refuses to overwrite an existing locked artifact.
+Locked evaluation publication is transactional: model, score, and locked-result
+files are written under a private staging directory and the completed directory
+is renamed into place only after all content hashes are recorded. An interrupted
+attempt cannot publish a partial frozen dataset, and a retry refuses any final
+directory that already exists.
 
 The current authenticated run used selection SHA-256 `0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906` and produced locked-result SHA-256 `9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987`. Attempt 1 reached in-memory scoring but stopped before persistence when timezone-aware event dates met timezone-naive return dates. After an operational-only normalization fix was tested and committed, attempt 2 reran the identical frozen selection and completed. This recovery is recorded in the immutable artifact, final report, and public snapshot. Do not rerun this dataset; any new hypothesis or protocol requires a new dataset/run ID.
 

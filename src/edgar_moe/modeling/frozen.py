@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import math
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import numpy as np
 import orjson
@@ -271,9 +273,35 @@ def save_frozen_evaluation(
     *,
     recovery_note: str | None = None,
 ) -> Path:
-    """Persist the one-time locked result and refuse every overwrite."""
-    output = Path(output_root) / result.dataset_id
-    output.mkdir(parents=True, exist_ok=True)
+    """Publish the one-time locked result atomically and refuse every overwrite."""
+    root = Path(output_root)
+    root.mkdir(parents=True, exist_ok=True)
+    output = root / result.dataset_id
+    if output.exists():
+        raise FileExistsError(
+            f"Frozen evaluation already exists at {output}; refusing to overwrite"
+        )
+
+    staging = root / f".{result.dataset_id}.staging-{uuid4().hex}"
+    staging.mkdir()
+    try:
+        _write_frozen_evaluation(result, staging, recovery_note=recovery_note)
+        # The final directory is absent by contract; renaming the completed
+        # directory publishes all three immutable artifacts as one unit.
+        staging.rename(output)
+    except BaseException:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+    return output
+
+
+def _write_frozen_evaluation(
+    result: FrozenEvaluationResult,
+    output: Path,
+    *,
+    recovery_note: str | None = None,
+) -> None:
+    """Write a complete frozen evaluation into an unpublished directory."""
     locked_path = output / "locked-test.json"
     if locked_path.exists():
         raise FileExistsError(f"Locked test already exists at {locked_path}; refusing to overwrite")
@@ -350,7 +378,6 @@ def save_frozen_evaluation(
         orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
     )
     temporary_locked.replace(locked_path)
-    return output
 
 
 def _make_frozen_split(
