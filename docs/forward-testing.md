@@ -379,6 +379,13 @@ therefore cannot be used to claim that a provider tier is free. The stop and
 warning disk thresholds are recorded in the report, and paid usage remains an
 explicit approval decision.
 
+The repository also includes a lightweight weekly/manual
+`.github/workflows/capacity-baseline.yml` job. It measures the GitHub-hosted
+runner with the same command, retains the report for 30 days, and does not make
+provider API calls unless the optional repository variable
+`EDGAR_MOE_CAPACITY_API_URL` is configured. The hosted-runner observation is
+useful for trend comparison but is not a load test or a provider-quota claim.
+
 The optional notifier maps these conditions to `failed_run`, `stale_runner`,
 `registry_unavailable`, `quality_failure`, and `quality_warning` events. Use
 `uv run python scripts/notify_forward_alert.py --dry-run` with a saved context
