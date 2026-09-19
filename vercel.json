@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["sin1"],
   "fluid": true,
-  "buildCommand": "python3 scripts/validate_public_bundle.py",
+  "buildCommand": "python3 scripts/validate_deployment_contract.py && python3 scripts/validate_public_bundle.py",
   "outputDirectory": "public",
   "functions": {
     "api/**/*.py": {

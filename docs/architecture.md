@@ -120,8 +120,9 @@ earliest-event audits are supplementary and must be labeled as such.
 ### Deployment and operations
 
 `vercel.json` serves committed `public/` assets, packages the Python API, and
-requests `sin1`. Its build command is `true`: CI rebuilds and checks that committed
-assets match source; deployment itself does not rebuild them. Vercel deployment
+requests `sin1`. Its build command validates the deployment contract and scans
+the committed bundle; CI separately rebuilds the React assets and checks that
+committed assets match source. Deployment does not rebuild the bundle, and it
 must not be assumed to wait for CI unless account settings enforce that gate.
 
 The forward workflow pins Ubuntu 24.04, runs Tuesday–Saturday at 07:17 UTC,
