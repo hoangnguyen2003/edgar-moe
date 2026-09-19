@@ -343,6 +343,29 @@ Tuesday–Saturday schedule and its weekend gap.
 
 Monitor failed runs, failed/warning quality checks, dataset freshness, unmatched settlements, registry availability, and the age of the latest successful run. Failed runs remain in the ledger. Fix the source problem and start a new run; never delete or repurpose the failed identity.
 
+Capture a cost/capacity baseline before increasing the universe, lookback, or
+hosting tier:
+
+```bash
+uv run edgar-moe capacity-baseline \
+  --snapshot data/demo/snapshot.json \
+  --path data/forward \
+  --path data/cache/forward-filings \
+  --path data/artifacts/embedding-cache-finbert \
+  --api-url https://your-deployment.example \
+  --workflow-runtime-seconds 630 \
+  --output reports/capacity-baseline.json
+```
+
+The report measures local cold/warm snapshot loads, representative read-path
+latencies, registry query timings, file counts/bytes, and disk headroom. It
+retains an operator-supplied workflow runtime when available. Managed database
+connection counts, object-storage usage, account quotas, and billing limits are
+marked `not_observed` until the hosted environment is measured; the report
+therefore cannot be used to claim that a provider tier is free. The stop and
+warning disk thresholds are recorded in the report, and paid usage remains an
+explicit approval decision.
+
 The optional notifier maps these conditions to `failed_run`, `stale_runner`,
 `registry_unavailable`, `quality_failure`, and `quality_warning` events. Use
 `uv run python scripts/notify_forward_alert.py --dry-run` with a saved context

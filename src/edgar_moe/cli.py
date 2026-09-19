@@ -13,6 +13,7 @@ import numpy as np
 import orjson
 import typer
 
+from edgar_moe.capacity import DEFAULT_BASELINE_PATHS, build_capacity_baseline
 from edgar_moe.data.alpaca import AlpacaDataClient
 from edgar_moe.data.demo import build_demo_snapshot
 from edgar_moe.data.fred import FredClient
@@ -927,6 +928,54 @@ def forward_status(
     finally:
         database.dispose()
     typer.echo(orjson.dumps(payload, option=orjson.OPT_INDENT_2).decode())
+
+
+@app.command("capacity-baseline")
+def capacity_baseline(
+    snapshot: Annotated[
+        Path,
+        typer.Option("--snapshot", help="Snapshot JSON used for local read-path timings."),
+    ] = Path("data/demo/snapshot.json"),
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    api_url: Annotated[
+        str | None,
+        typer.Option("--api-url", help="Optional public API origin to measure over HTTP."),
+    ] = None,
+    workflow_runtime_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--workflow-runtime-seconds",
+            min=0,
+            help="Optional observed GitHub Actions runtime to retain in the baseline.",
+        ),
+    ] = None,
+    path: Annotated[
+        list[Path] | None,
+        typer.Option("--path", help="Filesystem path to inventory; repeat for additional paths."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report destination."),
+    ] = None,
+) -> None:
+    """Capture local latency, storage, and cost-capacity observations."""
+    settings = runtime_settings()
+    report = build_capacity_baseline(
+        snapshot_path=snapshot,
+        database_url=_forward_database_url(settings, database_url),
+        api_url=api_url,
+        paths=path or DEFAULT_BASELINE_PATHS,
+        workflow_runtime_seconds=workflow_runtime_seconds,
+    )
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(serialized)
+        typer.echo(f"Wrote capacity baseline to {output}")
+    typer.echo(serialized.decode())
 
 
 @app.command()

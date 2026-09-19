@@ -33,6 +33,8 @@ jobs:
         run: uv run python scripts/notify_forward_alert.py --help
       - name: Check artifact reconciliation command is runnable
         run: uv run edgar-moe forward-reconcile-artifacts --help
+      - name: Check capacity baseline command is runnable
+        run: uv run edgar-moe capacity-baseline --help
       - name: Check research drift command is runnable
         run: uv run edgar-moe research-drift --help
       - name: Verify forward-registry migrations match the ORM schema
