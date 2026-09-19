@@ -10,8 +10,18 @@ URLs, raw dumps, or provider payloads into the repository.
 
 Start with the example draft, replace the `not_run` records with the checks you
 actually performed, and add one artifact entry for every retained redacted
-report. An artifact name is a local evidence filename; its SHA-256 is the hash
-of the retained file, not of a database dump or secret.
+report. An artifact name is a local evidence filename; the builder below derives
+its SHA-256 and byte count from the retained file, rather than requiring those
+values to be copied by hand. The builder also requires the artifact directory to
+contain exactly the declared files and rejects symlinks, oversized files, and
+credential-bearing content.
+
+```bash
+uv run python scripts/build_operator_evidence_packet.py \
+  --input /path/to/provider-packet-draft.json \
+  --artifact-root /path/to/redacted-artifacts \
+  --output /tmp/operator-evidence-packet.json
+```
 
 ```bash
 uv run python scripts/write_operator_evidence_packet.py \
@@ -26,10 +36,10 @@ uv run python scripts/check_operator_readiness.py \
   --max-age-days 30
 ```
 
-The writer validates the draft, adds `packet_sha256`, and publishes the finished
-file atomically without overwriting an existing packet. The verifier checks
-the hash, timestamps, check coverage, artifact hashes, and redaction contract
-without printing packet contents. It rejects URLs, connection strings,
+The builder and writer validate the draft, add `packet_sha256`, and publish the
+finished file atomically without overwriting an existing packet. The verifier
+checks the hash, timestamps, check coverage, artifact hashes, and redaction
+contract without printing packet contents. It rejects URLs, connection strings,
 secret-like assignments, private-key material, absolute/path-traversal artifact
 names, unknown fields, and passed/failed checks without evidence references.
 
