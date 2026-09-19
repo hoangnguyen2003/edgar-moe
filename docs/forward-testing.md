@@ -262,6 +262,16 @@ trigger. The report records the dataset/source identities, frozen artifact and
 selection hashes, and an immutable-report hash. It intentionally does not read
 targets, labels, daily returns, or registry state.
 
+A representative target-free run is retained at
+[`reports/research-drift-2026-08-06.json`](../reports/research-drift-2026-08-06.json).
+It compares the frozen 2026-07-31 dataset (5,961 events) with the later
+2026-08-06 dataset (6,039 events) and reports stable distributions for all 807
+feature columns and 9 frozen component outputs, with no warnings or dimension
+mismatches. Its report hash is
+`0899bdfb3a108cfbf91f8b273de6d50ddb6907bc8612cbfdf64d45d9d9fb8e24`. This is
+an evidence snapshot, not a claim of predictive performance or a trigger for
+automatic retraining.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the

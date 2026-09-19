@@ -160,6 +160,12 @@ uv run edgar-moe research-drift \
   --output reports/research-drift.json
 ```
 
+A representative target-free run is retained in
+[`reports/research-drift-2026-08-06.json`](reports/research-drift-2026-08-06.json).
+It compares the frozen 2026-07-31 dataset with a later 2026-08-06 dataset and
+records stable feature and frozen-component distributions. This is drift
+evidence, not a performance claim or an automatic retraining decision.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
