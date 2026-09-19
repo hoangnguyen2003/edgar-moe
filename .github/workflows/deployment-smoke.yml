@@ -1,0 +1,44 @@
+name: Deployment smoke check
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: "HTTPS origin to probe (for example, the current Vercel deployment URL)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgar-moe-deployment-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: Probe the public deployment boundary
+        env:
+          DEPLOYMENT_URL: ${{ inputs.deployment_url }}
+        run: |
+          mkdir -p reports/deployment-smoke
+          uv run python scripts/smoke_deployment.py \
+            "$DEPLOYMENT_URL" \
+            --output reports/deployment-smoke/smoke.json
+      - name: Upload smoke evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-smoke-${{ github.run_id }}
+          path: reports/deployment-smoke/smoke.json
+          if-no-files-found: ignore
+          retention-days: 30
