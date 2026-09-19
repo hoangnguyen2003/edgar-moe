@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
+from uuid import uuid4
 
 import orjson
 
@@ -25,12 +27,19 @@ def main() -> int:
         if not isinstance(payload, dict):
             raise OperatorEvidenceError("packet draft must be a JSON object")
         packet = prepare_operator_evidence_packet(payload)
-        if args.output.exists():
+        if args.output.exists() or args.output.is_symlink():
             raise OperatorEvidenceError(f"refusing to overwrite existing packet: {args.output}")
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_bytes(
-            orjson.dumps(packet, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
-        )
+        staging = args.output.with_name(f".{args.output.name}.staging-{uuid4().hex}")
+        try:
+            staging.write_bytes(
+                orjson.dumps(packet, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+            )
+            # A hard link publishes the completed bytes without replacing a
+            # packet that another operator may have created concurrently.
+            os.link(staging, args.output)
+        finally:
+            staging.unlink(missing_ok=True)
     except (OSError, TypeError, ValueError) as error:
         print(f"Operator evidence packet write failed: {type(error).__name__}", file=sys.stderr)
         return 2

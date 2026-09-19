@@ -22,7 +22,8 @@ uv run python scripts/verify_operator_evidence_packet.py \
   --packet /tmp/operator-evidence-packet.json
 ```
 
-The writer adds `packet_sha256` after validating the draft. The verifier checks
+The writer validates the draft, adds `packet_sha256`, and publishes the finished
+file atomically without overwriting an existing packet. The verifier checks
 the hash, timestamps, check coverage, artifact hashes, and redaction contract
 without printing packet contents. It rejects URLs, connection strings,
 secret-like assignments, private-key material, absolute/path-traversal artifact

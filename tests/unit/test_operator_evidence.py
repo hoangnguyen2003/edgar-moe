@@ -116,6 +116,7 @@ def test_cli_writes_and_verifies_packet(tmp_path: Path) -> None:
         text=True,
     )
     assert json.loads(written.stdout)["status"] == "written"
+    assert not list(tmp_path.glob(".*.staging-*"))
 
     verified = subprocess.run(
         [
