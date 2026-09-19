@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "packet_id": "provider-audit-2026-09-19",
+  "captured_at": "2026-09-19T00:00:00Z",
+  "operator": "maintainer",
+  "provider": "provider-name",
+  "target": "isolated-verification-target",
+  "scope": [
+    "database_least_privilege",
+    "restore_rehearsal",
+    "partial_write_reconciliation"
+  ],
+  "checks": [
+    {
+      "check_id": "database_least_privilege",
+      "status": "not_run",
+      "observed_at": "2026-09-19T00:00:00Z",
+      "evidence_refs": [],
+      "notes": "Run the provider reader-role audit before treating this control as verified."
+    },
+    {
+      "check_id": "restore_rehearsal",
+      "status": "not_run",
+      "observed_at": "2026-09-19T00:00:00Z",
+      "evidence_refs": [],
+      "notes": "Run the isolated restore rehearsal and retain its redacted comparison report."
+    },
+    {
+      "check_id": "partial_write_reconciliation",
+      "status": "not_run",
+      "observed_at": "2026-09-19T00:00:00Z",
+      "evidence_refs": [],
+      "notes": "Exercise the object-store outage and reconciliation workflow against an isolated target."
+    }
+  ],
+  "artifacts": [],
+  "redaction": {
+    "secrets_excluded": true,
+    "provider_urls_excluded": true,
+    "raw_payloads_excluded": true
+  }
+}
