@@ -199,6 +199,12 @@ EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY
 EDGAR_MOE_ALERT_WEBHOOK_URL
 ```
 
+The three independent-auditor secrets are an all-or-none group. Configure all
+three to enable the post-cycle Go audit, or leave all three empty to skip it.
+After the runtime is installed, the workflow fails closed on a partial
+configuration before source refresh or the Go audit; it reports only missing
+variable names and never prints a database URL or credential value.
+
 Use the pooled Neon URL for the scheduled application connection. The API reader
 uses a separate bounded SQLAlchemy pool per warm serverless instance (one base
 connection, no overflow, and a five-second checkout timeout by default). This

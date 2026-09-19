@@ -57,35 +57,19 @@ jobs:
           python-version: "3.12"
           enable-cache: true
 
+      - name: Install frozen research and operations runtime
+        run: uv sync --extra research --extra operations
+
+      - name: Validate private runtime configuration
+        shell: bash
+        run: python3 scripts/validate_forward_runtime_config.py
+
       - name: Set up Go evidence auditor (optional)
         if: ${{ env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL != '' }}
         uses: actions/setup-go@v6
         with:
           go-version-file: tools/evidence-auditor/go.mod
           cache-dependency-path: tools/evidence-auditor/go.sum
-
-      - name: Install frozen research and operations runtime
-        run: uv sync --extra research --extra operations
-
-      - name: Require every private runtime secret
-        shell: bash
-        run: |
-          required=(
-            ALPACA_API_KEY ALPACA_API_SECRET FRED_API_KEY SEC_USER_AGENT
-            EDGAR_MOE_REGISTRY_DATABASE_URL EDGAR_MOE_R2_ENDPOINT_URL
-            EDGAR_MOE_R2_BUCKET EDGAR_MOE_R2_ACCESS_KEY_ID
-            EDGAR_MOE_R2_SECRET_ACCESS_KEY
-          )
-          missing=()
-          for name in "${required[@]}"; do
-            if [[ -z "${!name:-}" ]]; then
-              missing+=("$name")
-            fi
-          done
-          if (( ${#missing[@]} )); then
-            printf 'Missing required GitHub Actions secrets: %s\n' "${missing[*]}" >&2
-            exit 1
-          fi
 
       - name: Resolve the U.S. source cutoff
         id: cutoff
