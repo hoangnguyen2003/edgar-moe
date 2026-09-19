@@ -58,11 +58,21 @@ def _api_registry_database_url(settings: RuntimeSettings) -> str:
 
 
 api_registry_database_url = _api_registry_database_url(settings)
-forward_database = (
-    RegistryDatabase(api_registry_database_url)
-    if api_registry_database_url
-    else None
-)
+
+
+def _build_api_registry_database(settings: RuntimeSettings) -> RegistryDatabase | None:
+    database_url = _api_registry_database_url(settings)
+    if not database_url:
+        return None
+    return RegistryDatabase(
+        database_url,
+        pool_size=settings.edgar_moe_registry_api_pool_size,
+        max_overflow=settings.edgar_moe_registry_api_max_overflow,
+        pool_timeout=settings.edgar_moe_registry_api_pool_timeout_seconds,
+    )
+
+
+forward_database = _build_api_registry_database(settings)
 forward_registry = ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
 
 app = FastAPI(

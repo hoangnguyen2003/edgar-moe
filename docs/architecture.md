@@ -97,9 +97,13 @@ earliest-event audits are supplementary and must be labeled as such.
 - API → database: GET-only routes reduce exposure. The API now prefers
   `EDGAR_MOE_REGISTRY_READ_DATABASE_URL`; local SQLite compatibility falls back to
   the writer URL, while a missing reader URL never falls back to a hosted Postgres
-  writer. The shared database session helper can commit, so the deployed reader
-  role must still be granted SELECT-only privileges and verified before claiming
-  database-enforced least privilege.
+  writer. The API reader also uses a bounded per-instance connection pool
+  (`EDGAR_MOE_REGISTRY_API_POOL_SIZE`, `EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW`, and
+  `EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS`) to limit serverless connection
+  fan-out. Provider/project limits still require external verification. The shared
+  database session helper can commit, so the deployed reader role must still be
+  granted SELECT-only privileges and verified before claiming database-enforced
+  least privilege.
 - Runner → providers/database/R2: high-trust execution with source and write
   credentials. Workflow permissions are `contents: read`, but job secrets remain
   powerful. Review workflow and dependency changes as privileged code changes.

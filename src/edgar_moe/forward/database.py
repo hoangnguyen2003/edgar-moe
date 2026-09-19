@@ -5,7 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -39,21 +39,43 @@ def _protect_immutable_records(
 class RegistryDatabase:
     """SQLAlchemy database boundary shared by SQLite development and Postgres production."""
 
-    def __init__(self, database_url: str, *, echo: bool = False) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        echo: bool = False,
+        pool_size: int | None = None,
+        max_overflow: int | None = None,
+        pool_timeout: float | None = None,
+    ) -> None:
         if not database_url.strip():
             raise ValueError("A forward registry database URL is required")
+        _validate_pool_options(
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=pool_timeout,
+        )
         normalized = normalize_database_url(database_url)
         _prepare_sqlite_directory(normalized)
         connect_args: dict[str, object] = {}
         if normalized.startswith("sqlite"):
             connect_args["check_same_thread"] = False
         self.url = normalized
-        self.engine: Engine = create_engine(
-            normalized,
-            echo=echo,
-            pool_pre_ping=True,
-            connect_args=connect_args,
-        )
+        engine_options: dict[str, object] = {
+            "echo": echo,
+            "pool_pre_ping": True,
+            "connect_args": connect_args,
+        }
+        # SQLite uses a dialect-specific pool that rejects QueuePool options.
+        # Only the hosted Postgres reader receives the serverless bounds.
+        if not normalized.startswith("sqlite"):
+            if pool_size is not None:
+                engine_options["pool_size"] = pool_size
+            if max_overflow is not None:
+                engine_options["max_overflow"] = max_overflow
+            if pool_timeout is not None:
+                engine_options["pool_timeout"] = pool_timeout
+        self.engine = create_engine(normalized, **engine_options)
         if normalized.startswith("sqlite"):
             event.listen(self.engine, "connect", _enable_sqlite_foreign_keys)
         self._sessions = sessionmaker(
@@ -89,6 +111,20 @@ def normalize_database_url(database_url: str) -> str:
     if value.startswith("postgresql://"):
         return "postgresql+psycopg://" + value.removeprefix("postgresql://")
     return value
+
+
+def _validate_pool_options(
+    *,
+    pool_size: int | None,
+    max_overflow: int | None,
+    pool_timeout: float | None,
+) -> None:
+    if pool_size is not None and pool_size < 1:
+        raise ValueError("pool_size must be at least 1")
+    if max_overflow is not None and max_overflow < 0:
+        raise ValueError("max_overflow must be non-negative")
+    if pool_timeout is not None and pool_timeout <= 0:
+        raise ValueError("pool_timeout must be greater than 0")
 
 
 def _prepare_sqlite_directory(database_url: str) -> None:
