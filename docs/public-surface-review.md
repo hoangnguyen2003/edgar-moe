@@ -8,7 +8,7 @@ terms have been independently approved.
 
 | Surface | Public by design | Control | Remaining operator decision |
 | --- | --- | --- | --- |
-| `public/` static bundle | React UI and derived snapshot only | CI and the Vercel build both rebuild the bundle, reject symlinks, check the asset graph, reject source maps/private runtime names, and validate the disclosure files | Confirm the snapshot's source and redistribution terms before changing its contents |
+| `public/` static bundle | React UI and derived snapshot only | CI rebuilds and validates the bundle; the Vercel build rebuilds both supported output directories and checks that disclosure files are present | Confirm the snapshot's source and redistribution terms before changing its contents |
 | `GET /api/v1/*` | Derived research metadata, signals, and prospective aggregates | No mutation routes; a hosted Postgres reader URL is required; query lengths/page sizes are bounded; errors are generic where storage details could leak; security headers are applied by FastAPI and Vercel | Confirm the public fields remain acceptable as the forward registry grows |
 | `/api/docs` and OpenAPI | API contract and interactive documentation | Read-only endpoints; CSP explicitly allows the pinned documentation CDN while blocking objects/forms and framing | Disable public docs if deployment policy later treats the contract as private |
 | Anonymous traffic | No account/authentication required for the research terminal | Cache headers and compression reduce normal load; request IDs are safe-character allowlisted | Configure CDN/provider rate limits or a WAF if traffic becomes abusive; Python process-local counters would not be reliable across serverless instances |
@@ -64,7 +64,7 @@ oversized responses. The retained report contains paths, statuses, and health
 state but never response bodies or credentials. This is a runtime observation,
 not proof of provider-side rate limits, backups, or database grants.
 
-The deployment build runs the same bundle rebuild and contract validators, but
-it does not replace CI review or establish provider-side traffic controls. Keep
-the review with the release record and revisit it when public fields, data
-sources, hosting, or traffic patterns change.
+The deployment build rebuilds the bundle and checks its required disclosure
+files, but it does not replace CI review or establish provider-side traffic
+controls. Keep the review with the release record and revisit it when public
+fields, data sources, hosting, or traffic patterns change.
