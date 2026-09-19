@@ -17,4 +17,5 @@ def test_deployment_smoke_keeps_manual_origin_override() -> None:
 
     assert "  workflow_dispatch:" in text
     assert "github.event_name == 'workflow_dispatch' && inputs.deployment_url" in text
+    assert "vars.EDGAR_MOE_PUBLIC_DEPLOYMENT_URL" in text
     assert "github.event.deployment_status.target_url" in text
