@@ -268,6 +268,39 @@ jobs:
       - run: python -m json.tool vercel.json >/dev/null
       - run: git diff --exit-code -- public
 
+  container:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the reproducible serving image
+        run: docker build --tag edgar-moe-ci:${{ github.sha }} .
+      - name: Smoke-test the non-root container
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker run --detach --publish 18000:8000 edgar-moe-ci:${GITHUB_SHA})"
+          cleanup() { docker rm --force "$container_id" >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error \
+              http://127.0.0.1:18000/api/v1/health >/tmp/edgar-moe-container-health.json; then
+              break
+            fi
+            sleep 1
+          done
+          test -s /tmp/edgar-moe-container-health.json
+          test "$(docker inspect --format '{{.Config.User}}' "$container_id")" = "app"
+          for _ in $(seq 1 30); do
+            health="$(docker inspect --format '{{json .State.Health.Status}}' "$container_id")"
+            if [[ "$health" == '"healthy"' ]]; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker inspect "$container_id"
+          exit 1
+
   evidence-auditor:
     runs-on: ubuntu-24.04
     defaults:

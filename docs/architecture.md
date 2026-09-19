@@ -31,7 +31,7 @@ Each authenticated layer has a JSON manifest recording source identity, configur
 
 ## Deployment boundary
 
-Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The React application performs visualization and filtering but no model inference or order routing.
+Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The React application performs visualization and filtering but no model inference or order routing. A provider-neutral Docker image packages the same serving boundary for a future container host; it is non-root, healthchecked, and does not include the private forward runner or source-data credentials.
 
 ## Architecture baseline — September 18, 2026
 

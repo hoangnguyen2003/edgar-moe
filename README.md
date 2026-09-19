@@ -89,6 +89,17 @@ npx vercel@latest --prod
 
 The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. The content-addressed `config/public_snapshot.lock.json` is verified in CI and the Vercel build, so changing the frozen v1 snapshot is an explicit reviewed decision. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
 
+The repository also ships a provider-neutral container path for a future host:
+
+```bash
+docker compose up --build
+```
+
+The image installs only the locked serving dependencies, runs as a non-root
+`app` user, includes a `/api/v1/health` container healthcheck, and is built and
+smoke-tested in CI. This is an alternative packaging boundary, not a reason to
+move the private forecasting runner into the public serving container.
+
 ## Prospective forward testing
 
 The production-quality v2 layer is deliberately separate from the historical locked test. It adds SQLAlchemy models and Alembic migrations for datasets, frozen models, runs, forecasts, labels, quality checks, artifacts, and audit events. Immutable records are protected against update/delete operations, batch writes are idempotent, and evidence artifacts use content-addressed SHA-256 keys locally or in Cloudflare R2.
