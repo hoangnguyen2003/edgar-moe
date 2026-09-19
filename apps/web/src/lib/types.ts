@@ -96,6 +96,37 @@ export interface FreshnessResponse {
   message: string;
 }
 
+export interface FrozenSnapshotIdentity {
+  path: "data/demo/snapshot.json";
+  sha256: string;
+  data_mode: "authenticated_locked_test";
+  as_of: string;
+  selection_hash: string;
+  locked_test_hash: string;
+  research_only: true;
+}
+
+export interface PublicDataBoundary {
+  raw_sources_public: false;
+  derived_output_public: true;
+  redistribution_status: "operator_review_required";
+}
+
+export interface GovernanceControl {
+  key: string;
+  status: "enforced" | "pending_operator_evidence";
+  owner: "repository" | "operator";
+  summary: string;
+}
+
+export interface GovernanceResponse {
+  schema_version: 1;
+  frozen_v1: FrozenSnapshotIdentity;
+  public_data: PublicDataBoundary;
+  controls: GovernanceControl[];
+  forward_status: ForwardStatusResponse;
+}
+
 export interface ForwardStatusResponse {
   configured: boolean;
   available: boolean;

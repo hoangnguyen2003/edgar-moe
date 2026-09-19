@@ -122,6 +122,29 @@ class HealthResponse(BaseModel):
     as_of: date | None
 
 
+class FrozenSnapshotIdentity(BaseModel):
+    path: Literal["data/demo/snapshot.json"]
+    sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    data_mode: Literal["authenticated_locked_test"]
+    as_of: date
+    selection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    locked_test_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    research_only: Literal[True]
+
+
+class PublicDataBoundary(BaseModel):
+    raw_sources_public: Literal[False]
+    derived_output_public: Literal[True]
+    redistribution_status: Literal["operator_review_required"]
+
+
+class GovernanceControl(BaseModel):
+    key: str
+    status: Literal["enforced", "pending_operator_evidence"]
+    owner: Literal["repository", "operator"]
+    summary: str
+
+
 class ForwardStatusResponse(BaseModel):
     configured: bool
     available: bool
@@ -142,6 +165,14 @@ class ForwardStatusResponse(BaseModel):
     latest_quality_warnings: int = Field(default=0, ge=0)
     latest_quality_failures: int = Field(default=0, ge=0)
     message: str
+
+
+class GovernanceResponse(BaseModel):
+    schema_version: Literal[1]
+    frozen_v1: FrozenSnapshotIdentity
+    public_data: PublicDataBoundary
+    controls: list[GovernanceControl]
+    forward_status: ForwardStatusResponse
 
 
 class ForwardRunRecord(BaseModel):

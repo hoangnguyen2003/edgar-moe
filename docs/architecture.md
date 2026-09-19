@@ -19,7 +19,7 @@
 - `artifacts`: model states, preprocessors, experiment manifests, and reports.
 - `demo`: small public snapshot consumed by FastAPI and React.
 
-Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Historical research pages use a validated snapshot. Forward Lab uses a Postgres registry containing forecast evidence, appended outcomes, and mutable run status. The public API exposes reads only; the private runner performs writes.
+Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Historical research pages use a validated snapshot. Forward Lab uses a Postgres registry containing forecast evidence, appended outcomes, and mutable run status. The read-only governance endpoint exposes the frozen-v1 identity, public-data boundary, repository-enforced controls, and current forward status as one machine-readable contract. The public API exposes reads only; the private runner performs writes.
 
 ## Failure behavior
 
@@ -76,7 +76,7 @@ flowchart LR
 | Component | Responsibility | Boundary / source of truth |
 | --- | --- | --- |
 | React + `public/` | Display research and operational status | Public by design; never store credentials here |
-| `api/index.py`, `src/edgar_moe/api/app.py` | Snapshot and registry queries | No training or mutation endpoints; shared application DB abstraction |
+| `api/index.py`, `src/edgar_moe/api/app.py` | Snapshot, governance, and registry queries | No training or mutation endpoints; governance fields are value-safe and provider-neutral |
 | Postgres | Forecasts, labels, identities, runs, quality checks | Prospective record of truth; SQLite is the local/test alternative |
 | `scripts/run_forward_cycle.py` | Refresh, build, forecast, settle, diagnose | Batch execution, not a web request |
 | `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins |
@@ -132,8 +132,8 @@ serializes production jobs, and has a 300-minute compute deadline inside a
 360-minute job. The application reports a 96-hour freshness window. These are
 configured behaviors, not guaranteed scheduler latency or availability SLAs.
 
-Forecast list/performance routes request 60-second caching; registry status is
-`no-store`. An unconfigured registry is reported explicitly; database errors
+Forecast list/performance routes request 60-second caching; registry status and
+governance are `no-store`. An unconfigured registry is reported explicitly; database errors
 produce an unavailable status or 503 on forward data routes. Historical snapshot
 reads have a separate dependency path. Snapshot health alone does not prove that
 the registry or scheduler is healthy.

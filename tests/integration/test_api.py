@@ -1,4 +1,5 @@
 import json
+from hashlib import sha256
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -34,9 +35,11 @@ def fixture_snapshot() -> dict:
             "version": "0.1.0",
             "generated_at": "2026-01-01T00:00:00Z",
             "as_of": "2026-01-01",
-            "data_mode": "test",
+            "data_mode": "authenticated_locked_test",
             "research_only": True,
             "disclaimer": "test",
+            "selection_hash": "a" * 64,
+            "locked_test_hash": "b" * 64,
         },
         "summary": {
             "title": "Test",
@@ -92,6 +95,18 @@ def test_api_contracts(tmp_path: Path) -> None:
         assert client.get("/api/v1/equity-curves?cost_bps=17").status_code == 422
         status = client.get("/api/v1/forward/status")
         assert status.json()["configured"] is False
+        governance = client.get("/api/v1/governance")
+        assert governance.status_code == 200
+        governance_payload = governance.json()
+        assert governance_payload["schema_version"] == 1
+        assert governance_payload["frozen_v1"]["path"] == "data/demo/snapshot.json"
+        assert governance_payload["frozen_v1"]["sha256"] == sha256(path.read_bytes()).hexdigest()
+        assert governance_payload["public_data"]["raw_sources_public"] is False
+        assert governance_payload["forward_status"]["available"] is False
+        assert {control["status"] for control in governance_payload["controls"]} == {
+            "enforced",
+            "pending_operator_evidence",
+        }
         assert status.headers["x-content-type-options"] == "nosniff"
         assert status.headers["x-frame-options"] == "DENY"
         assert status.headers["cross-origin-opener-policy"] == "same-origin"

@@ -9,6 +9,7 @@ import type {
   ForwardQualityRecord,
   ForwardRunRecord,
   ForwardStatusResponse,
+  GovernanceResponse,
   MethodologyResponse,
   SummaryResponse,
 } from "./types";
@@ -35,6 +36,7 @@ export const api = {
   latestSignals: () => request<EventRecord[]>("/api/v1/latest-signals"),
   methodology: () => request<MethodologyResponse>("/api/v1/methodology"),
   freshness: () => request<FreshnessResponse>("/api/v1/freshness"),
+  governance: () => request<GovernanceResponse>("/api/v1/governance"),
   forwardStatus: () => request<ForwardStatusResponse>("/api/v1/forward/status"),
   forwardRuns: () => request<ForwardRunRecord[]>("/api/v1/forward/runs"),
   forwardForecasts: () => request<ForwardForecastPage>("/api/v1/forward/forecasts?limit=50"),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 from pathlib import Path
 from threading import RLock
@@ -20,6 +21,7 @@ class SnapshotRepository:
         self._lock = RLock()
         self._mtime_ns: int | None = None
         self._snapshot: dict[str, Any] | None = None
+        self._snapshot_sha256: str | None = None
 
     def load(self) -> dict[str, Any]:
         with self._lock:
@@ -29,11 +31,36 @@ class SnapshotRepository:
                 )
             modified = self.path.stat().st_mtime_ns
             if self._snapshot is None or modified != self._mtime_ns:
-                payload = orjson.loads(self.path.read_bytes())
+                raw = self.path.read_bytes()
+                payload = orjson.loads(raw)
                 self._validate_shape(payload)
                 self._snapshot = payload
                 self._mtime_ns = modified
+                self._snapshot_sha256 = hashlib.sha256(raw).hexdigest()
             return self._snapshot
+
+    def frozen_identity(self) -> dict[str, Any]:
+        """Return the public, content-addressed identity of the frozen snapshot."""
+        snapshot = self.load()
+        metadata = snapshot.get("metadata")
+        if not isinstance(metadata, dict):
+            raise ValueError("Invalid snapshot; metadata must be an object")
+        if self._snapshot_sha256 is None:
+            raise ValueError("Invalid snapshot; content hash is unavailable")
+        required = ("data_mode", "as_of", "selection_hash", "locked_test_hash")
+        if any(not isinstance(metadata.get(field), str) for field in required):
+            raise ValueError("Invalid snapshot; frozen identity metadata is incomplete")
+        if metadata.get("research_only") is not True:
+            raise ValueError("Invalid snapshot; frozen snapshot must be research-only")
+        return {
+            "path": "data/demo/snapshot.json",
+            "sha256": self._snapshot_sha256,
+            "data_mode": metadata["data_mode"],
+            "as_of": metadata["as_of"],
+            "selection_hash": metadata["selection_hash"],
+            "locked_test_hash": metadata["locked_test_hash"],
+            "research_only": True,
+        }
 
     def summary(self) -> dict[str, Any]:
         snapshot = self.load()

@@ -27,8 +27,12 @@ from edgar_moe.api.models import (
     ForwardRunRecord,
     ForwardStatusResponse,
     FreshnessResponse,
+    FrozenSnapshotIdentity,
+    GovernanceControl,
+    GovernanceResponse,
     HealthResponse,
     MethodologyResponse,
+    PublicDataBoundary,
     SummaryResponse,
 )
 from edgar_moe.api.repository import SnapshotNotFoundError, SnapshotRepository
@@ -141,6 +145,28 @@ def _cache(response: Response, seconds: int = 300) -> None:
     response.headers["Cache-Control"] = f"public, max-age={seconds}, stale-while-revalidate=600"
 
 
+def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusResponse:
+    if registry is None:
+        return ForwardStatusResponse(
+            configured=False,
+            available=False,
+            message="Forward registry is not configured in this deployment.",
+        )
+    try:
+        payload = registry.status()
+    except SQLAlchemyError:
+        return ForwardStatusResponse(
+            configured=True,
+            available=False,
+            message="Forward registry is configured but currently unavailable.",
+        )
+    return ForwardStatusResponse(
+        **payload,
+        available=True,
+        message="Append-only forward registry is available.",
+    )
+
+
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["operations"])
 def health(repo: RepositoryDependency) -> HealthResponse:
     try:
@@ -246,6 +272,60 @@ def freshness(response: Response, repo: RepositoryDependency) -> FreshnessRespon
 
 
 @app.get(
+    "/api/v1/governance",
+    response_model=GovernanceResponse,
+    tags=["governance"],
+)
+def governance(
+    response: Response,
+    repo: RepositoryDependency,
+    registry: ForwardRegistryDependency,
+) -> GovernanceResponse:
+    """Expose the immutable-v1 and prospective-evaluation control contract."""
+    response.headers["Cache-Control"] = "no-store"
+    try:
+        frozen_identity = repo.frozen_identity()
+    except (SnapshotNotFoundError, ValueError) as error:
+        raise HTTPException(status_code=503, detail="Frozen snapshot unavailable") from error
+    return GovernanceResponse(
+        schema_version=1,
+        frozen_v1=FrozenSnapshotIdentity.model_validate(frozen_identity),
+        public_data=PublicDataBoundary(
+            raw_sources_public=False,
+            derived_output_public=True,
+            redistribution_status="operator_review_required",
+        ),
+        controls=[
+            GovernanceControl(
+                key="frozen_v1_identity",
+                status="enforced",
+                owner="repository",
+                summary="Model, selection, locked result, and snapshot identity remain content-addressed.",
+            ),
+            GovernanceControl(
+                key="pre_entry_forecasts",
+                status="enforced",
+                owner="repository",
+                summary="Prospective forecasts require a recorded timestamp before tradable entry.",
+            ),
+            GovernanceControl(
+                key="append_only_outcomes",
+                status="enforced",
+                owner="repository",
+                summary="Outcomes are appended after maturity; the frozen v1 result is not overwritten.",
+            ),
+            GovernanceControl(
+                key="provider_operations",
+                status="pending_operator_evidence",
+                owner="operator",
+                summary="Provider grants, backups, restore timing, and object-store failure evidence require an external exercise.",
+            ),
+        ],
+        forward_status=_forward_status_response(registry),
+    )
+
+
+@app.get(
     "/api/v1/forward/status",
     response_model=ForwardStatusResponse,
     tags=["forward testing"],
@@ -255,25 +335,7 @@ def forward_status(
     registry: ForwardRegistryDependency,
 ) -> ForwardStatusResponse:
     response.headers["Cache-Control"] = "no-store"
-    if registry is None:
-        return ForwardStatusResponse(
-            configured=False,
-            available=False,
-            message="Forward registry is not configured in this deployment.",
-        )
-    try:
-        payload = registry.status()
-    except SQLAlchemyError:
-        return ForwardStatusResponse(
-            configured=True,
-            available=False,
-            message="Forward registry is configured but currently unavailable.",
-        )
-    return ForwardStatusResponse(
-        **payload,
-        available=True,
-        message="Append-only forward registry is available.",
-    )
+    return _forward_status_response(registry)
 
 
 @app.get(
