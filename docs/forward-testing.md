@@ -87,6 +87,29 @@ runner existed:
 uv run edgar-moe forward-mirror-artifacts
 ```
 
+Before or after a retry, verify that every database artifact reference still
+resolves to a hash- and size-verified local object:
+
+```bash
+uv run edgar-moe forward-reconcile-artifacts \
+  --output data/forward/diagnostics/artifact-reconciliation.json
+```
+
+The default command is read-only. With an explicit `--repair`, it mirrors only
+registry-referenced objects that pass the local content-addressed checks; it
+never edits forecasts, labels, run state, or database artifact rows:
+
+```bash
+uv run edgar-moe forward-reconcile-artifacts --repair \
+  --output data/forward/diagnostics/artifact-reconciliation.json
+```
+
+The report fails on missing/corrupt local bytes, unsupported primary URIs, or a
+mirror identity mismatch. It does not invent replacements for missing objects;
+recover those from an independently verified source, then rerun the command.
+The independent Go auditor remains the authority for checking the durable R2
+object store.
+
 Run migrations from a trusted machine before connecting the API. The migration
 URL must be the writer role; do not use the API reader URL for schema changes:
 

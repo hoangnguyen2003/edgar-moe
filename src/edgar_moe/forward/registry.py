@@ -371,6 +371,27 @@ class ForwardRegistry:
             )
             return record
 
+    def list_artifacts(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return immutable artifact references for independent verification."""
+        statement = select(ArtifactRecord).order_by(ArtifactRecord.created_at, ArtifactRecord.artifact_id)
+        if limit is not None:
+            if limit < 1:
+                raise ValueError("Artifact limit must be positive")
+            statement = statement.limit(limit)
+        with self.database.session() as session:
+            records = session.scalars(statement).all()
+            return [
+                {
+                    "artifact_id": row.artifact_id,
+                    "run_id": row.run_id,
+                    "kind": row.kind,
+                    "uri": row.uri,
+                    "sha256": row.sha256,
+                    "size_bytes": row.size_bytes,
+                }
+                for row in records
+            ]
+
     def status(
         self,
         *,

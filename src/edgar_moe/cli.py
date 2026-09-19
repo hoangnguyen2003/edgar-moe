@@ -35,6 +35,7 @@ from edgar_moe.forward.artifacts import (
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
 from edgar_moe.forward.inference import FrozenPredictor
+from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.forward.workflow import ForwardWorkflow
 from edgar_moe.modeling.experiment import (
@@ -729,6 +730,54 @@ def forward_mirror_artifacts() -> None:
         f"Mirrored and verified {result['objects']:,} artifact(s) "
         f"({result['bytes']:,} bytes) in R2."
     )
+
+
+@app.command("forward-reconcile-artifacts")
+def forward_reconcile_artifacts(
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    repair: Annotated[
+        bool,
+        typer.Option(
+            "--repair",
+            help="Mirror verified referenced objects to R2; default mode is read-only.",
+        ),
+    ] = False,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report destination."),
+    ] = None,
+) -> None:
+    """Verify registry-referenced evidence and optionally repair the R2 mirror."""
+    settings = runtime_settings()
+    database = RegistryDatabase(_forward_database_url(settings, database_url))
+    mirror = None
+    if repair:
+        mirror = R2ArtifactStore(
+            endpoint_url=settings.edgar_moe_r2_endpoint_url,
+            bucket=settings.edgar_moe_r2_bucket,
+            access_key_id=settings.edgar_moe_r2_access_key_id,
+            secret_access_key=settings.edgar_moe_r2_secret_access_key,
+        )
+    try:
+        report = reconcile_registry_artifacts(
+            ForwardRegistry(database, actor="edgar-moe-reconciler"),
+            LocalArtifactStore(settings.edgar_moe_artifact_dir),
+            mirror=mirror,
+            repair=repair,
+        )
+    finally:
+        database.dispose()
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(serialized)
+        typer.echo(f"Wrote artifact reconciliation report to {output}")
+    typer.echo(serialized.decode())
+    if report["status"] != "passed":
+        raise typer.Exit(code=1)
 
 
 @app.command("forward-forecast")
