@@ -25,6 +25,8 @@ jobs:
         run: uv run python scripts/verify_postgres_reader.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
+      - name: Check restore comparison verifier is runnable
+        run: uv run python scripts/verify_restore_comparison.py --help
       - name: Check local restore rehearsal command is runnable
         run: uv run python scripts/rehearse_sqlite_restore.py --help
       - name: Check PostgreSQL restore fixture commands are runnable
@@ -186,6 +188,8 @@ jobs:
             --source-audit "$REHEARSAL_DIR/source-evidence-audit.json" \
             --restored-audit "$REHEARSAL_DIR/restored-evidence-audit.json" \
             | tee "$REHEARSAL_DIR/restore-comparison.json"
+          uv run python scripts/verify_restore_comparison.py \
+            --report "$REHEARSAL_DIR/restore-comparison.json"
       - name: Probe the restored read path
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}

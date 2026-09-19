@@ -188,11 +188,15 @@ uv run python scripts/compare_restore_reports.py \
   --source-audit "$REHEARSAL_DIR/source-evidence-audit.json" \
   --restored-audit "$REHEARSAL_DIR/evidence-audit.json" \
   | tee "$REHEARSAL_DIR/restore-comparison.json"
+uv run python scripts/verify_restore_comparison.py \
+  --report "$REHEARSAL_DIR/restore-comparison.json"
 ```
 
 The command exits `0` only when counts match, neither audit is incomplete, and
 the restored target introduces no new finding. It exits `1` for a failed
-comparison and `2` for malformed inputs.
+comparison and `2` for malformed inputs. The comparison report includes a
+content SHA-256; the verifier proves that the retained JSON was not altered
+after the comparison ran.
 
 If the production evidence is local-only, copy an immutable export to a private
 isolated directory and use the auditor's `-manifest` and `-local-root` fixture

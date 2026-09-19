@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -72,8 +73,8 @@ def compare_reports(
         and restored_status != "incomplete"
         else "failed"
     )
-    return {
-        "schema_version": 1,
+    report = {
+        "schema_version": 2,
         "status": status,
         "observed_at": datetime.now(UTC).isoformat(),
         "counts_match": not count_mismatches,
@@ -83,3 +84,27 @@ def compare_reports(
         "new_findings": new_findings,
         "resolved_findings": resolved_findings,
     }
+    report["report_hash"] = _content_hash(report)
+    return report
+
+
+def verify_restore_comparison_report(payload: dict[str, Any]) -> None:
+    """Raise when a serialized restore comparison was changed after creation."""
+    expected = str(payload.get("report_hash", ""))
+    if len(expected) != 64:
+        raise RestoreComparisonError("restore comparison is missing a SHA-256 report_hash")
+    unsigned = dict(payload)
+    unsigned.pop("report_hash", None)
+    observed = _content_hash(unsigned)
+    if observed != expected:
+        raise RestoreComparisonError("restore comparison report_hash does not match content")
+
+
+def _content_hash(payload: dict[str, Any]) -> str:
+    serialized = json.dumps(
+        payload,
+        ensure_ascii=True,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(serialized).hexdigest()
