@@ -5,6 +5,7 @@ from sys import executable
 
 WORKFLOW_ROOT = Path(".github/workflows")
 PROVIDER_WORKFLOWS = (
+    "provider-evidence-preflight.yml",
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
@@ -24,7 +25,7 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     result = _run_validator(WORKFLOW_ROOT)
 
     assert result.returncode == 0
-    assert "provider workflow safety contract passed (3 workflows)" in result.stdout
+    assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
 def test_provider_workflow_policy_rejects_secret_in_step_with_mapping(tmp_path: Path) -> None:
