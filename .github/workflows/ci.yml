@@ -27,6 +27,8 @@ jobs:
         run: uv run python scripts/compare_restore_reports.py --help
       - name: Check forward failure context writer is runnable
         run: uv run python scripts/write_forward_failure_context.py
+      - name: Check optional forward alert notifier is runnable
+        run: uv run python scripts/notify_forward_alert.py --help
       - name: Check research drift command is runnable
         run: uv run edgar-moe research-drift --help
       - name: Verify forward-registry migrations match the ORM schema

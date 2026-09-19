@@ -144,6 +144,8 @@ EDGAR_MOE_R2_ENDPOINT_URL
 EDGAR_MOE_R2_BUCKET
 EDGAR_MOE_R2_ACCESS_KEY_ID
 EDGAR_MOE_R2_SECRET_ACCESS_KEY
+# Optional HTTPS webhook for redacted failure/health alerts:
+EDGAR_MOE_ALERT_WEBHOOK_URL
 ```
 
 Use the pooled Neon URL for the scheduled application connection. Apply Alembic
@@ -172,6 +174,17 @@ If refresh, inference, or settlement fails, the workflow writes a redacted
 outcome, uploads it with any diagnostic already produced, and adds a failure
 summary to the run. This is durable investigation evidence, not a claim that an
 external alert recipient has been configured.
+
+If `EDGAR_MOE_ALERT_WEBHOOK_URL` is configured, the runner sends a redacted
+HTTPS JSON alert after a failed cycle and after a successful cycle whose status
+is stale, unavailable, or has quality warnings/failures. Delivery is
+best-effort (`continue-on-error`) so a notification outage cannot hide the
+original run result. The payload contains only operational identifiers and
+machine-readable classification; database URLs, R2 credentials, raw exception
+messages, and source data are never copied. Without the optional secret the
+steps skip delivery at no cost. When configured, the workflow retains a
+redacted delivery receipt with the alert dedupe key and HTTP result for 30 days;
+the receipt never contains the webhook URL.
 
 ## Research drift review
 
@@ -295,6 +308,13 @@ decision. The default freshness window is 96 hours, which allows for the
 Tuesday–Saturday schedule and its weekend gap.
 
 Monitor failed runs, failed/warning quality checks, dataset freshness, unmatched settlements, registry availability, and the age of the latest successful run. Failed runs remain in the ledger. Fix the source problem and start a new run; never delete or repurpose the failed identity.
+
+The optional notifier maps these conditions to `failed_run`, `stale_runner`,
+`registry_unavailable`, `quality_failure`, and `quality_warning` events. Use
+`uv run python scripts/notify_forward_alert.py --dry-run` with a saved context
+or status payload to review the redaction contract before configuring a
+recipient. A successful local dry run is not evidence that an external channel
+received a message.
 
 Back up Postgres using the provider's export/restore process and periodically verify that downloaded R2 objects match their recorded SHA-256. Rotate database and R2 credentials immediately after suspected exposure.
 

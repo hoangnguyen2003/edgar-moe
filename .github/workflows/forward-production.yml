@@ -43,6 +43,7 @@ jobs:
       EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
       EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
       EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+      EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
       HF_HOME: ${{ github.workspace }}/data/cache/huggingface
       PYTHONUNBUFFERED: "1"
     steps:
@@ -132,6 +133,15 @@ jobs:
         run: |
           uv run python scripts/write_forward_failure_context.py
 
+      - name: Notify failed cycle (optional)
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        continue-on-error: true
+        env:
+          EDGAR_MOE_FAILURE_CONTEXT_PATH: data/forward/diagnostics/forward-failure-context.json
+          EDGAR_MOE_ALERT_RECEIPT_PATH: data/forward/diagnostics/forward-alert-receipt.json
+        shell: bash
+        run: uv run python scripts/notify_forward_alert.py
+
       - name: Upload failure evidence
         if: ${{ always() && !cancelled() && steps.forward_cycle.outcome != 'success' }}
         uses: actions/upload-artifact@v7
@@ -140,6 +150,7 @@ jobs:
           path: |
             data/forward/diagnostics/forward-failure-context.json
             data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
+            data/forward/diagnostics/forward-alert-receipt.json
           if-no-files-found: ignore
           retention-days: 30
 
@@ -166,6 +177,35 @@ jobs:
           name: forward-diagnostic-${{ steps.cutoff.outputs.date }}
           path: data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
           if-no-files-found: error
+          retention-days: 30
+
+      - name: Capture registry health status (optional)
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        shell: bash
+        run: |
+          status_path=data/forward/diagnostics/forward-status.json
+          mkdir -p "$(dirname "$status_path")"
+          if ! uv run edgar-moe forward-status > "$status_path"; then
+            printf '%s\n' '{"available":false,"error":"registry_status_command_failed"}' > "$status_path"
+          fi
+
+      - name: Notify registry health (optional)
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        continue-on-error: true
+        env:
+          EDGAR_MOE_ALERT_RECEIPT_PATH: data/forward/diagnostics/forward-alert-receipt.json
+        shell: bash
+        run: uv run python scripts/notify_forward_alert.py --status-file data/forward/diagnostics/forward-status.json
+
+      - name: Upload optional health alert evidence
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: forward-health-alert-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            data/forward/diagnostics/forward-status.json
+            data/forward/diagnostics/forward-alert-receipt.json
+          if-no-files-found: ignore
           retention-days: 30
 
       - name: Save resumable filing and embedding caches

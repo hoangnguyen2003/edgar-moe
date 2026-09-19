@@ -81,6 +81,7 @@ flowchart LR
 | `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins |
 | Local artifacts + R2 mirror | Content-addressed evidence bytes | Mirrored identity checks; bucket access/retention still require account verification |
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup |
+| Optional alert webhook | Receives redacted failed-run and health classifications | Secret is runner-only; delivery is best-effort and never contains database/R2 credentials |
 | Go evidence auditor | Cross-check registry rows against object bytes | Read-only operational boundary; no repair or write authority |
 
 Production workflow sequence: restore caches and verify model → refresh inputs →
