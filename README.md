@@ -166,6 +166,20 @@ It compares the frozen 2026-07-31 dataset with a later 2026-08-06 dataset and
 records stable feature and frozen-component distributions. This is drift
 evidence, not a performance claim or an automatic retraining decision.
 
+Once multiple later datasets are available, review the trend without changing
+the frozen model:
+
+```bash
+uv run edgar-moe research-drift-history \
+  --report reports/research-drift-2026-08-06.json \
+  --minimum-reports 3 \
+  --output reports/research-drift-history.json
+```
+
+The history remains `insufficient_history` until the configured minimum number
+of independently hashed reports is present. The current one-observation review
+is retained at [`reports/research-drift-history.json`](reports/research-drift-history.json).
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run

@@ -1,0 +1,52 @@
+{
+  "automatic_retraining": false,
+  "baseline": {
+    "as_of": "2026-07-31",
+    "dataset_id": "research-2026-07-31-3553e7ad78dd",
+    "source_manifest_hash": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603"
+  },
+  "history_hash": "0275db162c2e5c8121cc9ab5ff68997bf9d92b88205198dc933195d9f44f7929",
+  "history_version": 1,
+  "minimum_reports": 3,
+  "model": {
+    "artifact_sha256": "5cf77b2a8de255eb959236a48caac1f6c5d429767e250976c0c31324ef0bcd2c",
+    "frozen_at": "2026-08-06T04:35:16.041067+00:00",
+    "model_id": "edgar-moe-frozen-v1",
+    "model_version": "1.0.0-frozen",
+    "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906"
+  },
+  "observations": [
+    {
+      "component_warning_count": 0,
+      "feature_warning_count": 0,
+      "prospective": {
+        "as_of": "2026-08-06",
+        "dataset_id": "research-2026-08-06-e4ba3c323d37",
+        "event_count": 6039,
+        "included_events": 6039
+      },
+      "report_hash": "0899bdfb3a108cfbf91f8b273de6d50ddb6907bc8612cbfdf64d45d9d9fb8e24",
+      "sequence": 1,
+      "status": "stable",
+      "warning_names": []
+    }
+  ],
+  "observed_at": "2026-09-19T09:25:49.660737+00:00",
+  "report_count": 1,
+  "report_files": [
+    {
+      "path": "reports/research-drift-2026-08-06.json",
+      "report_hash": "0899bdfb3a108cfbf91f8b273de6d50ddb6907bc8612cbfdf64d45d9d9fb8e24"
+    }
+  ],
+  "review_required": true,
+  "scope": "research_drift_history",
+  "status": "insufficient_history",
+  "thresholds": {
+    "missing_rate_delta": 0.1,
+    "population_stability_index": 0.2,
+    "standardized_mean_shift": 1.0
+  },
+  "v1_immutable": true,
+  "warning_streak": 0
+}

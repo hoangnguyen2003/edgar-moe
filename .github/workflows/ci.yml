@@ -49,6 +49,8 @@ jobs:
         run: uv run edgar-moe capacity-baseline --help
       - name: Check research drift command is runnable
         run: uv run edgar-moe research-drift --help
+      - name: Check research drift history command is runnable
+        run: uv run edgar-moe research-drift-history --help
       - name: Verify forward-registry migrations match the ORM schema
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: sqlite:////tmp/edgar-moe-migration-check.sqlite3

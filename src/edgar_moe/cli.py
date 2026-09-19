@@ -26,6 +26,10 @@ from edgar_moe.data.security_master import build_security_master
 from edgar_moe.data.universe import screen_liquid_universe
 from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
 from edgar_moe.features.drift import build_research_drift_report
+from edgar_moe.features.drift_history import (
+    DriftHistoryError,
+    build_research_drift_history,
+)
 from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
 from edgar_moe.forward.artifacts import (
     LocalArtifactStore,
@@ -489,6 +493,56 @@ def research_drift(
     typer.echo(
         f"Research drift status: {report['status']}; "
         f"report hash: {report['report_hash']}; wrote {output}"
+    )
+
+
+@app.command("research-drift-history")
+def research_drift_history(
+    reports: Annotated[
+        list[Path],
+        typer.Option(
+            "--report",
+            help="Content-hashed research-drift report; repeat for each later dataset.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="JSON drift-history review destination."),
+    ] = Path("reports/research-drift-history.json"),
+    minimum_reports: Annotated[
+        int,
+        typer.Option("--minimum-reports", min=1, help="Reports required before stable history."),
+    ] = 3,
+) -> None:
+    """Aggregate prospective drift reports without retraining or reading outcomes."""
+    if not reports:
+        raise typer.BadParameter("at least one --report is required")
+    payloads: list[dict[str, Any]] = []
+    for report_path in reports:
+        try:
+            payload = orjson.loads(report_path.read_bytes())
+        except (OSError, orjson.JSONDecodeError) as error:
+            raise typer.BadParameter(f"cannot read drift report: {report_path}") from error
+        if not isinstance(payload, dict):
+            raise typer.BadParameter(f"drift report must be a JSON object: {report_path}")
+        payloads.append(payload)
+    try:
+        history = build_research_drift_history(
+            payloads,
+            report_paths=reports,
+            minimum_reports=minimum_reports,
+        )
+    except DriftHistoryError as error:
+        raise typer.BadParameter(str(error)) from error
+    serialized = orjson.dumps(history, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    temporary_output.write_bytes(serialized)
+    temporary_output.replace(output)
+    typer.echo(
+        f"Research drift history status: {history['status']}; "
+        f"reports: {history['report_count']}; history hash: {history['history_hash']}; "
+        f"wrote {output}"
     )
 
 

@@ -301,6 +301,29 @@ mismatches. Its report hash is
 an evidence snapshot, not a claim of predictive performance or a trigger for
 automatic retraining.
 
+The retained [`research-drift-history.json`](../reports/research-drift-history.json)
+records this one observation with status `insufficient_history` and requires two
+more later reports before a stable trend can be declared. Its history hash is
+`0275db162c2e5c8121cc9ab5ff68997bf9d92b88205198dc933195d9f44f7929`.
+
+When several later datasets are available, aggregate their immutable reports for
+review instead of treating one comparison as a trend:
+
+```bash
+uv run edgar-moe research-drift-history \
+  --report reports/research-drift-2026-08-06.json \
+  --report reports/research-drift-2026-09-15.json \
+  --report reports/research-drift-2026-10-15.json \
+  --minimum-reports 3 \
+  --output reports/research-drift-history.json
+```
+
+The history command verifies every child hash and requires one baseline, frozen
+model identity, and threshold set across all reports. It orders observations by
+prospective dataset date, rejects duplicate dataset IDs, marks fewer than three
+observations as `insufficient_history`, and exposes warning streaks for human
+review. It never retrains, reads outcomes, or changes the frozen artifact.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the
