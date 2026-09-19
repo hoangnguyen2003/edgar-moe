@@ -96,6 +96,34 @@ def complete_responses() -> dict[str, FakeResponse]:
             ),
             "application/json",
         ),
+        f"{base}/api/v1/governance": FakeResponse(
+            f"{base}/api/v1/governance",
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "frozen_v1": {
+                        "path": "data/demo/snapshot.json",
+                        "sha256": "a" * 64,
+                        "data_mode": "authenticated_locked_test",
+                        "as_of": "2026-07-31",
+                        "selection_hash": "b" * 64,
+                        "locked_test_hash": "c" * 64,
+                        "research_only": True,
+                    },
+                    "public_data": {
+                        "raw_sources_public": False,
+                        "derived_output_public": True,
+                        "redistribution_status": "operator_review_required",
+                    },
+                    "controls": [
+                        {"status": "enforced", "owner": "repository"},
+                        {"status": "pending_operator_evidence", "owner": "operator"},
+                    ],
+                    "forward_status": {"configured": False, "available": False},
+                }
+            ),
+            "application/json",
+        ),
         f"{base}/api/v1/health": FakeResponse(
             f"{base}/api/v1/health",
             json.dumps({"status": "ok", "snapshot_loaded": True}),

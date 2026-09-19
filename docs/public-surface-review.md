@@ -28,7 +28,10 @@ redistribution boundary. It explicitly declares that raw sources are not public
 and that legal/provider review remains required. CI and the Vercel build
 cross-check the published identity against `config/public_snapshot.lock.json`;
 this is evidence of the repository's disclosure posture, not evidence that any
-provider has approved redistribution.
+provider has approved redistribution. The read-only `/api/v1/governance`
+endpoint presents the same boundary together with the content-addressed frozen-v1
+identity and the current forward-registry state; it deliberately labels
+provider-side controls as pending operator evidence.
 
 ## Failure behavior
 
@@ -63,8 +66,8 @@ origin is important when the hosting provider protects per-deployment URLs;
 the workflow falls back to the deployment status target when the variable is
 absent. The same workflow keeps a manual HTTPS-origin trigger for rechecks and
 non-GitHub deployments. It performs only bounded `GET` requests to the
-homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`, and
-`/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
+homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`,
+`/api/v1/governance`, and `/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
 any mismatch in the full security-header contract (including a one-year HSTS
 minimum), degraded health, and
 oversized responses. The retained report contains paths, statuses, and health

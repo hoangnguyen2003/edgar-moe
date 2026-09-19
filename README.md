@@ -79,7 +79,7 @@ uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
 
 ## Deployment
 
-The public terminal deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes FastAPI as one Python Function in Singapore (`sin1`). The frozen v1 snapshot remains stateless. The optional Forward Lab reads from Postgres when `EDGAR_MOE_REGISTRY_DATABASE_URL` is configured; without it, the UI explicitly reports that prospective evidence is not connected.
+The public terminal deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes FastAPI as one Python Function in Singapore (`sin1`). The frozen v1 snapshot remains stateless. The Governance page and `/api/v1/governance` endpoint expose the content-addressed v1 identity and distinguish repository-enforced controls from pending provider evidence. The optional Forward Lab reads from Postgres when `EDGAR_MOE_REGISTRY_DATABASE_URL` is configured; without it, the UI explicitly reports that prospective evidence is not connected.
 
 ```bash
 npm run build:public

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -32,6 +33,7 @@ _REQUIRED_SECURITY_HEADERS = {
     ),
 }
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
 
 class _CrossOriginRedirectError(ValueError):
@@ -99,6 +101,14 @@ def run_smoke(
             "application/json",
             timeout,
         ),
+        _check_endpoint(
+            base,
+            origin,
+            "/api/v1/governance",
+            "governance",
+            "application/json",
+            timeout,
+        ),
         _check_endpoint(base, origin, "/api/v1/health", "health", "application/json", timeout),
     ]
 
@@ -129,6 +139,48 @@ def run_smoke(
                         check.update(status="failed", error="health_status_invalid")
                     elif health_status == "degraded" and not allow_degraded:
                         check.update(status="failed", error="health_status_degraded")
+        elif check["name"] == "governance":
+            payload = check.pop("_json", None)
+            if check["status"] == "passed":
+                frozen = payload.get("frozen_v1") if isinstance(payload, dict) else None
+                public_data = payload.get("public_data") if isinstance(payload, dict) else None
+                controls = payload.get("controls") if isinstance(payload, dict) else None
+                forward_status = payload.get("forward_status") if isinstance(payload, dict) else None
+                frozen_valid = isinstance(frozen, dict) and all(
+                    (
+                        frozen.get("path") == "data/demo/snapshot.json",
+                        frozen.get("data_mode") == "authenticated_locked_test",
+                        frozen.get("research_only") is True,
+                        _SHA256.fullmatch(str(frozen.get("sha256", ""))) is not None,
+                        _SHA256.fullmatch(str(frozen.get("selection_hash", ""))) is not None,
+                        _SHA256.fullmatch(str(frozen.get("locked_test_hash", ""))) is not None,
+                    )
+                )
+                boundary_valid = isinstance(public_data, dict) and (
+                    public_data.get("raw_sources_public") is False
+                    and public_data.get("derived_output_public") is True
+                    and public_data.get("redistribution_status") == "operator_review_required"
+                )
+                controls_valid = isinstance(controls, list) and bool(controls) and all(
+                    isinstance(control, dict)
+                    and control.get("status") in {"enforced", "pending_operator_evidence"}
+                    and control.get("owner") in {"repository", "operator"}
+                    for control in controls
+                )
+                forward_valid = isinstance(forward_status, dict) and all(
+                    isinstance(forward_status.get(field), bool)
+                    for field in ("configured", "available")
+                )
+                if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+                    check.update(status="failed", error="governance_schema_invalid")
+                elif not frozen_valid:
+                    check.update(status="failed", error="governance_identity_contract_invalid")
+                elif not boundary_valid:
+                    check.update(status="failed", error="governance_public_boundary_invalid")
+                elif not controls_valid:
+                    check.update(status="failed", error="governance_controls_invalid")
+                elif not forward_valid:
+                    check.update(status="failed", error="governance_forward_status_invalid")
         elif check["name"] == "provenance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -203,7 +255,7 @@ def _check_endpoint(
                 check["missing_headers"] = missing_headers
                 return check
             decoded = body.decode("utf-8")
-            if name in {"health", "provenance"}:
+            if name in {"health", "provenance", "governance"}:
                 try:
                     check["_json"] = json.loads(decoded)
                 except json.JSONDecodeError:

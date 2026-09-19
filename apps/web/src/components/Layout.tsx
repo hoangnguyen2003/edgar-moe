@@ -8,6 +8,7 @@ import {
   Menu,
   Orbit,
   RadioTower,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { type ReactNode, useState } from "react";
@@ -21,6 +22,7 @@ const navigation = [
   { to: "/filings", label: "Filing explorer", icon: FileSearch },
   { to: "/signals", label: "Weekly signals", icon: RadioTower },
   { to: "/forward", label: "Forward lab", icon: Orbit },
+  { to: "/governance", label: "Governance", icon: ShieldCheck },
   { to: "/methodology", label: "Methodology", icon: BookOpenText },
 ];
 
