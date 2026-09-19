@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra dev --extra research --extra operations
+      - run: uv sync --locked --extra dev --extra research --extra operations
       - run: uv run ruff check .
       - run: uv run mypy src
       - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
@@ -90,7 +90,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra dev
+      - run: uv sync --locked --extra dev
       - name: Apply registry schema as the migration owner
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
@@ -147,7 +147,7 @@ jobs:
         with:
           go-version-file: tools/evidence-auditor/go.mod
           cache-dependency-path: tools/evidence-auditor/go.sum
-      - run: uv sync --extra dev
+      - run: uv sync --locked --extra dev
       - name: Prepare isolated rehearsal directories
         run: mkdir -p "$REHEARSAL_DIR" "$RESTORE_ARTIFACT_ROOT"
       - name: Apply schema and seed a representative registry

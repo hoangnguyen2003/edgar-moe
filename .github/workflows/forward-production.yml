@@ -58,7 +58,7 @@ jobs:
           enable-cache: true
 
       - name: Install frozen research and operations runtime
-        run: uv sync --extra research --extra operations
+        run: uv sync --locked --extra research --extra operations
 
       - name: Validate private runtime configuration
         shell: bash

@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra dev
+      - run: uv sync --locked --extra dev
       - name: Probe the public deployment boundary
         env:
           DEPLOYMENT_URL: ${{ inputs.deployment_url }}

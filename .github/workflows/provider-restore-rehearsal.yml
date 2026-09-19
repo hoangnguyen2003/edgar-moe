@@ -48,7 +48,7 @@ jobs:
           go-version-file: tools/evidence-auditor/go.mod
           cache-dependency-path: tools/evidence-auditor/go.sum
 
-      - run: uv sync --extra dev
+      - run: uv sync --locked --extra dev
 
       - name: Prepare private rehearsal directories
         shell: bash

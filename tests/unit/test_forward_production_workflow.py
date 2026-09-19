@@ -7,7 +7,7 @@ def test_forward_workflow_validates_secrets_before_installing_runtime() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
     setup_uv = text.index("astral-sh/setup-uv@v7")
-    install = text.index("uv sync --extra research --extra operations")
+    install = text.index("uv sync --locked --extra research --extra operations")
     validation = text.index("scripts/validate_forward_runtime_config.py")
     setup_go = text.index("actions/setup-go@v6")
 

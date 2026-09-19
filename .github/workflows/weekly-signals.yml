@@ -24,7 +24,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra research
+      - run: uv sync --locked --extra research
       - name: Build transparent verification snapshot
         run: uv run edgar-moe demo --epochs 12 --output /tmp/edgar-moe-synthetic.json
       - name: Validate snapshot API
@@ -40,7 +40,7 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      - run: uv sync --extra research
+      - run: uv sync --locked --extra research
       - name: Require reviewed research universe
         run: test -f config/universe.research.csv
       - name: Check authenticated-source configuration

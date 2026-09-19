@@ -9,8 +9,8 @@ between diagnostic observations and the official 20-session evaluation.
 Every change follows this sequence:
 
 1. Start from the latest `main` and create a descriptive branch. Use one of
-   `feat/`, `fix/`, `chore/`, `docs/`, `research/`, `refactor/`, or `test/`,
-   followed by the concrete task (for example,
+   `feat/`, `fix/`, `chore/`, `docs/`, `research/`, `refactor/`, `test/`,
+   `security/`, or `ops/`, followed by the concrete task (for example,
    `research/official-outcome-audit`). Dependabot branches are also allowed.
 2. Make the smallest coherent change. Update the relevant architecture or
    operations documentation when a boundary, data contract, or failure
@@ -22,6 +22,12 @@ Every change follows this sequence:
    uv run mypy src
    uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
    ```
+
+   CI treats `uv.lock` as authoritative and runs `uv sync --locked`. When
+   dependencies change, update the lockfile deliberately with `uv lock`, then
+   include the resulting lockfile diff in the pull request. The web job uses
+   `npm ci`, so `apps/web/package-lock.json` must stay synchronized with
+   `package.json`.
 
    Go changes additionally run `gofmt`, `go vet ./...`, and `go test -race ./...`
    from the relevant module. Web changes run the commands in

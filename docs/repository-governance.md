@@ -40,6 +40,9 @@ record.
 - A green PR proves repository checks passed; it does not prove provider quotas,
   database grants, backups, scheduler delivery, or R2 retention. Those require
   separate operational verification.
+- CI installs Python dependencies with `uv sync --locked` and web dependencies
+  with `npm ci`; dependency changes must include deliberate lockfile updates in
+  the reviewed pull request.
 - Keep the Vercel/public bundle and private forward runner as separate
   deployment boundaries. The browser must never receive database or R2
   credentials.
