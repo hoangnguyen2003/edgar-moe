@@ -6,64 +6,17 @@ import json
 import subprocess
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any
 from zoneinfo import ZoneInfo
 
-import numpy as np
 import orjson
 import typer
 
 from edgar_moe.capacity import DEFAULT_BASELINE_PATHS, build_capacity_baseline
-from edgar_moe.data.alpaca import AlpacaDataClient
-from edgar_moe.data.demo import build_demo_snapshot
-from edgar_moe.data.fred import FredClient
-from edgar_moe.data.refresh import (
-    load_universe_csv,
-    refresh_authenticated_to_disk,
-)
-from edgar_moe.data.sec import SecClient
-from edgar_moe.data.security_master import build_security_master
-from edgar_moe.data.universe import screen_liquid_universe
-from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
-from edgar_moe.features.drift import build_research_drift_report
-from edgar_moe.features.drift_history import (
-    DriftHistoryError,
-    build_research_drift_history,
-)
-from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
-from edgar_moe.forward.artifacts import (
-    LocalArtifactStore,
-    R2ArtifactStore,
-    artifact_store_from_settings,
-    mirror_local_artifacts,
-)
-from edgar_moe.forward.config import FrozenModelSpec
-from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
-from edgar_moe.forward.inference import FrozenPredictor
-from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
-from edgar_moe.forward.registry import ForwardRegistry
-from edgar_moe.forward.workflow import ForwardWorkflow
-from edgar_moe.modeling.experiment import (
-    run_authenticated_experiment,
-    save_study_artifacts,
-)
-from edgar_moe.modeling.frozen import (
-    evaluate_frozen_selection,
-    save_frozen_evaluation,
-)
-from edgar_moe.modeling.walk_forward import (
-    run_walk_forward_study,
-    save_walk_forward_artifacts,
-)
-from edgar_moe.reporting import (
-    build_authenticated_snapshot,
-    build_frozen_snapshot,
-    write_frozen_evaluation_report,
-    write_research_report,
-    write_validation_report,
-    write_walk_forward_report,
-)
-from edgar_moe.settings import ResearchConfig, RuntimeSettings, runtime_settings
+from edgar_moe.settings import runtime_settings
+
+if TYPE_CHECKING:
+    from edgar_moe.settings import RuntimeSettings
 
 app = typer.Typer(
     name="edgar-moe",
@@ -81,6 +34,9 @@ def demo(
     epochs: Annotated[int, typer.Option(min=1, max=200)] = 35,
 ) -> None:
     """Train the real MoE on deterministic synthetic fixtures and export the app snapshot."""
+    from edgar_moe.data.demo import build_demo_snapshot
+    from edgar_moe.settings import ResearchConfig
+
     config = ResearchConfig.from_yaml(config_path)
     snapshot = build_demo_snapshot(
         output, config=config, seed=config.project.random_seed, max_epochs=epochs
@@ -96,6 +52,8 @@ def validate_config(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Validate and print the resolved research configuration."""
+    from edgar_moe.settings import ResearchConfig
+
     config = ResearchConfig.from_yaml(config_path)
     typer.echo(config.model_dump_json(indent=2))
 
@@ -106,6 +64,8 @@ def ingest_sec(
     output_dir: Annotated[Path, typer.Option()] = Path("data/raw/sec"),
 ) -> None:
     """Download a filer's submissions and point-in-time company facts."""
+    from edgar_moe.data.sec import SecClient
+
     settings = runtime_settings()
 
     async def run() -> None:
@@ -131,6 +91,8 @@ def ingest_assets(
     output: Annotated[Path, typer.Option()] = Path("data/raw/alpaca/assets.json"),
 ) -> None:
     """Download active and inactive US equity asset metadata from Alpaca."""
+    from edgar_moe.data.alpaca import AlpacaDataClient
+
     settings = runtime_settings()
 
     async def run() -> list[dict[str, object]]:
@@ -155,6 +117,11 @@ def build_universe(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Build a reviewed SEC-to-Alpaca security master including inactive assets."""
+    from edgar_moe.data.alpaca import AlpacaDataClient
+    from edgar_moe.data.sec import SecClient
+    from edgar_moe.data.security_master import build_security_master
+    from edgar_moe.settings import ResearchConfig
+
     settings = runtime_settings()
     config = ResearchConfig.from_yaml(config_path)
     _require_source_configuration(settings, needs_fred=False)
@@ -245,6 +212,12 @@ def refresh_data(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Collect a resumable, hashed SEC filing/market/macro research checkpoint."""
+    from edgar_moe.data.alpaca import AlpacaDataClient
+    from edgar_moe.data.fred import FredClient
+    from edgar_moe.data.refresh import load_universe_csv, refresh_authenticated_to_disk
+    from edgar_moe.data.sec import SecClient
+    from edgar_moe.settings import ResearchConfig
+
     settings = runtime_settings()
     config = ResearchConfig.from_yaml(config_path)
     _require_source_configuration(settings, needs_fred=True)
@@ -309,6 +282,10 @@ def screen_universe(
     batch_size: Annotated[int, typer.Option(min=1, max=500)] = 200,
 ) -> None:
     """Create a free-tier research candidate set using trailing IEX liquidity."""
+    from edgar_moe.data.alpaca import AlpacaDataClient
+    from edgar_moe.data.refresh import load_universe_csv
+    from edgar_moe.data.universe import screen_liquid_universe
+
     settings = runtime_settings()
     _require_source_configuration(settings, needs_fred=False)
     members = load_universe_csv(source)
@@ -397,6 +374,12 @@ def build_dataset(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Convert an authenticated checkpoint into a point-in-time model dataset."""
+    import numpy as np
+
+    from edgar_moe.features.dataset import build_research_dataset
+    from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
+    from edgar_moe.settings import ResearchConfig
+
     config = ResearchConfig.from_yaml(config_path)
     text_encoder: FinBertEmbedder | HashingTextEmbedder
     if embedder == "finbert":
@@ -455,6 +438,11 @@ def research_drift(
     ] = "cpu",
 ) -> None:
     """Measure prospective feature and frozen-component drift without retraining."""
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.features.drift import build_research_drift_report
+    from edgar_moe.forward.config import FrozenModelSpec
+    from edgar_moe.forward.inference import FrozenPredictor
+
     if device not in {"cpu", "mps"}:
         raise typer.BadParameter("device must be 'cpu' or 'mps'")
     spec = FrozenModelSpec.from_yaml(model_config)
@@ -515,6 +503,8 @@ def research_drift_history(
     ] = 3,
 ) -> None:
     """Aggregate prospective drift reports without retraining or reading outcomes."""
+    from edgar_moe.features.drift_history import DriftHistoryError, build_research_drift_history
+
     if not reports:
         raise typer.BadParameter("at least one --report is required")
     payloads: list[dict[str, Any]] = []
@@ -573,6 +563,15 @@ def run_study(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Select models on validation and optionally open the locked test exactly once."""
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.modeling.experiment import run_authenticated_experiment, save_study_artifacts
+    from edgar_moe.reporting import (
+        build_authenticated_snapshot,
+        write_research_report,
+        write_validation_report,
+    )
+    from edgar_moe.settings import ResearchConfig
+
     config = ResearchConfig.from_yaml(config_path)
     dataset = ResearchDataset.load(dataset_dir)
     artifact_directory = output_dir / dataset.dataset_id
@@ -639,6 +638,11 @@ def walk_forward_study(
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Choose a stable champion on expanding pre-test folds; never score the test."""
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.modeling.walk_forward import run_walk_forward_study, save_walk_forward_artifacts
+    from edgar_moe.reporting import write_walk_forward_report
+    from edgar_moe.settings import ResearchConfig
+
     if device not in {"cpu", "mps", "auto"}:
         raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
     config = ResearchConfig.from_yaml(config_path)
@@ -703,6 +707,10 @@ def open_frozen_test(
     ] = "cpu",
 ) -> None:
     """Open the locked period once using only the hash-confirmed frozen champion."""
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.modeling.frozen import evaluate_frozen_selection, save_frozen_evaluation
+    from edgar_moe.reporting import build_frozen_snapshot, write_frozen_evaluation_report
+
     if device not in {"cpu", "mps", "auto"}:
         raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
     dataset = ResearchDataset.load(dataset_dir)
@@ -760,6 +768,8 @@ def forward_init(
     from alembic import command
     from alembic.config import Config
 
+    from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
+
     resolved_url = _forward_database_url(runtime_settings(), database_url)
     bootstrap_database = RegistryDatabase(resolved_url)
     bootstrap_database.dispose()
@@ -772,6 +782,12 @@ def forward_init(
 @app.command("forward-mirror-artifacts")
 def forward_mirror_artifacts() -> None:
     """Copy and verify all local content-addressed evidence in Cloudflare R2."""
+    from edgar_moe.forward.artifacts import (
+        LocalArtifactStore,
+        R2ArtifactStore,
+        mirror_local_artifacts,
+    )
+
     settings = runtime_settings()
     local = LocalArtifactStore(settings.edgar_moe_artifact_dir)
     mirror = R2ArtifactStore(
@@ -806,6 +822,11 @@ def forward_reconcile_artifacts(
     ] = None,
 ) -> None:
     """Verify registry-referenced evidence and optionally repair the R2 mirror."""
+    from edgar_moe.forward.artifacts import LocalArtifactStore, R2ArtifactStore
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
+    from edgar_moe.forward.registry import ForwardRegistry
+
     settings = runtime_settings()
     database = RegistryDatabase(_forward_database_url(settings, database_url))
     mirror = None
@@ -852,6 +873,12 @@ def forward_forecast(
     device: Annotated[str, typer.Option(help="Inference device: cpu, mps, or auto.")] = "cpu",
 ) -> None:
     """Score only not-yet-tradable events with the immutable frozen model."""
+    from edgar_moe.forward.artifacts import artifact_store_from_settings
+    from edgar_moe.forward.config import FrozenModelSpec
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+    from edgar_moe.forward.workflow import ForwardWorkflow
+
     if device not in {"cpu", "mps", "auto"}:
         raise typer.BadParameter("device must be 'cpu', 'mps', or 'auto'")
     settings = runtime_settings()
@@ -895,6 +922,12 @@ def forward_settle(
     ] = None,
 ) -> None:
     """Append matured outcomes without changing any recorded forecast."""
+    from edgar_moe.forward.artifacts import artifact_store_from_settings
+    from edgar_moe.forward.config import FrozenModelSpec
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+    from edgar_moe.forward.workflow import ForwardWorkflow
+
     settings = runtime_settings()
     database = RegistryDatabase(_forward_database_url(settings, database_url))
     registry = ForwardRegistry(database, actor="edgar-moe-cli")
@@ -943,7 +976,10 @@ def forward_diagnostic(
     ] = None,
 ) -> None:
     """Report short-horizon diagnostics without mutating forward evidence."""
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.diagnostics import diagnostic_report
+    from edgar_moe.forward.registry import ForwardRegistry
 
     settings = runtime_settings()
     database = RegistryDatabase(_forward_database_url(settings, database_url))
@@ -975,6 +1011,9 @@ def forward_status(
     ] = None,
 ) -> None:
     """Print registry coverage and prospective performance as JSON."""
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+
     database = RegistryDatabase(_forward_database_url(runtime_settings(), database_url))
     registry = ForwardRegistry(database, actor="edgar-moe-cli")
     try:
