@@ -66,6 +66,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: python scripts/validate_public_bundle.py
+      - run: python -m json.tool vercel.json >/dev/null
       - run: git diff --exit-code -- public
 
   evidence-auditor:

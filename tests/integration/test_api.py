@@ -94,6 +94,12 @@ def test_api_contracts(tmp_path: Path) -> None:
         assert status.json()["configured"] is False
         assert status.headers["x-content-type-options"] == "nosniff"
         assert status.headers["x-frame-options"] == "DENY"
+        assert status.headers["cross-origin-opener-policy"] == "same-origin"
+        assert status.headers["cross-origin-resource-policy"] == "same-site"
+        assert status.headers["content-security-policy"].find("object-src 'none'") >= 0
+        assert client.get("/api/v1/events?ticker=" + "A" * 33).status_code == 422
+        assert client.get("/api/v1/events?cursor=" + "1" * 21).status_code == 422
+        assert client.get("/api/v1/events/not-an-accession").status_code == 422
     app.dependency_overrides.clear()
 
 

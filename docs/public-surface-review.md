@@ -1,0 +1,44 @@
+# Public-surface review
+
+This review covers the anonymous Vercel deployment. It is a design and
+verification record, not a claim that provider-side rate limits or data-license
+terms have been independently approved.
+
+## Boundary and decisions
+
+| Surface | Public by design | Control | Remaining operator decision |
+| --- | --- | --- | --- |
+| `public/` static bundle | React UI and derived snapshot only | CI rebuilds the bundle, checks the asset graph, rejects source maps/private runtime names/credential patterns, and the Vercel build command repeats the bundle validation | Confirm the snapshot's source and redistribution terms before changing its contents |
+| `GET /api/v1/*` | Derived research metadata, signals, and prospective aggregates | No mutation routes; a hosted Postgres reader URL is required; query lengths/page sizes are bounded; errors are generic where storage details could leak; security headers are applied by FastAPI and Vercel | Confirm the public fields remain acceptable as the forward registry grows |
+| `/api/docs` and OpenAPI | API contract and interactive documentation | Read-only endpoints; CSP explicitly allows the pinned documentation CDN while blocking objects/forms and framing | Disable public docs if deployment policy later treats the contract as private |
+| Anonymous traffic | No account/authentication required for the research terminal | Cache headers and compression reduce normal load; request IDs are safe-character allowlisted | Configure CDN/provider rate limits or a WAF if traffic becomes abusive; Python process-local counters would not be reliable across serverless instances |
+| Raw source data and credentials | Not public | Raw filings, market data, model checkpoints, database URLs, R2 credentials, and source maps are excluded from the bundle and deployment inputs | Re-check provider licenses and rotate credentials after any suspected exposure |
+
+## Failure behavior
+
+- A failed public-bundle validation stops the Vercel build before a deployment is
+  accepted.
+- A missing/invalid snapshot degrades the health endpoint; it does not replace
+  the committed snapshot with a partial result.
+- A missing or unavailable forward registry returns an explicit disconnected or
+  `503` response; the API never falls back to a hosted writer credential.
+- Oversized or malformed query inputs fail with `422` before an unbounded scan.
+- Database failures return generic public errors; the server logs remain the
+  private operator channel and must not be copied into public responses.
+
+## Verification
+
+Run the same checks used by CI before opening a deployment PR:
+
+```bash
+npm ci --prefix apps/web
+npm run build:public --prefix apps/web
+python3 scripts/validate_public_bundle.py
+git diff --exit-code -- public
+uv run pytest -q tests/integration/test_api.py
+```
+
+The deployment build repeats `python3 scripts/validate_public_bundle.py`, but it
+does not replace CI review or establish provider-side traffic controls. Keep the
+review with the release record and revisit it when public fields, data sources,
+hosting, or traffic patterns change.
