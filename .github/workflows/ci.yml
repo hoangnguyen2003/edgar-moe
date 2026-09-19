@@ -44,6 +44,54 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
 
+  postgres-reader-role:
+    runs-on: ubuntu-24.04
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: edgar_moe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d edgar_moe"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --extra dev
+      - name: Apply registry schema as the migration owner
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
+        run: uv run alembic upgrade head
+      - name: Provision the disposable SELECT-only role
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
+        shell: bash
+        run: |
+          psql "$EDGAR_MOE_REGISTRY_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 \
+            --command "CREATE ROLE edgar_moe_migrator NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;"
+          psql "$EDGAR_MOE_REGISTRY_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 \
+            --command "CREATE ROLE edgar_moe_api_reader LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT PASSWORD 'reader-password';"
+          psql "$EDGAR_MOE_REGISTRY_DATABASE_URL" \
+            --set ON_ERROR_STOP=1 \
+            --variable api_reader_role=edgar_moe_api_reader \
+            --variable migration_owner=edgar_moe_migrator \
+            --file ops/postgres/provision-reader.sql
+      - name: Verify effective PostgreSQL reader privileges and denied writes
+        env:
+          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe
+        run: uv run python scripts/verify_postgres_reader.py
+
   web:
     runs-on: ubuntu-24.04
     steps:

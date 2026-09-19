@@ -148,6 +148,11 @@ The verifier must pass before putting the reader URL in Vercel. Keep the writer
 URL out of the API host; if the reader is unavailable, the API intentionally
 reports the registry as disconnected rather than using a more powerful credential.
 
+The pull-request CI job also provisions the same contract in a disposable
+PostgreSQL 16 service and runs the verifier as the reader role. That catches SQL,
+schema, and privilege-regression mistakes before deployment; it is not a
+substitute for a redacted verification report from the hosted provider.
+
 ## Scheduled production runner
 
 `.github/workflows/forward-production.yml` runs at 07:17 UTC Tuesday through
