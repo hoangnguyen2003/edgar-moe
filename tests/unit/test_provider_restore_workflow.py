@@ -34,3 +34,5 @@ def test_provider_restore_workflow_protects_source_and_target_evidence() -> None
     assert "Remove private temporary dump" in text
     assert "retention-days: 30" in text
     assert "SHA256SUMS" in text
+    assert "scripts/validate_redacted_artifacts.py" in text
+    assert "steps.redaction.outcome == 'success'" in text

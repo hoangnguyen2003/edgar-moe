@@ -47,6 +47,8 @@ jobs:
         run: |
           uv run python scripts/write_operator_evidence_packet.py --help
           uv run python scripts/verify_operator_evidence_packet.py --help
+      - name: Check retained evidence redaction command is runnable
+        run: uv run python scripts/validate_redacted_artifacts.py --help
       - name: Check artifact reconciliation command is runnable
         run: uv run edgar-moe forward-reconcile-artifacts --help
       - name: Check capacity baseline command is runnable

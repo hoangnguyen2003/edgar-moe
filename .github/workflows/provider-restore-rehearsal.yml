@@ -351,8 +351,13 @@ jobs:
             > "$REHEARSAL_DIR/summary.json"
           echo "overall_status=$status" >> "$GITHUB_OUTPUT"
 
-      - name: Hash retained rehearsal evidence
+      - name: Verify retained evidence is redacted
+        id: redaction
         if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$REHEARSAL_DIR"
+
+      - name: Hash retained rehearsal evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -370,7 +375,7 @@ jobs:
         run: rm -rf "$WORK_DIR"
 
       - name: Upload provider restore evidence
-        if: ${{ always() }}
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: provider-restore-rehearsal-${{ github.run_id }}-${{ github.run_attempt }}
@@ -379,7 +384,7 @@ jobs:
           retention-days: 30
 
       - name: Fail unless the rehearsal passed
-        if: ${{ always() && steps.summary.outputs.overall_status != 'passed' }}
+        if: ${{ always() && (steps.summary.outputs.overall_status != 'passed' || steps.redaction.outcome != 'success') }}
         shell: bash
         run: |
           echo "Provider restore rehearsal did not pass; inspect the retained artifact." >&2

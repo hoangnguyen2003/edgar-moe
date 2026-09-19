@@ -63,10 +63,12 @@ evidence audit**. Configure these Actions secrets with read-only credentials:
 Run it from the Actions tab after a provider change, suspected partial write, or
 before relying on a restore. The workflow never enables the Go repair path or
 uses the runner's writer/R2 upload credentials. It retains the JSON result, a
-redacted error stream, run metadata, and a SHA-256 file list for 30 days, then
-fails the job when the audit reports an integrity finding or a required secret is
-missing. A passing disposable CI fixture still does not prove the hosted bucket
-was checked.
+redacted error stream, run metadata, and a SHA-256 file list for 30 days. Before
+upload, it scans every retained text file for credential-bearing URLs, token
+patterns, private-key material, unsafe symlinks, and unexpected binary payloads;
+a scan failure blocks the upload. It then fails the job when the audit reports an
+integrity finding or a required secret is missing. A passing disposable CI
+fixture still does not prove the hosted bucket was checked.
 
 ## Offline contract fixture
 

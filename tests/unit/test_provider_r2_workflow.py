@@ -25,4 +25,6 @@ def test_provider_r2_workflow_has_no_repair_or_writer_path() -> None:
     assert "EDGAR_MOE_R2_ACCESS_KEY_ID" not in text
     assert "EDGAR_MOE_R2_SECRET_ACCESS_KEY" not in text
     assert "SHA256SUMS" in text
+    assert "scripts/validate_redacted_artifacts.py" in text
+    assert "steps.redaction.outcome == 'success'" in text
     assert "Fail unless the provider audit passed" in text

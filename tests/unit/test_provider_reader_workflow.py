@@ -23,4 +23,6 @@ def test_provider_reader_workflow_retains_evidence_before_failing() -> None:
     assert "if: ${{ always() }}" in text
     assert "reader-role.error" in text
     assert "SHA256SUMS" in text
+    assert "scripts/validate_redacted_artifacts.py" in text
+    assert "steps.redaction.outcome == 'success'" in text
     assert "Fail unless the provider contract passed" in text

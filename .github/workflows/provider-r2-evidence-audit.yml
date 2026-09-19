@@ -89,8 +89,13 @@ jobs:
           set -euo pipefail
           sha256sum "$AUDIT_DIR"/* | sort > "$AUDIT_DIR/SHA256SUMS"
 
-      - name: Upload redacted provider R2 audit evidence
+      - name: Verify retained evidence is redacted
+        id: redaction
         if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$AUDIT_DIR"
+
+      - name: Upload redacted provider R2 audit evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
         uses: actions/upload-artifact@v7
         with:
           name: provider-r2-audit-${{ github.run_id }}-${{ github.run_attempt }}
@@ -99,7 +104,7 @@ jobs:
           retention-days: 30
 
       - name: Fail unless the provider audit passed
-        if: ${{ always() && (steps.secret.outcome != 'success' || steps.audit.outputs.exit_code != '0') }}
+        if: ${{ always() && (steps.secret.outcome != 'success' || steps.audit.outputs.exit_code != '0' || steps.redaction.outcome != 'success') }}
         shell: bash
         run: |
           echo "Provider R2 evidence audit did not pass; inspect the retained artifact." >&2
