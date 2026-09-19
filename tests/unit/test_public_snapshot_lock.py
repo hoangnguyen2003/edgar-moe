@@ -70,3 +70,29 @@ def test_snapshot_lock_rejects_identity_change(tmp_path: Path) -> None:
 
     assert "public snapshot data_mode must remain authenticated_locked_test" in errors
     assert "public snapshot metadata does not match lock field: data_mode" in errors
+
+
+def test_snapshot_lock_rejects_published_provenance_drift(tmp_path: Path) -> None:
+    lock_path, _ = write_locked_fixture(tmp_path)
+    public_path = tmp_path / "public" / "data-provenance.json"
+    public_path.parent.mkdir(parents=True)
+    public_path.write_text(
+        json.dumps(
+            {
+                "snapshot": {
+                    "path": "data/demo/snapshot.json",
+                    "data_mode": "authenticated_locked_test",
+                    "as_of": "2026-07-31",
+                    "sha256": "c" * 64,
+                    "selection_hash": "a" * 64,
+                    "locked_test_hash": "b" * 64,
+                    "research_only": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    errors = _MODULE.validate_public_snapshot_lock(lock_path, repo_root=tmp_path)
+
+    assert "public provenance does not match lock field: sha256" in errors

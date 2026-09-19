@@ -34,7 +34,8 @@ members before a forward run or public build:
 
 - `scripts/validate_frozen_runtime.py` verifies the frozen model bundle;
 - `ops/frozen/SHA256SUMS` and `config/public_snapshot.lock.json` pin bytes;
-- `scripts/verify_public_snapshot_lock.py` rejects unreviewed public changes;
+- `scripts/verify_public_snapshot_lock.py` rejects unreviewed public changes and
+  cross-checks the published `data-provenance.json` identity;
 - the forward workflow copies the verified model into a new run workspace.
 
 ### Evaluate future observations in an append-only prospective lane

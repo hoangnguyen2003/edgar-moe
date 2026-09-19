@@ -29,6 +29,8 @@ _PRIVATE_RUNTIME_NAMES = re.compile(
 )
 _SOURCE_MAP_REFERENCE = re.compile(r"sourceMappingURL|[A-Za-z0-9._/-]+\.(?:js|css)\.map")
 _ASSET_REFERENCE = re.compile(r"[\"`]((?:/|\./)?(?:assets/)?[A-Za-z0-9._/-]+\.(?:js|css))[\"`]")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_EXPECTED_SNAPSHOT_PATH = "data/demo/snapshot.json"
 _SECURITY_CONTACT = re.compile(r"(?m)^Contact:\s*\S+\s*$")
 _SECURITY_POLICY = re.compile(r"(?m)^Policy:\s*\S+\s*$")
 _SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)*\s*$")
@@ -142,8 +144,19 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
     if not isinstance(snapshot, dict):
         errors.append("public/data-provenance.json snapshot must be an object")
     else:
+        if snapshot.get("path") != _EXPECTED_SNAPSHOT_PATH:
+            errors.append(
+                "public provenance snapshot path must be " + _EXPECTED_SNAPSHOT_PATH
+            )
         if snapshot.get("data_mode") != "authenticated_locked_test":
             errors.append("public provenance data_mode must remain authenticated_locked_test")
+        if not _SHA256.fullmatch(str(snapshot.get("sha256", ""))):
+            errors.append("public provenance snapshot sha256 must be a lowercase SHA-256 digest")
+        for field in ("selection_hash", "locked_test_hash"):
+            if not _SHA256.fullmatch(str(snapshot.get(field, ""))):
+                errors.append(f"public provenance snapshot {field} must be a lowercase SHA-256 digest")
+        if snapshot.get("research_only") is not True:
+            errors.append("public provenance snapshot research_only must remain true")
         if snapshot.get("raw_sources_public") is not False:
             errors.append("public provenance must declare raw_sources_public=false")
         if snapshot.get("derived_output_public") is not True:

@@ -23,11 +23,12 @@ replace provider-side WAF/rate-limit configuration or establish a source-data
 license.
 
 It also publishes `data-provenance.json`, a conservative machine-readable
-contract for the snapshot's source families and redistribution boundary. It
-explicitly declares that raw sources are not public and that legal/provider
-review remains required. CI validates the shape and statuses; this is evidence
-of the repository's disclosure posture, not evidence that any provider has
-approved redistribution.
+contract for the snapshot's source families, content-addressed identity, and
+redistribution boundary. It explicitly declares that raw sources are not public
+and that legal/provider review remains required. CI and the Vercel build
+cross-check the published identity against `config/public_snapshot.lock.json`;
+this is evidence of the repository's disclosure posture, not evidence that any
+provider has approved redistribution.
 
 ## Failure behavior
 
@@ -50,6 +51,7 @@ Run the same checks used by CI before opening a deployment PR:
 npm ci --prefix apps/web
 npm run build:public --prefix apps/web
 python3 scripts/validate_public_bundle.py
+python3 scripts/verify_public_snapshot_lock.py
 git diff --exit-code -- public
 uv run pytest -q tests/integration/test_api.py
 ```
