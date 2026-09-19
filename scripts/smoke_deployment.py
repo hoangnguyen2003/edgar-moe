@@ -31,6 +31,7 @@ _REQUIRED_SECURITY_HEADERS = {
         "connect-src 'self'"
     ),
 }
+_MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 
 
 class _CrossOriginRedirectError(ValueError):
@@ -195,7 +196,7 @@ def _check_endpoint(
             missing_headers = [
                 key
                 for key, expected in _REQUIRED_SECURITY_HEADERS.items()
-                if response_headers.get(key) != expected
+                if not _security_header_matches(key, response_headers.get(key, ""), expected)
             ]
             if missing_headers:
                 check["error"] = "required_security_header_missing"
@@ -219,6 +220,31 @@ def _check_endpoint(
     except (OSError, URLError, UnicodeDecodeError, ValueError) as error:
         check["error"] = type(error).__name__
     return check
+
+
+def _security_header_matches(key: str, actual: str, expected: str) -> bool:
+    """Validate required headers while allowing provider-managed HSTS extensions.
+
+    Vercel documents a two-year HSTS default and may append ``preload`` to a
+    project-level value. The smoke check therefore enforces a one-year minimum
+    with ``includeSubDomains`` instead of requiring one exact max-age string.
+    Other security headers remain exact contracts so an accidental policy
+    weakening is still caught.
+    """
+    if key != "strict-transport-security":
+        return actual == expected
+    directives: dict[str, str] = {}
+    for part in actual.split(";"):
+        token = part.strip().lower()
+        if not token:
+            continue
+        name, separator, value = token.partition("=")
+        directives[name] = value if separator else ""
+    try:
+        max_age = int(directives.get("max-age", "0"))
+    except ValueError:
+        return False
+    return max_age >= _MINIMUM_HSTS_MAX_AGE_SECONDS and "includesubdomains" in directives
 
 
 def _open_url(

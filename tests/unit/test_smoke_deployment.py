@@ -200,6 +200,31 @@ def test_smoke_rejects_missing_security_header(monkeypatch: pytest.MonkeyPatch) 
     assert report["checks"][0]["missing_headers"] == ["x-frame-options"]
 
 
+def test_smoke_accepts_provider_managed_hsts_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/"].headers["Strict-Transport-Security"] = (
+        "max-age=63072000; includeSubDomains; preload"
+    )
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "passed"
+
+
+def test_smoke_rejects_weak_hsts_policy(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/"].headers["Strict-Transport-Security"] = (
+        "max-age=86400; includeSubDomains"
+    )
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    assert report["checks"][0]["missing_headers"] == ["strict-transport-security"]
+
+
 def test_smoke_rejects_invalid_content_security_policy(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/"].headers["Content-Security-Policy"] = "default-src *"
