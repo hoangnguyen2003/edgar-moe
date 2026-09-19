@@ -49,6 +49,25 @@ The default output is one JSON report. Exit codes are:
 prevents an unexpected object from consuming unbounded memory or time. Objects
 are streamed through SHA-256; the auditor does not load an artifact into memory.
 
+## Repeatable provider audit
+
+The repository also includes a manual GitHub Actions workflow named **Provider R2
+evidence audit**. Configure these Actions secrets with read-only credentials:
+
+- `EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL`
+- `EDGAR_MOE_R2_ENDPOINT_URL`
+- `EDGAR_MOE_R2_BUCKET`
+- `EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID`
+- `EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY`
+
+Run it from the Actions tab after a provider change, suspected partial write, or
+before relying on a restore. The workflow never enables the Go repair path or
+uses the runner's writer/R2 upload credentials. It retains the JSON result, a
+redacted error stream, run metadata, and a SHA-256 file list for 30 days, then
+fails the job when the audit reports an integrity finding or a required secret is
+missing. A passing disposable CI fixture still does not prove the hosted bucket
+was checked.
+
 ## Offline contract fixture
 
 For CI and local development, `-manifest` reads a complete JSON export with

@@ -1,0 +1,106 @@
+name: Provider R2 evidence audit
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: provider-r2-evidence-audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  r2-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+      AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+      AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+      AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+      AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+      AUDIT_DIR: reports/provider-r2-audit
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
+
+      - name: Prepare redacted audit directory
+        shell: bash
+        run: mkdir -p "$AUDIT_DIR"
+
+      - name: Require read-only provider credentials
+        id: secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          for name in \
+            AUDITOR_DATABASE_URL \
+            AUDITOR_R2_ENDPOINT_URL \
+            AUDITOR_R2_BUCKET \
+            AUDITOR_R2_ACCESS_KEY_ID \
+            AUDITOR_R2_SECRET_ACCESS_KEY; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]} > 0)); then
+            printf '{"status":"not_run","reason":"required read-only provider secret(s) missing","missing":[' \
+              > "$AUDIT_DIR/summary.json"
+            printf '"%s",' "${missing[@]}" | sed 's/,$//' >> "$AUDIT_DIR/summary.json"
+            printf ']}\n' >> "$AUDIT_DIR/summary.json"
+            echo "Configure all required read-only provider secrets before running this audit." >&2
+            exit 1
+          fi
+
+      - name: Run the independent Go auditor
+        id: audit
+        if: ${{ always() && steps.secret.outcome == 'success' }}
+        working-directory: tools/evidence-auditor
+        shell: bash
+        run: |
+          set +e
+          go run . -timeout 10m -stale-after 96h \
+            > "../../$AUDIT_DIR/auditor.json" \
+            2> "../../$AUDIT_DIR/auditor.error"
+          exit_code=$?
+          set -e
+
+          if [[ "$exit_code" -eq 0 ]]; then
+            status=passed
+          else
+            status=failed
+          fi
+
+          printf '{"status":"%s","exit_code":%s,"workflow":"provider-r2-evidence-audit","run_id":"%s","run_attempt":"%s","commit":"%s","audit_report":"auditor.json","error_report":"auditor.error"}\n' \
+            "$status" "$exit_code" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" \
+            > "../../$AUDIT_DIR/summary.json"
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+
+      - name: Hash audit evidence
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum "$AUDIT_DIR"/* | sort > "$AUDIT_DIR/SHA256SUMS"
+
+      - name: Upload redacted provider R2 audit evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: provider-r2-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/provider-r2-audit/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless the provider audit passed
+        if: ${{ always() && (steps.secret.outcome != 'success' || steps.audit.outputs.exit_code != '0') }}
+        shell: bash
+        run: |
+          echo "Provider R2 evidence audit did not pass; inspect the retained artifact." >&2
+          exit 1
