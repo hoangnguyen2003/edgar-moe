@@ -36,8 +36,9 @@ Training uses PyTorch and Transformers outside the serving tier. The deployed Fa
 ## Architecture baseline — September 18, 2026
 
 This is a repository-backed description, not a certification of cloud account
-settings. See the [decision record](adr/0001-separate-serving-and-batch.md) and
-[improvement plan](architecture-roadmap.md). Provider quotas, backup configuration,
+settings. See the [serving/batch decision record](adr/0001-separate-serving-and-batch.md),
+the [frozen-v1/prospective-evaluation decision record](adr/0002-freeze-v1-prospective-evaluation.md),
+and the [improvement plan](architecture-roadmap.md). Provider quotas, backup configuration,
 database grants, branch protection, and billing settings were not inspected.
 
 ### Context and requirements
