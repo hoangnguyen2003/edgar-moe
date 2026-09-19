@@ -38,7 +38,7 @@ The dataset builder stores the source timestamp beside every feature and rejects
 
 ## Public snapshot and synthetic fixture
 
-`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
+`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; CI and the Vercel build reject an unreviewed replacement. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
 
 ## Authenticated refresh bundle
 
