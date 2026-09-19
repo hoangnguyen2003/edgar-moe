@@ -12,7 +12,7 @@ import pandas as pd
 
 from edgar_moe.data.storage import sha256_file
 from edgar_moe.features.dataset import ResearchDataset
-from edgar_moe.forward.artifacts import ArtifactStore
+from edgar_moe.forward.artifacts import ArtifactStore, ArtifactWriteError
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.domain import (
     DatasetRegistration,
@@ -139,6 +139,13 @@ class ForwardWorkflow:
                 counts=counts,
                 artifact_uri=reference.uri,
             )
+        except ArtifactWriteError as error:
+            self._record_partial_artifact(
+                run.run_id,
+                kind="forecast_batch",
+                error=error,
+            )
+            raise
         except Exception as error:
             self.registry.fail_run(run.run_id, error_message=f"{type(error).__name__}: {error}")
             raise
@@ -231,9 +238,56 @@ class ForwardWorkflow:
                 counts=counts,
                 artifact_uri=reference.uri,
             )
+        except ArtifactWriteError as error:
+            self._record_partial_artifact(
+                run.run_id,
+                kind="settlement_batch",
+                error=error,
+            )
+            raise
         except Exception as error:
             self.registry.fail_run(run.run_id, error_message=f"{type(error).__name__}: {error}")
             raise
+
+    def _record_partial_artifact(
+        self,
+        run_id: str,
+        *,
+        kind: str,
+        error: ArtifactWriteError,
+    ) -> None:
+        """Retain a verified primary after a mirror failure for safe repair.
+
+        The registry row is written before the run is marked failed, so the
+        read-only reconciler can discover and repair the primary bytes. If the
+        registry write itself fails, the run still records a provider-neutral
+        failure classification rather than pretending the evidence is durable.
+        """
+
+        try:
+            self.registry.register_artifact(
+                run_id,
+                kind=kind,
+                reference=error.primary_reference,
+            )
+        except Exception as registration_error:  # noqa: BLE001 - preserve original failure
+            self.registry.fail_run(
+                run_id,
+                error_message=(
+                    "ArtifactWriteError: mirror write failed and primary artifact "
+                    "registration failed "
+                    f"({type(registration_error).__name__})"
+                ),
+            )
+            return
+        self.registry.fail_run(
+            run_id,
+            error_message=(
+                "ArtifactWriteError: mirror write failed; primary artifact was "
+                "recorded for reconciliation "
+                f"(cause={error.cause_type})"
+            ),
+        )
 
     def _ensure_registrations(
         self,

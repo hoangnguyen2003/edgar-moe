@@ -18,6 +18,22 @@ class ArtifactReference:
     key: str
 
 
+class ArtifactWriteError(OSError):
+    """Raised when a mirrored write fails after the primary write succeeded.
+
+    The primary reference is intentionally retained so the caller can register
+    the durable local bytes and let the reconciliation job repair the mirror.
+    The public error text stays provider-neutral; the concrete exception type is
+    enough for private logs and failure classification without leaking endpoint
+    names or credential-bearing SDK messages into the registry.
+    """
+
+    def __init__(self, *, primary_reference: ArtifactReference, cause_type: str) -> None:
+        super().__init__("Artifact mirror write failed after the primary write")
+        self.primary_reference = primary_reference
+        self.cause_type = cause_type
+
+
 class ArtifactStore(Protocol):
     def put_file(
         self, source: str | Path, *, logical_name: str | None = None
@@ -199,14 +215,38 @@ class MirroredArtifactStore:
         logical_name: str | None = None,
     ) -> ArtifactReference:
         primary = self.primary.put_file(source, logical_name=logical_name)
-        mirror = self.mirror.put_file(source, logical_name=logical_name)
-        _require_equivalent_references(primary, mirror)
+        try:
+            mirror = self.mirror.put_file(source, logical_name=logical_name)
+        except Exception as error:  # noqa: BLE001 - preserve primary for reconciliation
+            raise ArtifactWriteError(
+                primary_reference=primary,
+                cause_type=type(error).__name__,
+            ) from error
+        try:
+            _require_equivalent_references(primary, mirror)
+        except ValueError as error:
+            raise ArtifactWriteError(
+                primary_reference=primary,
+                cause_type="identity_mismatch",
+            ) from error
         return primary
 
     def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
         primary = self.primary.put_bytes(content, logical_name=logical_name)
-        mirror = self.mirror.put_bytes(content, logical_name=logical_name)
-        _require_equivalent_references(primary, mirror)
+        try:
+            mirror = self.mirror.put_bytes(content, logical_name=logical_name)
+        except Exception as error:  # noqa: BLE001 - preserve primary for reconciliation
+            raise ArtifactWriteError(
+                primary_reference=primary,
+                cause_type=type(error).__name__,
+            ) from error
+        try:
+            _require_equivalent_references(primary, mirror)
+        except ValueError as error:
+            raise ArtifactWriteError(
+                primary_reference=primary,
+                cause_type="identity_mismatch",
+            ) from error
         return primary
 
     def read_bytes(self, reference: ArtifactReference) -> bytes:

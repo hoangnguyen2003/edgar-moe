@@ -7,6 +7,7 @@ import pytest
 from edgar_moe.forward.artifacts import (
     ArtifactReference,
     ArtifactStore,
+    ArtifactWriteError,
     LocalArtifactStore,
     MirroredArtifactStore,
     mirror_local_artifacts,
@@ -53,11 +54,13 @@ def test_mirror_failure_leaves_primary_content_retryable(tmp_path: Path) -> None
     mirror = FailOnceStore(tmp_path / "mirror")
     store: ArtifactStore = MirroredArtifactStore(primary, mirror)
 
-    with pytest.raises(OSError, match="injected mirror outage"):
+    with pytest.raises(ArtifactWriteError, match="mirror write failed") as caught:
         store.put_bytes(b"retryable evidence", logical_name="evidence.json")
 
-    # The first attempt does not register an artifact, but its immutable primary
-    # bytes remain available. A retry mirrors the same content identity exactly.
+    # The primary reference is available for registry registration and repair;
+    # a retry mirrors the same immutable content identity exactly.
+    assert caught.value.primary_reference.uri.startswith("local://")
+    assert caught.value.cause_type == "OSError"
     reference = store.put_bytes(b"retryable evidence", logical_name="evidence.json")
     assert primary.read_bytes(reference) == b"retryable evidence"
     assert mirror.read_bytes(reference) == b"retryable evidence"

@@ -110,6 +110,14 @@ recover those from an independently verified source, then rerun the command.
 The independent Go auditor remains the authority for checking the durable R2
 object store.
 
+If a mirrored forecast or settlement write fails after the local primary has
+accepted the bytes, the workflow records that primary reference in the registry
+before marking the run failed. The original forecasts/labels remain unchanged;
+the failed run is intentionally visible and the reference is now discoverable by
+the read-only reconciler. Run the repair command above after the mirror is
+available, verify its report, and retry with a new workflow run identity. Do not
+delete the failed run or overwrite its evidence to make the retry appear atomic.
+
 Run migrations from a trusted machine before connecting the API. The migration
 URL must be the writer role; do not use the API reader URL for schema changes:
 
