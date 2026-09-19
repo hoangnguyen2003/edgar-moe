@@ -20,6 +20,7 @@ from edgar_moe.forward.domain import (
     QualityCheckDraft,
     RunRegistration,
 )
+from edgar_moe.forward.failure_context import redact_sensitive_text
 from edgar_moe.forward.metrics import forward_metrics
 from edgar_moe.forward.models import (
     ArtifactRecord,
@@ -159,7 +160,7 @@ class ForwardRegistry:
         with self.database.session() as session:
             run = _require_running_run(session, run_id)
             run.status = "failed"
-            run.error_message = error_message[:4000]
+            run.error_message = redact_sensitive_text(error_message, max_length=4_000)
             run.finished_at = utc_now()
             _audit(
                 session,

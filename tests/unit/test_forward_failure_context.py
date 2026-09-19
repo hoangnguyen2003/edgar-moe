@@ -4,7 +4,11 @@ from datetime import UTC, datetime
 
 import psycopg
 
-from edgar_moe.forward.failure_context import build_failure_context, safe_exception_message
+from edgar_moe.forward.failure_context import (
+    build_failure_context,
+    redact_sensitive_text,
+    safe_exception_message,
+)
 from edgar_moe.forward.registry import RegistryStateError
 
 
@@ -47,6 +51,18 @@ def test_external_driver_errors_are_reduced_to_type_only() -> None:
 
     assert message == "OperationalError"
     assert "super-secret" not in message
+
+
+def test_redact_sensitive_text_is_safe_for_registry_callers() -> None:
+    message = redact_sensitive_text(
+        "provider rejected https://reader:super-secret@example.test/api "
+        "token=abcdef123"
+    )
+
+    assert "example.test" not in message
+    assert "super-secret" not in message
+    assert "abcdef123" not in message
+    assert "<redacted>" in message
 
 
 def test_internal_error_details_redact_urls_and_secret_assignments() -> None:

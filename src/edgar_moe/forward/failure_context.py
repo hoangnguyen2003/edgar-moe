@@ -18,6 +18,14 @@ _SECRET_ASSIGNMENT = re.compile(
 )
 
 
+def redact_sensitive_text(text: str, *, max_length: int = 1_000) -> str:
+    """Redact URLs and common credential assignments from operator text."""
+    detail = " ".join(text.split())
+    detail = _URL.sub(r"\g<scheme><redacted-url>", detail)
+    detail = _SECRET_ASSIGNMENT.sub(r"\g<name>\g<separator><redacted>", detail)
+    return detail[:max_length]
+
+
 def safe_exception_message(error: BaseException) -> str:
     """Return a provider-neutral error suitable for a public run record.
 
@@ -27,11 +35,9 @@ def safe_exception_message(error: BaseException) -> str:
     operators still get useful state-machine diagnostics.
     """
     error_type = type(error).__name__
-    detail = " ".join(str(error).split())
+    detail = redact_sensitive_text(str(error))
     if not detail or not type(error).__module__.startswith("edgar_moe."):
         return error_type
-    detail = _URL.sub(r"\g<scheme><redacted-url>", detail)
-    detail = _SECRET_ASSIGNMENT.sub(r"\g<name>\g<separator><redacted>", detail)
     return f"{error_type}: {detail}"[:1_000]
 
 
