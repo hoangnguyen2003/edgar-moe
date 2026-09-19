@@ -9,6 +9,8 @@ Alpaca, FRED, or processed training data.
   locked-test hash.
 - `SHA256SUMS` is checked before either file is copied to the ignored runtime path
   referenced by `config/forward.yaml`.
+- `scripts/validate_frozen_runtime.py` independently cross-checks those hashes,
+  the frozen-v1 model identity, and the locked-test dataset/selection bindings.
 
 The model is never retrained by the scheduled workflow. Replacing either artifact
 requires a new reviewed model ID and prospective protocol.

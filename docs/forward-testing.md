@@ -12,6 +12,17 @@ A row is a forward forecast only when all of the following are true:
 4. The SEC filing was available before the forecast, while the configured market entry and outcome horizon are both still in the future.
 5. The forecast is committed before any outcome is read. A later settlement run appends one label and never changes the original score, rank, expert weights, or timestamps.
 
+The checked-in frozen runtime bundle is cross-validated before CI and scheduled
+execution with:
+
+```bash
+uv run python scripts/validate_frozen_runtime.py
+```
+
+This check binds `ops/frozen/SHA256SUMS`, `ops/frozen/frozen-model.pt`,
+`ops/frozen/locked-test.json`, and `config/forward.yaml` to one reviewed v1
+identity. It does not permit prospective observations to replace that identity.
+
 The application prevents normal ORM updates and deletes for evidence tables and stores canonical payload hashes in an audit trail. Database administrators still have physical write authority, so durable evidence should also be exported to a versioned, access-restricted R2 bucket with retention policies.
 
 ## Local setup

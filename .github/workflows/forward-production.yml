@@ -101,6 +101,7 @@ jobs:
         shell: bash
         run: |
           sha256sum -c ops/frozen/SHA256SUMS
+          uv run python scripts/validate_frozen_runtime.py
           destination=data/artifacts/frozen-studies/research-2026-07-31-3553e7ad78dd
           mkdir -p "$destination"
           install -m 0644 ops/frozen/frozen-model.pt "$destination/frozen-model.pt"

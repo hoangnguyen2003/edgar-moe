@@ -62,6 +62,8 @@ jobs:
         run: uv run python scripts/smoke_deployment.py --help
       - name: Verify immutable public snapshot lock
         run: uv run python scripts/verify_public_snapshot_lock.py
+      - name: Verify frozen v1 runtime bundle identity
+        run: uv run python scripts/validate_frozen_runtime.py
       - name: Verify forward-registry migrations match the ORM schema
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: sqlite:////tmp/edgar-moe-migration-check.sqlite3
