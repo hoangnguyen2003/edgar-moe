@@ -87,7 +87,18 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI; CI rebuilds it, checks its asset graph for publishable secrets/source maps, and rejects source/bundle drift. Vercel also applies browser security headers to the static response, while FastAPI applies the same policy to API responses. The content-addressed `config/public_snapshot.lock.json` is verified in CI and the Vercel build, so changing the frozen v1 snapshot is an explicit reviewed decision. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+
+The repository also ships a provider-neutral container path for a future host:
+
+```bash
+docker compose up --build
+```
+
+The image installs only the locked serving dependencies, runs as a non-root
+`app` user, includes a `/api/v1/health` container healthcheck, and is built and
+smoke-tested in CI. This is an alternative packaging boundary, not a reason to
+move the private forecasting runner into the public serving container.
 
 ## Prospective forward testing
 
@@ -148,7 +159,39 @@ If a rolling dataset no longer contains an older event row, the diagnostic uses
 the forecast's immutable security and entry metadata and reports matched and
 unmatched coverage separately.
 
-For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` to a migrated Postgres database (for example Neon) in the API host. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
+To review research drift separately from service health, compare the frozen
+training dataset with a later prospective dataset. This verifies the pinned v1
+artifact, measures feature missingness/distributions and target-free component
+outputs, and never retrains or mutates forward evidence:
+
+```bash
+uv run edgar-moe research-drift \
+  --baseline-dataset data/processed/finbert/<frozen-training-dataset-id> \
+  --prospective-dataset data/processed/finbert/<later-dataset-id> \
+  --output reports/research-drift.json
+```
+
+A representative target-free run is retained in
+[`reports/research-drift-2026-08-06.json`](reports/research-drift-2026-08-06.json).
+It compares the frozen 2026-07-31 dataset with a later 2026-08-06 dataset and
+records stable feature and frozen-component distributions. This is drift
+evidence, not a performance claim or an automatic retraining decision.
+
+Once multiple later datasets are available, review the trend without changing
+the frozen model:
+
+```bash
+uv run edgar-moe research-drift-history \
+  --report reports/research-drift-2026-08-06.json \
+  --minimum-reports 3 \
+  --output reports/research-drift-history.json
+```
+
+The history remains `insufficient_history` until the configured minimum number
+of independently hashed reports is present. The current one-observation review
+is retained at [`reports/research-drift-history.json`](reports/research-drift-history.json).
+
+For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
 
@@ -223,7 +266,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 | Area | Responsibility |
 |---|---|
 | `src/edgar_moe/data` | SEC, Alpaca, ALFRED clients; authenticated refresh; security mappings; analytical storage; demo pipeline |
-| `src/edgar_moe/features` | Filing text, XBRL ratios, market features, and availability audits |
+| `src/edgar_moe/features` | Filing text, XBRL ratios, market features, availability audits, and prospective drift metrics |
 | `src/edgar_moe/modeling` | Fold-only preprocessing, baselines, shrinkage-gated PyTorch MoE, anchored hybrids, deterministic walk-forward selection |
 | `src/edgar_moe/backtest` | Neutral allocation, event-driven accounting, costs, and inference metrics |
 | `src/edgar_moe/api` | Versioned, snapshot-backed FastAPI contract |
@@ -240,7 +283,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 - Base portfolio: 100% gross, ≤2% net, ≤0.05 beta, ≤5% SIC-industry, ≤2% per name.
 - Cost scenarios: 10/25/50 bps plus 2%/5% annual borrow sensitivity.
 
-See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
+See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [repository governance](docs/repository-governance.md), [operator evidence packets](docs/operator-evidence.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
 
 For a concise, accurate project description tailored to a one-page résumé, see the [CV entry](docs/cv-entry.md).
 

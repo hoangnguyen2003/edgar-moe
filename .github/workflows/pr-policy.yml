@@ -1,0 +1,24 @@
+name: PR policy
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  branch-name:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require descriptive branch prefix
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_BRANCH" in
+            feat/*|fix/*|chore/*|docs/*|research/*|refactor/*|test/*|security/*|ops/*|dependabot/*)
+              ;;
+            *)
+              echo "Branch must use a descriptive prefix (feat/, fix/, chore/, docs/, research/, refactor/, test/, security/, ops/)."
+              exit 1
+              ;;
+          esac

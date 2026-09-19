@@ -1,0 +1,4 @@
+Contact: https://github.com/hoangnguyen2003/edgar-moe/security/advisories/new
+Policy: https://github.com/hoangnguyen2003/edgar-moe/blob/main/SECURITY.md
+Preferred-Languages: en, vi
+Expires: 2027-09-19T00:00:00.000Z

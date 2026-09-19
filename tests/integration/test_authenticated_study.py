@@ -298,6 +298,8 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     assert np.isfinite(frozen.test_metrics["rank_ic"])
     assert (frozen_directory / "locked-test.json").exists()
     assert (frozen_directory / "frozen-model.pt").exists()
+    assert (frozen_directory / "locked-test-scores.npz").exists()
+    assert not list((tmp_path / "frozen").glob(".*.staging-*"))
     assert frozen_payload["opening_audit"] == {
         "completed_attempt": 2,
         "recovery_note": recovery_note,
@@ -308,6 +310,15 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     assert str(frozen_payload["locked_test_hash"]) in report_text
     with pytest.raises(FileExistsError, match="refusing to overwrite"):
         save_frozen_evaluation(frozen, tmp_path / "frozen")
+
+    partial_root = tmp_path / "partial-frozen"
+    partial_directory = partial_root / frozen.dataset_id
+    partial_directory.mkdir(parents=True)
+    partial_model = partial_directory / "frozen-model.pt"
+    partial_model.write_bytes(b"partial artifact")
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        save_frozen_evaluation(frozen, partial_root)
+    assert partial_model.read_bytes() == b"partial artifact"
 
     anchored_selection = replace(
         result,

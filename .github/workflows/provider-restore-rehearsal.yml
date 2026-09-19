@@ -1,0 +1,391 @@
+name: Provider isolated restore rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_isolated_target:
+        description: "Type the exact confirmation before using the pre-created empty target database"
+        required: true
+        type: choice
+        options:
+          - CANCEL
+          - I_UNDERSTAND_ISOLATED_TARGET
+        default: CANCEL
+
+concurrency:
+  group: provider-isolated-restore-rehearsal
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  restore-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
+      TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
+      SOURCE_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
+      TARGET_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+      AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+      AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+      AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+      AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+      CONFIRM_ISOLATED_TARGET: ${{ inputs.confirm_isolated_target }}
+      REHEARSAL_DIR: reports/provider-restore
+      WORK_DIR: /tmp/edgar-moe-provider-restore
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
+
+      - run: uv sync --locked --extra dev
+
+      - name: Prepare private rehearsal directories
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p "$REHEARSAL_DIR" "$WORK_DIR"
+
+      - name: Validate isolated target and read-only audit credentials
+        id: preflight
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail_preflight() {
+            printf '{"status":"not_ready","reason":"%s"}\n' "$1" > "$REHEARSAL_DIR/preflight.json"
+            echo "Provider restore preflight failed: $1" >&2
+            exit 1
+          }
+
+          if [[ "$CONFIRM_ISOLATED_TARGET" != "I_UNDERSTAND_ISOLATED_TARGET" ]]; then
+            fail_preflight "explicit isolated-target confirmation was not provided"
+          fi
+
+          missing=()
+          for name in \
+            SOURCE_DATABASE_URL \
+            TARGET_DATABASE_URL \
+            SOURCE_AUDITOR_DATABASE_URL \
+            TARGET_AUDITOR_DATABASE_URL \
+            AUDITOR_R2_ENDPOINT_URL \
+            AUDITOR_R2_BUCKET \
+            AUDITOR_R2_ACCESS_KEY_ID \
+            AUDITOR_R2_SECRET_ACCESS_KEY; do
+            if [[ -z "${!name}" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if ((${#missing[@]} > 0)); then
+            fail_preflight "required provider secret(s) are missing"
+          fi
+
+          if ! source_identity="$(psql "$SOURCE_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
+            2>/dev/null)"; then
+            fail_preflight "source database is unreachable"
+          fi
+          if ! target_identity="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
+            2>/dev/null)"; then
+            fail_preflight "isolated target database is unreachable"
+          fi
+          if [[ -z "$source_identity" || -z "$target_identity" || "$source_identity" == "$target_identity" ]]; then
+            fail_preflight "source and isolated target identities are not distinct"
+          fi
+
+          if ! source_auditor_identity="$(psql "$SOURCE_AUDITOR_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
+            2>/dev/null)"; then
+            fail_preflight "source auditor database is unreachable"
+          fi
+          if ! target_auditor_identity="$(psql "$TARGET_AUDITOR_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
+            2>/dev/null)"; then
+            fail_preflight "target auditor database is unreachable"
+          fi
+          if [[ "$source_identity" != "$source_auditor_identity" || "$target_identity" != "$target_auditor_identity" ]]; then
+            fail_preflight "auditor URLs do not point to their corresponding databases"
+          fi
+
+          if ! target_table_count="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')" \
+            2>/dev/null)"; then
+            fail_preflight "isolated target table inventory failed"
+          fi
+          if [[ "$target_table_count" != "0" ]]; then
+            fail_preflight "isolated target is not empty"
+          fi
+
+          printf '{"status":"ready","source_target_distinct":true,"auditor_urls_aligned":true,"target_table_count":0,"checked_at":"%s"}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$REHEARSAL_DIR/preflight.json"
+
+      - name: Export source registry counts
+        id: source_counts
+        if: ${{ steps.preflight.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          uv run python scripts/export_forward_registry_counts.py \
+            --database-url "$SOURCE_DATABASE_URL" \
+            --output "$REHEARSAL_DIR/source-counts.json"
+
+      - name: Audit source registry and R2 evidence
+        id: source_audit
+        if: ${{ steps.source_counts.outcome == 'success' }}
+        working-directory: tools/evidence-auditor
+        env:
+          AUDITOR_DATABASE_URL: ${{ env.SOURCE_AUDITOR_DATABASE_URL }}
+        shell: bash
+        run: |
+          set +e
+          go run . -timeout 10m -stale-after 96h \
+            > "../../$REHEARSAL_DIR/source-evidence-audit.json" \
+            2> "../../$REHEARSAL_DIR/source-evidence-audit.error"
+          audit_code=$?
+          set -e
+          printf '{"exit_code":%s}\n' "$audit_code" > "../../$REHEARSAL_DIR/source-audit-exit.json"
+          exit 0
+
+      - name: Dump source into private temporary storage
+        id: source_dump
+        if: ${{ steps.source_counts.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          pg_dump --format=custom --no-owner --no-privileges \
+            --file="$WORK_DIR/registry.dump" "$SOURCE_DATABASE_URL" \
+            2> "$WORK_DIR/pg-dump.error"
+          dump_code=$?
+          set -e
+          printf '{"exit_code":%s}\n' "$dump_code" > "$REHEARSAL_DIR/pg-dump-status.json"
+          if [[ "$dump_code" -ne 0 ]]; then
+            exit "$dump_code"
+          fi
+          pg_restore --list "$WORK_DIR/registry.dump" \
+            > "$REHEARSAL_DIR/restore-contents.txt" \
+            2> "$WORK_DIR/pg-restore-list.error"
+
+      - name: Re-check target emptiness before restore
+        id: target_empty
+        if: ${{ steps.source_dump.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          target_table_count="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
+            --command "SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')")"
+          if [[ "$target_table_count" != "0" ]]; then
+            echo "The isolated target changed after preflight; refusing to restore." >&2
+            exit 1
+          fi
+          printf '{"target_table_count_before_restore":0}\n' > "$REHEARSAL_DIR/target-before-restore.json"
+
+      - name: Restore into the isolated target
+        id: restore
+        if: ${{ steps.target_empty.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          restore_started_epoch="$(date +%s)"
+          restore_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          pg_restore --no-owner --no-privileges --exit-on-error \
+            --dbname="$TARGET_DATABASE_URL" "$WORK_DIR/registry.dump" \
+            2> "$WORK_DIR/pg-restore.error"
+          restore_code=$?
+          restore_finished_epoch="$(date +%s)"
+          restore_finished_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          set -e
+          printf '{"started_at":"%s","finished_at":"%s","restore_elapsed_seconds":%s,"exit_code":%s}\n' \
+            "$restore_started_at" "$restore_finished_at" \
+            "$((restore_finished_epoch - restore_started_epoch))" "$restore_code" \
+            > "$REHEARSAL_DIR/restore-timing.json"
+          exit "$restore_code"
+
+      - name: Check restored schema
+        id: schema
+        if: ${{ steps.restore.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.TARGET_DATABASE_URL }}
+        run: uv run alembic check > "$REHEARSAL_DIR/alembic-check.txt" 2>&1
+
+      - name: Export restored registry counts
+        id: restored_counts
+        if: ${{ steps.restore.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          uv run python scripts/export_forward_registry_counts.py \
+            --database-url "$TARGET_DATABASE_URL" \
+            --output "$REHEARSAL_DIR/restored-counts.json"
+
+      - name: Audit restored registry and R2 evidence
+        id: restored_audit
+        if: ${{ steps.restored_counts.outcome == 'success' }}
+        working-directory: tools/evidence-auditor
+        shell: bash
+        run: |
+          set +e
+          AUDITOR_DATABASE_URL="$TARGET_AUDITOR_DATABASE_URL" \
+            go run . -timeout 10m -stale-after 96h \
+            > "../../$REHEARSAL_DIR/restored-evidence-audit.json" \
+            2> "../../$REHEARSAL_DIR/restored-evidence-audit.error"
+          audit_code=$?
+          set -e
+          printf '{"exit_code":%s}\n' "$audit_code" > "../../$REHEARSAL_DIR/restored-audit-exit.json"
+          exit 0
+
+      - name: Probe restored read path
+        id: read_path
+        if: ${{ steps.restored_counts.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        env:
+          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.TARGET_AUDITOR_DATABASE_URL }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ""
+        run: |
+          uv run python - <<'PY' > "$REHEARSAL_DIR/read-path.json"
+          import json
+          import os
+
+          from edgar_moe.forward.database import RegistryDatabase
+          from edgar_moe.forward.registry import ForwardRegistry
+
+          database = RegistryDatabase(os.environ["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"])
+          try:
+              registry = ForwardRegistry(database, actor="provider-restore-read-probe")
+              status = registry.status()
+              forecasts = registry.list_forecasts(limit=1)
+              performance = registry.performance()
+              assert status["health_status"] == "ok", status
+              assert isinstance(forecasts["total"], int), forecasts
+              assert isinstance(performance["forecast_count"], int), performance
+              print(json.dumps({
+                  "status": "passed",
+                  "health_status": status["health_status"],
+                  "forecast_total": forecasts["total"],
+                  "performance_forecast_count": performance["forecast_count"],
+              }, sort_keys=True))
+          finally:
+              database.dispose()
+          PY
+
+      - name: Compare and verify restore evidence
+        id: compare
+        if: ${{ steps.source_counts.outcome == 'success' && steps.restored_counts.outcome == 'success' && steps.restored_audit.outcome == 'success' }}
+        continue-on-error: true
+        shell: bash
+        run: |
+          set +e
+          uv run python scripts/compare_restore_reports.py \
+            --source-counts "$REHEARSAL_DIR/source-counts.json" \
+            --restored-counts "$REHEARSAL_DIR/restored-counts.json" \
+            --source-audit "$REHEARSAL_DIR/source-evidence-audit.json" \
+            --restored-audit "$REHEARSAL_DIR/restored-evidence-audit.json" \
+            > "$REHEARSAL_DIR/restore-comparison.json" \
+            2> "$REHEARSAL_DIR/restore-comparison.error"
+          compare_code=$?
+          uv run python scripts/verify_restore_comparison.py \
+            --report "$REHEARSAL_DIR/restore-comparison.json" \
+            > "$REHEARSAL_DIR/restore-comparison-verification.json" \
+            2>> "$REHEARSAL_DIR/restore-comparison.error"
+          verify_code=$?
+          set -e
+          printf '{"compare_exit_code":%s,"verify_exit_code":%s}\n' \
+            "$compare_code" "$verify_code" > "$REHEARSAL_DIR/comparison-exit.json"
+          if [[ "$compare_code" -ne 0 || "$verify_code" -ne 0 ]]; then
+            exit 1
+          fi
+
+      - name: Write redacted rehearsal summary
+        id: summary
+        if: ${{ always() }}
+        shell: bash
+        env:
+          PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          SOURCE_COUNTS_OUTCOME: ${{ steps.source_counts.outcome }}
+          SOURCE_DUMP_OUTCOME: ${{ steps.source_dump.outcome }}
+          TARGET_EMPTY_OUTCOME: ${{ steps.target_empty.outcome }}
+          RESTORE_OUTCOME: ${{ steps.restore.outcome }}
+          SCHEMA_OUTCOME: ${{ steps.schema.outcome }}
+          RESTORED_COUNTS_OUTCOME: ${{ steps.restored_counts.outcome }}
+          READ_PATH_OUTCOME: ${{ steps.read_path.outcome }}
+          COMPARE_OUTCOME: ${{ steps.compare.outcome }}
+        run: |
+          set -euo pipefail
+          status=passed
+          for outcome in \
+            "$PREFLIGHT_OUTCOME" \
+            "$SOURCE_COUNTS_OUTCOME" \
+            "$SOURCE_DUMP_OUTCOME" \
+            "$TARGET_EMPTY_OUTCOME" \
+            "$RESTORE_OUTCOME" \
+            "$SCHEMA_OUTCOME" \
+            "$RESTORED_COUNTS_OUTCOME" \
+            "$READ_PATH_OUTCOME" \
+            "$COMPARE_OUTCOME"; do
+            if [[ "$outcome" != "success" ]]; then
+              status=failed
+            fi
+          done
+          printf '{"status":"%s","workflow":"provider-isolated-restore-rehearsal","run_id":"%s","run_attempt":"%s","commit":"%s","steps":{"preflight":"%s","source_counts":"%s","source_dump":"%s","target_empty":"%s","restore":"%s","schema":"%s","restored_counts":"%s","read_path":"%s","compare":"%s"}}\n' \
+            "$status" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" \
+            "$PREFLIGHT_OUTCOME" "$SOURCE_COUNTS_OUTCOME" "$SOURCE_DUMP_OUTCOME" \
+            "$TARGET_EMPTY_OUTCOME" "$RESTORE_OUTCOME" "$SCHEMA_OUTCOME" \
+            "$RESTORED_COUNTS_OUTCOME" "$READ_PATH_OUTCOME" "$COMPARE_OUTCOME" \
+            > "$REHEARSAL_DIR/summary.json"
+          echo "overall_status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Verify retained evidence is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$REHEARSAL_DIR"
+
+      - name: Hash retained rehearsal evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=()
+          while IFS= read -r file; do
+            files+=("$file")
+          done < <(find "$REHEARSAL_DIR" -maxdepth 1 -type f ! -name SHA256SUMS -print | sort)
+          if ((${#files[@]} > 0)); then
+            sha256sum "${files[@]}" | sort > "$REHEARSAL_DIR/SHA256SUMS"
+          fi
+
+      - name: Remove private temporary dump
+        if: ${{ always() }}
+        shell: bash
+        run: rm -rf "$WORK_DIR"
+
+      - name: Upload provider restore evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: provider-restore-rehearsal-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/provider-restore/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless the rehearsal passed
+        if: ${{ always() && (steps.summary.outputs.overall_status != 'passed' || steps.redaction.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "Provider restore rehearsal did not pass; inspect the retained artifact." >&2
+          exit 1

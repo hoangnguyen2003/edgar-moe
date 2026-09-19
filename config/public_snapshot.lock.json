@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "path": "data/demo/snapshot.json",
+  "sha256": "06aa652c638d12400f5e8210778b0d0842dab3c70cfbd59bbb84a67879dab7a5",
+  "data_mode": "authenticated_locked_test",
+  "as_of": "2026-07-31",
+  "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
+  "locked_test_hash": "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987"
+}

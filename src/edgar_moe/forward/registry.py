@@ -20,6 +20,7 @@ from edgar_moe.forward.domain import (
     QualityCheckDraft,
     RunRegistration,
 )
+from edgar_moe.forward.failure_context import redact_sensitive_text
 from edgar_moe.forward.metrics import forward_metrics
 from edgar_moe.forward.models import (
     ArtifactRecord,
@@ -159,7 +160,7 @@ class ForwardRegistry:
         with self.database.session() as session:
             run = _require_running_run(session, run_id)
             run.status = "failed"
-            run.error_message = error_message[:4000]
+            run.error_message = redact_sensitive_text(error_message, max_length=4_000)
             run.finished_at = utc_now()
             _audit(
                 session,
@@ -370,6 +371,27 @@ class ForwardRegistry:
                 payload={"run_id": run_id, "kind": kind, "sha256": reference.sha256},
             )
             return record
+
+    def list_artifacts(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return immutable artifact references for independent verification."""
+        statement = select(ArtifactRecord).order_by(ArtifactRecord.created_at, ArtifactRecord.artifact_id)
+        if limit is not None:
+            if limit < 1:
+                raise ValueError("Artifact limit must be positive")
+            statement = statement.limit(limit)
+        with self.database.session() as session:
+            records = session.scalars(statement).all()
+            return [
+                {
+                    "artifact_id": row.artifact_id,
+                    "run_id": row.run_id,
+                    "kind": row.kind,
+                    "uri": row.uri,
+                    "sha256": row.sha256,
+                    "size_bytes": row.size_bytes,
+                }
+                for row in records
+            ]
 
     def status(
         self,

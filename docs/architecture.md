@@ -31,7 +31,7 @@ Each authenticated layer has a JSON manifest recording source identity, configur
 
 ## Deployment boundary
 
-Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The React application performs visualization and filtering but no model inference or order routing.
+Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The React application performs visualization and filtering but no model inference or order routing. A provider-neutral Docker image packages the same serving boundary for a future container host; it is non-root, healthchecked, and does not include the private forward runner or source-data credentials.
 
 ## Architecture baseline — September 18, 2026
 
@@ -81,6 +81,7 @@ flowchart LR
 | `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins |
 | Local artifacts + R2 mirror | Content-addressed evidence bytes | Mirrored identity checks; bucket access/retention still require account verification |
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup |
+| Optional alert webhook | Receives redacted failed-run and health classifications | Secret is runner-only; delivery is best-effort and never contains database/R2 credentials |
 | Go evidence auditor | Cross-check registry rows against object bytes | Read-only operational boundary; no repair or write authority |
 
 Production workflow sequence: restore caches and verify model → refresh inputs →
@@ -93,10 +94,16 @@ earliest-event audits are supplementary and must be labeled as such.
 
 - Browser → API: anonymous public reads. CORS is not authorization. Pagination
   bounds response sizes, but does not by itself prevent scraping or request floods.
-- API → database: GET-only routes reduce exposure, but do not prove that the
-  deployed database credential is SELECT-only. The shared database session helper
-  can commit. Verify separate reader, writer, and migration roles before claiming
-  database-enforced least privilege.
+- API → database: GET-only routes reduce exposure. The API now prefers
+  `EDGAR_MOE_REGISTRY_READ_DATABASE_URL`; local SQLite compatibility falls back to
+  the writer URL, while a missing reader URL never falls back to a hosted Postgres
+  writer. The API reader also uses a bounded per-instance connection pool
+  (`EDGAR_MOE_REGISTRY_API_POOL_SIZE`, `EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW`, and
+  `EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS`) to limit serverless connection
+  fan-out. Provider/project limits still require external verification. The shared
+  database session helper can commit, so the deployed reader role must still be
+  granted SELECT-only privileges and verified before claiming database-enforced
+  least privilege.
 - Runner → providers/database/R2: high-trust execution with source and write
   credentials. Workflow permissions are `contents: read`, but job secrets remain
   powerful. Review workflow and dependency changes as privileged code changes.
@@ -113,8 +120,9 @@ earliest-event audits are supplementary and must be labeled as such.
 ### Deployment and operations
 
 `vercel.json` serves committed `public/` assets, packages the Python API, and
-requests `sin1`. Its build command is `true`: CI rebuilds and checks that committed
-assets match source; deployment itself does not rebuild them. Vercel deployment
+requests `sin1`. Its build command validates the deployment contract and scans
+the committed bundle; CI separately rebuilds the React assets and checks that
+committed assets match source. Deployment does not rebuild the bundle, and it
 must not be assumed to wait for CI unless account settings enforce that gate.
 
 The forward workflow pins Ubuntu 24.04, runs Tuesday–Saturday at 07:17 UTC,
@@ -129,5 +137,9 @@ reads have a separate dependency path. Snapshot health alone does not prove that
 the registry or scheduler is healthy.
 
 No independently verified restore drill, end-to-end alert delivery, cloud-role
-audit, or capacity benchmark is established by this baseline. The roadmap defines
-the evidence needed to close those gaps without adding unnecessary services.
+audit, or capacity benchmark is established by this baseline. The checked-in
+reader-role grant contract and verifier make least-privilege verification
+repeatable, but no provider grant has been independently verified yet. The
+[restore-rehearsal runbook](restore-rehearsal.md) defines an isolated recovery
+procedure, but no restore result has been recorded. The roadmap defines the
+evidence needed to close those gaps without adding unnecessary services.

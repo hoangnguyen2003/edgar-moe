@@ -110,6 +110,16 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_demo_snapshot: Path = Path("data/demo/snapshot.json")
     edgar_moe_log_level: str = "INFO"
     edgar_moe_registry_database_url: str = ""
+    # The API prefers this SELECT-only connection; the writer URL remains for
+    # the private forecast runner and migrations.
+    edgar_moe_registry_read_database_url: str = ""
+    # Keep each serverless API instance bounded to a small SELECT-only pool.
+    # The private runner does not use these settings.
+    edgar_moe_registry_api_pool_size: int = Field(default=1, ge=1, le=20)
+    edgar_moe_registry_api_max_overflow: int = Field(default=0, ge=0, le=20)
+    edgar_moe_registry_api_pool_timeout_seconds: float = Field(
+        default=5.0, gt=0, le=60
+    )
     edgar_moe_artifact_backend: str = "local"
     edgar_moe_artifact_mirror_backend: str = "none"
     edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")

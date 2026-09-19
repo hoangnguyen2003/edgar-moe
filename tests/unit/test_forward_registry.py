@@ -141,6 +141,26 @@ def test_registry_enforces_prospective_timing_and_state(tmp_path: Path) -> None:
     database.dispose()
 
 
+def test_failed_run_messages_are_redacted_at_registry_boundary(tmp_path: Path) -> None:
+    database, registry_service = registry(tmp_path)
+    run_id = prepare_forecast_run(registry_service)
+
+    registry_service.fail_run(
+        run_id,
+        error_message=(
+            "provider rejected postgresql://reader:super-secret@example.test/registry "
+            "password=another-secret"
+        ),
+    )
+
+    failed_run = registry_service.list_runs(limit=1)[0]
+    assert failed_run["error_message"] is not None
+    assert "example.test" not in failed_run["error_message"]
+    assert "super-secret" not in failed_run["error_message"]
+    assert "another-secret" not in failed_run["error_message"]
+    database.dispose()
+
+
 def test_label_settlement_and_forward_performance(tmp_path: Path) -> None:
     database, registry_service = registry(tmp_path)
     forecast_run = prepare_forecast_run(registry_service)

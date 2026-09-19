@@ -8,13 +8,22 @@ from pathlib import Path
 import numpy as np
 import orjson
 import pandas as pd
+import psycopg
+import pytest
 
 from edgar_moe.features.dataset import ResearchDataset
-from edgar_moe.forward.artifacts import LocalArtifactStore
+from edgar_moe.forward.artifacts import (
+    ArtifactReference,
+    ArtifactStore,
+    ArtifactWriteError,
+    LocalArtifactStore,
+    MirroredArtifactStore,
+)
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.domain import ForecastDraft, QualityCheckDraft
 from edgar_moe.forward.inference import ForecastBatch
+from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.forward.workflow import ForwardWorkflow
 
@@ -55,7 +64,47 @@ class FixturePredictor:
         )
 
 
-def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) -> None:
+class ExternalFailurePredictor:
+    def forecast(
+        self,
+        dataset: ResearchDataset,
+        *,
+        as_of: datetime,
+        device: str = "cpu",
+    ) -> ForecastBatch:
+        del dataset, as_of, device
+        raise psycopg.OperationalError(
+            "connection failed for postgresql://reader:super-secret@example.test/registry"
+        )
+
+
+class FailOnceMirror:
+    """Mirror fixture that fails one byte write, then behaves normally."""
+
+    def __init__(self, root: Path) -> None:
+        self.delegate = LocalArtifactStore(root)
+        self.fail_next_bytes = True
+
+    def put_file(
+        self, source: str | Path, *, logical_name: str | None = None
+    ) -> ArtifactReference:
+        return self.delegate.put_file(source, logical_name=logical_name)
+
+    def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
+        if self.fail_next_bytes:
+            self.fail_next_bytes = False
+            raise OSError("injected mirror outage")
+        return self.delegate.put_bytes(content, logical_name=logical_name)
+
+    def read_bytes(self, reference: ArtifactReference) -> bytes:
+        return self.delegate.read_bytes(reference)
+
+
+def build_workflow_fixture(
+    tmp_path: Path,
+    *,
+    artifact_store: ArtifactStore | None = None,
+) -> tuple[ForwardWorkflow, ForwardRegistry, RegistryDatabase, Path, datetime, list[datetime]]:
     forecast_as_of = datetime.now(UTC)
     training_dir = save_dataset(
         tmp_path / "datasets",
@@ -106,9 +155,16 @@ def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) 
     clock = [forecast_as_of]
     workflow = ForwardWorkflow(
         registry,
-        LocalArtifactStore(tmp_path / "artifacts"),
+        artifact_store or LocalArtifactStore(tmp_path / "artifacts"),
         spec,
         clock=lambda: clock[0],
+    )
+    return workflow, registry, database, training_dir, forecast_as_of, clock
+
+
+def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) -> None:
+    workflow, registry, database, training_dir, forecast_as_of, clock = build_workflow_fixture(
+        tmp_path
     )
 
     forecast_result = workflow.forecast(
@@ -141,6 +197,77 @@ def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) 
     assert settled["score"] == 0.12
     assert settled["realized_abnormal_return"] == 0.08
     assert registry.performance()["coverage"] == 1.0
+    database.dispose()
+
+
+def test_mirror_failure_records_primary_for_reconciliation_and_retry(tmp_path: Path) -> None:
+    primary = LocalArtifactStore(tmp_path / "artifacts")
+    mirror = FailOnceMirror(tmp_path / "mirror")
+    workflow, registry, database, training_dir, forecast_as_of, _ = build_workflow_fixture(
+        tmp_path,
+        artifact_store=MirroredArtifactStore(primary, mirror),
+    )
+
+    with pytest.raises(ArtifactWriteError, match="mirror write failed"):
+        workflow.forecast(
+            training_dir,
+            as_of=forecast_as_of,
+            code_revision="deadbeef",
+            predictor=FixturePredictor(),
+        )
+
+    failed_run = registry.list_runs(limit=1)[0]
+    assert failed_run["status"] == "failed"
+    assert "primary artifact was recorded for reconciliation" in failed_run["error_message"]
+    assert registry.list_forecasts(limit=10)["total"] == 1
+    references = registry.list_artifacts()
+    assert len(references) == 1
+
+    repaired_mirror = LocalArtifactStore(tmp_path / "repaired-mirror")
+    report = reconcile_registry_artifacts(
+        registry,
+        primary,
+        mirror=repaired_mirror,
+        repair=True,
+    )
+    assert report["status"] == "passed"
+    assert report["mirrored_artifacts"] == 1
+    record = references[0]
+    repaired_reference = ArtifactReference(
+        uri=record["uri"],
+        sha256=record["sha256"],
+        size_bytes=record["size_bytes"],
+        key=record["uri"].removeprefix("local://"),
+    )
+    assert repaired_mirror.read_bytes(repaired_reference)
+
+    retry = workflow.forecast(
+        training_dir,
+        as_of=forecast_as_of,
+        code_revision="deadbeef",
+        predictor=FixturePredictor(),
+    )
+    assert retry.status == "succeeded"
+    assert retry.counts["forecasts_idempotent"] == 1
+    assert len(registry.list_artifacts()) == 2
+    assert registry.list_runs(limit=1)[0]["status"] == "succeeded"
+    database.dispose()
+
+
+def test_external_failure_is_redacted_in_public_run_record(tmp_path: Path) -> None:
+    workflow, registry, database, training_dir, forecast_as_of, _ = build_workflow_fixture(tmp_path)
+
+    with pytest.raises(psycopg.OperationalError):
+        workflow.forecast(
+            training_dir,
+            as_of=forecast_as_of,
+            code_revision="deadbeef",
+            predictor=ExternalFailurePredictor(),
+        )
+
+    failed_run = registry.list_runs(limit=1)[0]
+    assert failed_run["error_message"] == "OperationalError"
+    assert "super-secret" not in str(failed_run)
     database.dispose()
 
 

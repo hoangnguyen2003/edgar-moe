@@ -7,6 +7,7 @@ from typing import Annotated
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi import Path as APIPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,15 +34,45 @@ from edgar_moe.api.models import (
 from edgar_moe.api.repository import SnapshotNotFoundError, SnapshotRepository
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.registry import ForwardRegistry
-from edgar_moe.settings import runtime_settings
+from edgar_moe.settings import RuntimeSettings, runtime_settings
 
 settings = runtime_settings()
 repository = SnapshotRepository(settings.edgar_moe_demo_snapshot)
-forward_database = (
-    RegistryDatabase(settings.edgar_moe_registry_database_url)
-    if settings.edgar_moe_registry_database_url
-    else None
-)
+
+
+def _api_registry_database_url(settings: RuntimeSettings) -> str:
+    """Select the API URL without silently exposing a production writer secret.
+
+    A dedicated reader URL is mandatory for a hosted Postgres deployment. The
+    writer URL is retained only for local SQLite development, where it is a
+    file path rather than a network credential.
+    """
+    reader_url = settings.edgar_moe_registry_read_database_url.strip()
+    if reader_url:
+        return reader_url
+
+    writer_url = settings.edgar_moe_registry_database_url.strip()
+    if writer_url.lower().startswith("sqlite"):
+        return writer_url
+    return ""
+
+
+api_registry_database_url = _api_registry_database_url(settings)
+
+
+def _build_api_registry_database(settings: RuntimeSettings) -> RegistryDatabase | None:
+    database_url = _api_registry_database_url(settings)
+    if not database_url:
+        return None
+    return RegistryDatabase(
+        database_url,
+        pool_size=settings.edgar_moe_registry_api_pool_size,
+        max_overflow=settings.edgar_moe_registry_api_max_overflow,
+        pool_timeout=settings.edgar_moe_registry_api_pool_timeout_seconds,
+    )
+
+
+forward_database = _build_api_registry_database(settings)
 forward_registry = ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
 
 app = FastAPI(
@@ -77,13 +108,18 @@ async def security_headers(
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-site"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; "
-        "script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; object-src 'none'; "
+        "form-action 'self'; script-src 'self' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
         "font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; "
         "connect-src 'self'"
     )
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
 
@@ -147,12 +183,12 @@ def equity_curve(
 def events(
     response: Response,
     repo: RepositoryDependency,
-    ticker: str | None = None,
+    ticker: str | None = Query(default=None, min_length=1, max_length=32),
     form: str | None = Query(default=None, pattern=r"^10-[KQ]$"),
     direction: str | None = Query(default=None, pattern=r"^(long|short|neutral)$"),
     from_date: date | None = None,
     to_date: date | None = None,
-    cursor: str | None = None,
+    cursor: str | None = Query(default=None, max_length=20, pattern=r"^\d+$"),
     limit: int = Query(default=25, ge=1, le=100),
 ) -> EventPage:
     _cache(response)
@@ -167,13 +203,20 @@ def events(
             limit=limit,
         )
     except ValueError as error:
-        raise HTTPException(status_code=422, detail=str(error)) from error
+        raise HTTPException(status_code=422, detail="Invalid event query") from error
     return EventPage.model_validate(payload)
 
 
 @app.get("/api/v1/events/{accession_number}", response_model=EventRecord, tags=["filings"])
 def event(
-    accession_number: str,
+    accession_number: Annotated[
+        str,
+        APIPath(
+            min_length=1,
+            max_length=20,
+            pattern=r"^\d{10}-\d{2}-\d{6}$",
+        ),
+    ],
     response: Response,
     repo: RepositoryDependency,
 ) -> EventRecord:

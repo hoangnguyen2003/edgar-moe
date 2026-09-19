@@ -1,0 +1,64 @@
+name: Hosted capacity baseline
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Keep this lightweight and weekly; it records observations, not a paid load test.
+    - cron: "41 8 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgar-moe-capacity-baseline
+  cancel-in-progress: false
+
+jobs:
+  baseline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      EDGAR_MOE_CAPACITY_API_URL: ${{ vars.EDGAR_MOE_CAPACITY_API_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked --extra dev
+      - name: Capture hosted runner and optional API observations
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reports/capacity
+          common=(
+            capacity-baseline
+            --snapshot data/demo/snapshot.json
+            --path data/forward
+            --path data/cache/forward-filings
+            --path data/artifacts/embedding-cache-finbert
+          )
+          if [[ -n "${EDGAR_MOE_CAPACITY_API_URL:-}" ]]; then
+            common+=(--api-url "$EDGAR_MOE_CAPACITY_API_URL")
+          fi
+
+          started_ms="$(date +%s%3N)"
+          uv run edgar-moe "${common[@]}" \
+            --output /tmp/edgar-moe-capacity-probe.json >/dev/null
+          finished_ms="$(date +%s%3N)"
+          elapsed_ms=$((finished_ms - started_ms))
+          elapsed_seconds="$(awk -v milliseconds="$elapsed_ms" 'BEGIN { printf "%.3f", milliseconds / 1000 }')"
+
+          uv run edgar-moe "${common[@]}" \
+            --workflow-runtime-seconds "$elapsed_seconds" \
+            --output reports/capacity/hosted-capacity-baseline.json >/dev/null
+          python3 -m json.tool reports/capacity/hosted-capacity-baseline.json >/dev/null
+          printf 'Hosted baseline runtime: %ss\n' "$elapsed_seconds"
+      - name: Upload capacity baseline evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: hosted-capacity-baseline-${{ github.run_id }}
+          path: reports/capacity/hosted-capacity-baseline.json
+          if-no-files-found: ignore
+          retention-days: 30

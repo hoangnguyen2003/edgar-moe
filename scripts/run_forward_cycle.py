@@ -7,6 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from edgar_moe.forward.failure_context import safe_exception_message
 from edgar_moe.forward.operations import (
     find_processed_dataset,
     rolling_source_start,
@@ -162,11 +163,16 @@ def _run(executable: str, *arguments: str) -> None:
     subprocess.run(command, check=True)
 
 
+def _failure_message(error: BaseException) -> str:
+    """Return a provider-neutral terminal message for the private runner log."""
+    return f"forward cycle failed: {safe_exception_message(error)}"
+
+
 if __name__ == "__main__":
     try:
         main()
     except subprocess.CalledProcessError as error:
         raise SystemExit(error.returncode) from error
     except Exception as error:
-        print(f"forward cycle failed: {type(error).__name__}: {error}", file=sys.stderr)
+        print(_failure_message(error), file=sys.stderr)
         raise SystemExit(1) from error

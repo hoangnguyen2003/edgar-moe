@@ -248,6 +248,75 @@ class FrozenPredictor:
             candidate_indices=candidate_indices,
         )
 
+    def component_outputs(
+        self,
+        dataset: ResearchDataset,
+        *,
+        device: str = "cpu",
+    ) -> dict[str, np.ndarray]:
+        """Score every feature row for research-drift inspection only.
+
+        This path is intentionally separate from :meth:`forecast`: it does not
+        select tradable candidates, register a run, read targets, or write
+        evidence. It reuses the hash-pinned v1 preprocessing and model so drift
+        reports can compare component behavior without changing the frozen
+        artifact or opening the locked test.
+        """
+        modalities = {
+            name: np.asarray(dataset.modalities[name]) for name in MODALITY_NAMES
+        }
+        if any(len(values) != len(dataset.events) for values in modalities.values()) or len(
+            dataset.regime
+        ) != len(dataset.events):
+            raise ValueError("Dataset feature rows must match the event row count")
+        self._verify_dimensions(modalities, dataset.regime)
+        violations = audit_feature_availability(dataset.availability)
+        if violations:
+            preview = ", ".join(
+                f"{item.event_id}:{item.feature_name}" for item in violations[:5]
+            )
+            raise ValueError(
+                f"Point-in-time availability audit failed ({len(violations)} rows): {preview}"
+            )
+        transformed, missing_mask = self.preprocessor.transform(modalities)
+        values = {
+            **transformed,
+            "regime": self.regime_transform.transform(dataset.regime),
+            "missing_mask": missing_mask,
+        }
+        prediction = predict_moe(self.model, values, device=device)
+        moe_scores = prediction.scores * self.target_std + self.target_mean
+        outputs: dict[str, np.ndarray] = {"moe_score": np.asarray(moe_scores, dtype=np.float64)}
+        for expert_index, name in enumerate(MODALITY_NAMES):
+            outputs[f"expert_weight:{name}"] = np.asarray(
+                prediction.expert_weights[:, expert_index], dtype=np.float64
+            )
+            outputs[f"expert_prediction:{name}"] = np.asarray(
+                prediction.expert_predictions[:, expert_index] * self.target_std
+                + self.target_mean,
+                dtype=np.float64,
+            )
+        if self.fundamental_coef is not None and self.fundamental_intercept is not None:
+            fundamental_scores = np.asarray(
+                values["fundamental"] @ self.fundamental_coef + self.fundamental_intercept,
+                dtype=np.float64,
+            )
+            outputs["fundamental_score"] = fundamental_scores
+        else:
+            fundamental_scores = None
+        if self.champion_family == "anchored_multimodal":
+            if fundamental_scores is None:
+                raise AssertionError("Anchored model is missing fundamental predictions")
+            anchor_weight = float(self.champion_parameters["fundamental_anchor_weight"])
+            residual_weight = float(self.champion_parameters["moe_residual_weight"])
+            if not np.isclose(anchor_weight + residual_weight, 1.0):
+                raise ValueError("Frozen anchor and residual weights do not sum to one")
+            final_scores = anchor_weight * fundamental_scores + residual_weight * moe_scores
+        else:
+            final_scores = moe_scores
+        outputs["final_score"] = np.asarray(final_scores, dtype=np.float64)
+        return outputs
+
     def _verify_dimensions(
         self,
         modalities: dict[str, np.ndarray],

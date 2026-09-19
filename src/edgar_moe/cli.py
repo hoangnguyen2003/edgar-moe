@@ -13,6 +13,7 @@ import numpy as np
 import orjson
 import typer
 
+from edgar_moe.capacity import DEFAULT_BASELINE_PATHS, build_capacity_baseline
 from edgar_moe.data.alpaca import AlpacaDataClient
 from edgar_moe.data.demo import build_demo_snapshot
 from edgar_moe.data.fred import FredClient
@@ -24,6 +25,11 @@ from edgar_moe.data.sec import SecClient
 from edgar_moe.data.security_master import build_security_master
 from edgar_moe.data.universe import screen_liquid_universe
 from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
+from edgar_moe.features.drift import build_research_drift_report
+from edgar_moe.features.drift_history import (
+    DriftHistoryError,
+    build_research_drift_history,
+)
 from edgar_moe.features.text import FinBertEmbedder, HashingTextEmbedder
 from edgar_moe.forward.artifacts import (
     LocalArtifactStore,
@@ -33,6 +39,8 @@ from edgar_moe.forward.artifacts import (
 )
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.database import RegistryDatabase, normalize_database_url
+from edgar_moe.forward.inference import FrozenPredictor
+from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.forward.workflow import ForwardWorkflow
 from edgar_moe.modeling.experiment import (
@@ -418,6 +426,126 @@ def build_dataset(
     )
 
 
+@app.command("research-drift")
+def research_drift(
+    baseline_dataset_dir: Annotated[
+        Path,
+        typer.Option(
+            "--baseline-dataset",
+            help="Frozen training dataset directory used as the comparison baseline.",
+        ),
+    ],
+    prospective_dataset_dir: Annotated[
+        Path,
+        typer.Option(
+            "--prospective-dataset",
+            help="Later processed dataset to inspect prospectively.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="JSON drift report destination."),
+    ] = Path("reports/research-drift.json"),
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
+        "config/forward.yaml"
+    ),
+    device: Annotated[
+        str,
+        typer.Option(help="Frozen predictor device: 'cpu' or 'mps'."),
+    ] = "cpu",
+) -> None:
+    """Measure prospective feature and frozen-component drift without retraining."""
+    if device not in {"cpu", "mps"}:
+        raise typer.BadParameter("device must be 'cpu' or 'mps'")
+    spec = FrozenModelSpec.from_yaml(model_config)
+    baseline = ResearchDataset.load(baseline_dataset_dir)
+    prospective = ResearchDataset.load(prospective_dataset_dir)
+    if baseline.dataset_id != spec.training_dataset_id:
+        raise typer.BadParameter(
+            "Baseline dataset identity does not match the frozen model specification: "
+            f"expected {spec.training_dataset_id}, observed {baseline.dataset_id}"
+        )
+    spec.verify_locked_evidence()
+    predictor = FrozenPredictor.load(
+        spec.model_path,
+        expected_sha256=spec.artifact_sha256,
+        expected_selection_hash=spec.selection_hash,
+        device=device,
+    )
+    report = build_research_drift_report(
+        baseline,
+        prospective,
+        baseline_components=predictor.component_outputs(baseline, device=device),
+        prospective_components=predictor.component_outputs(prospective, device=device),
+        context={
+            "model_id": spec.model_id,
+            "model_version": spec.version,
+            "artifact_sha256": spec.artifact_sha256,
+            "selection_hash": spec.selection_hash,
+            "frozen_at": spec.frozen_at.isoformat(),
+        },
+    )
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    temporary_output.write_bytes(serialized)
+    temporary_output.replace(output)
+    typer.echo(
+        f"Research drift status: {report['status']}; "
+        f"report hash: {report['report_hash']}; wrote {output}"
+    )
+
+
+@app.command("research-drift-history")
+def research_drift_history(
+    reports: Annotated[
+        list[Path],
+        typer.Option(
+            "--report",
+            help="Content-hashed research-drift report; repeat for each later dataset.",
+        ),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="JSON drift-history review destination."),
+    ] = Path("reports/research-drift-history.json"),
+    minimum_reports: Annotated[
+        int,
+        typer.Option("--minimum-reports", min=1, help="Reports required before stable history."),
+    ] = 3,
+) -> None:
+    """Aggregate prospective drift reports without retraining or reading outcomes."""
+    if not reports:
+        raise typer.BadParameter("at least one --report is required")
+    payloads: list[dict[str, Any]] = []
+    for report_path in reports:
+        try:
+            payload = orjson.loads(report_path.read_bytes())
+        except (OSError, orjson.JSONDecodeError) as error:
+            raise typer.BadParameter(f"cannot read drift report: {report_path}") from error
+        if not isinstance(payload, dict):
+            raise typer.BadParameter(f"drift report must be a JSON object: {report_path}")
+        payloads.append(payload)
+    try:
+        history = build_research_drift_history(
+            payloads,
+            report_paths=reports,
+            minimum_reports=minimum_reports,
+        )
+    except DriftHistoryError as error:
+        raise typer.BadParameter(str(error)) from error
+    serialized = orjson.dumps(history, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    temporary_output.write_bytes(serialized)
+    temporary_output.replace(output)
+    typer.echo(
+        f"Research drift history status: {history['status']}; "
+        f"reports: {history['report_count']}; history hash: {history['history_hash']}; "
+        f"wrote {output}"
+    )
+
+
 @app.command("run-study")
 def run_study(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
@@ -659,6 +787,54 @@ def forward_mirror_artifacts() -> None:
     )
 
 
+@app.command("forward-reconcile-artifacts")
+def forward_reconcile_artifacts(
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    repair: Annotated[
+        bool,
+        typer.Option(
+            "--repair",
+            help="Mirror verified referenced objects to R2; default mode is read-only.",
+        ),
+    ] = False,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report destination."),
+    ] = None,
+) -> None:
+    """Verify registry-referenced evidence and optionally repair the R2 mirror."""
+    settings = runtime_settings()
+    database = RegistryDatabase(_forward_database_url(settings, database_url))
+    mirror = None
+    if repair:
+        mirror = R2ArtifactStore(
+            endpoint_url=settings.edgar_moe_r2_endpoint_url,
+            bucket=settings.edgar_moe_r2_bucket,
+            access_key_id=settings.edgar_moe_r2_access_key_id,
+            secret_access_key=settings.edgar_moe_r2_secret_access_key,
+        )
+    try:
+        report = reconcile_registry_artifacts(
+            ForwardRegistry(database, actor="edgar-moe-reconciler"),
+            LocalArtifactStore(settings.edgar_moe_artifact_dir),
+            mirror=mirror,
+            repair=repair,
+        )
+    finally:
+        database.dispose()
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(serialized)
+        typer.echo(f"Wrote artifact reconciliation report to {output}")
+    typer.echo(serialized.decode())
+    if report["status"] != "passed":
+        raise typer.Exit(code=1)
+
+
 @app.command("forward-forecast")
 def forward_forecast(
     dataset_dir: Annotated[Path, typer.Option(help="Processed point-in-time dataset directory.")],
@@ -806,6 +982,54 @@ def forward_status(
     finally:
         database.dispose()
     typer.echo(orjson.dumps(payload, option=orjson.OPT_INDENT_2).decode())
+
+
+@app.command("capacity-baseline")
+def capacity_baseline(
+    snapshot: Annotated[
+        Path,
+        typer.Option("--snapshot", help="Snapshot JSON used for local read-path timings."),
+    ] = Path("data/demo/snapshot.json"),
+    database_url: Annotated[
+        str | None,
+        typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
+    ] = None,
+    api_url: Annotated[
+        str | None,
+        typer.Option("--api-url", help="Optional public API origin to measure over HTTP."),
+    ] = None,
+    workflow_runtime_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--workflow-runtime-seconds",
+            min=0,
+            help="Optional observed GitHub Actions runtime to retain in the baseline.",
+        ),
+    ] = None,
+    path: Annotated[
+        list[Path] | None,
+        typer.Option("--path", help="Filesystem path to inventory; repeat for additional paths."),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional JSON report destination."),
+    ] = None,
+) -> None:
+    """Capture local latency, storage, and cost-capacity observations."""
+    settings = runtime_settings()
+    report = build_capacity_baseline(
+        snapshot_path=snapshot,
+        database_url=_forward_database_url(settings, database_url),
+        api_url=api_url,
+        paths=path or DEFAULT_BASELINE_PATHS,
+        workflow_runtime_seconds=workflow_runtime_seconds,
+    )
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        output.write_bytes(serialized)
+        typer.echo(f"Wrote capacity baseline to {output}")
+    typer.echo(serialized.decode())
 
 
 @app.command()
