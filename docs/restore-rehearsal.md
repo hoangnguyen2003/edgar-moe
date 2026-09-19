@@ -35,6 +35,34 @@ operational procedure, not evidence that a restore has already succeeded. The
 maintainer records the outputs in a private incident/recovery note and never
 uses the production database as the rehearsal target.
 
+## Manual hosted workflow
+
+For a repeatable hosted rehearsal, the repository includes the manual **Provider
+isolated restore rehearsal** Actions workflow. It requires these repository
+secrets, all kept outside logs and artifacts:
+
+- `EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL`: source URL with dump/read access;
+- `EDGAR_MOE_RESTORE_TARGET_DATABASE_URL`: pre-created empty isolated target with
+  restore/schema privileges;
+- `EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL` and
+  `EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL`: corresponding SELECT-only
+  URLs for the independent Go auditor and read-path probe;
+- `EDGAR_MOE_R2_ENDPOINT_URL`, `EDGAR_MOE_R2_BUCKET`,
+  `EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID`, and
+  `EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY`: read-only R2 verification access.
+
+The operator must choose `I_UNDERSTAND_ISOLATED_TARGET`. The workflow checks that
+source and target identities differ, both auditor URLs point at their matching
+database, and the target has no public tables before it runs. It uses a custom
+`pg_dump` only as a logical rehearsal, stores the dump under a private temporary
+directory, removes it before job completion, and never uses `pg_restore --clean`.
+The dump itself is never uploaded. Retained evidence contains counts, schema and
+timing output, both Go audits, the read-path probe, a content-hashed comparison,
+step outcomes, and a SHA-256 file list for 30 days. A successful workflow is
+evidence of this specific source/target rehearsal; it is not proof that the
+provider's managed backup job, RPO, or RTO meets a target until those observations
+are recorded separately.
+
 Pull-request CI also runs a fully disposable PostgreSQL 16 version of this
 exercise. It seeds an explicit synthetic fixture (only when the workflow passes
 `--allow-synthetic`), creates a custom-format dump, restores it into a different
