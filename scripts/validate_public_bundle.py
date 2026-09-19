@@ -51,7 +51,13 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
     _validate_disclosure_metadata(root, errors)
     _validate_provenance_manifest(root, errors)
 
-    files = sorted(path for path in root.rglob("*") if path.is_file())
+    files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root).as_posix()
+        if path.is_symlink():
+            errors.append(f"symlink is not allowed in publishable bundle: {relative}")
+        elif path.is_file():
+            files.append(path)
     for path in files:
         relative = path.relative_to(root).as_posix()
         if path.suffix == ".map" or path.name.startswith(".env"):

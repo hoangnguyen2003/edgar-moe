@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 
+import pytest
+
 _VALIDATOR_PATH = Path(__file__).parents[2] / "scripts" / "validate_public_bundle.py"
 _VALIDATOR_SPEC = importlib.util.spec_from_file_location("validate_public_bundle", _VALIDATOR_PATH)
 assert _VALIDATOR_SPEC is not None and _VALIDATOR_SPEC.loader is not None
@@ -124,3 +126,17 @@ def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:
     errors = validate_public_bundle(tmp_path)
 
     assert "public provenance must declare raw_sources_public=false" in errors
+
+
+def test_public_bundle_rejects_symlinked_assets(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    target = tmp_path / "outside.js"
+    target.write_text("export const private_value = 'outside';", encoding="utf-8")
+    try:
+        (tmp_path / "assets" / "linked.js").symlink_to(target)
+    except OSError:
+        pytest.skip("symlinks are unavailable in this environment")
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert errors == ["symlink is not allowed in publishable bundle: assets/linked.js"]
