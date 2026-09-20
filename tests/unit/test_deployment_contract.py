@@ -70,6 +70,14 @@ def test_deployment_contract_excludes_private_data_from_the_function() -> None:
         assert path in exclude_files
 
 
+def test_deployment_contract_includes_the_runtime_snapshot_lock() -> None:
+    payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
+    include_files = payload["functions"]["api/**/*.py"]["includeFiles"]
+
+    assert "config/public_snapshot.lock.json" in include_files
+    assert "data/demo/snapshot.json" in include_files
+
+
 def test_deployment_contract_rejects_overlong_function_glob(tmp_path: Path) -> None:
     payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
     payload["functions"]["api/**/*.py"]["excludeFiles"] = "x" * 257

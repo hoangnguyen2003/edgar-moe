@@ -26,6 +26,7 @@ RUN groupadd --system --gid 10001 app \
        --shell /usr/sbin/nologin app
 COPY --from=python-dependencies --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app data/demo ./data/demo
+COPY --chown=app:app config/public_snapshot.lock.json ./config/public_snapshot.lock.json
 COPY --from=web-build --chown=app:app /workspace/apps/web/dist ./static
 USER app
 EXPOSE 8000

@@ -92,7 +92,11 @@ def validate_deployment_contract(
             _require_path_tokens(
                 errors,
                 api_function.get("includeFiles"),
-                ("data/demo/snapshot.json", "src/edgar_moe/**"),
+                (
+                    "config/public_snapshot.lock.json",
+                    "data/demo/snapshot.json",
+                    "src/edgar_moe/**",
+                ),
                 "functions.api/**/*.py.includeFiles",
             )
             _require_path_tokens(
