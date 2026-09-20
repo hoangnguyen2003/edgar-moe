@@ -1539,6 +1539,63 @@ def research_copilot_review_verify(
     )
 
 
+@app.command("research-copilot-readiness")
+def research_copilot_readiness(
+    benchmark: Annotated[
+        Path,
+        typer.Option("--benchmark", help="Private evaluation.json from research-copilot-benchmark."),
+    ],
+    history: Annotated[
+        Path,
+        typer.Option("--history", help="Content-addressed review history JSON."),
+    ],
+    min_pass_rate: Annotated[
+        float,
+        typer.Option(
+            "--min-pass-rate",
+            min=0.0,
+            max=1.0,
+            help="Minimum benchmark structural pass rate required for readiness.",
+        ),
+    ] = 1.0,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional readiness summary destination."),
+    ] = None,
+) -> None:
+    """Decide whether a private copilot benchmark is ready for human reliance."""
+    from edgar_moe.copilot.readiness import (
+        CopilotReadinessError,
+        build_copilot_readiness,
+    )
+
+    try:
+        benchmark_payload = json.loads(benchmark.read_text(encoding="utf-8"))
+        history_payload = json.loads(history.read_text(encoding="utf-8"))
+        if not isinstance(benchmark_payload, dict):
+            raise CopilotReadinessError("benchmark report must be a JSON object")
+        if not isinstance(history_payload, dict):
+            raise CopilotReadinessError("review history must be a JSON object")
+        report = build_copilot_readiness(
+            benchmark_payload,
+            history_payload,
+            min_pass_rate=min_pass_rate,
+        )
+    except (CopilotReadinessError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary_output = output.with_suffix(output.suffix + ".tmp")
+        temporary_output.write_bytes(serialized)
+        temporary_output.replace(output)
+        typer.echo(f"Wrote copilot readiness summary to {output}")
+    typer.echo(serialized.decode())
+    if report["status"] != "ready":
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
