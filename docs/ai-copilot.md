@@ -27,6 +27,16 @@ the question, answer, frozen identity, citations, and a non-sensitive tool
 trace. A report with no tool citations is marked `uncited`; it is not silently
 treated as evidence.
 
+Newly generated envelopes also include an `agent_identity` record containing
+the stable policy ID, a SHA-256 digest of the system policy, a SHA-256 digest of
+the exact tool schema offered for that run, and the configured tool-call
+budget. This lets a reviewer distinguish a changed prompt/tool boundary from a
+changed provider answer without retaining the provider endpoint, prompt
+payload, or secret. The verifier checks the policy digest and bounded fields;
+the tool-contract digest is content-addressed because optional diagnostic tools
+can change the allowed schema. Existing schema-1 reports without this optional
+record remain verifiable.
+
 Envelope verification is enforced at every local boundary: the agent validates
 its generated answer before returning it, the CLI validates it before printing
 or atomically writing it, and benchmark/evaluation commands reject unverified

@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from .contracts import COPILOT_DISCLAIMER
+from .policy import COPILOT_POLICY_ID, copilot_policy_sha256
 
 
 class CopilotVerificationError(ValueError):
@@ -49,13 +50,16 @@ _ANSWER_KEYS = frozenset(
         "tool_trace",
     }
 )
-_OPTIONAL_KEYS = frozenset({"evaluation_case_id", "usage"})
+_OPTIONAL_KEYS = frozenset({"agent_identity", "evaluation_case_id", "usage"})
 _IDENTITY_KEYS = frozenset(
     {"as_of", "data_mode", "locked_test_hash", "path", "research_only", "selection_hash", "sha256"}
 )
 _CITATION_KEYS = frozenset({"evidence_sha256", "fields", "label", "source"})
 _TRACE_KEYS = frozenset(
     {"arguments_sha256", "call_index", "citation_count", "name", "result_sha256"}
+)
+_AGENT_IDENTITY_KEYS = frozenset(
+    {"max_tool_calls", "policy_id", "policy_sha256", "tool_contract_sha256"}
 )
 _MAX_ANSWER_BYTES = 2_000_000
 _MAX_CITATIONS = 64
@@ -99,6 +103,8 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
             raise CopilotVerificationError("copilot answer evaluation_case_id is invalid")
     if "usage" in report:
         _verify_usage(report.get("usage"))
+    if "agent_identity" in report:
+        _verify_agent_identity(report.get("agent_identity"))
 
     _verify_frozen_identity(report.get("frozen_identity"))
     citations = _verify_citations(report.get("citations"))
@@ -201,6 +207,24 @@ def _verify_usage(value: object) -> None:
         value = usage[field]
         if value is not None:
             _bounded_int(value, f"usage.{field}", minimum=0, maximum=_MAX_USAGE_TOKENS)
+
+
+def _verify_agent_identity(value: object) -> None:
+    identity = _exact_mapping(value, _AGENT_IDENTITY_KEYS, "agent_identity")
+    if identity["policy_id"] != COPILOT_POLICY_ID:
+        raise CopilotVerificationError("copilot answer agent_identity policy_id is invalid")
+    policy_sha256 = _digest(identity["policy_sha256"], "agent_identity.policy_sha256")
+    if policy_sha256 != copilot_policy_sha256():
+        raise CopilotVerificationError(
+            "copilot answer agent_identity policy_sha256 does not match the current policy"
+        )
+    _digest(identity["tool_contract_sha256"], "agent_identity.tool_contract_sha256")
+    _bounded_int(
+        identity["max_tool_calls"],
+        "agent_identity.max_tool_calls",
+        minimum=1,
+        maximum=8,
+    )
 
 
 def _bounded_int(value: object, label: str, *, minimum: int, maximum: int) -> int:
