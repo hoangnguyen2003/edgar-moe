@@ -560,6 +560,54 @@ def research_drift_history_verify(
     )
 
 
+@app.command("research-drift-readiness")
+def research_drift_readiness(
+    history: Annotated[
+        Path,
+        typer.Argument(help="Content-addressed prospective research-drift history JSON."),
+    ],
+    minimum_reports: Annotated[
+        int,
+        typer.Option(
+            "--minimum-reports",
+            min=1,
+            help="Minimum later observations required before readiness.",
+        ),
+    ] = 3,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional readiness summary destination."),
+    ] = None,
+) -> None:
+    """Decide whether prospective drift history is ready for human review."""
+    from edgar_moe.features.drift_readiness import (
+        DriftReadinessError,
+        build_research_drift_readiness,
+    )
+
+    try:
+        payload = orjson.loads(history.read_bytes())
+    except (OSError, orjson.JSONDecodeError) as error:
+        raise typer.BadParameter(f"cannot read drift history: {history}") from error
+    if not isinstance(payload, dict):
+        raise typer.BadParameter("drift history must be a JSON object")
+    try:
+        report = build_research_drift_readiness(payload, minimum_reports=minimum_reports)
+    except DriftReadinessError as error:
+        raise typer.BadParameter(str(error)) from error
+
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary_output = output.with_suffix(output.suffix + ".tmp")
+        temporary_output.write_bytes(serialized)
+        temporary_output.replace(output)
+        typer.echo(f"Wrote drift readiness summary to {output}")
+    typer.echo(serialized.decode())
+    if report["status"] != "ready":
+        raise typer.Exit(code=1)
+
+
 @app.command("run-study")
 def run_study(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],

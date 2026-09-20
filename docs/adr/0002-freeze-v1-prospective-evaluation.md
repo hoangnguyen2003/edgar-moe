@@ -63,6 +63,10 @@ IDs, one frozen model identity, and warning streaks. Fewer than the configured
 minimum observations remains `insufficient_history`; a drift warning does not
 authorize retraining or threshold changes. A future model can be introduced
 only under a new model identity with a reviewed prospective evaluation plan.
+The separate `research-drift-readiness` command is a structural review aid: it
+requires enough stable observations and exits non-zero for insufficient,
+warning, incomplete, or error histories. Its hash-pinned summary never changes
+the model or treats drift as a promotion decision.
 
 ### Keep infrastructure observations outside software claims
 

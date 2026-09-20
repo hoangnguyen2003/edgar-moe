@@ -191,6 +191,21 @@ The history remains `insufficient_history` until the configured minimum number
 of independently hashed reports is present. The current one-observation review
 is retained at [`reports/research-drift-history.json`](reports/research-drift-history.json).
 
+Use the read-only readiness gate before relying on the trend in a research
+review:
+
+```bash
+uv run edgar-moe research-drift-readiness \
+  reports/research-drift-history.json \
+  --minimum-reports 3 \
+  --output /tmp/research-drift-readiness.json
+```
+
+It exits non-zero until the history has enough observations, remains stable,
+and has no unresolved review state. The content-addressed summary contains
+only safe identities, counts, hashes, check statuses, and blocker codes; it
+never authorizes retraining or changes the frozen v1 artifact.
+
 For evidence navigation, the optional operator-run research copilot can answer
 questions over the frozen snapshot and (when configured) the forward registry.
 It uses bounded read-only tools, content-hashed citations, and an explicit
