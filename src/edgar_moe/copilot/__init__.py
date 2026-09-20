@@ -11,7 +11,13 @@ from .agent import (
     ResearchCopilot,
     normalize_provider_endpoint,
 )
-from .benchmark import BenchmarkFailure, BenchmarkRun, run_benchmark, write_benchmark_report
+from .benchmark import (
+    BenchmarkFailure,
+    BenchmarkRun,
+    BenchmarkUsage,
+    run_benchmark,
+    write_benchmark_report,
+)
 from .contracts import (
     COPILOT_DISCLAIMER,
     Citation,
@@ -58,6 +64,7 @@ __all__ = [
     "CaseEvaluation",
     "BenchmarkFailure",
     "BenchmarkRun",
+    "BenchmarkUsage",
     "EvaluationCase",
     "EvaluationCorpus",
     "EvaluationInputError",

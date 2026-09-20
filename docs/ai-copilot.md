@@ -38,7 +38,10 @@ prompt/completion/total token counters when the provider reports them. Unknown
 provider metadata is discarded, counters are range-checked, and missing counters
 remain `null`. This supports operator cost/capacity review without retaining
 provider payloads, prompts, billing assumptions, or endpoint details. Aggregate
-benchmark reports still retain only structural scores and hashes.
+benchmark reports additionally retain only the successful-answer count and
+aggregate request/latency telemetry; token totals are `null` when any successful
+answer does not report that counter. These aggregates contain no answer text,
+questions, provider payloads, billing assumptions, or endpoint details.
 
 ## Safety boundary
 
@@ -184,7 +187,12 @@ the private answer text and citations before relying on it.
 
 To run the complete corpus sequentially with one provider configuration, use
 the bounded benchmark command. It writes the individual private answer
-envelopes and the aggregate structural report under `/tmp` by default:
+envelopes and an aggregate structural report under `/tmp` by default. When all
+successful answers include verified usage summaries, the aggregate also records
+the successful-answer count, provider-request count, and local duration; each
+standard token total is summed only when every successful answer reports it,
+otherwise that counter is `null`. This is an observability signal, not a billing
+estimate or provider-pricing calculation:
 
 ```bash
 uv run edgar-moe research-copilot-benchmark \
