@@ -76,6 +76,8 @@ def _build_api_registry_database(settings: RuntimeSettings) -> RegistryDatabase 
         pool_size=settings.edgar_moe_registry_api_pool_size,
         max_overflow=settings.edgar_moe_registry_api_max_overflow,
         pool_timeout=settings.edgar_moe_registry_api_pool_timeout_seconds,
+        read_only=True,
+        statement_timeout_ms=settings.edgar_moe_registry_api_statement_timeout_ms,
     )
 
 

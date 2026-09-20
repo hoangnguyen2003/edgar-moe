@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from edgar_moe.forward.database import RegistryDatabase
+from edgar_moe.forward.database import RegistryDatabase, _build_connect_args
 
 
 def test_sqlite_ignores_serverless_pool_options(tmp_path) -> None:
@@ -11,6 +11,8 @@ def test_sqlite_ignores_serverless_pool_options(tmp_path) -> None:
         pool_size=1,
         max_overflow=0,
         pool_timeout=5,
+        read_only=True,
+        statement_timeout_ms=5_000,
     )
 
     try:
@@ -38,12 +40,30 @@ def test_postgres_applies_serverless_pool_options_without_connecting() -> None:
         database.dispose()
 
 
+def test_postgres_read_only_session_options_are_applied_without_connecting() -> None:
+    assert _build_connect_args(
+        "postgresql+psycopg://reader:password@db.example.test/edgar_moe",
+        read_only=True,
+        statement_timeout_ms=5_000,
+    ) == {"options": "-c default_transaction_read_only=on -c statement_timeout=5000"}
+    assert _build_connect_args(
+        "postgresql+psycopg://writer:password@db.example.test/edgar_moe",
+        read_only=False,
+        statement_timeout_ms=None,
+    ) == {}
+
+
 @pytest.mark.parametrize(
     ("option", "value", "message"),
     [
         ("pool_size", 0, "pool_size must be at least 1"),
         ("max_overflow", -1, "max_overflow must be non-negative"),
         ("pool_timeout", 0, "pool_timeout must be greater than 0"),
+        (
+            "statement_timeout_ms",
+            600_001,
+            "statement_timeout_ms must be between 1 and 600000 milliseconds",
+        ),
     ],
 )
 def test_pool_options_reject_invalid_values(option: str, value: int, message: str) -> None:

@@ -41,6 +41,7 @@ transient retry policy. The provider key and evidence context remain outside
 the public API and browser bundle.
 
 The provider egress decision is recorded in [ADR 0010](adr/0010-copilot-provider-redirect-boundary.md).
+The API database-session decision is recorded in [ADR 0011](adr/0011-api-read-only-statement-boundary.md).
 
 ## Architecture baseline — September 18, 2026
 
@@ -111,10 +112,13 @@ earliest-event audits are supplementary and must be labeled as such.
   writer. The API reader also uses a bounded per-instance connection pool
   (`EDGAR_MOE_REGISTRY_API_POOL_SIZE`, `EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW`, and
   `EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS`) to limit serverless connection
-  fan-out. Provider/project limits still require external verification. The shared
-  database session helper can commit, so the deployed reader role must still be
-  granted SELECT-only privileges and verified before claiming database-enforced
-  least privilege.
+  fan-out, requests `default_transaction_read_only=on`, and applies the bounded
+  `EDGAR_MOE_REGISTRY_API_STATEMENT_TIMEOUT_MS` Postgres statement timeout.
+  These are defense-in-depth controls; provider/project limits and the deployed
+  role grants still require external verification. The shared database session
+  helper can commit, so the deployed reader role must still be granted
+  SELECT-only privileges and verified before claiming database-enforced least
+  privilege.
 - Runner → providers/database/R2: high-trust execution with source and write
   credentials. Workflow permissions are `contents: read`, but job secrets remain
   powerful. Review workflow and dependency changes as privileged code changes.
