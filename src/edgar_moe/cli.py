@@ -1075,6 +1075,83 @@ def forward_diagnostic(
     typer.echo(serialized.decode())
 
 
+@app.command("forward-diagnostic-history")
+def forward_diagnostic_history(
+    reports: Annotated[
+        list[Path] | None,
+        typer.Option(
+            "--report",
+            help="Private diagnostic JSON; repeat for each later observation.",
+        ),
+    ] = None,
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Content-addressed history JSON destination."),
+    ] = Path("reports/forward-diagnostic-history.json"),
+    minimum_reports: Annotated[
+        int,
+        typer.Option(
+            "--minimum-reports",
+            min=1,
+            max=128,
+            help="Reports required before history status can become ready.",
+        ),
+    ] = 3,
+) -> None:
+    """Build a redacted chronological history of short-horizon diagnostics."""
+    from edgar_moe.forward.diagnostic_history import (
+        DiagnosticHistoryError,
+        build_forward_diagnostic_history,
+        load_forward_diagnostic_reports,
+    )
+
+    paths = tuple(reports or ())
+    try:
+        summaries = load_forward_diagnostic_reports(paths)
+        history = build_forward_diagnostic_history(
+            summaries,
+            minimum_reports=minimum_reports,
+        )
+    except DiagnosticHistoryError as error:
+        raise typer.BadParameter(str(error)) from error
+    serialized = orjson.dumps(history, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    temporary_output = output.with_suffix(output.suffix + ".tmp")
+    temporary_output.write_bytes(serialized)
+    temporary_output.replace(output)
+    typer.echo(
+        f"Forward diagnostic history status: {history['status']}; "
+        f"reports: {history['report_count']}; history hash: {history['history_sha256']}; "
+        f"wrote {output}"
+    )
+
+
+@app.command("forward-diagnostic-history-verify")
+def forward_diagnostic_history_verify(
+    history: Annotated[
+        Path,
+        typer.Argument(help="Content-addressed forward diagnostic history JSON."),
+    ],
+) -> None:
+    """Verify a retained diagnostic history without reopening source reports."""
+    from edgar_moe.forward.diagnostic_history import (
+        DiagnosticHistoryError,
+        verify_forward_diagnostic_history,
+    )
+
+    try:
+        payload = orjson.loads(history.read_bytes())
+        if not isinstance(payload, dict):
+            raise DiagnosticHistoryError("diagnostic history must be an object")
+        verify_forward_diagnostic_history(payload)
+    except (DiagnosticHistoryError, OSError, orjson.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(
+        f"Verified forward diagnostic history {payload['history_sha256']} "
+        f"({payload['report_count']} reports; status={payload['status']})"
+    )
+
+
 @app.command("forward-status")
 def forward_status(
     database_url: Annotated[

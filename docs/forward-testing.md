@@ -461,6 +461,33 @@ all selected events, including those pending or unmatched. If selection metadata
 is missing, that evaluation is marked unavailable instead of guessing chronology.
 Observation rows include model ID and forecast timestamp for auditability.
 
+### Retain a diagnostic history
+
+When several private diagnostic artifacts have accumulated, build a separate
+history for engineering review:
+
+```bash
+uv run edgar-moe forward-diagnostic-history \
+  --report /private/path/diagnostic-2026-09-17.json \
+  --report /private/path/diagnostic-2026-09-18.json \
+  --report /private/path/diagnostic-2026-09-19.json \
+  --minimum-reports 3 \
+  --output reports/forward-diagnostic-history.json
+
+uv run edgar-moe forward-diagnostic-history-verify \
+  reports/forward-diagnostic-history.json
+```
+
+The command accepts only summaries produced by the diagnostic redaction
+boundary. The retained history contains chronological source digests, safe
+counts, maturity, coverage, metrics, and the diagnostic horizon. It rejects
+raw observations, event/forecast identifiers, duplicate timestamps, mixed
+horizons, malformed reports, and tampered history. `insufficient_history` is a
+valid explicit status until the configured minimum number of later artifacts
+exists; a non-ready diagnostic status produces `review_required`. Verification
+never reopens the private source files. This history is not the official
+20-session evaluation, a performance promotion gate, or a retraining trigger.
+
 ## Monitoring and recovery
 
 The independent Go [evidence auditor](evidence-auditor.md) verifies registry
