@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 
 from edgar_moe.copilot.contracts import COPILOT_DISCLAIMER
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.verification import (
     CopilotVerificationError,
     verify_copilot_answer_report,
@@ -137,6 +138,37 @@ def test_verifier_accepts_benchmark_case_and_api_citation() -> None:
     ]
 
     verify_copilot_answer_report(report)
+
+
+def test_verifier_accepts_and_checks_agent_identity() -> None:
+    report = valid_report()
+    report["agent_identity"] = {
+        "policy_id": COPILOT_POLICY_ID,
+        "policy_sha256": copilot_policy_sha256(),
+        "tool_contract_sha256": "1" * 64,
+        "max_tool_calls": 4,
+    }
+    verify_copilot_answer_report(report)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["policy_id"] = "other-policy"
+    with pytest.raises(CopilotVerificationError, match="policy_id"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["policy_sha256"] = "2" * 64
+    with pytest.raises(CopilotVerificationError, match="policy_sha256 does not match"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["tool_contract_sha256"] = "invalid"
+    with pytest.raises(CopilotVerificationError, match="tool_contract_sha256"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["max_tool_calls"] = 0
+    with pytest.raises(CopilotVerificationError, match="max_tool_calls"):
+        verify_copilot_answer_report(invalid)
 
 
 def test_verifier_accepts_forward_diagnostic_tool_and_source() -> None:

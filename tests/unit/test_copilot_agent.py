@@ -15,6 +15,7 @@ from edgar_moe.copilot.agent import (
     _parse_provider_response,
     normalize_provider_endpoint,
 )
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.tools import ReadOnlyToolset
 from edgar_moe.copilot.verification import CopilotVerificationError
 
@@ -74,6 +75,11 @@ def test_agent_executes_read_tool_then_returns_citation_backed_answer() -> None:
     assert answer.trace[0].citation_count == 1
     assert any(message.get("role") == "tool" for message in provider.messages[-1])
     assert answer.as_dict()["research_only"] is True
+    identity = answer.as_dict()["agent_identity"]
+    assert identity["policy_id"] == COPILOT_POLICY_ID
+    assert identity["policy_sha256"] == copilot_policy_sha256()
+    assert len(identity["tool_contract_sha256"]) == 64
+    assert identity["max_tool_calls"] == 4
 
 
 def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() -> None:

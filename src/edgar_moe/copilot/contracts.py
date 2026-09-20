@@ -99,6 +99,24 @@ class ToolTrace:
 
 
 @dataclass(frozen=True)
+class CopilotAgentIdentity:
+    """Content-addressed identity of the policy and tool surface used by an agent."""
+
+    policy_id: str
+    policy_sha256: str
+    tool_contract_sha256: str
+    max_tool_calls: int
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "policy_id": self.policy_id,
+            "policy_sha256": self.policy_sha256,
+            "tool_contract_sha256": self.tool_contract_sha256,
+            "max_tool_calls": self.max_tool_calls,
+        }
+
+
+@dataclass(frozen=True)
 class CopilotUsage:
     """Bounded, non-sensitive execution telemetry for one copilot answer."""
 
@@ -140,6 +158,7 @@ class CopilotAnswer:
     trace: tuple[ToolTrace, ...]
     evidence_status: EvidenceStatus
     usage: CopilotUsage | None = None
+    agent_identity: CopilotAgentIdentity | None = None
 
     def as_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -158,4 +177,6 @@ class CopilotAnswer:
         }
         if self.usage is not None:
             payload["usage"] = self.usage.as_dict()
+        if self.agent_identity is not None:
+            payload["agent_identity"] = self.agent_identity.as_dict()
         return payload

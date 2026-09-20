@@ -21,6 +21,7 @@ from .benchmark import (
 from .contracts import (
     COPILOT_DISCLAIMER,
     Citation,
+    CopilotAgentIdentity,
     CopilotAnswer,
     CopilotUsage,
     ToolDefinition,
@@ -56,6 +57,7 @@ from .verification import CopilotVerificationError, verify_copilot_answer_report
 __all__ = [
     "Citation",
     "COPILOT_DISCLAIMER",
+    "CopilotAgentIdentity",
     "CopilotError",
     "CopilotProvider",
     "CopilotProviderError",
