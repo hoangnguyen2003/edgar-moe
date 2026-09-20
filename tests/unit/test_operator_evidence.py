@@ -14,9 +14,13 @@ import pytest
 from edgar_moe.forward.operator_evidence import (
     PROVIDER_EVIDENCE_PROFILES,
     OperatorEvidenceError,
+    OperatorReadinessError,
+    build_operator_readiness_report,
     operator_readiness,
+    packet_summary,
     prepare_operator_evidence_packet,
     verify_operator_evidence_packet,
+    verify_operator_readiness_report,
 )
 
 
@@ -109,6 +113,18 @@ def test_prepare_adds_hash_and_verify_accepts_packet() -> None:
 
     assert len(packet["packet_sha256"]) == 64
     verify_operator_evidence_packet(packet)
+
+
+def test_packet_summary_is_redacted_and_counts_check_statuses() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    summary = packet_summary(packet)
+
+    assert summary["status"] == "verified"
+    assert summary["packet_id"] == packet["packet_id"]
+    assert summary["check_counts"]["passed"] == 3
+    assert summary["artifact_count"] == 3
+    assert "isolated-target" not in json.dumps(summary)
 
 
 def test_verify_rejects_changed_packet_content() -> None:
@@ -225,6 +241,84 @@ def test_operator_readiness_rejects_unknown_profile() -> None:
 
     with pytest.raises(ValueError, match="profile must be one of"):
         operator_readiness(packet, profile="provider-only")
+
+
+def test_operator_readiness_rejects_invalid_window_and_naive_clock() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    with pytest.raises(ValueError, match="max_age must be positive"):
+        operator_readiness(packet, max_age=timedelta(0))
+    with pytest.raises(ValueError, match="now must include a UTC offset"):
+        operator_readiness(packet, now=datetime(2026, 9, 19))
+
+
+def test_operator_readiness_report_is_hash_pinned_and_profile_bound() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    report = build_operator_readiness_report(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+        max_age=timedelta(days=30),
+    )
+
+    assert report["status"] == "ready"
+    assert report["profile"] == "p0"
+    assert report["packet_sha256"] == packet["packet_sha256"]
+    assert len(report["readiness_sha256"]) == 64
+    verify_operator_readiness_report(report)
+
+
+def test_operator_readiness_report_rejects_tampering_and_inconsistent_status() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+    report = build_operator_readiness_report(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+    )
+
+    tampered_hash = copy.deepcopy(report)
+    tampered_hash["packet_sha256"] = "0" * 64
+    with pytest.raises(OperatorReadinessError, match="content hash"):
+        verify_operator_readiness_report(tampered_hash)
+
+    mismatched_profile = copy.deepcopy(report)
+    mismatched_profile["profile"] = "p1"
+    with pytest.raises(OperatorReadinessError, match="required_check_ids"):
+        verify_operator_readiness_report(mismatched_profile)
+
+    tampered_status = copy.deepcopy(report)
+    tampered_status["status"] = "blocked"
+    tampered_status["readiness_sha256"] = "0" * 64
+    with pytest.raises(OperatorReadinessError, match="status is inconsistent"):
+        verify_operator_readiness_report(tampered_status)
+
+
+def test_operator_readiness_report_rejects_non_integral_freshness_window() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    with pytest.raises(ValueError, match="whole number of seconds"):
+        build_operator_readiness_report(packet, max_age=timedelta(seconds=1, microseconds=1))
+
+
+def test_operator_readiness_report_retains_blocked_and_stale_decisions() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    blocked = build_operator_readiness_report(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+        profile="p1",
+    )
+    stale = build_operator_readiness_report(
+        packet,
+        now=datetime(2026, 10, 20, tzinfo=UTC),
+        max_age=timedelta(days=30),
+    )
+
+    assert blocked["status"] == "blocked"
+    assert blocked["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])[3:]
+    assert stale["status"] == "stale"
+    assert stale["stale_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p0"])
+    verify_operator_readiness_report(blocked)
+    verify_operator_readiness_report(stale)
 
 
 def test_cli_writes_and_verifies_packet(tmp_path: Path) -> None:
@@ -417,3 +511,56 @@ def test_cli_selects_readiness_profile(tmp_path: Path) -> None:
     summary = json.loads(result.stdout)
     assert summary["profile"] == "p1"
     assert summary["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])[3:]
+
+
+def test_cli_builds_verifies_and_refuses_to_overwrite_readiness_report(tmp_path: Path) -> None:
+    packet_path = tmp_path / "packet.json"
+    report_path = tmp_path / "readiness.json"
+    packet_path.write_bytes(
+        orjson.dumps(prepare_operator_evidence_packet(_complete_draft()))
+    )
+
+    built = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_operator_readiness.py",
+            "--packet",
+            str(packet_path),
+            "--output",
+            str(report_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    built_summary = json.loads(built.stdout)
+    assert built_summary["status"] == "written"
+    assert built_summary["readiness_status"] == "ready"
+    assert not list(tmp_path.glob(".*.staging-*"))
+
+    verified = subprocess.run(
+        [
+            sys.executable,
+            "scripts/verify_operator_readiness.py",
+            "--report",
+            str(report_path),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(verified.stdout)["status"] == "verified"
+
+    overwrite = subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_operator_readiness.py",
+            "--packet",
+            str(packet_path),
+            "--output",
+            str(report_path),
+        ],
+        capture_output=True,
+        text=True,
+    )
+    assert overwrite.returncode == 2

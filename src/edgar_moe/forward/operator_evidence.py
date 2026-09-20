@@ -76,6 +76,37 @@ class OperatorEvidenceError(ValueError):
     """Raised when a redacted operator evidence packet is malformed."""
 
 
+class OperatorReadinessError(ValueError):
+    """Raised when a retained operator readiness report is malformed."""
+
+
+_READINESS_STATUSES = frozenset({"ready", "blocked", "stale"})
+_READINESS_SCOPE = "operator_evidence_readiness"
+_READINESS_DISCLAIMER = (
+    "Operator evidence readiness is a time-bounded verification of retained metadata; "
+    "it does not create, upgrade, or independently prove provider-side observations."
+)
+_READINESS_REPORT_KEYS = frozenset(
+    {
+        "schema_version",
+        "scope",
+        "status",
+        "packet_id",
+        "packet_sha256",
+        "captured_at",
+        "evaluated_at",
+        "profile",
+        "max_age_seconds",
+        "required_check_ids",
+        "required_checks",
+        "blocked_checks",
+        "stale_checks",
+        "disclaimer",
+        "readiness_sha256",
+    }
+)
+
+
 def prepare_operator_evidence_packet(payload: Mapping[str, Any]) -> dict[str, Any]:
     """Validate a packet draft and add its canonical content hash."""
     _validate_packet(payload, require_hash=False)
@@ -192,6 +223,153 @@ def operator_readiness(
         "blocked_checks": blocked,
         "stale_checks": stale,
     }
+
+
+def build_operator_readiness_report(
+    payload: Mapping[str, Any],
+    *,
+    now: datetime | None = None,
+    max_age: timedelta = timedelta(days=30),
+    profile: str = "p0",
+) -> dict[str, Any]:
+    """Build an immutable, hash-pinned readiness decision for a packet.
+
+    The report retains only packet identity, profile metadata, and derived check
+    results. It deliberately does not copy packet contents or provider evidence.
+    """
+    if max_age.total_seconds() != int(max_age.total_seconds()):
+        raise ValueError("max_age must resolve to a whole number of seconds")
+    evaluated_at = now or datetime.now(UTC)
+    summary = operator_readiness(
+        payload,
+        now=evaluated_at,
+        max_age=max_age,
+        profile=profile,
+    )
+    report: dict[str, Any] = {
+        "schema_version": 1,
+        "scope": _READINESS_SCOPE,
+        "status": summary["status"],
+        "packet_id": summary["packet_id"],
+        "packet_sha256": summary["packet_sha256"],
+        "captured_at": summary["captured_at"],
+        "evaluated_at": _format_utc(evaluated_at),
+        "profile": summary["profile"],
+        "max_age_seconds": summary["max_age_seconds"],
+        "required_check_ids": summary["required_check_ids"],
+        "required_checks": summary["required_checks"],
+        "blocked_checks": summary["blocked_checks"],
+        "stale_checks": summary["stale_checks"],
+        "disclaimer": _READINESS_DISCLAIMER,
+    }
+    report["readiness_sha256"] = _content_hash(report)
+    verify_operator_readiness_report(report)
+    return report
+
+
+def verify_operator_readiness_report(report: Mapping[str, Any]) -> None:
+    """Verify a retained readiness report without reopening its packet."""
+    if not isinstance(report, Mapping):
+        raise OperatorReadinessError("operator readiness report must be a JSON object")
+    unknown = sorted(str(key) for key in report if key not in _READINESS_REPORT_KEYS)
+    if unknown:
+        raise OperatorReadinessError(
+            "operator readiness report contains unsupported fields: " + ", ".join(unknown)
+        )
+    missing = sorted(key for key in _READINESS_REPORT_KEYS if key not in report)
+    if missing:
+        raise OperatorReadinessError(
+            "operator readiness report is missing fields: " + ", ".join(missing)
+        )
+    if report.get("schema_version") != 1 or report.get("scope") != _READINESS_SCOPE:
+        raise OperatorReadinessError("operator readiness report schema or scope is invalid")
+    if report.get("status") not in _READINESS_STATUSES:
+        raise OperatorReadinessError("operator readiness report status is invalid")
+    if report.get("disclaimer") != _READINESS_DISCLAIMER:
+        raise OperatorReadinessError("operator readiness report disclaimer is invalid")
+    _readiness_identifier(report.get("packet_id"), "packet_id")
+    for field in ("packet_sha256", "readiness_sha256"):
+        _readiness_digest(report.get(field), field)
+    captured_at = _readiness_timestamp(report.get("captured_at"), "captured_at")
+    evaluated_at = _readiness_timestamp(report.get("evaluated_at"), "evaluated_at")
+    if evaluated_at < captured_at:
+        raise OperatorReadinessError("evaluated_at must not precede captured_at")
+
+    profile = report.get("profile")
+    if not isinstance(profile, str) or profile not in PROVIDER_EVIDENCE_PROFILES:
+        raise OperatorReadinessError("operator readiness report profile is invalid")
+    required_ids = report.get("required_check_ids")
+    expected_ids = list(PROVIDER_EVIDENCE_PROFILES[profile])
+    if required_ids != expected_ids:
+        raise OperatorReadinessError("required_check_ids do not match the selected profile")
+    max_age_seconds = report.get("max_age_seconds")
+    if (
+        isinstance(max_age_seconds, bool)
+        or not isinstance(max_age_seconds, int)
+        or max_age_seconds <= 0
+    ):
+        raise OperatorReadinessError("max_age_seconds must be a positive integer")
+
+    results = report.get("required_checks")
+    if not isinstance(results, list) or len(results) != len(expected_ids):
+        raise OperatorReadinessError("required_checks do not cover the selected profile")
+    blocked: list[str] = []
+    stale: list[str] = []
+    for expected_id, result in zip(expected_ids, results, strict=True):
+        if not isinstance(result, Mapping) or result.get("check_id") != expected_id:
+            raise OperatorReadinessError("required_checks are out of order or contain an invalid id")
+        status = result.get("status")
+        if status == "missing":
+            if set(result) != {"check_id", "status", "fresh"} or result.get("fresh") is not False:
+                raise OperatorReadinessError("missing readiness checks have invalid fields")
+            blocked.append(expected_id)
+            continue
+        if status not in _STATUSES:
+            raise OperatorReadinessError("required check status is invalid")
+        if set(result) != {
+            "check_id",
+            "status",
+            "observed_at",
+            "age_seconds",
+            "fresh",
+            "evidence_ref_count",
+        }:
+            raise OperatorReadinessError("required check result fields are invalid")
+        observed_at = _readiness_timestamp(result.get("observed_at"), f"{expected_id}.observed_at")
+        age_seconds = result.get("age_seconds")
+        if isinstance(age_seconds, bool) or not isinstance(age_seconds, int):
+            raise OperatorReadinessError(f"{expected_id}.age_seconds must be an integer")
+        expected_age = int((evaluated_at - observed_at).total_seconds())
+        if age_seconds != expected_age:
+            raise OperatorReadinessError(f"{expected_id}.age_seconds is inconsistent")
+        fresh = result.get("fresh")
+        expected_fresh = 0 <= age_seconds <= max_age_seconds
+        if fresh is not expected_fresh:
+            raise OperatorReadinessError(f"{expected_id}.fresh is inconsistent")
+        evidence_ref_count = result.get("evidence_ref_count")
+        if (
+            isinstance(evidence_ref_count, bool)
+            or not isinstance(evidence_ref_count, int)
+            or evidence_ref_count < 0
+        ):
+            raise OperatorReadinessError(f"{expected_id}.evidence_ref_count is invalid")
+        if status != "passed" or age_seconds < 0:
+            blocked.append(expected_id)
+        elif not fresh:
+            stale.append(expected_id)
+
+    if report.get("blocked_checks") != blocked:
+        raise OperatorReadinessError("blocked_checks are inconsistent with required_checks")
+    if report.get("stale_checks") != stale:
+        raise OperatorReadinessError("stale_checks are inconsistent with required_checks")
+    expected_status = "blocked" if blocked else "stale" if stale else "ready"
+    if report.get("status") != expected_status:
+        raise OperatorReadinessError("operator readiness report status is inconsistent")
+
+    unsigned = dict(report)
+    unsigned.pop("readiness_sha256", None)
+    if _content_hash(unsigned) != str(report["readiness_sha256"]):
+        raise OperatorReadinessError("operator readiness report content hash mismatch")
 
 
 def _validate_packet(payload: Mapping[str, Any], *, require_hash: bool) -> None:
@@ -374,6 +552,29 @@ def _require_string_list(value: Any, field: str) -> list[str]:
 def _require_nonnegative_int(value: Any, field: str) -> None:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise OperatorEvidenceError(f"{field} must be a non-negative integer")
+
+
+def _readiness_identifier(value: object, field: str) -> None:
+    if not isinstance(value, str) or not _PACKET_ID.fullmatch(value):
+        raise OperatorReadinessError(f"{field} must match {_PACKET_ID.pattern}")
+
+
+def _readiness_digest(value: object, field: str) -> None:
+    if not isinstance(value, str) or not _SHA256.fullmatch(value):
+        raise OperatorReadinessError(f"{field} must be a lowercase SHA-256 digest")
+
+
+def _readiness_timestamp(value: object, field: str) -> datetime:
+    try:
+        return _parse_timestamp(value, field)
+    except OperatorEvidenceError as error:
+        raise OperatorReadinessError(str(error)) from error
+
+
+def _format_utc(value: datetime) -> str:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("timestamp must include a UTC offset")
+    return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _content_hash(payload: Mapping[str, Any]) -> str:
