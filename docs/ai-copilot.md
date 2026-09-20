@@ -52,6 +52,13 @@ its generated answer before returning it, the CLI validates it before printing
 or atomically writing it, and benchmark/evaluation commands reject unverified
 reports before they enter private case files or aggregate scores.
 
+Citation closure is also enforced at the generation boundary. Every allowlisted
+evidence-tool result must carry a citation, and the final answer must retain at
+least one citation emitted by that tool; otherwise the run fails closed instead
+of saving an apparently valid uncited answer. A refusal after only rejected or
+unknown tool requests may remain explicitly uncited because no evidence was
+obtained. The offline verifier repeats these rules for saved envelopes.
+
 Each generated private answer may also include a bounded `usage` summary: the
 number of provider requests, total local elapsed milliseconds, and standard
 prompt/completion/total token counters when the provider reports them. Unknown
@@ -113,6 +120,8 @@ copilot:
 - records an unknown or write-like tool request only as the neutral
   `rejected_tool_request` trace marker, never as an executable or allowlisted
   write capability; and
+- rejects a final answer that follows an allowlisted evidence-tool call without
+  a retained tool citation; and
 - uses a zero-temperature request, bounded timeout, response-size limit, and
   token/tool-call budgets, and rejects provider redirects; and
 - must describe missing, pending, or negative evidence instead of inventing a

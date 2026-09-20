@@ -57,6 +57,24 @@ def test_verifier_accepts_a_grounded_answer_envelope() -> None:
     verify_copilot_answer_report(valid_report())
 
 
+def test_verifier_rejects_uncited_answer_after_evidence_tool_use() -> None:
+    report = valid_report()
+    report["evidence_status"] = "uncited"
+    report["citations"] = []
+    report["tool_trace"] = [
+        {
+            "call_index": 1,
+            "name": "get_study_summary",
+            "arguments_sha256": "e" * 64,
+            "result_sha256": "f" * 64,
+            "citation_count": 0,
+        }
+    ]
+
+    with pytest.raises(CopilotVerificationError, match="cannot follow an evidence tool call"):
+        verify_copilot_answer_report(report)
+
+
 @pytest.mark.parametrize(
     ("message", "mutate"),
     (

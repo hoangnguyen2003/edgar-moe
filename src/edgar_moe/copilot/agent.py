@@ -287,6 +287,7 @@ class ResearchCopilot:
         citations: list[Citation] = []
         trace: list[ToolTrace] = []
         tool_calls_seen = 0
+        evidence_tool_call_seen = False
         peak_context_bytes = 0
         provider_usages: list[ProviderUsage | None] = []
         provider_request_counts: list[int] = []
@@ -319,6 +320,10 @@ class ResearchCopilot:
                 answer = response.content.strip()
                 if not answer:
                     raise CopilotProviderError("copilot provider returned an empty answer")
+                if evidence_tool_call_seen and not citations:
+                    raise CopilotError(
+                        "copilot answer omitted citations after evidence tool use"
+                    )
                 envelope = CopilotAnswer(
                     question=normalized_question,
                     answer=answer,
@@ -350,6 +355,12 @@ class ResearchCopilot:
                 if tool_calls_seen > self.max_tool_calls:
                     raise CopilotError("copilot tool-call budget exceeded")
                 result, arguments = self._execute_call(call)
+                if call.name in allowed_tool_names:
+                    evidence_tool_call_seen = True
+                    if not result.citations:
+                        raise CopilotError(
+                            "copilot evidence tool result omitted citations"
+                        )
                 citations.extend(result.citations)
                 trace.append(
                     ToolTrace(

@@ -226,8 +226,11 @@ never authorizes retraining or changes the frozen v1 artifact.
 
 For evidence navigation, the optional operator-run research copilot can answer
 questions over the frozen snapshot and (when configured) the forward registry.
-It uses bounded read-only tools, content-hashed citations, and an explicit
-`uncited` status when the provider supplies no evidence. It cannot write
+It uses bounded read-only tools and content-hashed citations. Every evidence
+tool result must carry provenance, and once an evidence tool is called,
+generation and offline verification fail closed unless at least one tool
+citation survives; only refusal-only runs may remain explicitly `uncited`. It
+cannot write
 forecasts, labels, registry rows, model artifacts, or GitHub state. See the
 [copilot runbook](docs/ai-copilot.md), and use `--plan-only` first to inspect
 the contract without contacting an LLM provider. Saved private reports can be
