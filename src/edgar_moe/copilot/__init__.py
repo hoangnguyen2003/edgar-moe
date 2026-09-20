@@ -11,7 +11,14 @@ from .agent import (
     normalize_provider_endpoint,
 )
 from .benchmark import BenchmarkFailure, BenchmarkRun, run_benchmark, write_benchmark_report
-from .contracts import Citation, CopilotAnswer, ToolDefinition, ToolResult, ToolTrace
+from .contracts import (
+    COPILOT_DISCLAIMER,
+    Citation,
+    CopilotAnswer,
+    ToolDefinition,
+    ToolResult,
+    ToolTrace,
+)
 from .evaluation import (
     CaseEvaluation,
     EvaluationCase,
@@ -31,9 +38,11 @@ from .review import (
     write_copilot_review_history,
 )
 from .tools import ReadOnlyToolset, ToolInputError
+from .verification import CopilotVerificationError, verify_copilot_answer_report
 
 __all__ = [
     "Citation",
+    "COPILOT_DISCLAIMER",
     "CopilotError",
     "CopilotProvider",
     "CopilotProviderError",
@@ -55,6 +64,7 @@ __all__ = [
     "ToolInputError",
     "ToolResult",
     "ToolTrace",
+    "CopilotVerificationError",
     "answer_report",
     "evaluate_report",
     "evaluate_reports",
@@ -66,4 +76,5 @@ __all__ = [
     "benchmark_sha256",
     "verify_copilot_review_history",
     "write_copilot_review_history",
+    "verify_copilot_answer_report",
 ]
