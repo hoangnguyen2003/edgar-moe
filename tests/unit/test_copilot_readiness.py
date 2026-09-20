@@ -4,6 +4,7 @@ from copy import deepcopy
 
 import pytest
 
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.readiness import (
     CopilotReadinessError,
     build_copilot_readiness,
@@ -22,6 +23,13 @@ def _benchmark(*, corpus_id: str = "copilot-v1", answer_sha256: str = "a" * 64) 
         "pass_rate": 1.0,
         "complete": True,
         "missing_case_ids": [],
+        "agent_identity_status": "consistent",
+        "agent_identity": {
+            "policy_id": COPILOT_POLICY_ID,
+            "policy_sha256": copilot_policy_sha256(),
+            "tool_contract_sha256": "d" * 64,
+            "max_tool_calls": 4,
+        },
         "cases": [
             {
                 "case_id": "summary",
@@ -136,3 +144,25 @@ def test_readiness_reports_corpus_mismatch_as_blocked() -> None:
 
     assert report["status"] == "blocked"
     assert "corpus_identity" in report["blocked_reasons"]
+
+
+def test_readiness_requires_a_consistent_agent_identity() -> None:
+    benchmark = _benchmark()
+    history = append_copilot_reviews(benchmark, _review(benchmark), minimum_reviews=1)
+
+    legacy = deepcopy(benchmark)
+    legacy.pop("agent_identity")
+    legacy.pop("agent_identity_status")
+    legacy_report = build_copilot_readiness(legacy, history)
+    assert legacy_report["status"] == "review_required"
+    assert legacy_report["agent_identity_status"] == "legacy"
+    assert legacy_report["agent_identity"] is None
+    assert "agent_identity" in legacy_report["blocked_reasons"]
+
+    mixed = deepcopy(benchmark)
+    mixed["agent_identity_status"] = "mixed"
+    mixed["agent_identity"] = None
+    mixed_report = build_copilot_readiness(mixed, history)
+    assert mixed_report["status"] == "review_required"
+    assert mixed_report["agent_identity_status"] == "mixed"
+    assert "agent_identity" in mixed_report["blocked_reasons"]

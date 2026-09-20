@@ -53,6 +53,13 @@ aggregate request/latency telemetry; token totals are `null` when any successful
 answer does not report that counter. These aggregates contain no answer text,
 questions, provider payloads, billing assumptions, or endpoint details.
 
+The aggregate also records `agent_identity_status`: `consistent` when every
+evaluated answer carries the same verified policy/tool-contract identity,
+`legacy` when all answers predate the identity field, and `mixed` when the
+answers do not share one boundary. A consistent aggregate retains that one
+non-secret identity; legacy and mixed aggregates retain `null` so they cannot
+be mistaken for a reproducible run.
+
 ## Safety boundary
 
 This is an operator workflow, not a public Vercel endpoint. The provider key
@@ -286,11 +293,13 @@ uv run edgar-moe research-copilot-readiness \
 
 The gate revalidates both inputs, checks that the current benchmark answer
 hashes are reviewed, and exits non-zero unless the benchmark is complete and
-passing and the history is accepted. Its content-addressed output contains
-only check statuses, blocker codes, counts, and identities; it never includes
-questions, answers, provider payloads, or credentials. A `ready` result is a
-structural quality signal, not a truth guarantee, investment recommendation,
-or permission to retrain the frozen v1 model.
+passing, the history is accepted, and the benchmark has a consistent agent
+identity. Legacy or mixed agent identities produce `review_required` even when
+the structural score and review history pass. Its content-addressed output
+contains only check statuses, blocker codes, counts, and identities; it never
+includes questions, answers, provider payloads, or credentials. A `ready`
+result is a structural quality signal, not a truth guarantee, investment
+recommendation, or permission to retrain the frozen v1 model.
 
 ## Failure behavior and verification
 

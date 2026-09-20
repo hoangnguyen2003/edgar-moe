@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.review import (
     ReviewInputError,
     append_copilot_reviews,
@@ -23,6 +24,13 @@ def _benchmark() -> dict[str, object]:
         "pass_rate": 1.0,
         "complete": True,
         "missing_case_ids": [],
+        "agent_identity_status": "consistent",
+        "agent_identity": {
+            "policy_id": COPILOT_POLICY_ID,
+            "policy_sha256": copilot_policy_sha256(),
+            "tool_contract_sha256": "d" * 64,
+            "max_tool_calls": 4,
+        },
         "cases": [
             {
                 "case_id": "summary",
@@ -261,6 +269,27 @@ def test_review_history_rejects_unsafe_benchmark_metadata() -> None:
         mutate(invalid_benchmark)
         with pytest.raises(ReviewInputError, match=message):
             benchmark_sha256(invalid_benchmark)
+
+
+def test_review_history_rejects_mixed_or_invalid_agent_identity() -> None:
+    mixed = _benchmark()
+    mixed["agent_identity_status"] = "mixed"
+    mixed["agent_identity"] = {"policy_id": COPILOT_POLICY_ID}
+    with pytest.raises(ReviewInputError, match="must be omitted or null"):
+        benchmark_sha256(mixed)
+
+    invalid = _benchmark()
+    invalid["agent_identity"]["policy_sha256"] = "e" * 64
+    with pytest.raises(ReviewInputError, match="policy_sha256 does not match"):
+        benchmark_sha256(invalid)
+
+
+def test_review_history_keeps_legacy_aggregate_readable() -> None:
+    legacy = _benchmark()
+    legacy.pop("agent_identity")
+    legacy.pop("agent_identity_status")
+
+    assert len(benchmark_sha256(legacy)) == 64
 
 
 def test_review_history_detects_tampering() -> None:

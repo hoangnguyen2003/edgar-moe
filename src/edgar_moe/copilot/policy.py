@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from .contracts import CopilotAgentIdentity, ToolDefinition, content_hash
 
@@ -23,6 +23,10 @@ results from hypotheses. Do not invent metrics. Keep the answer concise and
 include a reminder that it is research-only when the question asks for a
 decision or recommendation.
 """
+
+_AGENT_IDENTITY_KEYS = frozenset(
+    {"max_tool_calls", "policy_id", "policy_sha256", "tool_contract_sha256"}
+)
 
 
 def copilot_policy_sha256() -> str:
@@ -46,4 +50,41 @@ def build_agent_identity(
             [tool.as_provider_schema() for tool in tool_definitions]
         ),
         max_tool_calls=max_tool_calls,
+    )
+
+
+def validate_agent_identity(value: object) -> dict[str, object]:
+    """Validate and normalize a non-secret agent identity from a JSON report."""
+    if not isinstance(value, Mapping):
+        raise ValueError("agent_identity must be an object")
+    unknown = sorted(str(key) for key in value if key not in _AGENT_IDENTITY_KEYS)
+    missing = sorted(key for key in _AGENT_IDENTITY_KEYS if key not in value)
+    if unknown or missing:
+        details: list[str] = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if unknown:
+            details.append("unknown " + ", ".join(unknown))
+        raise ValueError("agent_identity fields invalid: " + "; ".join(details))
+    if value["policy_id"] != COPILOT_POLICY_ID:
+        raise ValueError("agent_identity policy_id is invalid")
+    policy_sha256 = value["policy_sha256"]
+    if not _is_digest(policy_sha256):
+        raise ValueError("agent_identity policy_sha256 must be a lowercase SHA-256 digest")
+    if policy_sha256 != copilot_policy_sha256():
+        raise ValueError("agent_identity policy_sha256 does not match the current policy")
+    if not _is_digest(value["tool_contract_sha256"]):
+        raise ValueError("agent_identity tool_contract_sha256 must be a lowercase SHA-256 digest")
+    max_tool_calls = value["max_tool_calls"]
+    if isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int) or not 1 <= max_tool_calls <= 8:
+        raise ValueError("agent_identity max_tool_calls must be between 1 and 8")
+    return {key: value[key] for key in sorted(_AGENT_IDENTITY_KEYS)}
+
+
+def _is_digest(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and len(value) == 64
+        and value == value.lower()
+        and all(character in "0123456789abcdef" for character in value)
     )

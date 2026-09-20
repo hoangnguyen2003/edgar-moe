@@ -11,6 +11,8 @@ from typing import Any, cast
 
 import orjson
 
+from .policy import validate_agent_identity
+
 
 class ReviewInputError(ValueError):
     """Raised when a benchmark, review batch, or history violates its contract."""
@@ -152,6 +154,19 @@ def _validate_benchmark(
         raise ReviewInputError("benchmark provider_contacted must be true for human review")
     _non_empty_string(benchmark_metadata.get("provider"), "benchmark provider")
     _non_empty_string(benchmark_metadata.get("model"), "benchmark model")
+    agent_identity_status = benchmark.get("agent_identity_status", "legacy")
+    if agent_identity_status not in {"consistent", "legacy", "mixed"}:
+        raise ReviewInputError("benchmark agent_identity_status is invalid")
+    agent_identity = benchmark.get("agent_identity")
+    if agent_identity_status == "consistent":
+        try:
+            validate_agent_identity(agent_identity)
+        except ValueError as error:
+            raise ReviewInputError(f"benchmark {error}") from error
+    elif agent_identity is not None:
+        raise ReviewInputError(
+            "benchmark agent_identity must be omitted or null unless status is consistent"
+        )
     cases_value = benchmark.get("cases")
     if not isinstance(cases_value, list) or not 1 <= len(cases_value) <= _MAX_ENTRIES:
         raise ReviewInputError(f"benchmark cases must contain 1-{_MAX_ENTRIES} entries")
