@@ -38,9 +38,13 @@ accepts HTTPS for remote providers and loopback HTTP for local runtimes, then
 uses a no-redirect opener so a provider response cannot silently move the
 request to another origin. Redirects fail closed and are not included in the
 transient retry policy. The provider key and evidence context remain outside
-the public API and browser bundle.
+the public API and browser bundle. Once an allowlisted evidence tool is called,
+the agent and its offline verifier also require citation closure: a final
+answer without a tool-generated citation is rejected rather than retained as
+an apparently valid uncited response.
 
 The provider egress decision is recorded in [ADR 0010](adr/0010-copilot-provider-redirect-boundary.md).
+The citation-closure decision is recorded in [ADR 0012](adr/0012-copilot-citation-closure.md).
 The API database-session decision is recorded in [ADR 0011](adr/0011-api-read-only-statement-boundary.md).
 
 ## Architecture baseline — September 18, 2026
@@ -94,7 +98,7 @@ flowchart LR
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup |
 | Optional alert webhook | Receives redacted failed-run and health classifications | Secret is runner-only; delivery is best-effort and never contains database/R2 credentials |
 | Go evidence auditor | Cross-check registry rows against object bytes | Read-only operational boundary; no repair or write authority |
-| Research copilot | Operator-run LLM explanation, evidence navigation, diagnostic-history comparison, human quality review, and bounded usage observability | Bounded read-only tools, transient-only retry policy, content-addressed aggregate wall-clock and UTF-8 context budgets checked before provider calls; answer envelopes are verified at generation, CLI write, benchmark, and evaluation boundaries before review, while citations, frozen identity, content-addressed policy/tool-contract identity, aggregate identity consistency, structural evaluation, append-only rubric history, hash-pinned readiness, and non-sensitive request/latency/token/peak-context telemetry are retained; legacy or mixed agent boundaries remain review-required; diagnostic history is explicitly supplied and independently verified; no forecast, registry, artifact, or GitHub writes |
+| Research copilot | Operator-run LLM explanation, evidence navigation, diagnostic-history comparison, human quality review, and bounded usage observability | Bounded read-only tools, transient-only retry policy, content-addressed aggregate wall-clock and UTF-8 context budgets checked before provider calls; answer envelopes are verified at generation, CLI write, benchmark, and evaluation boundaries before review, while citation closure after evidence-tool use, citations, frozen identity, content-addressed policy/tool-contract identity, aggregate identity consistency, structural evaluation, append-only rubric history, hash-pinned readiness, and non-sensitive request/latency/token/peak-context telemetry are retained; legacy or mixed agent boundaries remain review-required; diagnostic history is explicitly supplied and independently verified; no forecast, registry, artifact, or GitHub writes |
 
 Production workflow sequence: restore caches and verify model → refresh inputs →
 build dataset → commit pre-entry forecasts → settle mature outcomes → produce

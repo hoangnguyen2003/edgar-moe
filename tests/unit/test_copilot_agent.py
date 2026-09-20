@@ -21,7 +21,7 @@ from edgar_moe.copilot.agent import (
     _parse_provider_response,
     normalize_provider_endpoint,
 )
-from edgar_moe.copilot.contracts import ToolDefinition, ToolResult
+from edgar_moe.copilot.contracts import Citation, ToolDefinition, ToolResult
 from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.tools import ReadOnlyToolset
 from edgar_moe.copilot.verification import CopilotVerificationError
@@ -56,7 +56,36 @@ class LargeToolset:
 
     def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
         del arguments
-        return ToolResult(name=name, payload={"blob": "x" * 20_000}, citations=())
+        return ToolResult(
+            name=name,
+            payload={"blob": "x" * 20_000},
+            citations=(
+                Citation(
+                    source="snapshot:test-large-tool",
+                    label="Large test payload",
+                    evidence_sha256="a" * 64,
+                ),
+            ),
+        )
+
+
+class CitationlessToolset:
+    """Test tool surface that simulates a broken evidence adapter."""
+
+    repository = object()
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        return (
+            ToolDefinition(
+                name="get_study_summary",
+                description="Return a test payload without provenance.",
+                parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+        )
+
+    def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
+        del arguments
+        return ToolResult(name=name, payload={"summary": "unattributed"}, citations=())
 
 
 def _tool_call(
@@ -108,6 +137,25 @@ def test_agent_executes_read_tool_then_returns_citation_backed_answer() -> None:
     assert identity["max_tool_calls"] == 4
     assert identity["max_duration_seconds"] == 300.0
     assert identity["max_context_bytes"] == 512 * 1024
+
+
+def test_agent_fails_closed_when_evidence_tool_returns_no_citation() -> None:
+    provider = FakeProvider(
+        [
+            _tool_call("get_study_summary"),
+            ProviderResponse(
+                content="The study says this, but the evidence chain was dropped.",
+                tool_calls=(),
+                model="fake-model",
+            ),
+        ]
+    )
+
+    with pytest.raises(CopilotError, match="omitted citations"):
+        ResearchCopilot(
+            provider=provider,
+            toolset=CitationlessToolset(),  # type: ignore[arg-type]
+        ).ask("Summarize the study.")
 
 
 def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() -> None:

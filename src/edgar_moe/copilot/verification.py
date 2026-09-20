@@ -112,12 +112,25 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
     evidence_status = report.get("evidence_status")
     if evidence_status not in {"grounded", "uncited"}:
         raise CopilotVerificationError("copilot answer evidence_status is invalid")
+    if evidence_status == "uncited" and any(
+        item["name"] != "rejected_tool_request" for item in trace
+    ):
+        raise CopilotVerificationError(
+            "uncited copilot answer cannot follow an evidence tool call"
+        )
     if evidence_status == "grounded" and not citations:
         raise CopilotVerificationError("grounded copilot answer must include citations")
     if evidence_status == "uncited" and citations:
         raise CopilotVerificationError("uncited copilot answer must not include citations")
     if sum(item["citation_count"] for item in trace) < len(citations):
         raise CopilotVerificationError("copilot answer trace undercounts citations")
+    if any(
+        item["name"] != "rejected_tool_request" and item["citation_count"] == 0
+        for item in trace
+    ):
+        raise CopilotVerificationError(
+            "evidence tool trace item must retain at least one citation"
+        )
 
 
 def _verify_frozen_identity(value: object) -> None:
