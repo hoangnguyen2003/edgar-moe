@@ -47,6 +47,17 @@ record.
   deployment boundaries. The browser must never receive database or R2
   credentials.
 
+## Deployment smoke correlation
+
+The credential-free deployment smoke workflow generates a fresh correlation ID
+for every probe. API checks send it as `X-Request-ID` and require the exact
+value to be echoed by FastAPI before the check can pass; static CDN checks do
+not require the header. Only the generated ID is retained in the redacted
+artifact, so an operator can correlate an API probe with serving logs without
+capturing response bodies, credentials, or arbitrary response headers. This is
+an incident-navigation aid, not a rate limit, authentication control, or proof
+that provider-side operations are healthy.
+
 ## Current personal-project mode
 
 Branch protection is intentionally not enabled: the repository is personal,

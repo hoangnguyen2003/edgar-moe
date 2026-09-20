@@ -12,6 +12,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from uuid import uuid4
 
 _USER_AGENT = "edgar-moe-deployment-smoke/1.0"
 _MAX_BODY_BYTES = 128 * 1024
@@ -214,9 +215,14 @@ def _check_endpoint(
     expected_content_type: str,
     timeout: float,
 ) -> dict[str, Any]:
+    request_id = uuid4().hex
     request = Request(
         f"{base}{path}",
-        headers={"Accept": expected_content_type, "User-Agent": _USER_AGENT},
+        headers={
+            "Accept": expected_content_type,
+            "User-Agent": _USER_AGENT,
+            "X-Request-ID": request_id,
+        },
         method="GET",
     )
     check: dict[str, Any] = {"name": name, "path": path, "status": "failed"}
@@ -254,6 +260,13 @@ def _check_endpoint(
                 check["error"] = "required_security_header_missing"
                 check["missing_headers"] = missing_headers
                 return check
+            if path.startswith("/api/"):
+                if response_headers.get("x-request-id") != request_id:
+                    check["error"] = "request_id_not_echoed"
+                    return check
+                # This is generated locally by this probe; never retain an
+                # arbitrary response header value in the redacted artifact.
+                check["request_id"] = request_id
             decoded = body.decode("utf-8")
             if name in {"health", "provenance", "governance"}:
                 try:

@@ -58,13 +58,20 @@ class FakeResponse:
         return self._url
 
 
-def fake_urlopen_factory(responses: dict[str, FakeResponse]):
+def fake_urlopen_factory(
+    responses: dict[str, FakeResponse], *, echo_request_id: bool = True
+):
     def fake_open(
         request: Any, *, timeout: float, origin: tuple[str, str]
     ) -> FakeResponse:
         assert timeout == 2.0
         assert origin == ("https", "terminal.example")
-        return responses[request.full_url]
+        response = responses[request.full_url]
+        if echo_request_id:
+            request_id = request.get_header("X-request-id")
+            if request_id is not None:
+                response.headers["X-Request-ID"] = request_id
+        return response
 
     return fake_open
 
@@ -152,6 +159,27 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert report["base_url"] == "https://terminal.example"
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
+    api_checks = [check for check in report["checks"] if check["path"].startswith("/api/")]
+    assert len(api_checks) == 2
+    for check in api_checks:
+        request_id = check["request_id"]
+        assert isinstance(request_id, str)
+        assert len(request_id) == 32
+        assert all(character in "0123456789abcdef" for character in request_id)
+
+
+def test_smoke_requires_api_request_id_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    monkeypatch.setattr(
+        _MODULE, "_open_url", fake_urlopen_factory(responses, echo_request_id=False)
+    )
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    health = report["checks"][-1]
+    assert health["error"] == "request_id_not_echoed"
+    assert "request_id" not in health
 
 
 def test_smoke_rejects_public_raw_source_contract(monkeypatch: pytest.MonkeyPatch) -> None:
