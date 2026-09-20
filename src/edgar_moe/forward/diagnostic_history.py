@@ -23,6 +23,7 @@ from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, read_forward_di
 HISTORY_VERSION = 1
 OFFICIAL_HORIZON_SESSIONS = 20
 MAX_HISTORY_REPORTS = 128
+MAX_HISTORY_BYTES = 2_000_000
 
 _HISTORY_STATUSES = frozenset({"insufficient_history", "review_required", "ready"})
 _REPORT_STATUSES = frozenset({"ready", "awaiting_maturity", "insufficient_coverage"})
@@ -107,6 +108,22 @@ _SHA256 = frozenset("0123456789abcdef")
 
 class DiagnosticHistoryError(ValueError):
     """Raised when a diagnostic history is malformed or unsafe."""
+
+
+def read_forward_diagnostic_history(path: Path) -> dict[str, Any]:
+    """Read and verify one retained history without reopening source reports."""
+    try:
+        if path.stat().st_size > MAX_HISTORY_BYTES:
+            raise DiagnosticHistoryError("diagnostic history exceeds the size limit")
+        payload = orjson.loads(path.read_bytes())
+    except DiagnosticHistoryError:
+        raise
+    except (OSError, orjson.JSONDecodeError) as error:
+        raise DiagnosticHistoryError("diagnostic history is unavailable") from error
+    if not isinstance(payload, dict):
+        raise DiagnosticHistoryError("diagnostic history must be an object")
+    verify_forward_diagnostic_history(payload)
+    return payload
 
 
 def load_forward_diagnostic_reports(paths: Sequence[Path]) -> tuple[dict[str, object], ...]:

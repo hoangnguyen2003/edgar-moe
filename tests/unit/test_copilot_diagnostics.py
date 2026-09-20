@@ -8,6 +8,10 @@ import pytest
 from edgar_moe.api.repository import SnapshotRepository
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, DiagnosticSummaryError
 from edgar_moe.copilot.tools import ReadOnlyToolset
+from edgar_moe.forward.diagnostic_history import (
+    build_forward_diagnostic_history,
+    load_forward_diagnostic_reports,
+)
 
 
 def _diagnostic() -> dict[str, object]:
@@ -79,7 +83,10 @@ def test_summary_is_strictly_redacted_and_content_addressed(tmp_path: Path) -> N
 def test_diagnostic_tool_is_not_advertised_without_explicit_path() -> None:
     toolset = ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json")))
 
-    assert "get_forward_diagnostic" not in {item.name for item in toolset.definitions()}
+    names = {item.name for item in toolset.definitions()}
+
+    assert "get_forward_diagnostic" not in names
+    assert "get_forward_diagnostic_history" not in names
 
 
 def test_invalid_diagnostic_is_reported_without_raw_error_or_path(tmp_path: Path) -> None:
@@ -106,3 +113,60 @@ def test_summary_reader_rejects_non_diagnostic_reports(tmp_path: Path) -> None:
 
     with pytest.raises(DiagnosticSummaryError, match="marked diagnostic-only"):
         read_forward_diagnostic_summary(path)
+
+
+def _write_history(tmp_path: Path) -> Path:
+    summaries: list[dict[str, object]] = []
+    for index in range(1, 4):
+        as_of = f"2026-09-{16 + index:02d}T12:07:18+00:00"
+        payload = _diagnostic()
+        payload["as_of"] = as_of
+        payload["unique_event_evaluation"]["as_of"] = as_of  # type: ignore[index]
+        report_path = tmp_path / f"diagnostic-{index}.json"
+        report_path.write_text(json.dumps(payload), encoding="utf-8")
+        summaries.extend(load_forward_diagnostic_reports([report_path]))
+    history = build_forward_diagnostic_history(summaries)
+    history_path = tmp_path / "diagnostic-history.json"
+    history_path.write_text(json.dumps(history), encoding="utf-8")
+    return history_path
+
+
+def test_history_tool_is_verified_redacted_and_does_not_reopen_sources(tmp_path: Path) -> None:
+    history_path = _write_history(tmp_path)
+    for source_path in tmp_path.glob("diagnostic-[0-9].json"):
+        source_path.unlink()
+
+    toolset = ReadOnlyToolset(
+        SnapshotRepository(Path("data/demo/snapshot.json")),
+        diagnostic_history_path=history_path,
+    )
+    assert "get_forward_diagnostic_history" in {item.name for item in toolset.definitions()}
+    result = toolset.execute("get_forward_diagnostic_history", {})
+
+    assert result.payload["status"] == "ready"
+    assert result.payload["report_count"] == 3
+    assert result.payload["history_sha256"]
+    assert "must-not-leak" not in json.dumps(result.payload)
+    assert "private-event" not in json.dumps(result.payload)
+    assert result.citations[0].source == "snapshot:forward-diagnostic-history"
+    assert result.citations[0].evidence_sha256
+
+
+@pytest.mark.parametrize("history_contents", ("{\"status\": \"tampered\"}", "not-json"))
+def test_invalid_history_is_reported_without_raw_error_or_path(
+    tmp_path: Path, history_contents: str
+) -> None:
+    history_path = tmp_path / "diagnostic-history.json"
+    history_path.write_text(history_contents, encoding="utf-8")
+    toolset = ReadOnlyToolset(
+        SnapshotRepository(Path("data/demo/snapshot.json")),
+        diagnostic_history_path=history_path,
+    )
+
+    result = toolset.execute("get_forward_diagnostic_history", {})
+
+    assert result.payload == {
+        "available": False,
+        "reason": "diagnostic_history_unavailable_or_invalid",
+    }
+    assert str(tmp_path) not in json.dumps(result.payload)

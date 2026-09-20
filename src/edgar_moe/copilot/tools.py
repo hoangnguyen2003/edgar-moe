@@ -9,6 +9,10 @@ from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 
 from edgar_moe.api.repository import SnapshotRepository
+from edgar_moe.forward.diagnostic_history import (
+    DiagnosticHistoryError,
+    read_forward_diagnostic_history,
+)
 from edgar_moe.forward.registry import ForwardRegistry
 
 from .contracts import Citation, ToolDefinition, ToolResult, content_hash
@@ -29,6 +33,7 @@ class ReadOnlyToolset:
     repository: SnapshotRepository
     registry: ForwardRegistry | None = None
     diagnostic_path: Path | None = None
+    diagnostic_history_path: Path | None = None
 
     def definitions(self) -> tuple[ToolDefinition, ...]:
         definitions = [
@@ -109,6 +114,22 @@ class ReadOnlyToolset:
                         "Read a redacted summary of the operator-supplied short-horizon forward "
                         "diagnostic. It is not the official 20-session evaluation and contains "
                         "no forecast or filing observations."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                )
+            )
+        if self.diagnostic_history_path is not None:
+            definitions.append(
+                ToolDefinition(
+                    name="get_forward_diagnostic_history",
+                    description=(
+                        "Read a verified, redacted history of repeated short-horizon forward "
+                        "diagnostics. It is research-only, does not replace the official "
+                        "20-session evaluation, and contains no forecast or filing observations."
                     ),
                     parameters={
                         "type": "object",
@@ -227,6 +248,38 @@ class ReadOnlyToolset:
                     "directional_accuracy",
                     "unique_event_evaluation",
                     "source_sha256",
+                ),
+            )
+        if name == "get_forward_diagnostic_history":
+            if self.diagnostic_history_path is None:
+                raise ToolInputError("forward diagnostic history is not configured")
+            try:
+                payload = read_forward_diagnostic_history(self.diagnostic_history_path)
+            except DiagnosticHistoryError:
+                payload = {
+                    "available": False,
+                    "reason": "diagnostic_history_unavailable_or_invalid",
+                }
+                return _result(
+                    name,
+                    payload,
+                    source="snapshot:forward-diagnostic-history",
+                    label="Forward diagnostic history availability",
+                    fields=("available", "reason"),
+                )
+            return _result(
+                name,
+                payload,
+                source="snapshot:forward-diagnostic-history",
+                label="Verified redacted short-horizon forward diagnostic history",
+                fields=(
+                    "status",
+                    "minimum_reports",
+                    "report_count",
+                    "horizon_sessions",
+                    "latest_as_of",
+                    "observations",
+                    "history_sha256",
                 ),
             )
         raise ToolInputError(f"tool is not allowlisted: {name}")

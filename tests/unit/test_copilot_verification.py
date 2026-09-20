@@ -154,6 +154,21 @@ def test_verifier_accepts_forward_diagnostic_tool_and_source() -> None:
     verify_copilot_answer_report(report)
 
 
+def test_verifier_accepts_forward_diagnostic_history_tool_and_source() -> None:
+    report = valid_report()
+    report["citations"] = [
+        {
+            "source": "snapshot:forward-diagnostic-history",
+            "label": "Verified redacted forward diagnostic history",
+            "evidence_sha256": "1" * 64,
+            "fields": ["report_count", "history_sha256"],
+        }
+    ]
+    report["tool_trace"][0]["name"] = "get_forward_diagnostic_history"
+
+    verify_copilot_answer_report(report)
+
+
 def test_verifier_rejects_duplicate_citations_and_unknown_trace_fields() -> None:
     duplicate = valid_report()
     duplicate["citations"].append(deepcopy(duplicate["citations"][0]))
