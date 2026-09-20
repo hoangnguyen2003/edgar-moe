@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from json import JSONDecodeError
-from time import monotonic
+from time import monotonic, sleep
 from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
@@ -29,6 +30,9 @@ from .verification import verify_copilot_answer_report
 _MAX_QUESTION_LENGTH = 2_000
 _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 _MAX_PROVIDER_USAGE_TOKENS = 100_000_000
+_MAX_RETRIES = 3
+_MAX_RETRY_BACKOFF_SECONDS = 5.0
+_RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429}) | frozenset(range(500, 600))
 _REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
 
@@ -62,6 +66,7 @@ class ProviderResponse:
     tool_calls: tuple[ProviderToolCall, ...]
     model: str
     usage: ProviderUsage | None = None
+    request_count: int = 1
 
     def as_assistant_message(self) -> dict[str, object]:
         payload: dict[str, object] = {"role": "assistant", "content": self.content}
@@ -109,6 +114,8 @@ class OpenAICompatibleProvider:
         model: str,
         timeout_seconds: float = 30.0,
         max_tokens: int = 800,
+        max_retries: int = 2,
+        retry_backoff_seconds: float = 0.25,
     ) -> None:
         self.endpoint = normalize_provider_endpoint(endpoint)
         self.api_key = api_key
@@ -119,8 +126,26 @@ class OpenAICompatibleProvider:
             raise ValueError("copilot provider timeout must be between 0 and 120 seconds")
         if not 1 <= max_tokens <= 8_000:
             raise ValueError("copilot max tokens must be between 1 and 8000")
+        if (
+            isinstance(max_retries, bool)
+            or not isinstance(max_retries, int)
+            or not 0 <= max_retries <= _MAX_RETRIES
+        ):
+            raise ValueError(f"copilot max retries must be between 0 and {_MAX_RETRIES}")
+        if (
+            isinstance(retry_backoff_seconds, bool)
+            or not isinstance(retry_backoff_seconds, (int, float))
+            or not math.isfinite(retry_backoff_seconds)
+            or not 0 <= retry_backoff_seconds <= _MAX_RETRY_BACKOFF_SECONDS
+        ):
+            raise ValueError(
+                "copilot retry backoff must be between 0 and "
+                f"{_MAX_RETRY_BACKOFF_SECONDS} seconds"
+            )
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
 
     def complete(
         self,
@@ -141,20 +166,39 @@ class OpenAICompatibleProvider:
             headers=self._headers(),
             method="POST",
         )
-        try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
-                raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
-        except HTTPError as error:
-            raise CopilotProviderError(f"copilot provider returned HTTP {error.code}") from error
-        except (URLError, TimeoutError, OSError) as error:
-            raise CopilotProviderError("copilot provider request failed") from error
+        attempts = 0
+        while True:
+            attempts += 1
+            try:
+                with urlopen(request, timeout=self.timeout_seconds) as response:
+                    raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
+            except HTTPError as error:
+                if error.code not in _RETRYABLE_HTTP_STATUSES or attempts > self.max_retries:
+                    raise CopilotProviderError(
+                        f"copilot provider returned HTTP {error.code}"
+                    ) from error
+                _sleep_before_retry(attempts, self.retry_backoff_seconds)
+                continue
+            except (URLError, TimeoutError, OSError) as error:
+                if attempts > self.max_retries:
+                    raise CopilotProviderError("copilot provider request failed") from error
+                _sleep_before_retry(attempts, self.retry_backoff_seconds)
+                continue
+            break
         if len(raw) > _MAX_PROVIDER_RESPONSE_BYTES:
             raise CopilotProviderError("copilot provider response exceeded the size limit")
         try:
             payload = json.loads(raw)
         except JSONDecodeError as error:
             raise CopilotProviderError("copilot provider returned invalid JSON") from error
-        return _parse_provider_response(payload, fallback_model=self.model)
+        parsed = _parse_provider_response(payload, fallback_model=self.model)
+        return ProviderResponse(
+            content=parsed.content,
+            tool_calls=parsed.tool_calls,
+            model=parsed.model,
+            usage=parsed.usage,
+            request_count=attempts,
+        )
 
     def _headers(self) -> dict[str, str]:
         headers = {"Accept": "application/json", "Content-Type": "application/json"}
@@ -195,6 +239,7 @@ class ResearchCopilot:
         tool_calls_seen = 0
         request_durations: list[int] = []
         provider_usages: list[ProviderUsage | None] = []
+        provider_request_counts: list[int] = []
         tool_definitions = self.toolset.definitions()
         agent_identity = build_agent_identity(tool_definitions, self.max_tool_calls)
         allowed_tool_names = {tool.name for tool in tool_definitions}
@@ -202,8 +247,14 @@ class ResearchCopilot:
         for _ in range(self.max_tool_calls + 1):
             started = monotonic()
             response = self.provider.complete(messages, tool_definitions)
+            if (
+                isinstance(response.request_count, bool)
+                or not 1 <= response.request_count <= _MAX_RETRIES + 1
+            ):
+                raise CopilotProviderError("copilot provider request count was invalid")
             request_durations.append(max(0, round((monotonic() - started) * 1000)))
             provider_usages.append(response.usage)
+            provider_request_counts.append(response.request_count)
             messages.append(response.as_assistant_message())
             if not response.tool_calls:
                 answer = response.content.strip()
@@ -220,7 +271,7 @@ class ResearchCopilot:
                     trace=tuple(trace),
                     evidence_status="grounded" if citations else "uncited",
                     usage=CopilotUsage(
-                        request_count=len(provider_usages),
+                        request_count=sum(provider_request_counts),
                         duration_ms=sum(request_durations),
                         prompt_tokens=_sum_usage(provider_usages, "prompt_tokens"),
                         completion_tokens=_sum_usage(provider_usages, "completion_tokens"),
@@ -346,6 +397,12 @@ def _parse_provider_response(payload: object, *, fallback_model: str) -> Provide
         model=model if isinstance(model, str) and model else fallback_model,
         usage=_parse_provider_usage(payload.get("usage")),
     )
+
+
+def _sleep_before_retry(attempt: int, backoff_seconds: float) -> None:
+    delay = min(backoff_seconds * (2 ** (attempt - 1)), _MAX_RETRY_BACKOFF_SECONDS)
+    if delay > 0:
+        sleep(delay)
 
 
 def _parse_provider_usage(value: object) -> ProviderUsage | None:

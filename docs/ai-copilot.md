@@ -21,7 +21,10 @@ chat-completions endpoint and gives the model seven baseline bounded, read-only 
 When an operator explicitly attaches diagnostic evidence, the toolset can also
 expose one redacted diagnostic or one verified redacted diagnostic history.
 
-The agent can make at most four tool calls by default. Each tool result is
+The agent can make at most four tool calls by default. The provider transport
+allows at most two retries for explicitly transient HTTP/network failures, with
+a capped exponential backoff; authentication, validation, malformed-response,
+and oversized-response failures are not retried. Each tool result is
 content-hashed and returned with a citation. The JSON answer envelope retains
 the question, answer, frozen identity, citations, and a non-sensitive tool
 trace. A report with no tool citations is marked `uncited`; it is not silently
@@ -52,6 +55,14 @@ benchmark reports additionally retain only the successful-answer count and
 aggregate request/latency telemetry; token totals are `null` when any successful
 answer does not report that counter. These aggregates contain no answer text,
 questions, provider payloads, billing assumptions, or endpoint details.
+
+The usage `request_count` includes transport retries, so an operator can see
+the actual number of provider attempts without retaining error bodies. Override
+the conservative defaults with `--max-retries` and
+`--retry-backoff-seconds`, or the corresponding
+`EDGAR_MOE_COPILOT_MAX_RETRIES` and
+`EDGAR_MOE_COPILOT_RETRY_BACKOFF_SECONDS` settings. Retry delays are never
+read from provider response headers.
 
 The aggregate also records `agent_identity_status`: `consistent` when every
 evaluated answer carries the same verified policy/tool-contract identity,

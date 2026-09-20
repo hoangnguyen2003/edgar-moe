@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import io
+import json
 from pathlib import Path
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -8,6 +11,7 @@ from edgar_moe.api.repository import SnapshotRepository
 from edgar_moe.copilot.agent import (
     CopilotError,
     CopilotProviderError,
+    OpenAICompatibleProvider,
     ProviderResponse,
     ProviderToolCall,
     ProviderUsage,
@@ -38,13 +42,17 @@ class FakeProvider:
 
 
 def _tool_call(
-    name: str, arguments: str = "{}", usage: ProviderUsage | None = None
+    name: str,
+    arguments: str = "{}",
+    usage: ProviderUsage | None = None,
+    request_count: int = 1,
 ) -> ProviderResponse:
     return ProviderResponse(
         content="",
         tool_calls=(ProviderToolCall(call_id="call-1", name=name, arguments=arguments),),
         model="fake-model",
         usage=usage,
+        request_count=request_count,
     )
 
 
@@ -88,6 +96,7 @@ def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() ->
             _tool_call(
                 "get_study_summary",
                 usage=ProviderUsage(prompt_tokens=12, completion_tokens=3, total_tokens=15),
+                request_count=2,
             ),
             ProviderResponse(
                 content="The cited snapshot is the source.",
@@ -103,7 +112,7 @@ def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() ->
     ).ask("Summarize the study.")
 
     assert answer.usage is not None
-    assert answer.usage.request_count == 2
+    assert answer.usage.request_count == 3
     assert answer.usage.duration_ms >= 0
     assert answer.usage.prompt_tokens == 32
     assert answer.usage.completion_tokens == 8
@@ -161,6 +170,110 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
         normalize_provider_endpoint("https://user:secret@api.example.com/v1/chat/completions")
     with pytest.raises(ValueError):
         normalize_provider_endpoint("https://api.example.com/v1/chat/completions?token=secret")
+
+
+def test_provider_retries_transient_http_failures_and_counts_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+    delays: list[float] = []
+
+    def fake_urlopen(_request: object, *, timeout: float) -> io.BytesIO:
+        assert timeout == 3.0
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise HTTPError("https://provider.example/v1/chat/completions", 503, "busy", {}, None)
+        return io.BytesIO(
+            json.dumps(
+                {"model": "test-model", "choices": [{"message": {"content": "ok"}}]}
+            ).encode()
+        )
+
+    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+    monkeypatch.setattr("edgar_moe.copilot.agent.sleep", delays.append)
+
+    response = OpenAICompatibleProvider(
+        endpoint="https://provider.example/v1/chat/completions",
+        api_key="secret",
+        model="test-model",
+        timeout_seconds=3.0,
+        max_retries=2,
+        retry_backoff_seconds=0.5,
+    ).complete([], [])
+
+    assert response.content == "ok"
+    assert response.request_count == 2
+    assert calls == 2
+    assert delays == [0.5]
+
+
+def test_provider_does_not_retry_authentication_failures(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def fake_urlopen(_request: object, *, timeout: float) -> io.BytesIO:
+        del timeout
+        nonlocal calls
+        calls += 1
+        raise HTTPError("https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None)
+
+    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+
+    with pytest.raises(CopilotProviderError, match="HTTP 401"):
+        OpenAICompatibleProvider(
+            endpoint="https://provider.example/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+            max_retries=2,
+            retry_backoff_seconds=0,
+        ).complete([], [])
+
+    assert calls == 1
+
+
+def test_provider_retries_transport_failures_and_caps_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_urlopen(_request: object, *, timeout: float) -> io.BytesIO:
+        del timeout
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise URLError("temporary network failure")
+        return io.BytesIO(
+            json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
+        )
+
+    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+    monkeypatch.setattr("edgar_moe.copilot.agent.sleep", lambda _delay: None)
+
+    response = OpenAICompatibleProvider(
+        endpoint="https://provider.example/v1/chat/completions",
+        api_key="secret",
+        model="test-model",
+        max_retries=2,
+        retry_backoff_seconds=0,
+    ).complete([], [])
+
+    assert response.request_count == 3
+    assert calls == 3
+
+    with pytest.raises(ValueError, match="max retries"):
+        OpenAICompatibleProvider(
+            endpoint="https://provider.example/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+            max_retries=4,
+        )
+    with pytest.raises(ValueError, match="retry backoff"):
+        OpenAICompatibleProvider(
+            endpoint="https://provider.example/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+            retry_backoff_seconds=6,
+        )
 
 
 def test_provider_response_keeps_only_bounded_usage_counters() -> None:
