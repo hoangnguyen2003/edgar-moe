@@ -87,7 +87,9 @@ def test_api_contracts(tmp_path: Path) -> None:
     app.dependency_overrides[get_repository] = lambda: repo
     app.dependency_overrides[get_forward_registry] = lambda: None
     with TestClient(app) as client:
-        assert client.get("/api/v1/health").json()["status"] == "ok"
+        health = client.get("/api/v1/health", headers={"X-Request-ID": "smoke-probe-123"})
+        assert health.json()["status"] == "ok"
+        assert health.headers["x-request-id"] == "smoke-probe-123"
         assert client.get("/api/v1/summary").status_code == 200
         events = client.get("/api/v1/events?direction=long").json()
         assert events["total"] == 1
