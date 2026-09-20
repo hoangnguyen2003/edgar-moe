@@ -350,6 +350,18 @@ prospective dataset date, rejects duplicate dataset IDs, marks fewer than three
 observations as `insufficient_history`, and exposes warning streaks for human
 review. It never retrains, reads outcomes, or changes the frozen artifact.
 
+To verify a retained history later without reopening the source reports, run:
+
+```bash
+uv run edgar-moe research-drift-history-verify \
+  reports/research-drift-history.json
+```
+
+The verifier checks the immutable scope, identities, timestamps, observation
+ordering, child-report references, aggregate status, warning streak, and final
+content hash. A valid hash alone is not enough to make a malformed history
+acceptable.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the
