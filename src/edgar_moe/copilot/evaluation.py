@@ -25,6 +25,7 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _MAX_CASES = 64
 _MAX_LIST_ITEMS = 8
 EvidenceStatus = Literal["grounded", "uncited"]
+AgentIdentityStatus = Literal["consistent", "legacy", "mixed"]
 
 
 class EvaluationInputError(ValueError):
@@ -121,6 +122,8 @@ class EvaluationSuite:
     corpus_sha256: str
     cases: tuple[CaseEvaluation, ...]
     missing_case_ids: tuple[str, ...]
+    agent_identity: dict[str, object] | None = None
+    agent_identity_status: AgentIdentityStatus = "legacy"
 
     @property
     def passed_count(self) -> int:
@@ -144,6 +147,8 @@ class EvaluationSuite:
             "pass_rate": round(self.pass_rate, 6),
             "complete": self.complete,
             "missing_case_ids": list(self.missing_case_ids),
+            "agent_identity": self.agent_identity,
+            "agent_identity_status": self.agent_identity_status,
             "cases": [case.as_dict() for case in self.cases],
             "disclaimer": (
                 "Structural evidence-contract evaluation only; a passing score does not establish "
@@ -200,6 +205,7 @@ def evaluate_reports(
     """Evaluate private answer envelopes without retaining their answer text."""
     evaluations: list[CaseEvaluation] = []
     seen_case_ids: set[str] = set()
+    identities: list[dict[str, object] | None] = []
     for report in reports:
         verify_copilot_answer_report(report)
         case = corpus.case_for_report(report)
@@ -207,13 +213,32 @@ def evaluate_reports(
             raise EvaluationInputError(f"duplicate answer report for case: {case.case_id}")
         seen_case_ids.add(case.case_id)
         evaluations.append(evaluate_report(report, case))
+        raw_identity = report.get("agent_identity")
+        identities.append(dict(raw_identity) if isinstance(raw_identity, Mapping) else None)
     missing = tuple(case.case_id for case in corpus.cases if case.case_id not in seen_case_ids)
+    agent_identity_status, agent_identity = _summarize_agent_identities(identities)
     return EvaluationSuite(
         corpus_id=corpus.corpus_id,
         corpus_sha256=corpus.sha256,
         cases=tuple(evaluations),
         missing_case_ids=missing,
+        agent_identity=agent_identity,
+        agent_identity_status=agent_identity_status,
     )
+
+
+def _summarize_agent_identities(
+    identities: list[dict[str, object] | None],
+) -> tuple[AgentIdentityStatus, dict[str, object] | None]:
+    if not identities or all(identity is None for identity in identities):
+        return "legacy", None
+    if any(identity is None for identity in identities):
+        return "mixed", None
+    first = identities[0]
+    assert first is not None
+    if all(identity == first for identity in identities[1:]):
+        return "consistent", dict(first)
+    return "mixed", None
 
 
 def evaluate_report(report: Mapping[str, object], case: EvaluationCase) -> CaseEvaluation:

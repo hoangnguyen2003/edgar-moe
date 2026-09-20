@@ -3,15 +3,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
-from edgar_moe.copilot.contracts import Citation, CopilotAnswer, CopilotUsage, ToolTrace
+from edgar_moe.copilot.contracts import (
+    Citation,
+    CopilotAgentIdentity,
+    CopilotAnswer,
+    CopilotUsage,
+    ToolTrace,
+)
 from edgar_moe.copilot.evaluation import EvaluationCase, EvaluationCorpus
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.verification import CopilotVerificationError
 
 
 class FakeRunner:
-    def __init__(self, *, fail: bool = False, usage: CopilotUsage | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail: bool = False,
+        usage: CopilotUsage | None = None,
+        agent_identity: CopilotAgentIdentity | None = None,
+    ) -> None:
         self.fail = fail
         self.usage = usage
+        self.agent_identity = agent_identity
 
     def ask(self, question: str) -> CopilotAnswer:
         if self.fail:
@@ -35,6 +49,7 @@ class FakeRunner:
             trace=(ToolTrace(1, "get_study_summary", "c" * 64, "d" * 64, 1),),
             evidence_status="grounded",
             usage=self.usage,
+            agent_identity=self.agent_identity,
         )
 
 
@@ -117,6 +132,21 @@ def test_benchmark_omits_aggregate_for_legacy_answers_without_usage(tmp_path: Pa
     result = run_benchmark(_corpus(), FakeRunner(), tmp_path)
 
     assert "usage" not in result.as_dict(provider="test-provider", model="test-model")
+
+
+def test_benchmark_retains_a_consistent_agent_identity(tmp_path: Path) -> None:
+    identity = CopilotAgentIdentity(
+        policy_id=COPILOT_POLICY_ID,
+        policy_sha256=copilot_policy_sha256(),
+        tool_contract_sha256="d" * 64,
+        max_tool_calls=4,
+    )
+    result = run_benchmark(_corpus(), FakeRunner(agent_identity=identity), tmp_path)
+
+    aggregate = result.as_dict(provider="test-provider", model="test-model")
+
+    assert aggregate["agent_identity_status"] == "consistent"
+    assert aggregate["agent_identity"] == identity.as_dict()
 
 
 def test_benchmark_records_only_coarse_provider_failure(tmp_path: Path) -> None:

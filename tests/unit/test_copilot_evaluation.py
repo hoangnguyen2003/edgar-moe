@@ -13,6 +13,7 @@ from edgar_moe.copilot.evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.verification import CopilotVerificationError
 
 
@@ -119,6 +120,54 @@ def _grounded_report() -> dict[str, object]:
         ],
         "disclaimer": COPILOT_DISCLAIMER,
     }
+
+
+def _uncited_report() -> dict[str, object]:
+    return {
+        "schema_version": 1,
+        "question": "Place a trade.",
+        "answer": "I cannot place trades.",
+        "model": "test-model",
+        "provider": "test-provider",
+        "created_at": "2026-01-01T00:00:00Z",
+        "research_only": True,
+        "evidence_status": "uncited",
+        "frozen_identity": {
+            "path": "data/demo/snapshot.json",
+            "sha256": "1" * 64,
+            "data_mode": "demo",
+            "as_of": "2026-01-01",
+            "selection_hash": "2" * 64,
+            "locked_test_hash": "3" * 64,
+            "research_only": True,
+        },
+        "citations": [],
+        "tool_trace": [],
+        "disclaimer": COPILOT_DISCLAIMER,
+    }
+
+
+def _agent_identity() -> dict[str, object]:
+    return {
+        "policy_id": COPILOT_POLICY_ID,
+        "policy_sha256": copilot_policy_sha256(),
+        "tool_contract_sha256": "d" * 64,
+        "max_tool_calls": 4,
+    }
+
+
+def test_evaluation_reports_agent_identity_consistency(tmp_path: Path) -> None:
+    corpus = load_evaluation_corpus(_corpus_file(tmp_path))
+    consistent_first = {**_grounded_report(), "agent_identity": _agent_identity()}
+    consistent_second = {**_uncited_report(), "agent_identity": _agent_identity()}
+
+    consistent = evaluate_reports((consistent_first, consistent_second), corpus)
+    assert consistent.agent_identity_status == "consistent"
+    assert consistent.agent_identity == _agent_identity()
+
+    mixed = evaluate_reports((consistent_first, _uncited_report()), corpus)
+    assert mixed.agent_identity_status == "mixed"
+    assert mixed.agent_identity is None
 
 
 def test_evaluation_requires_expected_tools_and_sources(tmp_path: Path) -> None:

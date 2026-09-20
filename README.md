@@ -238,7 +238,10 @@ provider configuration, use `research-copilot-benchmark`; it writes answer
 envelopes under `/tmp` and keeps only structural hashes in its aggregate score.
 New answer envelopes also pin the copilot policy digest, exact tool-contract
 digest, and tool-call budget so reviewers can reproduce the agent boundary
-without retaining prompts, provider payloads, or secrets.
+without retaining prompts, provider payloads, or secrets. The aggregate marks
+that boundary `consistent`, `legacy`, or `mixed`; only `consistent` runs can
+pass the copilot readiness gate, while legacy and mixed runs remain
+`review_required`.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.

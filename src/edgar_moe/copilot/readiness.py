@@ -9,6 +9,7 @@ from typing import Any
 
 import orjson
 
+from .policy import validate_agent_identity
 from .review import ReviewInputError, benchmark_sha256, verify_copilot_review_history
 
 
@@ -20,13 +21,14 @@ _SHA256_LENGTH = 64
 _STATUSES = frozenset({"ready", "blocked", "review_required"})
 _CHECK_STATUSES = frozenset({"passed", "failed"})
 _REVIEW_CHECKS = frozenset(
-    {"review_history_status", "review_history_minimum", "current_case_reviews"}
+    {"agent_identity", "review_history_status", "review_history_minimum", "current_case_reviews"}
 )
 _CHECK_IDS = (
     "benchmark_complete",
     "benchmark_pass_rate",
     "benchmark_cases_passed",
     "corpus_identity",
+    "agent_identity",
     "review_history_status",
     "review_history_minimum",
     "current_case_reviews",
@@ -35,6 +37,8 @@ _READINESS_KEYS = frozenset(
     {
         "benchmark_case_count",
         "benchmark_sha256",
+        "agent_identity",
+        "agent_identity_status",
         "blocked_reasons",
         "checks",
         "corpus_id",
@@ -99,6 +103,7 @@ def build_copilot_readiness(
     benchmark_complete = benchmark.get("complete") is True and not benchmark.get(
         "missing_case_ids"
     )
+    agent_identity_status, agent_identity = _benchmark_agent_identity(benchmark)
     cases_passed = all(
         isinstance(case, Mapping)
         and case.get("passed") is True
@@ -114,6 +119,7 @@ def build_copilot_readiness(
             "corpus_identity",
             corpus_id == history_corpus_id and corpus_sha256 == history_corpus_sha256,
         ),
+        _check("agent_identity", agent_identity_status == "consistent"),
         _check("review_history_status", history.get("status") == "accepted"),
         _check("review_history_minimum", history_entry_count >= history_minimum),
         _check("current_case_reviews", not missing_case_ids),
@@ -127,6 +133,8 @@ def build_copilot_readiness(
         "research_only": True,
         "status": status,
         "benchmark_sha256": benchmark_digest,
+        "agent_identity": agent_identity,
+        "agent_identity_status": agent_identity_status,
         "corpus_id": corpus_id,
         "corpus_sha256": corpus_sha256,
         "min_pass_rate": threshold,
@@ -164,6 +172,7 @@ def verify_copilot_readiness(report: Mapping[str, Any]) -> None:
     if report.get("disclaimer") != _DISCLAIMER:
         raise CopilotReadinessError("copilot readiness disclaimer is invalid")
     _required_digest(report.get("benchmark_sha256"), "benchmark_sha256")
+    agent_identity_status, agent_identity = _readiness_agent_identity(report)
     _required_digest(report.get("corpus_sha256"), "corpus_sha256")
     _required_text(report.get("corpus_id"), "corpus_id")
     _pass_rate(report.get("min_pass_rate"))
@@ -201,6 +210,11 @@ def verify_copilot_readiness(report: Mapping[str, Any]) -> None:
         raise CopilotReadinessError("copilot readiness check identifiers are incomplete")
     if report.get("blocked_reasons") != failed_ids:
         raise CopilotReadinessError("copilot readiness blocked_reasons do not match checks")
+    identity_check = next(check for check in checks if check["check_id"] == "agent_identity")
+    if identity_check["status"] != (
+        "passed" if agent_identity_status == "consistent" and agent_identity is not None else "failed"
+    ):
+        raise CopilotReadinessError("copilot readiness agent_identity check is inconsistent")
     expected_hash = _required_digest(report.get("readiness_sha256"), "readiness_sha256")
     unsigned = dict(report)
     unsigned.pop("readiness_sha256", None)
@@ -221,6 +235,46 @@ def _current_cases(cases: list[object]) -> set[tuple[str, str]]:
     if len(result) != len(cases):
         raise CopilotReadinessError("benchmark cases contain duplicate case identities")
     return result
+
+
+def _benchmark_agent_identity(
+    benchmark: Mapping[str, Any],
+) -> tuple[str, dict[str, object] | None]:
+    status = benchmark.get("agent_identity_status", "legacy")
+    if status not in {"consistent", "legacy", "mixed"}:
+        raise CopilotReadinessError("benchmark agent_identity_status is invalid")
+    value = benchmark.get("agent_identity")
+    if status == "consistent":
+        try:
+            identity = validate_agent_identity(value)
+        except ValueError as error:
+            raise CopilotReadinessError(f"benchmark {error}") from error
+        return status, identity
+    if value is not None:
+        raise CopilotReadinessError(
+            "benchmark agent_identity must be omitted or null unless status is consistent"
+        )
+    return status, None
+
+
+def _readiness_agent_identity(
+    report: Mapping[str, Any],
+) -> tuple[str, dict[str, object] | None]:
+    status = report.get("agent_identity_status")
+    if status not in {"consistent", "legacy", "mixed"}:
+        raise CopilotReadinessError("copilot readiness agent_identity_status is invalid")
+    value = report.get("agent_identity")
+    if status == "consistent":
+        try:
+            identity = validate_agent_identity(value)
+        except ValueError as error:
+            raise CopilotReadinessError(f"copilot readiness {error}") from error
+        return status, identity
+    if value is not None:
+        raise CopilotReadinessError(
+            "copilot readiness agent_identity must be null unless status is consistent"
+        )
+    return status, None
 
 
 def _missing_current_reviews(
