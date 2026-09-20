@@ -12,6 +12,7 @@ import orjson
 import pytest
 
 from edgar_moe.forward.operator_evidence import (
+    PROVIDER_EVIDENCE_PROFILES,
     OperatorEvidenceError,
     operator_readiness,
     prepare_operator_evidence_packet,
@@ -60,11 +61,14 @@ def _draft(*, status: str = "not_run") -> dict[str, object]:
 
 
 def _complete_draft(*, observed_at: str = "2026-09-18T00:00:00Z") -> dict[str, object]:
-    check_ids = [
-        "database_least_privilege",
-        "restore_rehearsal",
-        "partial_write_reconciliation",
-    ]
+    return _complete_draft_for_checks(
+        list(PROVIDER_EVIDENCE_PROFILES["p0"]), observed_at=observed_at
+    )
+
+
+def _complete_draft_for_checks(
+    check_ids: list[str], *, observed_at: str = "2026-09-18T00:00:00Z"
+) -> dict[str, object]:
     artifacts = [
         {
             "name": f"{check_id}.json",
@@ -98,6 +102,8 @@ def _complete_draft(*, observed_at: str = "2026-09-18T00:00:00Z") -> dict[str, o
             "raw_payloads_excluded": True,
         },
     }
+
+
 def test_prepare_adds_hash_and_verify_accepts_packet() -> None:
     packet = prepare_operator_evidence_packet(_draft())
 
@@ -149,6 +155,8 @@ def test_operator_readiness_blocks_incomplete_required_checks() -> None:
     )
 
     assert summary["status"] == "blocked"
+    assert summary["profile"] == "p0"
+    assert summary["required_check_ids"] == list(PROVIDER_EVIDENCE_PROFILES["p0"])
     assert summary["blocked_checks"] == [
         "database_least_privilege",
         "restore_rehearsal",
@@ -175,6 +183,48 @@ def test_operator_readiness_requires_fresh_passed_checks() -> None:
         "restore_rehearsal",
         "partial_write_reconciliation",
     ]
+
+
+def test_operator_readiness_profiles_expand_required_checks_without_upgrading_them() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    p1 = operator_readiness(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+        profile="p1",
+    )
+    full = operator_readiness(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+        profile="full",
+    )
+
+    assert p1["status"] == "blocked"
+    assert p1["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])[3:]
+    assert full["status"] == "blocked"
+    assert full["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["full"])[3:]
+
+
+def test_operator_readiness_accepts_a_complete_p1_profile() -> None:
+    packet = prepare_operator_evidence_packet(
+        _complete_draft_for_checks(list(PROVIDER_EVIDENCE_PROFILES["p1"]))
+    )
+
+    summary = operator_readiness(
+        packet,
+        now=datetime(2026, 9, 19, tzinfo=UTC),
+        profile="p1",
+    )
+
+    assert summary["status"] == "ready"
+    assert summary["required_check_ids"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])
+
+
+def test_operator_readiness_rejects_unknown_profile() -> None:
+    packet = prepare_operator_evidence_packet(_complete_draft())
+
+    with pytest.raises(ValueError, match="profile must be one of"):
+        operator_readiness(packet, profile="provider-only")
 
 
 def test_cli_writes_and_verifies_packet(tmp_path: Path) -> None:
@@ -342,3 +392,28 @@ def test_cli_reports_operator_readiness_without_exposing_packet_contents(tmp_pat
     )
     assert blocked.returncode == 1
     assert json.loads(blocked.stdout)["status"] == "blocked"
+
+
+def test_cli_selects_readiness_profile(tmp_path: Path) -> None:
+    packet_path = tmp_path / "packet.json"
+    packet_path.write_bytes(
+        orjson.dumps(prepare_operator_evidence_packet(_complete_draft()))
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "scripts/check_operator_readiness.py",
+            "--packet",
+            str(packet_path),
+            "--profile",
+            "p1",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    summary = json.loads(result.stdout)
+    assert summary["profile"] == "p1"
+    assert summary["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])[3:]

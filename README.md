@@ -331,6 +331,11 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 
 See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [repository governance](docs/repository-governance.md), [operator evidence packets](docs/operator-evidence.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
 
+Provider operations use a redacted, content-addressed evidence packet. The
+readiness check defaults to the P0 controls and supports explicit `p1` and
+`full` profiles when a broader operational review is required; profile results
+remain blocked until the corresponding provider-side observations are retained.
+
 For a concise, accurate project description tailored to a one-page résumé, see the [CV entry](docs/cv-entry.md).
 
 ## Quality checks

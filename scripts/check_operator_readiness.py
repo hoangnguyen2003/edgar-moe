@@ -10,7 +10,10 @@ from pathlib import Path
 
 import orjson
 
-from edgar_moe.forward.operator_evidence import operator_readiness
+from edgar_moe.forward.operator_evidence import (
+    PROVIDER_EVIDENCE_PROFILES,
+    operator_readiness,
+)
 
 
 def main() -> int:
@@ -22,6 +25,15 @@ def main() -> int:
         default=30,
         help="maximum age for each required provider check (default: 30)",
     )
+    parser.add_argument(
+        "--profile",
+        choices=tuple(PROVIDER_EVIDENCE_PROFILES),
+        default="p0",
+        help=(
+            "readiness profile: p0 (default), p1 (P0 plus operational controls), "
+            "or full (every declared provider check)"
+        ),
+    )
     args = parser.parse_args()
     try:
         payload = orjson.loads(args.packet.read_bytes())
@@ -30,6 +42,7 @@ def main() -> int:
         summary = operator_readiness(
             payload,
             max_age=timedelta(days=args.max_age_days),
+            profile=args.profile,
         )
     except (OSError, TypeError, ValueError) as error:
         print(f"Operator readiness check failed: {type(error).__name__}", file=sys.stderr)

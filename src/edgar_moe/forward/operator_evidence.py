@@ -10,22 +10,32 @@ from typing import Any
 
 import orjson
 
-_CHECK_IDS = frozenset(
-    {
-        "database_least_privilege",
-        "restore_rehearsal",
-        "partial_write_reconciliation",
-        "deployment_smoke",
-        "alert_delivery",
-        "capacity_baseline",
-        "drift_history",
-    }
+_ALL_CHECK_IDS = (
+    "database_least_privilege",
+    "restore_rehearsal",
+    "partial_write_reconciliation",
+    "deployment_smoke",
+    "alert_delivery",
+    "capacity_baseline",
+    "drift_history",
 )
+_CHECK_IDS = frozenset(_ALL_CHECK_IDS)
 REQUIRED_PROVIDER_CHECKS = (
     "database_least_privilege",
     "restore_rehearsal",
     "partial_write_reconciliation",
 )
+P1_PROVIDER_CHECKS = (
+    "deployment_smoke",
+    "alert_delivery",
+    "capacity_baseline",
+    "drift_history",
+)
+PROVIDER_EVIDENCE_PROFILES = {
+    "p0": REQUIRED_PROVIDER_CHECKS,
+    "p1": REQUIRED_PROVIDER_CHECKS + P1_PROVIDER_CHECKS,
+    "full": _ALL_CHECK_IDS,
+}
 _STATUSES = frozenset({"passed", "failed", "not_run", "not_applicable"})
 _PACKET_KEYS = frozenset(
     {
@@ -113,8 +123,9 @@ def operator_readiness(
     *,
     now: datetime | None = None,
     max_age: timedelta = timedelta(days=30),
+    profile: str = "p0",
 ) -> dict[str, Any]:
-    """Summarize whether required provider controls are passed and current.
+    """Summarize whether provider controls in a readiness profile are current.
 
     This is intentionally a read-only decision aid. It verifies the packet but
     never upgrades ``not_run`` or ``failed`` checks and never treats a packet
@@ -122,6 +133,10 @@ def operator_readiness(
     """
     if max_age <= timedelta(0):
         raise ValueError("max_age must be positive")
+    if not isinstance(profile, str) or profile not in PROVIDER_EVIDENCE_PROFILES:
+        raise ValueError(
+            "profile must be one of: " + ", ".join(PROVIDER_EVIDENCE_PROFILES)
+        )
     verify_operator_evidence_packet(payload)
     observed_now = now or datetime.now(UTC)
     if observed_now.tzinfo is None or observed_now.utcoffset() is None:
@@ -138,7 +153,8 @@ def operator_readiness(
     results: list[dict[str, Any]] = []
     blocked: list[str] = []
     stale: list[str] = []
-    for check_id in REQUIRED_PROVIDER_CHECKS:
+    required_check_ids = PROVIDER_EVIDENCE_PROFILES[profile]
+    for check_id in required_check_ids:
         check = by_id.get(check_id)
         if check is None:
             results.append({"check_id": check_id, "status": "missing", "fresh": False})
@@ -169,7 +185,9 @@ def operator_readiness(
         "packet_id": payload["packet_id"],
         "packet_sha256": payload["packet_sha256"],
         "captured_at": payload["captured_at"],
+        "profile": profile,
         "max_age_seconds": int(max_age.total_seconds()),
+        "required_check_ids": list(required_check_ids),
         "required_checks": results,
         "blocked_checks": blocked,
         "stale_checks": stale,
