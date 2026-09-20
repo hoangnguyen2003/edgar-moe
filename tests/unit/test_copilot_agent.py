@@ -22,7 +22,7 @@ from edgar_moe.copilot.agent import (
     normalize_provider_allowed_hosts,
     normalize_provider_endpoint,
 )
-from edgar_moe.copilot.contracts import Citation, ToolDefinition, ToolResult
+from edgar_moe.copilot.contracts import Citation, ToolDefinition, ToolResult, content_hash
 from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.tools import ReadOnlyToolset
 from edgar_moe.copilot.verification import CopilotVerificationError
@@ -57,14 +57,15 @@ class LargeToolset:
 
     def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
         del arguments
+        payload = {"blob": "x" * 20_000}
         return ToolResult(
             name=name,
-            payload={"blob": "x" * 20_000},
+            payload=payload,
             citations=(
                 Citation(
                     source="snapshot:test-large-tool",
                     label="Large test payload",
-                    evidence_sha256="a" * 64,
+                    evidence_sha256=content_hash(payload),
                 ),
             ),
         )
@@ -87,6 +88,95 @@ class CitationlessToolset:
     def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
         del arguments
         return ToolResult(name=name, payload={"summary": "unattributed"}, citations=())
+
+
+class TamperedCitationToolset:
+    """Test tool surface that returns a citation for a different payload hash."""
+
+    repository = object()
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        return (
+            ToolDefinition(
+                name="get_study_summary",
+                description="Return a payload with a tampered provenance digest.",
+                parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+        )
+
+    def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
+        del arguments
+        return ToolResult(
+            name=name,
+            payload={"summary": "attributed to another payload"},
+            citations=(
+                Citation(
+                    source="snapshot:test-tampered",
+                    label="Tampered evidence",
+                    evidence_sha256="0" * 64,
+                ),
+            ),
+        )
+
+
+class MismatchedToolResultNameToolset:
+    """Test tool surface that returns a result for another capability."""
+
+    repository = object()
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        return (
+            ToolDefinition(
+                name="get_study_summary",
+                description="Return a result with the wrong tool name.",
+                parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+        )
+
+    def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
+        del name, arguments
+        payload = {"summary": "wrong capability"}
+        return ToolResult(
+            name="get_methodology",
+            payload=payload,
+            citations=(
+                Citation(
+                    source="snapshot:test-name-mismatch",
+                    label="Mismatched evidence",
+                    evidence_sha256=content_hash(payload),
+                ),
+            ),
+        )
+
+
+class CitationOnRejectedToolset:
+    """Test tool surface that attempts to grant evidence to an unknown call."""
+
+    repository = object()
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        return (
+            ToolDefinition(
+                name="get_study_summary",
+                description="Expose one known read-only capability.",
+                parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+        )
+
+    def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
+        del arguments
+        payload = {"unexpected": "evidence"}
+        return ToolResult(
+            name=name,
+            payload=payload,
+            citations=(
+                Citation(
+                    source="snapshot:test-rejected",
+                    label="Rejected evidence",
+                    evidence_sha256=content_hash(payload),
+                ),
+            ),
+        )
 
 
 def _tool_call(
@@ -157,6 +247,45 @@ def test_agent_fails_closed_when_evidence_tool_returns_no_citation() -> None:
             provider=provider,
             toolset=CitationlessToolset(),  # type: ignore[arg-type]
         ).ask("Summarize the study.")
+
+
+def test_agent_fails_closed_when_citation_hash_does_not_match_tool_payload() -> None:
+    provider = FakeProvider(
+        [
+            _tool_call("get_study_summary"),
+            ProviderResponse(
+                content="The evidence was tampered with.",
+                tool_calls=(),
+                model="fake-model",
+            ),
+        ]
+    )
+
+    with pytest.raises(CopilotError, match="hash did not match"):
+        ResearchCopilot(
+            provider=provider,
+            toolset=TamperedCitationToolset(),  # type: ignore[arg-type]
+        ).ask("Summarize the study.")
+
+
+def test_agent_fails_closed_when_tool_result_name_does_not_match_request() -> None:
+    provider = FakeProvider([_tool_call("get_study_summary")])
+
+    with pytest.raises(CopilotError, match="result name did not match"):
+        ResearchCopilot(
+            provider=provider,
+            toolset=MismatchedToolResultNameToolset(),  # type: ignore[arg-type]
+        ).ask("Summarize the study.")
+
+
+def test_agent_fails_closed_when_rejected_tool_returns_citations() -> None:
+    provider = FakeProvider([_tool_call("execute_trade")])
+
+    with pytest.raises(CopilotError, match="rejected tool request returned citations"):
+        ResearchCopilot(
+            provider=provider,
+            toolset=CitationOnRejectedToolset(),  # type: ignore[arg-type]
+        ).ask("Place a trade")
 
 
 def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() -> None:

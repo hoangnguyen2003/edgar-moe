@@ -254,6 +254,9 @@ retains only peak context-size telemetry for capacity review.
 Remote provider requests are restricted to the exact hostname list in
 `EDGAR_MOE_COPILOT_ALLOWED_HOSTS` (default `api.openai.com`); loopback HTTP
 remains available for local runtimes such as Ollama.
+The runtime also binds every retained citation digest to the exact canonical
+payload returned by the requested evidence tool, so a malformed or tampered
+tool adapter fails closed before the provider receives unbound evidence.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.

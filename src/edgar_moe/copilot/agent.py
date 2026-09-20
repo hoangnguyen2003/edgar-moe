@@ -363,12 +363,12 @@ class ResearchCopilot:
                 if tool_calls_seen > self.max_tool_calls:
                     raise CopilotError("copilot tool-call budget exceeded")
                 result, arguments = self._execute_call(call)
+                _verify_tool_result_name(call.name, result)
                 if call.name in allowed_tool_names:
+                    _verify_evidence_tool_result(result)
                     evidence_tool_call_seen = True
-                    if not result.citations:
-                        raise CopilotError(
-                            "copilot evidence tool result omitted citations"
-                        )
+                elif result.citations:
+                    raise CopilotError("rejected tool request returned citations")
                 citations.extend(result.citations)
                 trace.append(
                     ToolTrace(
@@ -414,6 +414,21 @@ class ResearchCopilot:
                 citations=(),
             )
             return rejected, arguments
+
+
+def _verify_tool_result_name(call_name: str, result: ToolResult) -> None:
+    """Keep a tool result bound to the provider-requested capability."""
+    if result.name != call_name:
+        raise CopilotError("copilot tool result name did not match the requested tool")
+
+
+def _verify_evidence_tool_result(result: ToolResult) -> None:
+    """Require every evidence citation to hash the exact sanitized tool payload."""
+    if not result.citations:
+        raise CopilotError("copilot evidence tool result omitted citations")
+    expected_hash = content_hash(result.payload)
+    if any(citation.evidence_sha256 != expected_hash for citation in result.citations):
+        raise CopilotError("copilot evidence citation hash did not match tool payload")
 
 
 def normalize_provider_allowed_hosts(value: str | Sequence[str]) -> tuple[str, ...]:
