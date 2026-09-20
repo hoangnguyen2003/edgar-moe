@@ -13,6 +13,7 @@ from edgar_moe.copilot.agent import (
     normalize_provider_endpoint,
 )
 from edgar_moe.copilot.tools import ReadOnlyToolset
+from edgar_moe.copilot.verification import CopilotVerificationError
 
 
 class FakeProvider:
@@ -98,6 +99,7 @@ def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
     assert answer.evidence_status == "uncited"
     assert answer.citations == ()
     assert answer.trace[0].citation_count == 0
+    assert answer.trace[0].name == "rejected_tool_request"
     assert any(
         '"error": "tool request rejected by the read-only contract"' in str(message)
         for message in provider.messages[-1]
@@ -117,3 +119,16 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
         normalize_provider_endpoint("https://user:secret@api.example.com/v1/chat/completions")
     with pytest.raises(ValueError):
         normalize_provider_endpoint("https://api.example.com/v1/chat/completions?token=secret")
+
+
+def test_agent_rejects_an_answer_envelope_with_unsafe_provider_metadata() -> None:
+    provider = FakeProvider(
+        [ProviderResponse(content="Answer text", tool_calls=(), model="https://provider.example")]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+
+    with pytest.raises(CopilotVerificationError, match="unsafe metadata"):
+        copilot.ask("What does the frozen study measure?")

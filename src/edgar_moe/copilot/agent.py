@@ -21,9 +21,11 @@ from .contracts import (
     content_hash,
 )
 from .tools import ReadOnlyToolset, ToolInputError
+from .verification import verify_copilot_answer_report
 
 _MAX_QUESTION_LENGTH = 2_000
 _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
+_REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
 
 class CopilotError(RuntimeError):
@@ -178,6 +180,7 @@ class ResearchCopilot:
         trace: list[ToolTrace] = []
         tool_calls_seen = 0
         tool_definitions = self.toolset.definitions()
+        allowed_tool_names = {tool.name for tool in tool_definitions}
 
         for _ in range(self.max_tool_calls + 1):
             response = self.provider.complete(messages, tool_definitions)
@@ -186,7 +189,7 @@ class ResearchCopilot:
                 answer = response.content.strip()
                 if not answer:
                     raise CopilotProviderError("copilot provider returned an empty answer")
-                return CopilotAnswer(
+                envelope = CopilotAnswer(
                     question=normalized_question,
                     answer=answer,
                     model=response.model or self.provider.model,
@@ -197,6 +200,11 @@ class ResearchCopilot:
                     trace=tuple(trace),
                     evidence_status="grounded" if citations else "uncited",
                 )
+                # Treat verification as part of the generation boundary. A
+                # caller must never be able to persist an answer envelope that
+                # bypasses the same integrity checks used before sharing.
+                verify_copilot_answer_report(envelope.as_dict())
+                return envelope
 
             for call in response.tool_calls:
                 tool_calls_seen += 1
@@ -207,7 +215,11 @@ class ResearchCopilot:
                 trace.append(
                     ToolTrace(
                         call_index=tool_calls_seen,
-                        name=call.name,
+                        name=(
+                            call.name
+                            if call.name in allowed_tool_names
+                            else _REJECTED_TOOL_TRACE_NAME
+                        ),
                         arguments_sha256=content_hash(arguments),
                         result_sha256=content_hash(result.payload),
                         citation_count=len(result.citations),
