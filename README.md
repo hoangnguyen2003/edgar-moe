@@ -335,6 +335,8 @@ Provider operations use a redacted, content-addressed evidence packet. The
 readiness check defaults to the P0 controls and supports explicit `p1` and
 `full` profiles when a broader operational review is required; profile results
 remain blocked until the corresponding provider-side observations are retained.
+Hash-pinned readiness reports can be retained and independently verified without
+reopening the packet or exposing provider credentials.
 
 For a concise, accurate project description tailored to a one-page résumé, see the [CV entry](docs/cv-entry.md).
 

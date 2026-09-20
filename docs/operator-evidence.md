@@ -51,6 +51,15 @@ uv run python scripts/check_operator_readiness.py \
 uv run python scripts/check_operator_readiness.py \
   --packet /tmp/operator-evidence-packet.json \
   --profile full
+
+# Retain the decision itself as an immutable, hash-pinned report
+uv run python scripts/build_operator_readiness.py \
+  --packet /tmp/operator-evidence-packet.json \
+  --profile p0 \
+  --output /tmp/operator-readiness.json
+
+uv run python scripts/verify_operator_readiness.py \
+  --report /tmp/operator-readiness.json
 ```
 
 The builder and writer validate the draft, add `packet_sha256`, and publish the
@@ -72,6 +81,16 @@ check IDs so a CI log is unambiguous. It exits `0` only for `ready`; incomplete
 evidence returns `blocked`, and old otherwise passed evidence returns `stale`.
 It never changes packet status or creates provider evidence. A broader profile
 does not turn missing provider observations into a pass.
+
+When a readiness decision needs to be retained with an audit trail, use
+`build_operator_readiness.py`. The report is content-addressed, refuses to
+overwrite an existing file, binds the decision to the packet hash and selected
+profile, and records the evaluation timestamp and freshness arithmetic. The
+standalone verifier checks those invariants without reopening the packet, so a
+reviewer can validate the decision artifact without access to provider
+credentials or raw evidence. A structurally valid report may still have a
+`blocked` or `stale` readiness status; verification proves integrity, not
+provider completion.
 
 CI also runs `scripts/validate_provider_workflows.py`. This static gate keeps
 the provider workflows manual-only with `contents: read`, preserves in-flight
