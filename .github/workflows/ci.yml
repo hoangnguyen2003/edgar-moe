@@ -57,6 +57,10 @@ jobs:
         run: uv run python scripts/check_provider_evidence_prerequisites.py --help
       - name: Check public release readiness command is runnable
         run: uv run python scripts/public_release_readiness.py --help
+      - name: Check platform readiness commands are runnable
+        run: |
+          uv run python scripts/build_platform_readiness.py --help
+          uv run python scripts/verify_platform_readiness.py --help
       - name: Validate provider workflow safety contracts
         run: uv run python scripts/validate_provider_workflows.py
       - name: Check artifact reconciliation command is runnable

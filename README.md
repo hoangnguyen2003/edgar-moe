@@ -236,6 +236,12 @@ The report returns `blocked` when the bundle or immutable snapshot lock fails,
 It is an operator/release decision aid; it does not grant a license or replace
 provider-side rate limits, WAF controls, or legal review.
 
+For a single architecture-review decision across the public release, provider
+evidence, copilot, and prospective-drift gates, compose their retained reports
+with the [platform readiness guide](docs/platform-readiness.md). The aggregate
+is hash-pinned and keeps missing, blocked, stale, and review-required controls
+visible; it never authorizes retraining or hides pending provider evidence.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
@@ -317,6 +323,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 | `src/edgar_moe/api` | Versioned, snapshot-backed FastAPI contract |
 | `src/edgar_moe/forward` | Frozen inference, append-only registry, label settlement, artifact storage, and forward metrics |
 | `src/edgar_moe/copilot` | Optional bounded LLM provider adapter, read-only evidence tools, citations, and operator report envelope |
+| `src/edgar_moe/platform_readiness.py` | Hash-pinned composition of the public, provider, copilot, and drift readiness gates |
 | `apps/web` | React/TypeScript research terminal |
 
 ## Research contract
@@ -329,7 +336,9 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 - Base portfolio: 100% gross, ≤2% net, ≤0.05 beta, ≤5% SIC-industry, ≤2% per name.
 - Cost scenarios: 10/25/50 bps plus 2%/5% annual borrow sensitivity.
 
-See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [architecture improvement plan](docs/architecture-roadmap.md), [repository governance](docs/repository-governance.md), [operator evidence packets](docs/operator-evidence.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
+See [architecture](docs/architecture.md), [architecture decisions](docs/adr/0001-separate-serving-and-batch.md), [cross-domain readiness ADR](docs/adr/0003-cross-domain-platform-readiness.md), [architecture improvement plan](docs/architecture-roadmap.md), [repository governance](docs/repository-governance.md), [operator evidence packets](docs/operator-evidence.md), [Go evidence auditor](docs/evidence-auditor.md), [data card](docs/data-card.md), [model card](docs/model-card.md), the [research runbook](docs/research-runbook.md), and the [research report](reports/research_report.md).
+
+The cross-domain readiness decision is documented in [platform readiness](docs/platform-readiness.md).
 
 Provider operations use a redacted, content-addressed evidence packet. The
 readiness check defaults to the P0 controls and supports explicit `p1` and
