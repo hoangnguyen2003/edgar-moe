@@ -1071,6 +1071,111 @@ def capacity_baseline(
     typer.echo(serialized.decode())
 
 
+@app.command("research-copilot")
+def research_copilot(
+    question: Annotated[
+        str,
+        typer.Argument(help="Evidence-grounded research question; no trading instructions."),
+    ],
+    snapshot: Annotated[
+        Path,
+        typer.Option("--snapshot", help="Immutable snapshot JSON used by the read-only tools."),
+    ] = Path("data/demo/snapshot.json"),
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            envvar="EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
+            help="Optional SELECT-only forward-registry URL; local SQLite is also supported.",
+        ),
+    ] = None,
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional private JSON answer/evidence report."),
+    ] = None,
+    endpoint: Annotated[
+        str | None,
+        typer.Option("--endpoint", help="Optional OpenAI-compatible chat-completions endpoint."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Optional provider model override."),
+    ] = None,
+    max_tool_calls: Annotated[
+        int | None,
+        typer.Option("--max-tool-calls", min=1, max=8, help="Bound the agent tool-call loop."),
+    ] = None,
+    plan_only: Annotated[
+        bool,
+        typer.Option(
+            "--plan-only",
+            help="Print the frozen identity and tool contract without contacting an LLM.",
+        ),
+    ] = False,
+) -> None:
+    """Ask an optional, read-only, citation-backed research copilot.
+
+    This command is intentionally operator-run. It never exposes the provider
+    key through the public API and never mutates the model, registry, labels, or
+    deployment state. Use --plan-only to inspect the agent boundary for free.
+    """
+    from edgar_moe.api.repository import SnapshotRepository
+    from edgar_moe.copilot import OpenAICompatibleProvider, ReadOnlyToolset, ResearchCopilot
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+
+    settings = runtime_settings()
+    repository = SnapshotRepository(snapshot)
+    registry_database = None
+    registry = None
+    resolved_database_url = _copilot_database_url(settings, database_url)
+    if resolved_database_url:
+        registry_database = RegistryDatabase(resolved_database_url)
+        registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot")
+    try:
+        toolset = ReadOnlyToolset(repository, registry)
+        if plan_only:
+            report: dict[str, object] = {
+                "schema_version": 1,
+                "research_only": True,
+                "frozen_identity": repository.frozen_identity(),
+                "tools": [tool.as_provider_schema() for tool in toolset.definitions()],
+                "provider_contacted": False,
+                "disclaimer": (
+                    "The copilot is read-only and cannot modify forecasts, labels, registry records, "
+                    "or deployment state."
+                ),
+            }
+        else:
+            resolved_endpoint = endpoint or settings.edgar_moe_copilot_endpoint
+            provider = OpenAICompatibleProvider(
+                endpoint=resolved_endpoint,
+                api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),
+                model=model or settings.edgar_moe_copilot_model,
+                timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
+                max_tokens=settings.edgar_moe_copilot_max_tokens,
+            )
+            answer = ResearchCopilot(
+                provider=provider,
+                toolset=toolset,
+                max_tool_calls=max_tool_calls or settings.edgar_moe_copilot_max_tool_calls,
+            ).ask(question)
+            report = answer.as_dict()
+    finally:
+        if registry_database is not None:
+            registry_database.dispose()
+
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary_output = output.with_suffix(output.suffix + ".tmp")
+        temporary_output.write_bytes(serialized)
+        temporary_output.replace(output)
+        typer.echo(f"Wrote private research-copilot report to {output}")
+    else:
+        typer.echo(serialized.decode())
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
@@ -1104,6 +1209,17 @@ def _forward_database_url(settings: RuntimeSettings, override: str | None) -> st
         or settings.edgar_moe_registry_database_url
         or "sqlite:///data/forward/registry.sqlite3"
     )
+
+
+def _copilot_database_url(settings: RuntimeSettings, override: str | None) -> str:
+    """Prefer the SELECT-only URL and keep local SQLite development convenient."""
+    if override:
+        return override
+    if settings.edgar_moe_registry_read_database_url:
+        return settings.edgar_moe_registry_read_database_url
+    if settings.edgar_moe_registry_database_url.lower().startswith("sqlite"):
+        return settings.edgar_moe_registry_database_url
+    return ""
 
 
 def _parse_timestamp(value: str | None) -> datetime:
