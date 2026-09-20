@@ -42,6 +42,15 @@ uv run python scripts/verify_operator_evidence_packet.py \
 uv run python scripts/check_operator_readiness.py \
   --packet /tmp/operator-evidence-packet.json \
   --max-age-days 30
+
+# Optional broader reviews (the default is still --profile p0)
+uv run python scripts/check_operator_readiness.py \
+  --packet /tmp/operator-evidence-packet.json \
+  --profile p1
+
+uv run python scripts/check_operator_readiness.py \
+  --packet /tmp/operator-evidence-packet.json \
+  --profile full
 ```
 
 The builder and writer validate the draft, add `packet_sha256`, and publish the
@@ -51,13 +60,18 @@ contract without printing packet contents. It rejects URLs, connection strings,
 secret-like assignments, private-key material, absolute/path-traversal artifact
 names, unknown fields, and passed/failed checks without evidence references.
 
-The readiness command is a separate, read-only release aid. It requires the
-three P0 provider checks (`database_least_privilege`, `restore_rehearsal`, and
+The readiness command is a separate, read-only release aid. It defaults to the
+P0 profile, which requires the three highest-priority provider checks
+(`database_least_privilege`, `restore_rehearsal`, and
 `partial_write_reconciliation`) to be explicitly `passed`, backed by evidence
-references, and observed within the requested freshness window. It exits `0`
-only for `ready`; incomplete evidence returns `blocked`, and old otherwise
-passed evidence returns `stale`. It never changes packet status or creates
-provider evidence.
+references, and observed within the requested freshness window. Use `--profile
+p1` to add `deployment_smoke`, `alert_delivery`, `capacity_baseline`, and
+`drift_history`, or `--profile full` to require every check declared by the
+packet schema. The JSON summary records the selected profile and exact required
+check IDs so a CI log is unambiguous. It exits `0` only for `ready`; incomplete
+evidence returns `blocked`, and old otherwise passed evidence returns `stale`.
+It never changes packet status or creates provider evidence. A broader profile
+does not turn missing provider observations into a pass.
 
 CI also runs `scripts/validate_provider_workflows.py`. This static gate keeps
 the provider workflows manual-only with `contents: read`, preserves in-flight
@@ -99,7 +113,8 @@ retain a packet after these provider-side exercises:
 | `partial_write_reconciliation` | A production-like object-store failure leaves the primary reference intact and a later reconciliation repairs the mirror idempotently. |
 
 P1 checks (`deployment_smoke`, `alert_delivery`, `capacity_baseline`, and
-`drift_history`) may be included in the same packet or a later packet. A
+`drift_history`) may be included in the same packet or a later packet. Selecting
+the P1 or full readiness profile makes these checks part of the gate. A
 `passed` or `failed` check must reference retained redacted artifacts; a
 `not_run` or `not_applicable` check must explain why it has no evidence.
 
