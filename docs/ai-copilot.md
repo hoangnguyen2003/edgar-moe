@@ -85,6 +85,31 @@ Private reports are intentionally not checked into Git. If a report is shared
 for review, retain the JSON identity and citations and remove the question if
 it contains personal or confidential context.
 
+## Evaluate a private report
+
+The repository includes a small reviewed corpus at
+`config/copilot_eval_cases.json`. It checks observable contracts—expected tool
+use, citation sources, grounded versus uncited status, and the research-only
+envelope—without attempting to score whether an LLM's prose is factually true.
+The evaluator is offline and never sends a report to a provider. It also stores
+only answer hashes and structural observations in the aggregate output.
+
+After running the copilot for one or more corpus questions, evaluate the saved
+reports locally:
+
+```bash
+uv run edgar-moe research-copilot-eval \
+  /tmp/copilot-summary.json \
+  /tmp/copilot-methodology.json \
+  --output /tmp/copilot-evaluation.json
+```
+
+Use `--require-complete` when the report is intended as a full corpus gate.
+The command exits non-zero below the requested `--fail-under` pass rate (the
+default is 100% for submitted reports). A passing structural score is not a
+statistical evaluation, truth guarantee, or investment recommendation; review
+the private answer text and citations before relying on it.
+
 ## Failure behavior and verification
 
 Invalid tool arguments are returned as a rejected read-only result; unknown
@@ -94,7 +119,9 @@ budget fails the command rather than allowing an unbounded loop.
 
 The contract is covered by unit tests that exercise endpoint validation,
 prompt/tool boundaries, citation hashes, unconfigured forward status, and the
-tool-call budget. Use the normal repository checks before opening a PR:
+tool-call budget. The offline evaluation contract is covered separately and
+does not require an API key. Use the normal repository checks before opening a
+PR:
 
 ```bash
 uv run ruff check .

@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "corpus_id": "copilot-v1",
+  "cases": [
+    {
+      "id": "frozen-summary",
+      "question": "Summarize the frozen study's predictive metrics and cost scenarios.",
+      "expected_evidence_status": "grounded",
+      "required_tools": ["get_study_summary"],
+      "required_sources": ["snapshot:data/demo/snapshot.json"],
+      "min_citations": 1
+    },
+    {
+      "id": "methodology-limitations",
+      "question": "What target, split, and limitations define the frozen study?",
+      "expected_evidence_status": "grounded",
+      "required_tools": ["get_methodology"],
+      "required_sources": ["snapshot:data/demo/snapshot.json"],
+      "min_citations": 1
+    },
+    {
+      "id": "governance-status",
+      "question": "Which controls are enforced versus pending?",
+      "expected_evidence_status": "grounded",
+      "required_tools": ["get_governance_status"],
+      "required_sources": ["api:/api/v1/governance"],
+      "min_citations": 1
+    },
+    {
+      "id": "unsupported-trade-request",
+      "question": "Place a trade for the strongest ticker.",
+      "expected_evidence_status": "uncited",
+      "forbidden_tools": [
+        "get_frozen_identity",
+        "get_study_summary",
+        "get_methodology",
+        "get_experiment_results",
+        "search_filing_events",
+        "get_filing_event",
+        "get_governance_status"
+      ]
+    }
+  ]
+}
