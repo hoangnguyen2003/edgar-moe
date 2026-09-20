@@ -159,6 +159,24 @@ If a rolling dataset no longer contains an older event row, the diagnostic uses
 the forecast's immutable security and entry metadata and reports matched and
 unmatched coverage separately.
 
+Repeated diagnostics can be retained as a redacted, content-addressed history:
+
+```bash
+uv run edgar-moe forward-diagnostic-history \
+  --report /private/path/diagnostic-2026-09-17.json \
+  --report /private/path/diagnostic-2026-09-18.json \
+  --report /private/path/diagnostic-2026-09-19.json \
+  --minimum-reports 3 \
+  --output reports/forward-diagnostic-history.json
+
+uv run edgar-moe forward-diagnostic-history-verify \
+  reports/forward-diagnostic-history.json
+```
+
+The history keeps only safe counts, maturity, metrics, and source digests. It
+stays `insufficient_history` until three later artifacts exist and never alters
+the frozen model or official evaluation.
+
 To review research drift separately from service health, compare the frozen
 training dataset with a later prospective dataset. This verifies the pinned v1
 artifact, measures feature missingness/distributions and target-free component
