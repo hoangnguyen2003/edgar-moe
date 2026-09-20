@@ -73,6 +73,17 @@ the run budget. Override it with `--max-duration-seconds` or
 `EDGAR_MOE_COPILOT_MAX_DURATION_SECONDS` when a private provider exercise
 needs a different bounded allowance.
 
+The same pre-call boundary also limits cumulative provider context. The agent
+serializes the current UTF-8 messages and tool schemas, measures their byte
+length, and rejects the next provider call when it exceeds the 512 KiB default.
+The operator may choose a value from 16 KiB through the 2 MiB hard maximum with
+`--max-context-bytes` or
+`EDGAR_MOE_COPILOT_MAX_CONTEXT_BYTES`. The answer identity records this bound,
+and usage retains only the numeric `peak_context_bytes`; prompts, tool payloads,
+and the serialized context are never retained. This is a byte-budget safety
+control, not a provider-specific token-count guarantee, and an already in-flight
+request is not interrupted.
+
 The aggregate also records `agent_identity_status`: `consistent` when every
 evaluated answer carries the same verified policy/tool-contract identity,
 `legacy` when all answers predate the identity field, and `mixed` when the

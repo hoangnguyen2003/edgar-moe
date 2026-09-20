@@ -41,3 +41,11 @@ def test_copilot_duration_budget_is_bounded_and_configurable(monkeypatch) -> Non
     settings = RuntimeSettings(_env_file=None)
 
     assert settings.edgar_moe_copilot_max_duration_seconds == 450
+
+
+def test_copilot_context_budget_is_bounded_and_configurable(monkeypatch) -> None:
+    monkeypatch.setenv("EDGAR_MOE_COPILOT_MAX_CONTEXT_BYTES", "1048576")
+
+    settings = RuntimeSettings(_env_file=None)
+
+    assert settings.edgar_moe_copilot_max_context_bytes == 1_048_576

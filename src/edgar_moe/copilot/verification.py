@@ -67,6 +67,7 @@ _MAX_FIELDS = 64
 _MAX_USAGE_REQUESTS = (8 + 1) * (3 + 1)
 _MAX_USAGE_DURATION_MS = 2_000_000
 _MAX_USAGE_TOKENS = 1_000_000_000
+_MAX_USAGE_CONTEXT_BYTES = 2 * 1024 * 1024
 
 
 def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
@@ -187,25 +188,43 @@ def _verify_trace(value: object) -> list[dict[str, Any]]:
 
 
 def _verify_usage(value: object) -> None:
-    usage = _exact_mapping(
-        value,
-        frozenset(
-            {
-                "request_count",
-                "duration_ms",
-                "prompt_tokens",
-                "completion_tokens",
-                "total_tokens",
-            }
-        ),
-        "usage",
+    required_keys = frozenset(
+        {
+            "request_count",
+            "duration_ms",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+        }
     )
+    optional_keys = frozenset({"peak_context_bytes"})
+    if not isinstance(value, Mapping):
+        raise CopilotVerificationError("copilot answer usage must be an object")
+    unknown = sorted(str(key) for key in value if key not in required_keys | optional_keys)
+    missing = sorted(key for key in required_keys if key not in value)
+    if unknown or missing:
+        details: list[str] = []
+        if missing:
+            details.append("missing " + ", ".join(missing))
+        if unknown:
+            details.append("unknown " + ", ".join(unknown))
+        raise CopilotVerificationError(
+            "copilot answer usage fields invalid: " + "; ".join(details)
+        )
+    usage = value
     _bounded_int(usage["request_count"], "usage.request_count", minimum=1, maximum=_MAX_USAGE_REQUESTS)
     _bounded_int(usage["duration_ms"], "usage.duration_ms", minimum=0, maximum=_MAX_USAGE_DURATION_MS)
     for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
         value = usage[field]
         if value is not None:
             _bounded_int(value, f"usage.{field}", minimum=0, maximum=_MAX_USAGE_TOKENS)
+    if "peak_context_bytes" in usage and usage["peak_context_bytes"] is not None:
+        _bounded_int(
+            usage["peak_context_bytes"],
+            "usage.peak_context_bytes",
+            minimum=0,
+            maximum=_MAX_USAGE_CONTEXT_BYTES,
+        )
 
 
 def _verify_agent_identity(value: object) -> None:

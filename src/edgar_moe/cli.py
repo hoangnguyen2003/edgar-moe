@@ -1280,6 +1280,15 @@ def research_copilot(
             help="Bound total copilot wall-clock time before another provider call.",
         ),
     ] = None,
+    max_context_bytes: Annotated[
+        int | None,
+        typer.Option(
+            "--max-context-bytes",
+            min=16_384,
+            max=2_097_152,
+            help="Bound UTF-8 messages and tool schemas before another provider call.",
+        ),
+    ] = None,
     max_retries: Annotated[
         int | None,
         typer.Option(
@@ -1376,6 +1385,11 @@ def research_copilot(
                     settings.edgar_moe_copilot_max_duration_seconds
                     if max_duration_seconds is None
                     else max_duration_seconds
+                ),
+                max_context_bytes=(
+                    settings.edgar_moe_copilot_max_context_bytes
+                    if max_context_bytes is None
+                    else max_context_bytes
                 ),
             ).ask(question)
             report = answer.as_dict()
@@ -1554,6 +1568,15 @@ def research_copilot_benchmark(
             help="Bound total copilot wall-clock time before another provider call.",
         ),
     ] = None,
+    max_context_bytes: Annotated[
+        int | None,
+        typer.Option(
+            "--max-context-bytes",
+            min=16_384,
+            max=2_097_152,
+            help="Bound UTF-8 messages and tool schemas before another provider call.",
+        ),
+    ] = None,
     max_retries: Annotated[
         int | None,
         typer.Option(
@@ -1683,6 +1706,11 @@ def research_copilot_benchmark(
                 settings.edgar_moe_copilot_max_duration_seconds
                 if max_duration_seconds is None
                 else max_duration_seconds
+            ),
+            max_context_bytes=(
+                settings.edgar_moe_copilot_max_context_bytes
+                if max_context_bytes is None
+                else max_context_bytes
             ),
         )
         benchmark = run_benchmark(selected_corpus, copilot, output_dir)

@@ -80,6 +80,7 @@ def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> Non
                 prompt_tokens=10,
                 completion_tokens=4,
                 total_tokens=14,
+                peak_context_bytes=16_384,
             )
         ),
         tmp_path,
@@ -97,6 +98,7 @@ def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> Non
     assert '"prompt_tokens": 10' in aggregate
     assert '"completion_tokens": 4' in aggregate
     assert '"total_tokens": 14' in aggregate
+    assert '"peak_context_bytes": 16384' in aggregate
     assert '"summary"' in aggregate
     assert (tmp_path / "summary.json").stat().st_size > 0
 

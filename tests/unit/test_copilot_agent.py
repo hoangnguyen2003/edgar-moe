@@ -19,6 +19,7 @@ from edgar_moe.copilot.agent import (
     _parse_provider_response,
     normalize_provider_endpoint,
 )
+from edgar_moe.copilot.contracts import ToolDefinition, ToolResult
 from edgar_moe.copilot.policy import COPILOT_POLICY_ID, copilot_policy_sha256
 from edgar_moe.copilot.tools import ReadOnlyToolset
 from edgar_moe.copilot.verification import CopilotVerificationError
@@ -39,6 +40,21 @@ class FakeProvider:
     ) -> ProviderResponse:
         self.messages.append(messages)
         return self.responses.pop(0)
+
+
+class LargeToolset:
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        return (
+            ToolDefinition(
+                name="get_large_result",
+                description="Return a bounded test payload.",
+                parameters={"type": "object", "properties": {}, "additionalProperties": False},
+            ),
+        )
+
+    def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
+        del arguments
+        return ToolResult(name=name, payload={"blob": "x" * 20_000}, citations=())
 
 
 def _tool_call(
@@ -89,6 +105,7 @@ def test_agent_executes_read_tool_then_returns_citation_backed_answer() -> None:
     assert len(identity["tool_contract_sha256"]) == 64
     assert identity["max_tool_calls"] == 4
     assert identity["max_duration_seconds"] == 300.0
+    assert identity["max_context_bytes"] == 512 * 1024
 
 
 def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() -> None:
@@ -118,6 +135,8 @@ def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() ->
     assert answer.usage.prompt_tokens == 32
     assert answer.usage.completion_tokens == 8
     assert answer.usage.total_tokens == 40
+    assert answer.usage.peak_context_bytes is not None
+    assert answer.usage.peak_context_bytes > 0
     assert "usage" in answer.as_dict()
     assert "provider_payload" not in answer.as_dict()
 
@@ -161,6 +180,35 @@ def test_agent_rejects_invalid_run_duration_budget() -> None:
         ResearchCopilot(provider=provider, toolset=toolset, max_duration_seconds=0)
     with pytest.raises(ValueError, match="max_duration_seconds"):
         ResearchCopilot(provider=provider, toolset=toolset, max_duration_seconds=901)
+
+
+def test_agent_rejects_invalid_context_budget() -> None:
+    provider = FakeProvider([])
+    toolset = ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json")))
+
+    with pytest.raises(ValueError, match="max_context_bytes"):
+        ResearchCopilot(provider=provider, toolset=toolset, max_context_bytes=16_383)
+    with pytest.raises(ValueError, match="max_context_bytes"):
+        ResearchCopilot(provider=provider, toolset=toolset, max_context_bytes=2_097_153)
+
+
+def test_agent_stops_before_provider_call_when_context_budget_is_exceeded() -> None:
+    provider = FakeProvider(
+        [
+            _tool_call("get_large_result"),
+            ProviderResponse(content="must not be called", tool_calls=(), model="fake-model"),
+        ]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=LargeToolset(),  # type: ignore[arg-type]
+        max_context_bytes=16_384,
+    )
+
+    with pytest.raises(CopilotError, match="context budget"):
+        copilot.ask("Read the large result")
+
+    assert len(provider.messages) == 1
 
 
 def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:

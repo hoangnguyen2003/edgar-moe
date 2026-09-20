@@ -245,7 +245,9 @@ pass the copilot readiness gate, while legacy and mixed runs remain
 policy, and private usage counts include those actual attempts for cost review.
 Each operator copilot run also has a bounded aggregate wall-clock budget, which
 is recorded in its agent identity and prevents another provider call after the
-deadline.
+deadline. It also measures the UTF-8 serialized messages and tool schemas before
+each provider call, fails closed at a 512 KiB default (2 MiB hard maximum), and
+retains only peak context-size telemetry for capacity review.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.

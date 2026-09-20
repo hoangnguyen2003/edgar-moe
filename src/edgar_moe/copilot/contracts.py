@@ -107,6 +107,7 @@ class CopilotAgentIdentity:
     tool_contract_sha256: str
     max_tool_calls: int
     max_duration_seconds: float | None = None
+    max_context_bytes: int | None = None
 
     def as_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -117,6 +118,8 @@ class CopilotAgentIdentity:
         }
         if self.max_duration_seconds is not None:
             payload["max_duration_seconds"] = self.max_duration_seconds
+        if self.max_context_bytes is not None:
+            payload["max_context_bytes"] = self.max_context_bytes
         return payload
 
 
@@ -129,15 +132,19 @@ class CopilotUsage:
     prompt_tokens: int | None = None
     completion_tokens: int | None = None
     total_tokens: int | None = None
+    peak_context_bytes: int | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "request_count": self.request_count,
             "duration_ms": self.duration_ms,
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "total_tokens": self.total_tokens,
         }
+        if self.peak_context_bytes is not None:
+            payload["peak_context_bytes"] = self.peak_context_bytes
+        return payload
 
 
 EvidenceStatus = Literal["grounded", "uncited"]

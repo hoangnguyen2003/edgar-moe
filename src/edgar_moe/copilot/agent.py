@@ -34,6 +34,9 @@ _MAX_RETRIES = 3
 _MAX_RETRY_BACKOFF_SECONDS = 5.0
 _DEFAULT_MAX_DURATION_SECONDS = 300.0
 _MAX_DURATION_SECONDS = 900.0
+_DEFAULT_MAX_CONTEXT_BYTES = 512 * 1024
+_MIN_CONTEXT_BYTES = 16 * 1024
+_MAX_CONTEXT_BYTES = 2 * 1024 * 1024
 _RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429}) | frozenset(range(500, 600))
 _REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
@@ -219,6 +222,7 @@ class ResearchCopilot:
         toolset: ReadOnlyToolset,
         max_tool_calls: int = 4,
         max_duration_seconds: float = _DEFAULT_MAX_DURATION_SECONDS,
+        max_context_bytes: int = _DEFAULT_MAX_CONTEXT_BYTES,
     ) -> None:
         if not 1 <= max_tool_calls <= 8:
             raise ValueError("max_tool_calls must be between 1 and 8")
@@ -232,10 +236,20 @@ class ResearchCopilot:
                 "max_duration_seconds must be between 1 and "
                 f"{_MAX_DURATION_SECONDS:g} seconds"
             )
+        if (
+            isinstance(max_context_bytes, bool)
+            or not isinstance(max_context_bytes, int)
+            or not _MIN_CONTEXT_BYTES <= max_context_bytes <= _MAX_CONTEXT_BYTES
+        ):
+            raise ValueError(
+                "max_context_bytes must be between "
+                f"{_MIN_CONTEXT_BYTES} and {_MAX_CONTEXT_BYTES} bytes"
+            )
         self.provider = provider
         self.toolset = toolset
         self.max_tool_calls = max_tool_calls
         self.max_duration_seconds = max_duration_seconds
+        self.max_context_bytes = max_context_bytes
 
     def ask(self, question: str) -> CopilotAnswer:
         normalized_question = question.strip()
@@ -252,6 +266,7 @@ class ResearchCopilot:
         citations: list[Citation] = []
         trace: list[ToolTrace] = []
         tool_calls_seen = 0
+        peak_context_bytes = 0
         provider_usages: list[ProviderUsage | None] = []
         provider_request_counts: list[int] = []
         tool_definitions = self.toolset.definitions()
@@ -259,12 +274,17 @@ class ResearchCopilot:
             tool_definitions,
             self.max_tool_calls,
             self.max_duration_seconds,
+            self.max_context_bytes,
         )
         allowed_tool_names = {tool.name for tool in tool_definitions}
 
         for _ in range(self.max_tool_calls + 1):
             if monotonic() - run_started >= self.max_duration_seconds:
                 raise CopilotError("copilot execution time budget exceeded")
+            context_bytes = _serialized_context_bytes(messages, tool_definitions)
+            peak_context_bytes = max(peak_context_bytes, context_bytes)
+            if context_bytes > self.max_context_bytes:
+                raise CopilotError("copilot context budget exceeded")
             response = self.provider.complete(messages, tool_definitions)
             if (
                 isinstance(response.request_count, bool)
@@ -294,6 +314,7 @@ class ResearchCopilot:
                         prompt_tokens=_sum_usage(provider_usages, "prompt_tokens"),
                         completion_tokens=_sum_usage(provider_usages, "completion_tokens"),
                         total_tokens=_sum_usage(provider_usages, "total_tokens"),
+                        peak_context_bytes=peak_context_bytes,
                     ),
                     agent_identity=agent_identity,
                 )
@@ -460,6 +481,24 @@ def _sum_usage(usages: Sequence[ProviderUsage | None], field: str) -> int | None
     if not values or any(value is None for value in values):
         return None
     return sum(value for value in values if value is not None)
+
+
+def _serialized_context_bytes(
+    messages: Sequence[dict[str, object]],
+    tool_definitions: Sequence[ToolDefinition],
+) -> int:
+    """Measure the provider context without retaining prompts or tool output."""
+    encoded = json.dumps(
+        {
+            "messages": list(messages),
+            "tools": [tool.as_provider_schema() for tool in tool_definitions],
+        },
+        default=str,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return len(encoded)
 
 
 def _unique_citations(citations: Sequence[Citation]) -> tuple[Citation, ...]:
