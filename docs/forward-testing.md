@@ -362,6 +362,24 @@ ordering, child-report references, aggregate status, warning streak, and final
 content hash. A valid hash alone is not enough to make a malformed history
 acceptable.
 
+Before using the trend as a human research-review input, run the separate
+readiness gate:
+
+```bash
+uv run edgar-moe research-drift-readiness \
+  reports/research-drift-history.json \
+  --minimum-reports 3 \
+  --output /tmp/research-drift-readiness.json
+```
+
+The gate revalidates the retained history and exits `0` only when the requested
+number of later observations is present, the history is stable, and no review
+state or warning streak remains. `insufficient_history`, `error`, and
+`incomplete` histories are `blocked`; warning histories are `review_required`.
+The output is a hash-pinned structural decision containing no outcomes,
+credentials, or provider payloads. It is not a performance claim, model
+promotion decision, or retraining authorization.
+
 Each processed dataset ID includes the verified source-manifest digest. If a
 manual retry refreshes the same cutoff with different source evidence, it creates
 a new immutable dataset identity instead of overwriting or conflicting with the
