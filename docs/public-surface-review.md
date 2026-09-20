@@ -74,6 +74,15 @@ oversized responses. The retained report contains paths, statuses, and health
 state but never response bodies or credentials. This is a runtime observation,
 not proof of provider-side rate limits, backups, or database grants.
 
+If GitHub receives a terminal failure (`failure`, `error`, or `inactive`) for a
+Production deployment, the same workflow retains a redacted
+`deployment-failure.json` artifact for 30 days and fails the deployment gate. It
+records only the deployment state, commit, GitHub status identifiers, and public
+target URL; it does not copy provider logs or secrets. Transient `queued` and
+`in_progress` statuses are ignored. The operator must inspect the provider logs,
+redeploy the reviewed commit, and rerun the smoke check before treating the
+public surface as current.
+
 The deployment build rebuilds the bundle and checks its required disclosure
 files, but it does not replace CI review or establish provider-side traffic
 controls. Keep the review with the release record and revisit it when public

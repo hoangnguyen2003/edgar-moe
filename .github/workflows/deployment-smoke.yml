@@ -52,3 +52,40 @@ jobs:
           path: reports/deployment-smoke/smoke.json
           if-no-files-found: ignore
           retention-days: 30
+
+  record-failed-deployment:
+    if: >-
+      github.event_name == 'deployment_status' &&
+      github.event.deployment.environment == 'Production' &&
+      (github.event.deployment_status.state == 'failure' ||
+      github.event.deployment_status.state == 'error' ||
+      github.event.deployment_status.state == 'inactive')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - name: Write redacted deployment failure evidence
+        env:
+          DEPLOYMENT_STATE: ${{ github.event.deployment_status.state }}
+          DEPLOYMENT_ENVIRONMENT: ${{ github.event.deployment.environment }}
+          DEPLOYMENT_SHA: ${{ github.event.deployment.sha }}
+          DEPLOYMENT_ID: ${{ github.event.deployment.id }}
+          DEPLOYMENT_STATUS_ID: ${{ github.event.deployment_status.id }}
+          DEPLOYMENT_URL: ${{ github.event.deployment_status.target_url }}
+        run: |
+          python3 scripts/write_deployment_failure_evidence.py \
+            --output reports/deployment-smoke/deployment-failure.json
+      - name: Upload deployment failure evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: deployment-failure-${{ github.run_id }}
+          path: reports/deployment-smoke/deployment-failure.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail the deployment gate
+        run: |
+          echo "Production deployment status was $DEPLOYMENT_STATE; inspect the retained failure artifact." >&2
+          exit 1
+        env:
+          DEPLOYMENT_STATE: ${{ github.event.deployment_status.state }}
