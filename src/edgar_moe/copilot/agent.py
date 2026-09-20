@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -37,6 +38,8 @@ _MAX_DURATION_SECONDS = 900.0
 _DEFAULT_MAX_CONTEXT_BYTES = 512 * 1024
 _MIN_CONTEXT_BYTES = 16 * 1024
 _MAX_CONTEXT_BYTES = 2 * 1024 * 1024
+_DEFAULT_PROVIDER_ALLOWED_HOSTS = ("api.openai.com",)
+_HOST_LABEL = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
 _RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429}) | frozenset(range(500, 600))
 _REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
@@ -138,12 +141,17 @@ class OpenAICompatibleProvider:
         endpoint: str,
         api_key: str,
         model: str,
+        allowed_hosts: str | Sequence[str] = _DEFAULT_PROVIDER_ALLOWED_HOSTS,
         timeout_seconds: float = 30.0,
         max_tokens: int = 800,
         max_retries: int = 2,
         retry_backoff_seconds: float = 0.25,
     ) -> None:
-        self.endpoint = normalize_provider_endpoint(endpoint)
+        self.allowed_hosts = normalize_provider_allowed_hosts(allowed_hosts)
+        self.endpoint = normalize_provider_endpoint(
+            endpoint,
+            allowed_hosts=self.allowed_hosts,
+        )
         self.api_key = api_key
         self.model = model.strip()
         if not self.model or len(self.model) > 160:
@@ -408,11 +416,42 @@ class ResearchCopilot:
             return rejected, arguments
 
 
-def normalize_provider_endpoint(value: str) -> str:
-    """Validate an endpoint without permitting credentials or remote HTTP."""
+def normalize_provider_allowed_hosts(value: str | Sequence[str]) -> tuple[str, ...]:
+    """Validate exact DNS hostnames used for remote provider egress."""
+    raw_hosts = value.split(",") if isinstance(value, str) else list(value)
+    normalized: list[str] = []
+    for raw_host in raw_hosts:
+        if not isinstance(raw_host, str):
+            raise ValueError("copilot provider allowed hosts must be hostnames")
+        host = raw_host.strip().lower()
+        if (
+            not host
+            or len(host) > 253
+            or any(character.isspace() for character in host)
+            or any(marker in host for marker in ("://", "/", "@", ":", "*"))
+        ):
+            raise ValueError(
+                "copilot provider allowed hosts must be exact hostnames without URLs, ports, or wildcards"
+            )
+        labels = host.split(".")
+        if any(not _HOST_LABEL.fullmatch(label) for label in labels):
+            raise ValueError("copilot provider allowed hosts must be valid DNS hostnames")
+        if host not in normalized:
+            normalized.append(host)
+    if not normalized:
+        raise ValueError("copilot provider allowed hosts must not be empty")
+    return tuple(normalized)
+
+
+def normalize_provider_endpoint(
+    value: str,
+    *,
+    allowed_hosts: str | Sequence[str] = _DEFAULT_PROVIDER_ALLOWED_HOSTS,
+) -> str:
+    """Validate an endpoint without credentials, remote HTTP, or host drift."""
     parsed = urlsplit(value.strip())
     scheme = parsed.scheme.lower()
-    host = (parsed.hostname or "").lower()
+    host = (parsed.hostname or "").lower().rstrip(".")
     loopback = host in {"localhost", "127.0.0.1", "::1"}
     if (
         not parsed.netloc
@@ -424,6 +463,10 @@ def normalize_provider_endpoint(value: str) -> str:
         or (scheme == "http" and not loopback)
     ):
         raise ValueError("copilot provider endpoint must be HTTPS or loopback HTTP without credentials")
+    if scheme == "https" and not loopback:
+        normalized_hosts = normalize_provider_allowed_hosts(allowed_hosts)
+        if host not in normalized_hosts:
+            raise ValueError("copilot provider endpoint host is not allowlisted")
     return urlunsplit((scheme, parsed.netloc, parsed.path, "", ""))
 
 

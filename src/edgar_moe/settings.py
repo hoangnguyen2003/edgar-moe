@@ -136,6 +136,9 @@ class RuntimeSettings(BaseSettings):
     # Optional operator-run LLM copilot. The public API never reads these fields.
     edgar_moe_copilot_api_key: SecretStr = SecretStr("")
     edgar_moe_copilot_endpoint: str = "https://api.openai.com/v1/chat/completions"
+    # Exact comma-separated remote hostnames allowed to receive the copilot key.
+    # Loopback HTTP runtimes remain supported independently for local development.
+    edgar_moe_copilot_allowed_hosts: str = "api.openai.com"
     edgar_moe_copilot_model: str = "gpt-4o-mini"
     edgar_moe_copilot_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
     edgar_moe_copilot_max_tokens: int = Field(default=800, ge=1, le=8_000)

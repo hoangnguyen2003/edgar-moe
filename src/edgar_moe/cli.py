@@ -1364,6 +1364,7 @@ def research_copilot(
                 endpoint=resolved_endpoint,
                 api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),
                 model=model or settings.edgar_moe_copilot_model,
+                allowed_hosts=settings.edgar_moe_copilot_allowed_hosts,
                 timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
                 max_tokens=settings.edgar_moe_copilot_max_tokens,
                 max_retries=(
@@ -1687,6 +1688,7 @@ def research_copilot_benchmark(
             endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
             api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),
             model=model or settings.edgar_moe_copilot_model,
+            allowed_hosts=settings.edgar_moe_copilot_allowed_hosts,
             timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
             max_tokens=settings.edgar_moe_copilot_max_tokens,
             max_retries=(

@@ -251,6 +251,9 @@ is recorded in its agent identity and prevents another provider call after the
 deadline. It also measures the UTF-8 serialized messages and tool schemas before
 each provider call, fails closed at a 512 KiB default (2 MiB hard maximum), and
 retains only peak context-size telemetry for capacity review.
+Remote provider requests are restricted to the exact hostname list in
+`EDGAR_MOE_COPILOT_ALLOWED_HOSTS` (default `api.openai.com`); loopback HTTP
+remains available for local runtimes such as Ollama.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.
