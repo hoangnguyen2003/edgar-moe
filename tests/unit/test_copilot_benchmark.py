@@ -3,14 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
-from edgar_moe.copilot.contracts import Citation, CopilotAnswer, ToolTrace
+from edgar_moe.copilot.contracts import Citation, CopilotAnswer, CopilotUsage, ToolTrace
 from edgar_moe.copilot.evaluation import EvaluationCase, EvaluationCorpus
 from edgar_moe.copilot.verification import CopilotVerificationError
 
 
 class FakeRunner:
-    def __init__(self, *, fail: bool = False) -> None:
+    def __init__(self, *, fail: bool = False, usage: CopilotUsage | None = None) -> None:
         self.fail = fail
+        self.usage = usage
 
     def ask(self, question: str) -> CopilotAnswer:
         if self.fail:
@@ -33,6 +34,7 @@ class FakeRunner:
             citations=(Citation("snapshot:test", "Test", "b" * 64),),
             trace=(ToolTrace(1, "get_study_summary", "c" * 64, "d" * 64, 1),),
             evidence_status="grounded",
+            usage=self.usage,
         )
 
 
@@ -54,7 +56,19 @@ def _corpus() -> EvaluationCorpus:
 
 
 def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> None:
-    result = run_benchmark(_corpus(), FakeRunner(), tmp_path)
+    result = run_benchmark(
+        _corpus(),
+        FakeRunner(
+            usage=CopilotUsage(
+                request_count=2,
+                duration_ms=125,
+                prompt_tokens=10,
+                completion_tokens=4,
+                total_tokens=14,
+            )
+        ),
+        tmp_path,
+    )
 
     assert result.suite.pass_rate == 1.0
     assert not result.failures
@@ -62,8 +76,47 @@ def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> Non
     write_benchmark_report(report, result.as_dict(provider="test-provider", model="test-model"))
     aggregate = report.read_text(encoding="utf-8")
     assert "The cited snapshot" not in aggregate
+    assert '"answer_count": 1' in aggregate
+    assert '"request_count": 2' in aggregate
+    assert '"duration_ms": 125' in aggregate
+    assert '"prompt_tokens": 10' in aggregate
+    assert '"completion_tokens": 4' in aggregate
+    assert '"total_tokens": 14' in aggregate
     assert '"summary"' in aggregate
     assert (tmp_path / "summary.json").stat().st_size > 0
+
+
+def test_benchmark_keeps_unreported_token_counters_null(tmp_path: Path) -> None:
+    result = run_benchmark(
+        _corpus(),
+        FakeRunner(
+            usage=CopilotUsage(
+                request_count=1,
+                duration_ms=75,
+                prompt_tokens=None,
+                completion_tokens=3,
+                total_tokens=None,
+            )
+        ),
+        tmp_path,
+    )
+
+    aggregate = result.as_dict(provider="test-provider", model="test-model")
+
+    assert aggregate["usage"] == {
+        "answer_count": 1,
+        "request_count": 1,
+        "duration_ms": 75,
+        "prompt_tokens": None,
+        "completion_tokens": 3,
+        "total_tokens": None,
+    }
+
+
+def test_benchmark_omits_aggregate_for_legacy_answers_without_usage(tmp_path: Path) -> None:
+    result = run_benchmark(_corpus(), FakeRunner(), tmp_path)
+
+    assert "usage" not in result.as_dict(provider="test-provider", model="test-model")
 
 
 def test_benchmark_records_only_coarse_provider_failure(tmp_path: Path) -> None:
