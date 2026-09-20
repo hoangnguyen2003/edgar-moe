@@ -110,6 +110,21 @@ default is 100% for submitted reports). A passing structural score is not a
 statistical evaluation, truth guarantee, or investment recommendation; review
 the private answer text and citations before relying on it.
 
+To run the complete corpus sequentially with one provider configuration, use
+the bounded benchmark command. It writes the individual private answer
+envelopes and the aggregate structural report under `/tmp` by default:
+
+```bash
+uv run edgar-moe research-copilot-benchmark \
+  --output-dir /tmp/edgar-moe-copilot-benchmark
+```
+
+Use `--case governance-status` (repeatable) to exercise a subset, or
+`--plan-only` to list the selected cases without contacting the provider. A
+provider error is recorded only by case id and coarse exception type; the
+benchmark exits non-zero unless every selected case succeeds and meets the
+requested pass rate.
+
 ## Failure behavior and verification
 
 Invalid tool arguments are returned as a rejected read-only result; unknown
@@ -120,8 +135,9 @@ budget fails the command rather than allowing an unbounded loop.
 The contract is covered by unit tests that exercise endpoint validation,
 prompt/tool boundaries, citation hashes, unconfigured forward status, and the
 tool-call budget. The offline evaluation contract is covered separately and
-does not require an API key. Use the normal repository checks before opening a
-PR:
+does not require an API key. The benchmark is the only command in this layer
+that contacts an LLM, and it remains operator-run. Use the normal repository
+checks before opening a PR:
 
 ```bash
 uv run ruff check .

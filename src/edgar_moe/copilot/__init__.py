@@ -10,6 +10,7 @@ from .agent import (
     ResearchCopilot,
     normalize_provider_endpoint,
 )
+from .benchmark import BenchmarkFailure, BenchmarkRun, run_benchmark, write_benchmark_report
 from .contracts import Citation, CopilotAnswer, ToolDefinition, ToolResult, ToolTrace
 from .evaluation import (
     CaseEvaluation,
@@ -17,6 +18,7 @@ from .evaluation import (
     EvaluationCorpus,
     EvaluationInputError,
     EvaluationSuite,
+    answer_report,
     evaluate_report,
     evaluate_reports,
     load_evaluation_corpus,
@@ -30,6 +32,8 @@ __all__ = [
     "CopilotProviderError",
     "CopilotAnswer",
     "CaseEvaluation",
+    "BenchmarkFailure",
+    "BenchmarkRun",
     "EvaluationCase",
     "EvaluationCorpus",
     "EvaluationInputError",
@@ -43,8 +47,11 @@ __all__ = [
     "ToolInputError",
     "ToolResult",
     "ToolTrace",
+    "answer_report",
     "evaluate_report",
     "evaluate_reports",
     "load_evaluation_corpus",
     "normalize_provider_endpoint",
+    "run_benchmark",
+    "write_benchmark_report",
 ]

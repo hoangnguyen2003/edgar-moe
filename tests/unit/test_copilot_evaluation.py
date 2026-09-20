@@ -5,8 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from edgar_moe.copilot.contracts import Citation, CopilotAnswer, ToolTrace
 from edgar_moe.copilot.evaluation import (
     EvaluationInputError,
+    answer_report,
     evaluate_report,
     evaluate_reports,
     load_evaluation_corpus,
@@ -18,6 +20,26 @@ def test_checked_in_corpus_is_loadable() -> None:
 
     assert corpus.corpus_id == "copilot-v1"
     assert len(corpus.cases) == 4
+
+
+def test_answer_report_pins_the_reviewed_case_without_changing_the_envelope() -> None:
+    answer = CopilotAnswer(
+        question="Summarize the study.",
+        answer="The cited snapshot is the source.",
+        model="test-model",
+        provider="test-provider",
+        created_at="2026-01-01T00:00:00+00:00",
+        frozen_identity={"sha256": "a" * 64},
+        citations=(Citation("snapshot:test", "Test", "b" * 64),),
+        trace=(ToolTrace(1, "get_study_summary", "c" * 64, "d" * 64, 1),),
+        evidence_status="grounded",
+    )
+
+    report = answer_report(answer, case_id="summary")
+
+    assert report["evaluation_case_id"] == "summary"
+    assert report["research_only"] is True
+    assert report["answer"] == answer.answer
 
 
 def _corpus_file(tmp_path: Path) -> Path:

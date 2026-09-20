@@ -1237,6 +1237,156 @@ def research_copilot_eval(
         raise typer.Exit(code=1)
 
 
+@app.command("research-copilot-benchmark")
+def research_copilot_benchmark(
+    corpus: Annotated[
+        Path,
+        typer.Option("--corpus", help="Reviewed evaluation corpus JSON."),
+    ] = Path("config/copilot_eval_cases.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            help="Private directory for individual answer reports and the aggregate score.",
+        ),
+    ] = Path("/tmp/edgar-moe-copilot-benchmark"),
+    case_ids: Annotated[
+        list[str] | None,
+        typer.Option("--case", help="Run only this case id; repeat for multiple cases."),
+    ] = None,
+    snapshot: Annotated[
+        Path,
+        typer.Option("--snapshot", help="Immutable snapshot JSON used by the read-only tools."),
+    ] = Path("data/demo/snapshot.json"),
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            envvar="EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
+            help="Optional SELECT-only forward-registry URL.",
+        ),
+    ] = None,
+    endpoint: Annotated[
+        str | None,
+        typer.Option("--endpoint", help="Optional OpenAI-compatible chat-completions endpoint."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Optional provider model override."),
+    ] = None,
+    max_tool_calls: Annotated[
+        int | None,
+        typer.Option("--max-tool-calls", min=1, max=8, help="Bound each agent tool-call loop."),
+    ] = None,
+    fail_under: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Minimum structural pass rate."),
+    ] = 1.0,
+    plan_only: Annotated[
+        bool,
+        typer.Option("--plan-only", help="List selected cases without contacting an LLM."),
+    ] = False,
+) -> None:
+    """Run the reviewed copilot corpus as a bounded private benchmark.
+
+    Individual answer envelopes are written only to ``output_dir``. The
+    aggregate report contains hashes and structural observations, not answer
+    text, provider payloads, credentials, or endpoint URLs.
+    """
+    from edgar_moe.api.repository import SnapshotRepository
+    from edgar_moe.copilot import (
+        OpenAICompatibleProvider,
+        ReadOnlyToolset,
+        ResearchCopilot,
+    )
+    from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
+    from edgar_moe.copilot.evaluation import (
+        EvaluationCorpus,
+        EvaluationInputError,
+        load_evaluation_corpus,
+    )
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+
+    try:
+        evaluation_corpus = load_evaluation_corpus(corpus)
+        requested_case_ids = tuple(case_ids or ())
+        unknown_case_ids = sorted(
+            set(requested_case_ids) - {case.case_id for case in evaluation_corpus.cases}
+        )
+        if unknown_case_ids:
+            raise EvaluationInputError(f"unknown evaluation case id: {', '.join(unknown_case_ids)}")
+        if len(set(requested_case_ids)) != len(requested_case_ids):
+            raise EvaluationInputError("--case values must not contain duplicates")
+        selected_cases = tuple(
+            case
+            for case in evaluation_corpus.cases
+            if not requested_case_ids or case.case_id in requested_case_ids
+        )
+        selected_corpus = EvaluationCorpus(
+            corpus_id=evaluation_corpus.corpus_id,
+            cases=selected_cases,
+            sha256=evaluation_corpus.sha256,
+        )
+    except (EvaluationInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+
+    if plan_only:
+        typer.echo(
+            orjson.dumps(
+                {
+                    "schema_version": 1,
+                    "corpus_id": selected_corpus.corpus_id,
+                    "corpus_sha256": selected_corpus.sha256,
+                    "cases": [
+                        {"id": case.case_id, "question": case.question}
+                        for case in selected_corpus.cases
+                    ],
+                    "provider_contacted": False,
+                    "research_only": True,
+                },
+                option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS,
+            ).decode()
+        )
+        return
+
+    settings = runtime_settings()
+    repository = SnapshotRepository(snapshot)
+    registry_database = None
+    registry = None
+    resolved_database_url = _copilot_database_url(settings, database_url)
+    if resolved_database_url:
+        registry_database = RegistryDatabase(resolved_database_url)
+        registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot-benchmark")
+
+    try:
+        toolset = ReadOnlyToolset(repository, registry)
+        provider = OpenAICompatibleProvider(
+            endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
+            api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),
+            model=model or settings.edgar_moe_copilot_model,
+            timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
+            max_tokens=settings.edgar_moe_copilot_max_tokens,
+        )
+        copilot = ResearchCopilot(
+            provider=provider,
+            toolset=toolset,
+            max_tool_calls=max_tool_calls or settings.edgar_moe_copilot_max_tool_calls,
+        )
+        benchmark = run_benchmark(selected_corpus, copilot, output_dir)
+    finally:
+        if registry_database is not None:
+            registry_database.dispose()
+
+    aggregate = benchmark.as_dict(provider=provider.provider_name, model=provider.model)
+    summary_path = output_dir / "evaluation.json"
+    write_benchmark_report(summary_path, aggregate)
+    typer.echo(f"Wrote private copilot benchmark to {output_dir}")
+    typer.echo(orjson.dumps(aggregate, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
+    if benchmark.failures or benchmark.suite.pass_rate < fail_under or not benchmark.suite.complete:
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",
