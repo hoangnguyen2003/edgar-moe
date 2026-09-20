@@ -32,6 +32,14 @@ its generated answer before returning it, the CLI validates it before printing
 or atomically writing it, and benchmark/evaluation commands reject unverified
 reports before they enter private case files or aggregate scores.
 
+Each generated private answer may also include a bounded `usage` summary: the
+number of provider requests, total local elapsed milliseconds, and standard
+prompt/completion/total token counters when the provider reports them. Unknown
+provider metadata is discarded, counters are range-checked, and missing counters
+remain `null`. This supports operator cost/capacity review without retaining
+provider payloads, prompts, billing assumptions, or endpoint details. Aggregate
+benchmark reports still retain only structural scores and hashes.
+
 ## Safety boundary
 
 This is an operator workflow, not a public Vercel endpoint. The provider key

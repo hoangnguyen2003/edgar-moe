@@ -98,6 +98,26 @@ class ToolTrace:
         }
 
 
+@dataclass(frozen=True)
+class CopilotUsage:
+    """Bounded, non-sensitive execution telemetry for one copilot answer."""
+
+    request_count: int
+    duration_ms: int
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "request_count": self.request_count,
+            "duration_ms": self.duration_ms,
+            "prompt_tokens": self.prompt_tokens,
+            "completion_tokens": self.completion_tokens,
+            "total_tokens": self.total_tokens,
+        }
+
+
 EvidenceStatus = Literal["grounded", "uncited"]
 
 COPILOT_DISCLAIMER = (
@@ -119,9 +139,10 @@ class CopilotAnswer:
     citations: tuple[Citation, ...]
     trace: tuple[ToolTrace, ...]
     evidence_status: EvidenceStatus
+    usage: CopilotUsage | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "schema_version": 1,
             "question": self.question,
             "answer": self.answer,
@@ -135,3 +156,6 @@ class CopilotAnswer:
             "tool_trace": [item.as_dict() for item in self.trace],
             "disclaimer": COPILOT_DISCLAIMER,
         }
+        if self.usage is not None:
+            payload["usage"] = self.usage.as_dict()
+        return payload

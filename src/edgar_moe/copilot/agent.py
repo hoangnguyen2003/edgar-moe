@@ -7,7 +7,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from json import JSONDecodeError
-from typing import Protocol
+from time import monotonic
+from typing import Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import Request, urlopen
@@ -15,6 +16,7 @@ from urllib.request import Request, urlopen
 from .contracts import (
     Citation,
     CopilotAnswer,
+    CopilotUsage,
     ToolDefinition,
     ToolResult,
     ToolTrace,
@@ -25,6 +27,7 @@ from .verification import verify_copilot_answer_report
 
 _MAX_QUESTION_LENGTH = 2_000
 _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
+_MAX_PROVIDER_USAGE_TOKENS = 100_000_000
 _REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
 
@@ -44,10 +47,20 @@ class ProviderToolCall:
 
 
 @dataclass(frozen=True)
+class ProviderUsage:
+    """The small numeric usage subset accepted from a provider response."""
+
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+    total_tokens: int | None = None
+
+
+@dataclass(frozen=True)
 class ProviderResponse:
     content: str
     tool_calls: tuple[ProviderToolCall, ...]
     model: str
+    usage: ProviderUsage | None = None
 
     def as_assistant_message(self) -> dict[str, object]:
         payload: dict[str, object] = {"role": "assistant", "content": self.content}
@@ -179,11 +192,16 @@ class ResearchCopilot:
         citations: list[Citation] = []
         trace: list[ToolTrace] = []
         tool_calls_seen = 0
+        request_durations: list[int] = []
+        provider_usages: list[ProviderUsage | None] = []
         tool_definitions = self.toolset.definitions()
         allowed_tool_names = {tool.name for tool in tool_definitions}
 
         for _ in range(self.max_tool_calls + 1):
+            started = monotonic()
             response = self.provider.complete(messages, tool_definitions)
+            request_durations.append(max(0, round((monotonic() - started) * 1000)))
+            provider_usages.append(response.usage)
             messages.append(response.as_assistant_message())
             if not response.tool_calls:
                 answer = response.content.strip()
@@ -199,6 +217,13 @@ class ResearchCopilot:
                     citations=_unique_citations(citations),
                     trace=tuple(trace),
                     evidence_status="grounded" if citations else "uncited",
+                    usage=CopilotUsage(
+                        request_count=len(provider_usages),
+                        duration_ms=sum(request_durations),
+                        prompt_tokens=_sum_usage(provider_usages, "prompt_tokens"),
+                        completion_tokens=_sum_usage(provider_usages, "completion_tokens"),
+                        total_tokens=_sum_usage(provider_usages, "total_tokens"),
+                    ),
                 )
                 # Treat verification as part of the generation boundary. A
                 # caller must never be able to persist an answer envelope that
@@ -316,7 +341,47 @@ def _parse_provider_response(payload: object, *, fallback_model: str) -> Provide
         content=content,
         tool_calls=tuple(calls),
         model=model if isinstance(model, str) and model else fallback_model,
+        usage=_parse_provider_usage(payload.get("usage")),
     )
+
+
+def _parse_provider_usage(value: object) -> ProviderUsage | None:
+    """Keep only bounded standard token counters from an untrusted response."""
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        raise CopilotProviderError("copilot provider usage was invalid")
+    try:
+        return ProviderUsage(
+            prompt_tokens=_usage_count(value.get("prompt_tokens")),
+            completion_tokens=_usage_count(value.get("completion_tokens")),
+            total_tokens=_usage_count(value.get("total_tokens")),
+        )
+    except ValueError as error:
+        raise CopilotProviderError("copilot provider usage was invalid") from error
+
+
+def _usage_count(value: object) -> int | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not 0 <= value <= _MAX_PROVIDER_USAGE_TOKENS
+    ):
+        raise ValueError("invalid provider usage count")
+    return value
+
+
+def _sum_usage(usages: Sequence[ProviderUsage | None], field: str) -> int | None:
+    """Sum a counter only when every provider response reported that counter."""
+    values = [
+        cast(int | None, getattr(usage, field)) if usage is not None else None
+        for usage in usages
+    ]
+    if not values or any(value is None for value in values):
+        return None
+    return sum(value for value in values if value is not None)
 
 
 def _unique_citations(citations: Sequence[Citation]) -> tuple[Citation, ...]:

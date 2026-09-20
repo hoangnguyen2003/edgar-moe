@@ -169,6 +169,33 @@ def test_verifier_accepts_forward_diagnostic_history_tool_and_source() -> None:
     verify_copilot_answer_report(report)
 
 
+def test_verifier_accepts_bounded_usage_and_rejects_unsafe_mutations() -> None:
+    report = valid_report()
+    report["usage"] = {
+        "request_count": 2,
+        "duration_ms": 1250,
+        "prompt_tokens": 32,
+        "completion_tokens": 8,
+        "total_tokens": 40,
+    }
+    verify_copilot_answer_report(report)
+
+    invalid = deepcopy(report)
+    invalid["usage"]["request_count"] = 0
+    with pytest.raises(CopilotVerificationError, match="usage.request_count"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["usage"]["duration_ms"] = 2_000_001
+    with pytest.raises(CopilotVerificationError, match="usage.duration_ms"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["usage"]["provider_payload"] = "must not be retained"
+    with pytest.raises(CopilotVerificationError, match="unknown"):
+        verify_copilot_answer_report(invalid)
+
+
 def test_verifier_rejects_duplicate_citations_and_unknown_trace_fields() -> None:
     duplicate = valid_report()
     duplicate["citations"].append(deepcopy(duplicate["citations"][0]))
