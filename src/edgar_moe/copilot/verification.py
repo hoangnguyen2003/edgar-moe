@@ -49,7 +49,7 @@ _ANSWER_KEYS = frozenset(
         "tool_trace",
     }
 )
-_OPTIONAL_KEYS = frozenset({"evaluation_case_id"})
+_OPTIONAL_KEYS = frozenset({"evaluation_case_id", "usage"})
 _IDENTITY_KEYS = frozenset(
     {"as_of", "data_mode", "locked_test_hash", "path", "research_only", "selection_hash", "sha256"}
 )
@@ -61,6 +61,9 @@ _MAX_ANSWER_BYTES = 2_000_000
 _MAX_CITATIONS = 64
 _MAX_TRACE_ITEMS = 8
 _MAX_FIELDS = 64
+_MAX_USAGE_REQUESTS = 9
+_MAX_USAGE_DURATION_MS = 2_000_000
+_MAX_USAGE_TOKENS = 1_000_000_000
 
 
 def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
@@ -94,6 +97,8 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
         case_id = report.get("evaluation_case_id")
         if not isinstance(case_id, str) or not _IDENTIFIER.fullmatch(case_id):
             raise CopilotVerificationError("copilot answer evaluation_case_id is invalid")
+    if "usage" in report:
+        _verify_usage(report.get("usage"))
 
     _verify_frozen_identity(report.get("frozen_identity"))
     citations = _verify_citations(report.get("citations"))
@@ -174,6 +179,38 @@ def _verify_trace(value: object) -> list[dict[str, Any]]:
             )
         records.append({"name": name, "citation_count": citation_count})
     return records
+
+
+def _verify_usage(value: object) -> None:
+    usage = _exact_mapping(
+        value,
+        frozenset(
+            {
+                "request_count",
+                "duration_ms",
+                "prompt_tokens",
+                "completion_tokens",
+                "total_tokens",
+            }
+        ),
+        "usage",
+    )
+    _bounded_int(usage["request_count"], "usage.request_count", minimum=1, maximum=_MAX_USAGE_REQUESTS)
+    _bounded_int(usage["duration_ms"], "usage.duration_ms", minimum=0, maximum=_MAX_USAGE_DURATION_MS)
+    for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
+        value = usage[field]
+        if value is not None:
+            _bounded_int(value, f"usage.{field}", minimum=0, maximum=_MAX_USAGE_TOKENS)
+
+
+def _bounded_int(value: object, label: str, *, minimum: int, maximum: int) -> int:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, int)
+        or not minimum <= value <= maximum
+    ):
+        raise CopilotVerificationError(f"copilot answer {label} must be a bounded integer")
+    return value
 
 
 def _exact_mapping(value: object, keys: frozenset[str], label: str) -> Mapping[str, Any]:
