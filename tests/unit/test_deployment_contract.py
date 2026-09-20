@@ -51,3 +51,31 @@ def test_deployment_contract_requires_serving_only_vercel_source_boundary(
     assert any("!scripts/verify_public_snapshot_lock.py" in error for error in errors)
     assert any("config/*" in error for error in errors)
     assert any("!config/public_snapshot.lock.json" in error for error in errors)
+
+
+def test_deployment_contract_excludes_private_data_from_the_function() -> None:
+    payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
+    exclude_files = payload["functions"]["api/**/*.py"]["excludeFiles"]
+
+    for path in (
+        "data/**",
+        "mlruns/**",
+        "**/*.{duckdb,duckdb.wal}",
+        "ops/**",
+        "tools/**",
+        "migrations/**",
+        ".env*",
+        ".coverage",
+    ):
+        assert path in exclude_files
+
+
+def test_deployment_contract_rejects_overlong_function_glob(tmp_path: Path) -> None:
+    payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
+    payload["functions"]["api/**/*.py"]["excludeFiles"] = "x" * 257
+    path = tmp_path / "vercel.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    errors = validate_deployment_contract(path)
+
+    assert any("excludeFiles must be at most 256 characters" in error for error in errors)

@@ -14,7 +14,12 @@ terms have been independently approved.
 | Anonymous traffic | No account/authentication required for the research terminal | Cache headers and compression reduce normal load; request IDs are safe-character allowlisted | Configure CDN/provider rate limits or a WAF if traffic becomes abusive; Python process-local counters would not be reliable across serverless instances |
 | Raw source data and credentials | Not public | Raw filings, market data, model checkpoints, database URLs, R2 credentials, and source maps are excluded from the bundle and deployment inputs | Re-check provider licenses and rotate credentials after any suspected exposure |
 
-The bundle also publishes two low-cost discovery controls: `robots.txt`
+The source archive and Python Function apply the private-data boundary
+independently: raw/processed/forward data, model/operator directories, local
+database files, and dotenv files are excluded, while only the derived
+`data/demo/snapshot.json` is explicitly included. This protects local Vercel
+builds as well as Git-based deployments. The bundle also publishes two
+low-cost discovery controls: `robots.txt`
 discourages indexing of the read-only API and interactive API docs, while
 `/.well-known/security.txt` points security reports to GitHub's private advisory
 channel and identifies the supported languages. These files are checked by the

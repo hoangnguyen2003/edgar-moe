@@ -40,7 +40,24 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "!scripts/verify_public_snapshot_lock.py",
     "config/*",
     "!config/public_snapshot.lock.json",
+    "data/cache",
+    "data/forward",
+    "*.duckdb.wal",
+    "ops",
+    "tools",
+    "migrations",
 )
+REQUIRED_FUNCTION_EXCLUDE_PATHS = (
+    "data/**",
+    "mlruns/**",
+    "**/*.{duckdb,duckdb.wal}",
+    "ops/**",
+    "tools/**",
+    "migrations/**",
+    ".env*",
+    ".coverage",
+)
+MAX_FUNCTION_GLOB_LENGTH = 256
 
 
 def validate_deployment_contract(
@@ -81,9 +98,23 @@ def validate_deployment_contract(
             _require_path_tokens(
                 errors,
                 api_function.get("excludeFiles"),
-                (".github/**", "apps/**", "config/**", "docs/**", "scripts/**", "tests/**"),
+                (
+                    ".github/**",
+                    "apps/**",
+                    "config/**",
+                    "docs/**",
+                    "scripts/**",
+                    "tests/**",
+                    *REQUIRED_FUNCTION_EXCLUDE_PATHS,
+                ),
                 "functions.api/**/*.py.excludeFiles",
             )
+            exclude_files = api_function.get("excludeFiles")
+            if isinstance(exclude_files, str) and len(exclude_files) > MAX_FUNCTION_GLOB_LENGTH:
+                errors.append(
+                    "functions.api/**/*.py.excludeFiles must be at most "
+                    f"{MAX_FUNCTION_GLOB_LENGTH} characters"
+                )
             if "env" in api_function:
                 errors.append("functions.api/**/*.py must not define deployment env secrets")
 
