@@ -84,7 +84,7 @@ flowchart LR
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup |
 | Optional alert webhook | Receives redacted failed-run and health classifications | Secret is runner-only; delivery is best-effort and never contains database/R2 credentials |
 | Go evidence auditor | Cross-check registry rows against object bytes | Read-only operational boundary; no repair or write authority |
-| Research copilot | Operator-run LLM explanation and evidence navigation | Bounded read-only tools; citations and frozen identity are retained; no forecast, registry, artifact, or GitHub writes |
+| Research copilot | Operator-run LLM explanation, evidence navigation, and human quality review | Bounded read-only tools; citations, frozen identity, structural evaluation, and append-only rubric history are retained; no forecast, registry, artifact, or GitHub writes |
 
 Production workflow sequence: restore caches and verify model → refresh inputs →
 build dataset → commit pre-entry forecasts → settle mature outcomes → produce
