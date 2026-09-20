@@ -1161,6 +1161,16 @@ def research_copilot(
             help="Optional SELECT-only forward-registry URL; local SQLite is also supported.",
         ),
     ] = None,
+    diagnostic_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-path",
+            help=(
+                "Optional private forward diagnostic JSON; only a redacted summary is sent "
+                "to the operator-run copilot."
+            ),
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", help="Optional private JSON answer/evidence report."),
@@ -1210,7 +1220,7 @@ def research_copilot(
         registry_database = RegistryDatabase(resolved_database_url)
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot")
     try:
-        toolset = ReadOnlyToolset(repository, registry)
+        toolset = ReadOnlyToolset(repository, registry, diagnostic_path)
         if plan_only:
             report: dict[str, object] = {
                 "schema_version": 1,
@@ -1372,6 +1382,16 @@ def research_copilot_benchmark(
             help="Optional SELECT-only forward-registry URL.",
         ),
     ] = None,
+    diagnostic_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-path",
+            help=(
+                "Optional private forward diagnostic JSON; only a redacted summary is sent "
+                "to each operator-run case."
+            ),
+        ),
+    ] = None,
     endpoint: Annotated[
         str | None,
         typer.Option("--endpoint", help="Optional OpenAI-compatible chat-completions endpoint."),
@@ -1466,7 +1486,7 @@ def research_copilot_benchmark(
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot-benchmark")
 
     try:
-        toolset = ReadOnlyToolset(repository, registry)
+        toolset = ReadOnlyToolset(repository, registry, diagnostic_path)
         provider = OpenAICompatibleProvider(
             endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
             api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),

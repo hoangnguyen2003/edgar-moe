@@ -221,6 +221,9 @@ envelopes under `/tmp` and keeps only structural hashes in its aggregate score.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.
+For operational context, pass an explicitly downloaded forward diagnostic with
+`--diagnostic-path`; the copilot then receives only a validated, redacted
+summary and a content hash, never observations or forecast identifiers.
 
 Before treating the anonymous site as a distributable release, run the
 provider-neutral public-surface readiness report:

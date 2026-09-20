@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -11,6 +12,7 @@ from edgar_moe.api.repository import SnapshotRepository
 from edgar_moe.forward.registry import ForwardRegistry
 
 from .contracts import Citation, ToolDefinition, ToolResult, content_hash
+from .diagnostics import DiagnosticSummaryError, read_forward_diagnostic_summary
 
 _ACCESSION = re.compile(r"^\d{10}-\d{2}-\d{6}$")
 _MAX_EVENT_ROWS = 10
@@ -26,9 +28,10 @@ class ReadOnlyToolset:
 
     repository: SnapshotRepository
     registry: ForwardRegistry | None = None
+    diagnostic_path: Path | None = None
 
     def definitions(self) -> tuple[ToolDefinition, ...]:
-        return (
+        definitions = [
             ToolDefinition(
                 name="get_frozen_identity",
                 description=(
@@ -97,7 +100,24 @@ class ReadOnlyToolset:
                 ),
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
-        )
+        ]
+        if self.diagnostic_path is not None:
+            definitions.append(
+                ToolDefinition(
+                    name="get_forward_diagnostic",
+                    description=(
+                        "Read a redacted summary of the operator-supplied short-horizon forward "
+                        "diagnostic. It is not the official 20-session evaluation and contains "
+                        "no forecast or filing observations."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {},
+                        "additionalProperties": False,
+                    },
+                )
+            )
+        return tuple(definitions)
 
     def execute(self, name: str, arguments: dict[str, object]) -> ToolResult:
         """Execute exactly one allowlisted read operation."""
@@ -171,6 +191,43 @@ class ReadOnlyToolset:
                 source="api:/api/v1/governance",
                 label="Frozen-v1 governance and forward status",
                 fields=("frozen_v1", "public_data", "controls", "forward_status"),
+            )
+        if name == "get_forward_diagnostic":
+            if self.diagnostic_path is None:
+                raise ToolInputError("forward diagnostic is not configured")
+            try:
+                payload = read_forward_diagnostic_summary(self.diagnostic_path)
+            except DiagnosticSummaryError:
+                payload = {
+                    "available": False,
+                    "reason": "diagnostic_report_unavailable_or_invalid",
+                }
+                return _result(
+                    name,
+                    payload,
+                    source="snapshot:forward-diagnostic",
+                    label="Forward diagnostic availability",
+                    fields=("available", "reason"),
+                )
+            return _result(
+                name,
+                payload,
+                source="snapshot:forward-diagnostic",
+                label="Redacted short-horizon forward diagnostic",
+                fields=(
+                    "status",
+                    "as_of",
+                    "forecast_count",
+                    "matured_count",
+                    "pending_count",
+                    "coverage",
+                    "rank_ic",
+                    "rmse",
+                    "mae",
+                    "directional_accuracy",
+                    "unique_event_evaluation",
+                    "source_sha256",
+                ),
             )
         raise ToolInputError(f"tool is not allowlisted: {name}")
 

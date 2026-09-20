@@ -53,6 +53,25 @@ The model is an explanation and evidence-navigation assistant. It does not
 replace statistical evaluation, the frozen model identity checks, a human
 review, or investment/legal/compliance advice.
 
+### Inspect a private forward diagnostic
+
+An operator may explicitly provide one downloaded forward-cycle diagnostic to
+the copilot. The agent receives only a validated summary of counts, maturity,
+coverage, and short-horizon metrics; observations, event/forecast identifiers,
+unmatched rows, and the local filesystem path are removed before the tool
+result reaches the provider. The source artifact is represented by a SHA-256
+digest in the citation.
+
+```bash
+uv run edgar-moe research-copilot \
+  --diagnostic-path /private/path/diagnostic-2026-09-19.json \
+  "Is the latest short-horizon diagnostic mature, and what remains pending?"
+```
+
+This capability is opt-in and operator-only. Without `--diagnostic-path` the
+tool is not advertised to the model. Short-horizon diagnostics remain
+research-only and never replace the official twenty-session evaluation.
+
 ## Run it locally
 
 First inspect the exact tool contract without contacting a provider:
