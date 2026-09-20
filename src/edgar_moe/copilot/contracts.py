@@ -100,6 +100,11 @@ class ToolTrace:
 
 EvidenceStatus = Literal["grounded", "uncited"]
 
+COPILOT_DISCLAIMER = (
+    "Evidence-grounded research assistance only; this output is not investment advice, "
+    "a forecast, a suitability assessment, or an order instruction."
+)
+
 
 @dataclass(frozen=True)
 class CopilotAnswer:
@@ -128,8 +133,5 @@ class CopilotAnswer:
             "frozen_identity": self.frozen_identity,
             "citations": [citation.as_dict() for citation in self.citations],
             "tool_trace": [item.as_dict() for item in self.trace],
-            "disclaimer": (
-                "Evidence-grounded research assistance only; this output is not investment advice, "
-                "a forecast, a suitability assessment, or an order instruction."
-            ),
+            "disclaimer": COPILOT_DISCLAIMER,
         }

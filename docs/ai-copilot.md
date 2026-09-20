@@ -85,6 +85,17 @@ Private reports are intentionally not checked into Git. If a report is shared
 for review, retain the JSON identity and citations and remove the question if
 it contains personal or confidential context.
 
+Before sharing or archiving a saved answer envelope, verify its integrity
+offline. The verifier checks the research-only boundary, frozen identity,
+timestamp, citation and tool-trace digests, read-only tool names, bounded
+snapshot/API sources, and grounded-versus-uncited consistency. It never prints
+the answer text or contacts the provider:
+
+```bash
+uv run edgar-moe research-copilot-verify \
+  /tmp/edgar-moe-copilot-benchmark/governance-status.json
+```
+
 ## Evaluate a private report
 
 The repository includes a small reviewed corpus at

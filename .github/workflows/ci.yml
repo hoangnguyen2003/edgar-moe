@@ -67,6 +67,8 @@ jobs:
         run: uv run edgar-moe research-drift-history-verify --help
       - name: Check research copilot command is runnable
         run: uv run edgar-moe research-copilot --help
+      - name: Check research copilot verifier command is runnable
+        run: uv run edgar-moe research-copilot-verify --help
       - name: Check research copilot evaluation command is runnable
         run: uv run edgar-moe research-copilot-eval --help
       - name: Check research copilot benchmark command is runnable

@@ -1200,6 +1200,33 @@ def research_copilot(
         typer.echo(serialized.decode())
 
 
+@app.command("research-copilot-verify")
+def research_copilot_verify(
+    answer: Annotated[Path, typer.Argument(help="Private research-copilot answer JSON.")],
+) -> None:
+    """Verify a saved copilot answer envelope without printing its answer text."""
+    from edgar_moe.copilot.verification import (
+        CopilotVerificationError,
+        verify_copilot_answer_report,
+    )
+
+    try:
+        payload = json.loads(answer.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise CopilotVerificationError("copilot answer must be a JSON object")
+        verify_copilot_answer_report(payload)
+    except (CopilotVerificationError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+    citations = payload["citations"]
+    trace = payload["tool_trace"]
+    typer.echo(
+        "Verified research copilot answer envelope "
+        f"(provider={payload['provider']}; model={payload['model']}; "
+        f"evidence_status={payload['evidence_status']}; "
+        f"citations={len(citations)}; tool_calls={len(trace)})"
+    )
+
+
 @app.command("research-copilot-eval")
 def research_copilot_eval(
     answers: Annotated[
