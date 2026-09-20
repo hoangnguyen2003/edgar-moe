@@ -64,7 +64,9 @@ jobs:
       - name: Check research drift history command is runnable
         run: uv run edgar-moe research-drift-history --help
       - name: Check deployment smoke command is runnable
-        run: uv run python scripts/smoke_deployment.py --help
+        run: |
+          uv run python scripts/smoke_deployment.py --help
+          uv run python scripts/write_deployment_failure_evidence.py --help
       - name: Verify immutable public snapshot lock
         run: uv run python scripts/verify_public_snapshot_lock.py
       - name: Verify frozen v1 runtime bundle identity
