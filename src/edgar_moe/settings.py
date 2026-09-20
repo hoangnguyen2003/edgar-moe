@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -127,6 +127,13 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_r2_bucket: str = ""
     edgar_moe_r2_access_key_id: str = ""
     edgar_moe_r2_secret_access_key: str = ""
+    # Optional operator-run LLM copilot. The public API never reads these fields.
+    edgar_moe_copilot_api_key: SecretStr = SecretStr("")
+    edgar_moe_copilot_endpoint: str = "https://api.openai.com/v1/chat/completions"
+    edgar_moe_copilot_model: str = "gpt-4o-mini"
+    edgar_moe_copilot_timeout_seconds: float = Field(default=30.0, gt=0, le=120)
+    edgar_moe_copilot_max_tokens: int = Field(default=800, ge=1, le=8_000)
+    edgar_moe_copilot_max_tool_calls: int = Field(default=4, ge=1, le=8)
 
 
 @lru_cache

@@ -191,6 +191,14 @@ The history remains `insufficient_history` until the configured minimum number
 of independently hashed reports is present. The current one-observation review
 is retained at [`reports/research-drift-history.json`](reports/research-drift-history.json).
 
+For evidence navigation, the optional operator-run research copilot can answer
+questions over the frozen snapshot and (when configured) the forward registry.
+It uses bounded read-only tools, content-hashed citations, and an explicit
+`uncited` status when the provider supplies no evidence. It cannot write
+forecasts, labels, registry rows, model artifacts, or GitHub state. See the
+[copilot runbook](docs/ai-copilot.md), and use `--plan-only` first to inspect
+the contract without contacting an LLM provider.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
@@ -271,6 +279,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 | `src/edgar_moe/backtest` | Neutral allocation, event-driven accounting, costs, and inference metrics |
 | `src/edgar_moe/api` | Versioned, snapshot-backed FastAPI contract |
 | `src/edgar_moe/forward` | Frozen inference, append-only registry, label settlement, artifact storage, and forward metrics |
+| `src/edgar_moe/copilot` | Optional bounded LLM provider adapter, read-only evidence tools, citations, and operator report envelope |
 | `apps/web` | React/TypeScript research terminal |
 
 ## Research contract
