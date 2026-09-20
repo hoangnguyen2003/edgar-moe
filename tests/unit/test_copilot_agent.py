@@ -4,6 +4,7 @@ import io
 import json
 from pathlib import Path
 from urllib.error import HTTPError, URLError
+from urllib.request import Request
 
 import pytest
 
@@ -16,6 +17,7 @@ from edgar_moe.copilot.agent import (
     ProviderToolCall,
     ProviderUsage,
     ResearchCopilot,
+    _NoRedirectHandler,
     _parse_provider_response,
     normalize_provider_endpoint,
 )
@@ -250,6 +252,43 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
         normalize_provider_endpoint("https://api.example.com/v1/chat/completions?token=secret")
 
 
+def test_provider_redirects_are_rejected_before_following_the_new_url() -> None:
+    request = Request("https://provider.example/v1/chat/completions")
+
+    with pytest.raises(CopilotProviderError, match="redirects are not allowed"):
+        _NoRedirectHandler().redirect_request(
+            request,
+            None,
+            302,
+            "Found",
+            {},
+            "https://unexpected.example/v1/chat/completions",
+        )
+
+
+def test_provider_redirect_failures_are_not_retried(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = 0
+
+    def fake_open(_request: object, *, timeout: float) -> None:
+        del timeout
+        nonlocal calls
+        calls += 1
+        raise CopilotProviderError("copilot provider redirects are not allowed")
+
+    monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_open)
+
+    with pytest.raises(CopilotProviderError, match="redirects are not allowed"):
+        OpenAICompatibleProvider(
+            endpoint="https://provider.example/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+            max_retries=2,
+            retry_backoff_seconds=0,
+        ).complete([], [])
+
+    assert calls == 1
+
+
 def test_provider_retries_transient_http_failures_and_counts_attempts(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -268,7 +307,7 @@ def test_provider_retries_transient_http_failures_and_counts_attempts(
             ).encode()
         )
 
-    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+    monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
     monkeypatch.setattr("edgar_moe.copilot.agent.sleep", delays.append)
 
     response = OpenAICompatibleProvider(
@@ -295,7 +334,7 @@ def test_provider_does_not_retry_authentication_failures(monkeypatch: pytest.Mon
         calls += 1
         raise HTTPError("https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None)
 
-    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+    monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
 
     with pytest.raises(CopilotProviderError, match="HTTP 401"):
         OpenAICompatibleProvider(
@@ -324,7 +363,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
             json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
         )
 
-    monkeypatch.setattr("edgar_moe.copilot.agent.urlopen", fake_urlopen)
+    monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
     monkeypatch.setattr("edgar_moe.copilot.agent.sleep", lambda _delay: None)
 
     response = OpenAICompatibleProvider(

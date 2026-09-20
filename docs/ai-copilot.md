@@ -40,6 +40,13 @@ the tool-contract digest is content-addressed because optional diagnostic tools
 can change the allowed schema. Existing schema-1 reports without this optional
 record remain verifiable.
 
+The provider HTTP client uses a no-redirect opener. A configured HTTPS endpoint
+or loopback HTTP endpoint must answer directly; a `3xx` response fails closed
+before a second host can receive the request. Redirects are not treated as
+transient failures and are never retried. This keeps the provider egress
+boundary explicit and prevents an endpoint-controlled redirect from weakening
+the endpoint validation contract.
+
 Envelope verification is enforced at every local boundary: the agent validates
 its generated answer before returning it, the CLI validates it before printing
 or atomically writing it, and benchmark/evaluation commands reject unverified
@@ -107,7 +114,7 @@ copilot:
   `rejected_tool_request` trace marker, never as an executable or allowlisted
   write capability; and
 - uses a zero-temperature request, bounded timeout, response-size limit, and
-  token/tool-call budgets; and
+  token/tool-call budgets, and rejects provider redirects; and
 - must describe missing, pending, or negative evidence instead of inventing a
   metric or turning a research result into a recommendation.
 
@@ -336,8 +343,9 @@ recommendation, or permission to retrain the frozen v1 model.
 
 Invalid tool arguments are returned as a rejected read-only result; unknown
 tools never execute. Provider errors expose only a coarse failure type, not
-provider response bodies or authorization headers. Exceeding the tool-call
-budget fails the command rather than allowing an unbounded loop.
+provider response bodies or authorization headers. Redirect responses fail
+closed and are not retried. Exceeding the tool-call budget fails the command
+rather than allowing an unbounded loop.
 
 The contract is covered by unit tests that exercise endpoint validation,
 prompt/tool boundaries, citation hashes, unconfigured forward status, and the

@@ -33,6 +33,15 @@ Each authenticated layer has a JSON manifest recording source identity, configur
 
 Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The Vercel source boundary excludes the research lockfile, private research caches, and operator tree, retaining only the reviewed snapshot-lock validator inputs. The function-level boundary repeats those data exclusions and explicitly includes the derived demo snapshot plus its reviewed lock. `SnapshotRepository` verifies the lock before serving and rechecks it when either file changes, so a local checkout with raw filings or forward artifacts cannot create an oversized or identity-drifting serving bundle. The function therefore installs the core serving dependencies from `pyproject.toml`. The React application performs visualization and filtering but no model inference or order routing. A provider-neutral Docker image packages the same serving boundary for a future container host, including the reviewed lock as a non-secret runtime input; it is non-root, healthchecked, and does not include the private forward runner or source-data credentials.
 
+The operator-run copilot is a separate egress boundary: its provider adapter
+accepts HTTPS for remote providers and loopback HTTP for local runtimes, then
+uses a no-redirect opener so a provider response cannot silently move the
+request to another origin. Redirects fail closed and are not included in the
+transient retry policy. The provider key and evidence context remain outside
+the public API and browser bundle.
+
+The provider egress decision is recorded in [ADR 0010](adr/0010-copilot-provider-redirect-boundary.md).
+
 ## Architecture baseline — September 18, 2026
 
 This is a repository-backed description, not a certification of cloud account

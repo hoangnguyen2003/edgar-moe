@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from json import JSONDecodeError
 from time import monotonic, sleep
-from typing import Protocol, cast
+from typing import Any, Protocol, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .contracts import (
     Citation,
@@ -47,6 +47,27 @@ class CopilotError(RuntimeError):
 
 class CopilotProviderError(CopilotError):
     """Raised when an LLM provider cannot produce a valid response."""
+
+
+class _NoRedirectHandler(HTTPRedirectHandler):
+    """Fail closed instead of following a provider-controlled redirect."""
+
+    def redirect_request(
+        self,
+        req: Request,
+        fp: object,
+        code: int,
+        msg: str,
+        headers: object,
+        newurl: str,
+    ) -> Request:
+        del req, fp, code, msg, headers, newurl
+        raise CopilotProviderError("copilot provider redirects are not allowed")
+
+
+def _open_provider_request(request: Request, *, timeout: float) -> Any:
+    """Open one provider request without following redirects."""
+    return build_opener(_NoRedirectHandler()).open(request, timeout=timeout)
 
 
 @dataclass(frozen=True)
@@ -175,7 +196,7 @@ class OpenAICompatibleProvider:
         while True:
             attempts += 1
             try:
-                with urlopen(request, timeout=self.timeout_seconds) as response:
+                with _open_provider_request(request, timeout=self.timeout_seconds) as response:
                     raw = response.read(_MAX_PROVIDER_RESPONSE_BYTES + 1)
             except HTTPError as error:
                 if error.code not in _RETRYABLE_HTTP_STATUSES or attempts > self.max_retries:
