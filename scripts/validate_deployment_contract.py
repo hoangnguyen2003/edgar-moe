@@ -34,9 +34,20 @@ PRIVATE_RUNTIME_NAMES = (
     "EDGAR_MOE_R2_ACCESS_KEY_ID",
     "EDGAR_MOE_R2_SECRET_ACCESS_KEY",
 )
+REQUIRED_VERCEL_IGNORE_RULES = (
+    "uv.lock",
+    "scripts/*",
+    "!scripts/verify_public_snapshot_lock.py",
+    "config/*",
+    "!config/public_snapshot.lock.json",
+)
 
 
-def validate_deployment_contract(path: Path = Path("vercel.json")) -> list[str]:
+def validate_deployment_contract(
+    path: Path = Path("vercel.json"),
+    *,
+    vercelignore_path: Path = Path(".vercelignore"),
+) -> list[str]:
     """Return redacted validation errors for the serving-tier contract."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -105,7 +116,24 @@ def validate_deployment_contract(path: Path = Path("vercel.json")) -> list[str]:
     for name in PRIVATE_RUNTIME_NAMES:
         if name in serialized:
             errors.append(f"private runtime name found in deployment contract: {name}")
+    _validate_vercel_source_boundary(vercelignore_path, errors)
     return errors
+
+
+def _validate_vercel_source_boundary(path: Path, errors: list[str]) -> None:
+    """Keep research dependencies and private operator inputs out of Vercel builds."""
+    try:
+        rules = {
+            line.strip()
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+    except (OSError, UnicodeDecodeError):
+        errors.append(f"Vercel source boundary file is not readable: {path}")
+        return
+    for rule in REQUIRED_VERCEL_IGNORE_RULES:
+        if rule not in rules:
+            errors.append(f".vercelignore is missing required source-boundary rule: {rule}")
 
 
 def _require_path_tokens(

@@ -8,6 +8,7 @@
 .mypy_cache
 .coverage
 htmlcov
+uv.lock
 dist
 build
 *.egg-info
@@ -18,8 +19,12 @@ tests
 docs
 notebooks
 reports
-scripts
-config
+# The Vercel build contract needs these two reviewed inputs, but no other
+# operator scripts or private configuration should enter the source archive.
+scripts/*
+!scripts/verify_public_snapshot_lock.py
+config/*
+!config/public_snapshot.lock.json
 .github
 data/raw
 data/interim

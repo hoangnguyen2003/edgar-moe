@@ -38,3 +38,16 @@ def test_deployment_contract_rejects_private_runtime_names(tmp_path: Path) -> No
     errors = validate_deployment_contract(path)
 
     assert any("private runtime name" in error for error in errors)
+
+
+def test_deployment_contract_requires_serving_only_vercel_source_boundary(
+    tmp_path: Path,
+) -> None:
+    ignore_path = tmp_path / ".vercelignore"
+    ignore_path.write_text("uv.lock\nscripts/*\n", encoding="utf-8")
+
+    errors = validate_deployment_contract(Path("vercel.json"), vercelignore_path=ignore_path)
+
+    assert any("!scripts/verify_public_snapshot_lock.py" in error for error in errors)
+    assert any("config/*" in error for error in errors)
+    assert any("!config/public_snapshot.lock.json" in error for error in errors)
