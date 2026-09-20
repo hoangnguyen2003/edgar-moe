@@ -6,7 +6,7 @@
   "outputDirectory": "public",
   "functions": {
     "api/**/*.py": {
-      "includeFiles": "{data/demo/snapshot.json,src/edgar_moe/**}",
+      "includeFiles": "{config/public_snapshot.lock.json,data/demo/snapshot.json,src/edgar_moe/**}",
       "excludeFiles": "{.venv/**,.github/**,apps/**,config/**,docs/**,notebooks/**,reports/**,scripts/**,tests/**,dist/**,data/**,mlruns/**,**/*.{duckdb,duckdb.wal},**/__pycache__/**,.mypy_cache/**,.pytest_cache/**,.ruff_cache/**,ops/**,tools/**,migrations/**,.env*,.coverage}"
     }
   },

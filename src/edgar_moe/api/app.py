@@ -41,7 +41,10 @@ from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.settings import RuntimeSettings, runtime_settings
 
 settings = runtime_settings()
-repository = SnapshotRepository(settings.edgar_moe_demo_snapshot)
+repository = SnapshotRepository(
+    settings.edgar_moe_demo_snapshot,
+    lock_path=settings.edgar_moe_public_snapshot_lock,
+)
 
 
 def _api_registry_database_url(settings: RuntimeSettings) -> str:
