@@ -30,6 +30,11 @@ from .evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from .readiness import (
+    CopilotReadinessError,
+    build_copilot_readiness,
+    verify_copilot_readiness,
+)
 from .review import (
     ReviewInputError,
     append_copilot_reviews,
@@ -77,4 +82,7 @@ __all__ = [
     "verify_copilot_review_history",
     "write_copilot_review_history",
     "verify_copilot_answer_report",
+    "CopilotReadinessError",
+    "build_copilot_readiness",
+    "verify_copilot_readiness",
 ]

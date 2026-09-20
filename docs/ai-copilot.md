@@ -202,6 +202,25 @@ case/answer reviews are rejected, and the resulting status is
 an auditable quality record only; it cannot retrain the frozen model, change
 forecasts, or authorize an investment decision.
 
+Before relying on a benchmark in a research review, combine its aggregate
+report and the private review history with the read-only readiness gate:
+
+```bash
+uv run edgar-moe research-copilot-readiness \
+  --benchmark /tmp/edgar-moe-copilot-benchmark/evaluation.json \
+  --history /tmp/edgar-moe-copilot-review-history.json \
+  --min-pass-rate 1.0 \
+  --output /tmp/edgar-moe-copilot-readiness.json
+```
+
+The gate revalidates both inputs, checks that the current benchmark answer
+hashes are reviewed, and exits non-zero unless the benchmark is complete and
+passing and the history is accepted. Its content-addressed output contains
+only check statuses, blocker codes, counts, and identities; it never includes
+questions, answers, provider payloads, or credentials. A `ready` result is a
+structural quality signal, not a truth guarantee, investment recommendation,
+or permission to retrain the frozen v1 model.
+
 ## Failure behavior and verification
 
 Invalid tool arguments are returned as a rejected read-only result; unknown
