@@ -1176,6 +1176,67 @@ def research_copilot(
         typer.echo(serialized.decode())
 
 
+@app.command("research-copilot-eval")
+def research_copilot_eval(
+    answers: Annotated[
+        list[Path],
+        typer.Argument(help="Private JSON answer reports produced by research-copilot."),
+    ],
+    corpus: Annotated[
+        Path,
+        typer.Option("--corpus", help="Reviewed evaluation corpus JSON."),
+    ] = Path("config/copilot_eval_cases.json"),
+    output: Annotated[
+        Path | None,
+        typer.Option("--output", help="Optional private JSON evaluation report."),
+    ] = None,
+    fail_under: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Minimum pass rate; exit non-zero below this value."),
+    ] = 1.0,
+    require_complete: Annotated[
+        bool,
+        typer.Option("--require-complete", help="Fail unless every corpus case has an answer."),
+    ] = False,
+) -> None:
+    """Score private copilot reports against the reviewed evidence contract.
+
+    This is an offline structural evaluation. It never contacts an LLM and it
+    never writes answer text into the aggregate report.
+    """
+    from edgar_moe.copilot.evaluation import (
+        EvaluationInputError,
+        evaluate_reports,
+        load_evaluation_corpus,
+    )
+
+    try:
+        evaluation_corpus = load_evaluation_corpus(corpus)
+        reports: list[dict[str, object]] = []
+        for answer_path in answers:
+            parsed = json.loads(answer_path.read_text(encoding="utf-8"))
+            if not isinstance(parsed, dict):
+                raise EvaluationInputError(f"answer report must be a JSON object: {answer_path}")
+            reports.append({str(key): value for key, value in parsed.items()})
+        suite = evaluate_reports(tuple(reports), evaluation_corpus)
+    except (EvaluationInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+
+    report = suite.as_dict()
+    if require_complete and not suite.complete:
+        report["complete_gate_failed"] = True
+    serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+    if output is not None:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temporary_output = output.with_suffix(output.suffix + ".tmp")
+        temporary_output.write_bytes(serialized)
+        temporary_output.replace(output)
+        typer.echo(f"Wrote private copilot evaluation to {output}")
+    typer.echo(serialized.decode())
+    if (require_complete and not suite.complete) or suite.pass_rate < fail_under:
+        raise typer.Exit(code=1)
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",

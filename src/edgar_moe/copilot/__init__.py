@@ -11,6 +11,16 @@ from .agent import (
     normalize_provider_endpoint,
 )
 from .contracts import Citation, CopilotAnswer, ToolDefinition, ToolResult, ToolTrace
+from .evaluation import (
+    CaseEvaluation,
+    EvaluationCase,
+    EvaluationCorpus,
+    EvaluationInputError,
+    EvaluationSuite,
+    evaluate_report,
+    evaluate_reports,
+    load_evaluation_corpus,
+)
 from .tools import ReadOnlyToolset, ToolInputError
 
 __all__ = [
@@ -19,6 +29,11 @@ __all__ = [
     "CopilotProvider",
     "CopilotProviderError",
     "CopilotAnswer",
+    "CaseEvaluation",
+    "EvaluationCase",
+    "EvaluationCorpus",
+    "EvaluationInputError",
+    "EvaluationSuite",
     "OpenAICompatibleProvider",
     "ProviderResponse",
     "ProviderToolCall",
@@ -28,5 +43,8 @@ __all__ = [
     "ToolInputError",
     "ToolResult",
     "ToolTrace",
+    "evaluate_report",
+    "evaluate_reports",
+    "load_evaluation_corpus",
     "normalize_provider_endpoint",
 ]
