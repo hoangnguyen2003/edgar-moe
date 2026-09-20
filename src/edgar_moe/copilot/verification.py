@@ -62,7 +62,9 @@ _MAX_ANSWER_BYTES = 2_000_000
 _MAX_CITATIONS = 64
 _MAX_TRACE_ITEMS = 8
 _MAX_FIELDS = 64
-_MAX_USAGE_REQUESTS = 9
+# At most eight tool calls plus one final answer completion, with up to three
+# retries for each provider completion.
+_MAX_USAGE_REQUESTS = (8 + 1) * (3 + 1)
 _MAX_USAGE_DURATION_MS = 2_000_000
 _MAX_USAGE_TOKENS = 1_000_000_000
 

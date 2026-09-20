@@ -33,3 +33,11 @@ def test_copilot_retry_settings_are_bounded_and_configurable(monkeypatch) -> Non
 
     assert settings.edgar_moe_copilot_max_retries == 3
     assert settings.edgar_moe_copilot_retry_backoff_seconds == 1.5
+
+
+def test_copilot_duration_budget_is_bounded_and_configurable(monkeypatch) -> None:
+    monkeypatch.setenv("EDGAR_MOE_COPILOT_MAX_DURATION_SECONDS", "450")
+
+    settings = RuntimeSettings(_env_file=None)
+
+    assert settings.edgar_moe_copilot_max_duration_seconds == 450
