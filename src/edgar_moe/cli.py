@@ -1144,7 +1144,12 @@ def research_copilot(
     deployment state. Use --plan-only to inspect the agent boundary for free.
     """
     from edgar_moe.api.repository import SnapshotRepository
-    from edgar_moe.copilot import OpenAICompatibleProvider, ReadOnlyToolset, ResearchCopilot
+    from edgar_moe.copilot import (
+        OpenAICompatibleProvider,
+        ReadOnlyToolset,
+        ResearchCopilot,
+        verify_copilot_answer_report,
+    )
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
 
@@ -1189,6 +1194,8 @@ def research_copilot(
         if registry_database is not None:
             registry_database.dispose()
 
+    if not plan_only:
+        verify_copilot_answer_report(report)
     serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
     if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)

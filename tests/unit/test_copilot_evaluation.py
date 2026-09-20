@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from edgar_moe.copilot.contracts import Citation, CopilotAnswer, ToolTrace
+from edgar_moe.copilot.contracts import COPILOT_DISCLAIMER, Citation, CopilotAnswer, ToolTrace
 from edgar_moe.copilot.evaluation import (
     EvaluationInputError,
     answer_report,
@@ -13,6 +13,7 @@ from edgar_moe.copilot.evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from edgar_moe.copilot.verification import CopilotVerificationError
 
 
 def test_checked_in_corpus_is_loadable() -> None:
@@ -29,7 +30,15 @@ def test_answer_report_pins_the_reviewed_case_without_changing_the_envelope() ->
         model="test-model",
         provider="test-provider",
         created_at="2026-01-01T00:00:00+00:00",
-        frozen_identity={"sha256": "a" * 64},
+        frozen_identity={
+            "path": "data/demo/snapshot.json",
+            "sha256": "a" * 64,
+            "data_mode": "demo",
+            "as_of": "2026-01-01",
+            "selection_hash": "b" * 64,
+            "locked_test_hash": "c" * 64,
+            "research_only": True,
+        },
         citations=(Citation("snapshot:test", "Test", "b" * 64),),
         trace=(ToolTrace(1, "get_study_summary", "c" * 64, "d" * 64, 1),),
         evidence_status="grounded",
@@ -77,15 +86,38 @@ def _grounded_report() -> dict[str, object]:
         "schema_version": 1,
         "question": "Summarize the study.",
         "answer": "The study is documented in the cited snapshot.",
+        "model": "test-model",
+        "provider": "test-provider",
+        "created_at": "2026-01-01T00:00:00Z",
         "research_only": True,
         "evidence_status": "grounded",
+        "frozen_identity": {
+            "path": "data/demo/snapshot.json",
+            "sha256": "1" * 64,
+            "data_mode": "demo",
+            "as_of": "2026-01-01",
+            "selection_hash": "2" * 64,
+            "locked_test_hash": "3" * 64,
+            "research_only": True,
+        },
         "citations": [
             {
                 "source": "snapshot:data/demo/snapshot.json",
+                "label": "Frozen study summary",
                 "evidence_sha256": "a" * 64,
+                "fields": ["summary"],
             }
         ],
-        "tool_trace": [{"name": "get_study_summary"}],
+        "tool_trace": [
+            {
+                "call_index": 1,
+                "name": "get_study_summary",
+                "arguments_sha256": "4" * 64,
+                "result_sha256": "5" * 64,
+                "citation_count": 1,
+            }
+        ],
+        "disclaimer": COPILOT_DISCLAIMER,
     }
 
 
@@ -99,6 +131,15 @@ def test_evaluation_requires_expected_tools_and_sources(tmp_path: Path) -> None:
     assert suite.pass_rate == 1.0
     assert suite.missing_case_ids == ("trade-request",)
     assert len(suite.cases[0].answer_sha256) == 64
+
+
+def test_evaluation_rejects_an_unverified_answer_envelope(tmp_path: Path) -> None:
+    corpus = load_evaluation_corpus(_corpus_file(tmp_path))
+    report = _grounded_report()
+    report.pop("provider")
+
+    with pytest.raises(CopilotVerificationError, match="missing fields"):
+        evaluate_reports((report,), corpus)
 
 
 def test_uncited_answer_with_a_tool_or_citation_fails() -> None:

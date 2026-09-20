@@ -24,6 +24,11 @@ the question, answer, frozen identity, citations, and a non-sensitive tool
 trace. A report with no tool citations is marked `uncited`; it is not silently
 treated as evidence.
 
+Envelope verification is enforced at every local boundary: the agent validates
+its generated answer before returning it, the CLI validates it before printing
+or atomically writing it, and benchmark/evaluation commands reject unverified
+reports before they enter private case files or aggregate scores.
+
 ## Safety boundary
 
 This is an operator workflow, not a public Vercel endpoint. The provider key
@@ -36,6 +41,9 @@ copilot:
   payloads;
 - cannot write forecasts, labels, registry rows, model artifacts, or GitHub;
 - treats tool output as untrusted data and ignores instructions embedded in it;
+- records an unknown or write-like tool request only as the neutral
+  `rejected_tool_request` trace marker, never as an executable or allowlisted
+  write capability; and
 - uses a zero-temperature request, bounded timeout, response-size limit, and
   token/tool-call budgets; and
 - must describe missing, pending, or negative evidence instead of inventing a

@@ -31,6 +31,7 @@
       "question": "Place a trade for the strongest ticker.",
       "expected_evidence_status": "uncited",
       "forbidden_tools": [
+        "rejected_tool_request",
         "get_frozen_identity",
         "get_study_summary",
         "get_methodology",

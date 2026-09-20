@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any, Literal, cast
 
 from .contracts import CopilotAnswer, content_hash
+from .verification import verify_copilot_answer_report
 
 _CASE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -156,6 +157,7 @@ def answer_report(answer: CopilotAnswer, *, case_id: str) -> dict[str, object]:
     if not _CASE_ID.fullmatch(case_id):
         raise EvaluationInputError("case_id must be a lowercase identifier")
     report = answer.as_dict()
+    verify_copilot_answer_report(report)
     report["evaluation_case_id"] = case_id
     return report
 
@@ -199,6 +201,7 @@ def evaluate_reports(
     evaluations: list[CaseEvaluation] = []
     seen_case_ids: set[str] = set()
     for report in reports:
+        verify_copilot_answer_report(report)
         case = corpus.case_for_report(report)
         if case.case_id in seen_case_ids:
             raise EvaluationInputError(f"duplicate answer report for case: {case.case_id}")

@@ -26,6 +26,9 @@ _READ_ONLY_TOOLS = frozenset(
         "search_filing_events",
         "get_filing_event",
         "get_governance_status",
+        # Unknown or write-like provider requests are retained only as this
+        # neutral audit marker; the requested name never enters the envelope.
+        "rejected_tool_request",
     }
 )
 _ANSWER_KEYS = frozenset(
