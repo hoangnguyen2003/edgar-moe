@@ -39,6 +39,8 @@ def _protect_immutable_records(
 class RegistryDatabase:
     """SQLAlchemy database boundary shared by SQLite development and Postgres production."""
 
+    _MAX_STATEMENT_TIMEOUT_MS = 600_000
+
     def __init__(
         self,
         database_url: str,
@@ -47,6 +49,8 @@ class RegistryDatabase:
         pool_size: int | None = None,
         max_overflow: int | None = None,
         pool_timeout: float | None = None,
+        read_only: bool = False,
+        statement_timeout_ms: int | None = None,
     ) -> None:
         if not database_url.strip():
             raise ValueError("A forward registry database URL is required")
@@ -55,11 +59,17 @@ class RegistryDatabase:
             max_overflow=max_overflow,
             pool_timeout=pool_timeout,
         )
+        _validate_session_options(
+            read_only=read_only,
+            statement_timeout_ms=statement_timeout_ms,
+        )
         normalized = normalize_database_url(database_url)
         _prepare_sqlite_directory(normalized)
-        connect_args: dict[str, object] = {}
-        if normalized.startswith("sqlite"):
-            connect_args["check_same_thread"] = False
+        connect_args = _build_connect_args(
+            normalized,
+            read_only=read_only,
+            statement_timeout_ms=statement_timeout_ms,
+        )
         self.url = normalized
         engine_options: dict[str, object] = {
             "echo": echo,
@@ -113,6 +123,26 @@ def normalize_database_url(database_url: str) -> str:
     return value
 
 
+def _build_connect_args(
+    normalized_url: str,
+    *,
+    read_only: bool,
+    statement_timeout_ms: int | None,
+) -> dict[str, object]:
+    connect_args: dict[str, object] = {}
+    if normalized_url.startswith("sqlite"):
+        connect_args["check_same_thread"] = False
+    elif normalized_url.startswith("postgresql"):
+        postgres_options: list[str] = []
+        if read_only:
+            postgres_options.append("-c default_transaction_read_only=on")
+        if statement_timeout_ms is not None:
+            postgres_options.append(f"-c statement_timeout={statement_timeout_ms}")
+        if postgres_options:
+            connect_args["options"] = " ".join(postgres_options)
+    return connect_args
+
+
 def _validate_pool_options(
     *,
     pool_size: int | None,
@@ -125,6 +155,20 @@ def _validate_pool_options(
         raise ValueError("max_overflow must be non-negative")
     if pool_timeout is not None and pool_timeout <= 0:
         raise ValueError("pool_timeout must be greater than 0")
+
+
+def _validate_session_options(*, read_only: bool, statement_timeout_ms: int | None) -> None:
+    if not isinstance(read_only, bool):
+        raise ValueError("read_only must be a boolean")
+    if statement_timeout_ms is not None and (
+        isinstance(statement_timeout_ms, bool)
+        or not isinstance(statement_timeout_ms, int)
+        or not 1 <= statement_timeout_ms <= RegistryDatabase._MAX_STATEMENT_TIMEOUT_MS
+    ):
+        raise ValueError(
+            "statement_timeout_ms must be between 1 and "
+            f"{RegistryDatabase._MAX_STATEMENT_TIMEOUT_MS} milliseconds"
+        )
 
 
 def _prepare_sqlite_directory(database_url: str) -> None:

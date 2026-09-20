@@ -85,10 +85,13 @@ Production environment variables:
 EDGAR_MOE_REGISTRY_DATABASE_URL=postgresql://writer:...?...sslmode=require
 # API host only (for example Vercel):
 EDGAR_MOE_REGISTRY_READ_DATABASE_URL=postgresql://reader:...?...sslmode=require
-# Optional API-host pool bounds; defaults are one connection, no overflow, five-second wait:
+# API-host pool and query bounds: one connection, no overflow, five-second checkout
+# wait, and a five-second Postgres statement timeout by default. API Postgres
+# sessions also request default_transaction_read_only=on as defense in depth.
 EDGAR_MOE_REGISTRY_API_POOL_SIZE=1
 EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW=0
 EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS=5
+EDGAR_MOE_REGISTRY_API_STATEMENT_TIMEOUT_MS=5000
 EDGAR_MOE_ARTIFACT_BACKEND=local
 EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2
 EDGAR_MOE_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
@@ -218,11 +221,15 @@ variable names and never prints a database URL or credential value.
 
 Use the pooled Neon URL for the scheduled application connection. The API reader
 uses a separate bounded SQLAlchemy pool per warm serverless instance (one base
-connection, no overflow, and a five-second checkout timeout by default). This
-limits connection fan-out but is not a substitute for provider, project, or CDN
-connection limits; verify those limits with the hosted provider. Apply Alembic
-migrations separately with a direct URL. Create a private R2 bucket and restrict
-the S3 token to object read/write access for that bucket only.
+connection, no overflow, and a five-second checkout timeout by default). Hosted
+Postgres API sessions request read-only transactions and a bounded five-second
+statement timeout by default; this is defense in depth, not a substitute for
+the provider role grant or the provider-specific audit. The pool and timeout
+limit connection fan-out and hung queries but are not a substitute for provider,
+project, or CDN limits; verify those limits with the hosted provider. Apply
+Alembic migrations separately with a direct writer URL. Create a private R2
+bucket and restrict the S3 token to object read/write access for that bucket
+only.
 
 The job restores a bounded cache containing immutable filing bodies, FinBERT
 embeddings, and Hugging Face weights. Submissions, XBRL facts, daily bars,

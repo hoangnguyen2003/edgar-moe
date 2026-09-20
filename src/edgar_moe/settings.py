@@ -121,6 +121,11 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_registry_api_pool_timeout_seconds: float = Field(
         default=5.0, gt=0, le=60
     )
+    # API Postgres sessions fail closed on writes and bound database work. The
+    # setting is ignored for the local SQLite compatibility path.
+    edgar_moe_registry_api_statement_timeout_ms: int = Field(
+        default=5_000, ge=100, le=600_000
+    )
     edgar_moe_artifact_backend: str = "local"
     edgar_moe_artifact_mirror_backend: str = "none"
     edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")

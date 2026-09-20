@@ -23,6 +23,7 @@ def test_api_pool_settings_are_bounded_and_configurable(monkeypatch) -> None:
     assert settings.edgar_moe_registry_api_pool_size == 3
     assert settings.edgar_moe_registry_api_max_overflow == 2
     assert settings.edgar_moe_registry_api_pool_timeout_seconds == 7.5
+    assert settings.edgar_moe_registry_api_statement_timeout_ms == 5_000
 
 
 def test_copilot_retry_settings_are_bounded_and_configurable(monkeypatch) -> None:

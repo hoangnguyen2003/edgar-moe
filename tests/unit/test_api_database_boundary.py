@@ -56,6 +56,8 @@ def test_api_database_passes_bounded_pool_settings_to_reader(monkeypatch) -> Non
         "pool_size": 2,
         "max_overflow": 1,
         "pool_timeout": 4.5,
+        "read_only": True,
+        "statement_timeout_ms": 5_000,
     }
 
 
