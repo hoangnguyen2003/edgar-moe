@@ -27,6 +27,7 @@ _READ_ONLY_TOOLS = frozenset(
         "get_filing_event",
         "get_governance_status",
         "get_forward_diagnostic",
+        "get_forward_diagnostic_history",
         # Unknown or write-like provider requests are retained only as this
         # neutral audit marker; the requested name never enters the envelope.
         "rejected_tool_request",

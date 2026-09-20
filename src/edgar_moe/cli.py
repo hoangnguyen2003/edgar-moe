@@ -1136,14 +1136,11 @@ def forward_diagnostic_history_verify(
     """Verify a retained diagnostic history without reopening source reports."""
     from edgar_moe.forward.diagnostic_history import (
         DiagnosticHistoryError,
-        verify_forward_diagnostic_history,
+        read_forward_diagnostic_history,
     )
 
     try:
-        payload = orjson.loads(history.read_bytes())
-        if not isinstance(payload, dict):
-            raise DiagnosticHistoryError("diagnostic history must be an object")
-        verify_forward_diagnostic_history(payload)
+        payload = read_forward_diagnostic_history(history)
     except (DiagnosticHistoryError, OSError, orjson.JSONDecodeError) as error:
         raise typer.BadParameter(str(error)) from error
     typer.echo(
@@ -1248,6 +1245,16 @@ def research_copilot(
             ),
         ),
     ] = None,
+    diagnostic_history_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-history-path",
+            help=(
+                "Optional verified redacted diagnostic-history JSON; only safe multi-run summaries "
+                "are sent to the operator-run copilot."
+            ),
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", help="Optional private JSON answer/evidence report."),
@@ -1297,7 +1304,12 @@ def research_copilot(
         registry_database = RegistryDatabase(resolved_database_url)
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot")
     try:
-        toolset = ReadOnlyToolset(repository, registry, diagnostic_path)
+        toolset = ReadOnlyToolset(
+            repository,
+            registry,
+            diagnostic_path=diagnostic_path,
+            diagnostic_history_path=diagnostic_history_path,
+        )
         if plan_only:
             report: dict[str, object] = {
                 "schema_version": 1,
@@ -1469,6 +1481,16 @@ def research_copilot_benchmark(
             ),
         ),
     ] = None,
+    diagnostic_history_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-history-path",
+            help=(
+                "Optional verified redacted diagnostic-history JSON; only safe multi-run summaries "
+                "are sent to each operator-run case."
+            ),
+        ),
+    ] = None,
     endpoint: Annotated[
         str | None,
         typer.Option("--endpoint", help="Optional OpenAI-compatible chat-completions endpoint."),
@@ -1563,7 +1585,12 @@ def research_copilot_benchmark(
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot-benchmark")
 
     try:
-        toolset = ReadOnlyToolset(repository, registry, diagnostic_path)
+        toolset = ReadOnlyToolset(
+            repository,
+            registry,
+            diagnostic_path=diagnostic_path,
+            diagnostic_history_path=diagnostic_history_path,
+        )
         provider = OpenAICompatibleProvider(
             endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
             api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),

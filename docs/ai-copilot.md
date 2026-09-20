@@ -8,7 +8,7 @@ all outside the copilot's write boundary.
 ## What it does
 
 The `research-copilot` command sends a question to an OpenAI-compatible
-chat-completions endpoint and gives the model seven bounded, read-only tools:
+chat-completions endpoint and gives the model seven baseline bounded, read-only tools:
 
 - frozen snapshot identity;
 - study summary and cost scenarios;
@@ -17,6 +17,9 @@ chat-completions endpoint and gives the model seven bounded, read-only tools:
 - bounded searches of derived filing events;
 - one derived event by accession number; and
 - governance plus optional forward-registry status.
+
+When an operator explicitly attaches diagnostic evidence, the toolset can also
+expose one redacted diagnostic or one verified redacted diagnostic history.
 
 The agent can make at most four tool calls by default. Each tool result is
 content-hashed and returned with a citation. The JSON answer envelope retains
@@ -71,6 +74,29 @@ uv run edgar-moe research-copilot \
 This capability is opt-in and operator-only. Without `--diagnostic-path` the
 tool is not advertised to the model. Short-horizon diagnostics remain
 research-only and never replace the official twenty-session evaluation.
+
+To let the copilot compare repeated diagnostic observations, first build and
+verify a history from private reports, then attach the retained history:
+
+```bash
+uv run edgar-moe forward-diagnostic-history \
+  --report /private/path/diagnostic-2026-09-17.json \
+  --report /private/path/diagnostic-2026-09-18.json \
+  --report /private/path/diagnostic-2026-09-19.json \
+  --output /tmp/forward-diagnostic-history.json
+
+uv run edgar-moe research-copilot \
+  --diagnostic-history-path /tmp/forward-diagnostic-history.json \
+  "How has short-horizon diagnostic status changed across the retained observations?"
+```
+
+`--diagnostic-history-path` is explicitly opt-in, and the retained file is
+independently verified before the `get_forward_diagnostic_history` result is
+returned. The copilot receives only
+the content-addressed history and its safe counts, maturity, metrics, horizons,
+and source digests; it never reopens the private source reports or receives
+raw observations, event/forecast identifiers, or filesystem paths. Invalid or
+tampered history is reported as unavailable without exposing parser details.
 
 ## Run it locally
 

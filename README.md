@@ -241,7 +241,11 @@ content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.
 For operational context, pass an explicitly downloaded forward diagnostic with
 `--diagnostic-path`; the copilot then receives only a validated, redacted
-summary and a content hash, never observations or forecast identifiers.
+summary and a content hash, never observations or forecast identifiers. To
+compare repeated short-horizon observations, build a verified redacted history
+with `forward-diagnostic-history` and pass it with
+`--diagnostic-history-path`; the copilot receives only safe chronology, counts,
+maturity, metrics, and source digests.
 
 Before treating the anonymous site as a distributable release, run the
 provider-neutral public-surface readiness report:
@@ -343,7 +347,7 @@ The scheduled GitHub job builds and validates a temporary synthetic fixture with
 | `src/edgar_moe/backtest` | Neutral allocation, event-driven accounting, costs, and inference metrics |
 | `src/edgar_moe/api` | Versioned, snapshot-backed FastAPI contract |
 | `src/edgar_moe/forward` | Frozen inference, append-only registry, label settlement, artifact storage, and forward metrics |
-| `src/edgar_moe/copilot` | Optional bounded LLM provider adapter, read-only evidence tools, citations, and operator report envelope |
+| `src/edgar_moe/copilot` | Optional bounded LLM provider adapter, read-only evidence tools, diagnostic summaries/history, citations, and operator report envelope |
 | `src/edgar_moe/platform_readiness.py` | Hash-pinned composition of the public, provider, copilot, and drift readiness gates |
 | `apps/web` | React/TypeScript research terminal |
 
