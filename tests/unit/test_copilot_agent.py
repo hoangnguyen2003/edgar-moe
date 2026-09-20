@@ -19,6 +19,7 @@ from edgar_moe.copilot.agent import (
     ResearchCopilot,
     _NoRedirectHandler,
     _parse_provider_response,
+    normalize_provider_allowed_hosts,
     normalize_provider_endpoint,
 )
 from edgar_moe.copilot.contracts import Citation, ToolDefinition, ToolResult
@@ -289,15 +290,42 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
     assert normalize_provider_endpoint("http://localhost:11434/v1/chat/completions").startswith(
         "http://localhost"
     )
-    assert normalize_provider_endpoint("https://api.example.com/v1/chat/completions") == (
-        "https://api.example.com/v1/chat/completions"
-    )
+    assert normalize_provider_endpoint(
+        "https://api.example.com/v1/chat/completions",
+        allowed_hosts=("api.example.com",),
+    ) == "https://api.example.com/v1/chat/completions"
     with pytest.raises(ValueError):
         normalize_provider_endpoint("http://provider.example/v1/chat/completions")
     with pytest.raises(ValueError):
         normalize_provider_endpoint("https://user:secret@api.example.com/v1/chat/completions")
     with pytest.raises(ValueError):
         normalize_provider_endpoint("https://api.example.com/v1/chat/completions?token=secret")
+
+
+def test_provider_endpoint_requires_an_exact_remote_host_allowlist() -> None:
+    assert normalize_provider_endpoint(
+        "https://api.example.com/v1/chat/completions",
+        allowed_hosts=("api.example.com",),
+    ) == "https://api.example.com/v1/chat/completions"
+    assert normalize_provider_endpoint(
+        "http://localhost:11434/v1/chat/completions",
+        allowed_hosts=("api.openai.com",),
+    ).startswith("http://localhost")
+
+    with pytest.raises(ValueError, match="not allowlisted"):
+        normalize_provider_endpoint(
+            "https://api.example.com/v1/chat/completions",
+            allowed_hosts=("api.openai.com",),
+        )
+    with pytest.raises(ValueError, match="not allowlisted"):
+        OpenAICompatibleProvider(
+            endpoint="https://api.example.com/v1/chat/completions",
+            api_key="secret",
+            model="test-model",
+        )
+    for invalid in ("https://api.example.com", "api.example.com:443", "*.example.com", ""):
+        with pytest.raises(ValueError):
+            normalize_provider_allowed_hosts(invalid)
 
 
 def test_provider_redirects_are_rejected_before_following_the_new_url() -> None:
@@ -330,6 +358,7 @@ def test_provider_redirect_failures_are_not_retried(monkeypatch: pytest.MonkeyPa
             endpoint="https://provider.example/v1/chat/completions",
             api_key="secret",
             model="test-model",
+            allowed_hosts=("provider.example",),
             max_retries=2,
             retry_backoff_seconds=0,
         ).complete([], [])
@@ -362,6 +391,7 @@ def test_provider_retries_transient_http_failures_and_counts_attempts(
         endpoint="https://provider.example/v1/chat/completions",
         api_key="secret",
         model="test-model",
+        allowed_hosts=("provider.example",),
         timeout_seconds=3.0,
         max_retries=2,
         retry_backoff_seconds=0.5,
@@ -389,6 +419,7 @@ def test_provider_does_not_retry_authentication_failures(monkeypatch: pytest.Mon
             endpoint="https://provider.example/v1/chat/completions",
             api_key="secret",
             model="test-model",
+            allowed_hosts=("provider.example",),
             max_retries=2,
             retry_backoff_seconds=0,
         ).complete([], [])
@@ -418,6 +449,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
         endpoint="https://provider.example/v1/chat/completions",
         api_key="secret",
         model="test-model",
+        allowed_hosts=("provider.example",),
         max_retries=2,
         retry_backoff_seconds=0,
     ).complete([], [])
@@ -430,6 +462,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
             endpoint="https://provider.example/v1/chat/completions",
             api_key="secret",
             model="test-model",
+            allowed_hosts=("provider.example",),
             max_retries=4,
         )
     with pytest.raises(ValueError, match="retry backoff"):
@@ -437,6 +470,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
             endpoint="https://provider.example/v1/chat/completions",
             api_key="secret",
             model="test-model",
+            allowed_hosts=("provider.example",),
             retry_backoff_seconds=6,
         )
 

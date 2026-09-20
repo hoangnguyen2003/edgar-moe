@@ -9,6 +9,7 @@ from .agent import (
     ProviderToolCall,
     ProviderUsage,
     ResearchCopilot,
+    normalize_provider_allowed_hosts,
     normalize_provider_endpoint,
 )
 from .benchmark import (
@@ -88,6 +89,7 @@ __all__ = [
     "evaluate_reports",
     "load_evaluation_corpus",
     "normalize_provider_endpoint",
+    "normalize_provider_allowed_hosts",
     "run_benchmark",
     "write_benchmark_report",
     "append_copilot_reviews",

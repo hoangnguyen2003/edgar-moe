@@ -47,6 +47,13 @@ transient failures and are never retried. This keeps the provider egress
 boundary explicit and prevents an endpoint-controlled redirect from weakening
 the endpoint validation contract.
 
+Remote HTTPS egress is also restricted to an exact, comma-separated hostname
+allowlist. The default is `api.openai.com`; changing the endpoint to another
+remote OpenAI-compatible provider requires adding that provider hostname to
+`EDGAR_MOE_COPILOT_ALLOWED_HOSTS`. Entries cannot contain schemes, paths, ports,
+credentials, or wildcards. Loopback HTTP runtimes such as Ollama remain
+available for local development without being added to the remote list.
+
 Envelope verification is enforced at every local boundary: the agent validates
 its generated answer before returning it, the CLI validates it before printing
 or atomically writing it, and benchmark/evaluation commands reject unverified
@@ -122,6 +129,8 @@ copilot:
   write capability; and
 - rejects a final answer that follows an allowlisted evidence-tool call without
   a retained tool citation; and
+- sends remote provider requests only to an exact configured hostname allowlist
+  (loopback HTTP is the local-development exception); and
 - uses a zero-temperature request, bounded timeout, response-size limit, and
   token/tool-call budgets, and rejects provider redirects; and
 - must describe missing, pending, or negative evidence instead of inventing a
@@ -192,6 +201,14 @@ export EDGAR_MOE_COPILOT_MODEL="gpt-4o-mini"
 uv run edgar-moe research-copilot \
   --output /tmp/edgar-moe-copilot.json \
   "Summarize the locked result, costs, and the limitations I should disclose."
+```
+
+For a different remote provider, configure its exact hostname explicitly before
+running the command:
+
+```bash
+export EDGAR_MOE_COPILOT_ENDPOINT="https://api.example.com/v1/chat/completions"
+export EDGAR_MOE_COPILOT_ALLOWED_HOSTS="api.example.com"
 ```
 
 For a local runtime such as Ollama, use a loopback endpoint; plain HTTP to a
