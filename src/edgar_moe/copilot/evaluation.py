@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal, cast
 
-from .contracts import content_hash
+from .contracts import CopilotAnswer, content_hash
 
 _CASE_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{1,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -149,6 +149,15 @@ class EvaluationSuite:
                 "the truth of an answer, statistical validity, or investment suitability."
             ),
         }
+
+
+def answer_report(answer: CopilotAnswer, *, case_id: str) -> dict[str, object]:
+    """Attach a reviewed case identity to a private copilot answer envelope."""
+    if not _CASE_ID.fullmatch(case_id):
+        raise EvaluationInputError("case_id must be a lowercase identifier")
+    report = answer.as_dict()
+    report["evaluation_case_id"] = case_id
+    return report
 
 
 def load_evaluation_corpus(path: Path) -> EvaluationCorpus:
