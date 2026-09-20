@@ -1387,6 +1387,100 @@ def research_copilot_benchmark(
         raise typer.Exit(code=1)
 
 
+@app.command("research-copilot-review")
+def research_copilot_review(
+    benchmark: Annotated[
+        Path,
+        typer.Option("--benchmark", help="Private evaluation.json from research-copilot-benchmark."),
+    ],
+    review: Annotated[
+        Path,
+        typer.Option("--review", help="Private rubric review batch JSON."),
+    ],
+    history: Annotated[
+        Path,
+        typer.Option("--history", help="Append-only review history JSON destination."),
+    ] = Path("/tmp/edgar-moe-copilot-review-history.json"),
+    minimum_reviews: Annotated[
+        int,
+        typer.Option(
+            "--minimum-reviews",
+            min=1,
+            max=256,
+            help="Reviews required before an all-pass history is marked accepted.",
+        ),
+    ] = 4,
+) -> None:
+    """Append a private human rubric review to a content-addressed history."""
+    from edgar_moe.copilot.review import (
+        ReviewInputError,
+        append_copilot_reviews,
+        write_copilot_review_history,
+    )
+
+    try:
+        benchmark_payload = json.loads(benchmark.read_text(encoding="utf-8"))
+        review_payload = json.loads(review.read_text(encoding="utf-8"))
+        if not isinstance(benchmark_payload, dict):
+            raise ReviewInputError("benchmark report must be a JSON object")
+        if not isinstance(review_payload, dict):
+            raise ReviewInputError("review batch must be a JSON object")
+        existing_payload: dict[str, Any] | None = None
+        if history.exists():
+            parsed_history = json.loads(history.read_text(encoding="utf-8"))
+            if not isinstance(parsed_history, dict):
+                raise ReviewInputError("review history must be a JSON object")
+            existing_payload = parsed_history
+        updated = append_copilot_reviews(
+            benchmark_payload,
+            review_payload,
+            existing_payload,
+            minimum_reviews=minimum_reviews,
+        )
+        write_copilot_review_history(history, updated)
+    except (ReviewInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+
+    summary = {
+        key: updated[key]
+        for key in (
+            "schema_version",
+            "scope",
+            "corpus_id",
+            "corpus_sha256",
+            "minimum_reviews",
+            "entry_count",
+            "accepted_count",
+            "revise_count",
+            "rejected_count",
+            "status",
+            "history_sha256",
+        )
+    }
+    typer.echo(f"Wrote private copilot review history to {history}")
+    typer.echo(orjson.dumps(summary, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
+
+
+@app.command("research-copilot-review-verify")
+def research_copilot_review_verify(
+    history: Annotated[Path, typer.Argument(help="Content-addressed copilot review history JSON.")],
+) -> None:
+    """Verify a private copilot review history without printing its entries."""
+    from edgar_moe.copilot.review import ReviewInputError, verify_copilot_review_history
+
+    try:
+        payload = json.loads(history.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ReviewInputError("review history must be a JSON object")
+        verify_copilot_review_history(payload)
+    except (ReviewInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(
+        f"Verified copilot review history {payload['history_sha256']} "
+        f"({payload['entry_count']} entries; status={payload['status']})"
+    )
+
+
 @app.command()
 def serve(
     host: Annotated[str, typer.Option()] = "127.0.0.1",

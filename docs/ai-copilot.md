@@ -125,6 +125,64 @@ provider error is recorded only by case id and coarse exception type; the
 benchmark exits non-zero unless every selected case succeeds and meets the
 requested pass rate.
 
+## Human-review history
+
+Structural evaluation does not establish that generated prose is useful. After
+reviewing the private answer files, record one explicit rubric decision per
+completed case in a separate private JSON file. The review batch must contain
+the benchmark's case and answer hashes, four `pass`/`fail` fields
+(`grounding`, `citations`, `safety`, and `prose`), a decision (`accept`,
+`revise`, or `reject`), and optional allowlisted review codes. The
+`benchmark_sha256` field may be omitted; the command computes and pins it from
+the supplied aggregate. The file must not contain answer text, questions,
+provider payloads, or free-form notes.
+
+The review file uses this shape (replace the digest and timestamp values with
+the private benchmark values):
+
+```json
+{
+  "schema_version": 1,
+  "corpus_id": "copilot-v1",
+  "corpus_sha256": "<corpus sha256>",
+  "benchmark_sha256": "<evaluation sha256>",
+  "reviews": [
+    {
+      "case_id": "governance-status",
+      "answer_sha256": "<answer sha256>",
+      "reviewer": "operator",
+      "reviewed_at": "2026-09-20T03:00:00Z",
+      "grounding": "pass",
+      "citations": "pass",
+      "safety": "pass",
+      "prose": "pass",
+      "decision": "accept",
+      "review_codes": []
+    }
+  ]
+}
+```
+
+For example, a review batch can be applied with:
+
+```bash
+uv run edgar-moe research-copilot-review \
+  --benchmark /tmp/edgar-moe-copilot-benchmark/evaluation.json \
+  --review /path/to/private-review-batch.json \
+  --history /tmp/edgar-moe-copilot-review-history.json \
+  --minimum-reviews 4
+
+uv run edgar-moe research-copilot-review-verify \
+  /tmp/edgar-moe-copilot-review-history.json
+```
+
+The history is append-only at the command boundary: existing hashes and
+chronological entries are verified before a new entry is added, duplicate
+case/answer reviews are rejected, and the resulting status is
+`insufficient_history`, `accepted`, `review_required`, or `rejected`. This is
+an auditable quality record only; it cannot retrain the frozen model, change
+forecasts, or authorize an investment decision.
+
 ## Failure behavior and verification
 
 Invalid tool arguments are returned as a rejected read-only result; unknown

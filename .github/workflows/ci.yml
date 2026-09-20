@@ -69,6 +69,10 @@ jobs:
         run: uv run edgar-moe research-copilot-eval --help
       - name: Check research copilot benchmark command is runnable
         run: uv run edgar-moe research-copilot-benchmark --help
+      - name: Check research copilot review commands are runnable
+        run: |
+          uv run edgar-moe research-copilot-review --help
+          uv run edgar-moe research-copilot-review-verify --help
       - name: Check deployment smoke command is runnable
         run: |
           uv run python scripts/smoke_deployment.py --help

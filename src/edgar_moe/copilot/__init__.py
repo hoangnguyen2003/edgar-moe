@@ -23,6 +23,13 @@ from .evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from .review import (
+    ReviewInputError,
+    append_copilot_reviews,
+    benchmark_sha256,
+    verify_copilot_review_history,
+    write_copilot_review_history,
+)
 from .tools import ReadOnlyToolset, ToolInputError
 
 __all__ = [
@@ -38,6 +45,7 @@ __all__ = [
     "EvaluationCorpus",
     "EvaluationInputError",
     "EvaluationSuite",
+    "ReviewInputError",
     "OpenAICompatibleProvider",
     "ProviderResponse",
     "ProviderToolCall",
@@ -54,4 +62,8 @@ __all__ = [
     "normalize_provider_endpoint",
     "run_benchmark",
     "write_benchmark_report",
+    "append_copilot_reviews",
+    "benchmark_sha256",
+    "verify_copilot_review_history",
+    "write_copilot_review_history",
 ]
