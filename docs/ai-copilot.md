@@ -64,6 +64,15 @@ the conservative defaults with `--max-retries` and
 `EDGAR_MOE_COPILOT_RETRY_BACKOFF_SECONDS` settings. Retry delays are never
 read from provider response headers.
 
+Each copilot run also has a 300-second aggregate wall-clock budget by default,
+bounded to 900 seconds. The agent checks that budget before every provider
+completion, so a long tool loop cannot start another paid call after the
+deadline; an already in-flight provider request is not forcibly interrupted.
+The envelope records total local elapsed time, and its `agent_identity` records
+the run budget. Override it with `--max-duration-seconds` or
+`EDGAR_MOE_COPILOT_MAX_DURATION_SECONDS` when a private provider exercise
+needs a different bounded allowance.
+
 The aggregate also records `agent_identity_status`: `consistent` when every
 evaluated answer carries the same verified policy/tool-contract identity,
 `legacy` when all answers predate the identity field, and `mixed` when the

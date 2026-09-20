@@ -32,6 +32,8 @@ _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 _MAX_PROVIDER_USAGE_TOKENS = 100_000_000
 _MAX_RETRIES = 3
 _MAX_RETRY_BACKOFF_SECONDS = 5.0
+_DEFAULT_MAX_DURATION_SECONDS = 300.0
+_MAX_DURATION_SECONDS = 900.0
 _RETRYABLE_HTTP_STATUSES = frozenset({408, 425, 429}) | frozenset(range(500, 600))
 _REJECTED_TOOL_TRACE_NAME = "rejected_tool_request"
 
@@ -216,12 +218,24 @@ class ResearchCopilot:
         provider: CopilotProvider,
         toolset: ReadOnlyToolset,
         max_tool_calls: int = 4,
+        max_duration_seconds: float = _DEFAULT_MAX_DURATION_SECONDS,
     ) -> None:
         if not 1 <= max_tool_calls <= 8:
             raise ValueError("max_tool_calls must be between 1 and 8")
+        if (
+            isinstance(max_duration_seconds, bool)
+            or not isinstance(max_duration_seconds, (int, float))
+            or not math.isfinite(max_duration_seconds)
+            or not 1 <= max_duration_seconds <= _MAX_DURATION_SECONDS
+        ):
+            raise ValueError(
+                "max_duration_seconds must be between 1 and "
+                f"{_MAX_DURATION_SECONDS:g} seconds"
+            )
         self.provider = provider
         self.toolset = toolset
         self.max_tool_calls = max_tool_calls
+        self.max_duration_seconds = max_duration_seconds
 
     def ask(self, question: str) -> CopilotAnswer:
         normalized_question = question.strip()
@@ -234,25 +248,29 @@ class ResearchCopilot:
             {"role": "system", "content": COPILOT_SYSTEM_PROMPT},
             {"role": "user", "content": normalized_question},
         ]
+        run_started = monotonic()
         citations: list[Citation] = []
         trace: list[ToolTrace] = []
         tool_calls_seen = 0
-        request_durations: list[int] = []
         provider_usages: list[ProviderUsage | None] = []
         provider_request_counts: list[int] = []
         tool_definitions = self.toolset.definitions()
-        agent_identity = build_agent_identity(tool_definitions, self.max_tool_calls)
+        agent_identity = build_agent_identity(
+            tool_definitions,
+            self.max_tool_calls,
+            self.max_duration_seconds,
+        )
         allowed_tool_names = {tool.name for tool in tool_definitions}
 
         for _ in range(self.max_tool_calls + 1):
-            started = monotonic()
+            if monotonic() - run_started >= self.max_duration_seconds:
+                raise CopilotError("copilot execution time budget exceeded")
             response = self.provider.complete(messages, tool_definitions)
             if (
                 isinstance(response.request_count, bool)
                 or not 1 <= response.request_count <= _MAX_RETRIES + 1
             ):
                 raise CopilotProviderError("copilot provider request count was invalid")
-            request_durations.append(max(0, round((monotonic() - started) * 1000)))
             provider_usages.append(response.usage)
             provider_request_counts.append(response.request_count)
             messages.append(response.as_assistant_message())
@@ -272,7 +290,7 @@ class ResearchCopilot:
                     evidence_status="grounded" if citations else "uncited",
                     usage=CopilotUsage(
                         request_count=sum(provider_request_counts),
-                        duration_ms=sum(request_durations),
+                        duration_ms=max(0, round((monotonic() - run_started) * 1000)),
                         prompt_tokens=_sum_usage(provider_usages, "prompt_tokens"),
                         completion_tokens=_sum_usage(provider_usages, "completion_tokens"),
                         total_tokens=_sum_usage(provider_usages, "total_tokens"),

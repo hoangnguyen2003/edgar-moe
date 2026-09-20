@@ -106,14 +106,18 @@ class CopilotAgentIdentity:
     policy_sha256: str
     tool_contract_sha256: str
     max_tool_calls: int
+    max_duration_seconds: float | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "policy_id": self.policy_id,
             "policy_sha256": self.policy_sha256,
             "tool_contract_sha256": self.tool_contract_sha256,
             "max_tool_calls": self.max_tool_calls,
         }
+        if self.max_duration_seconds is not None:
+            payload["max_duration_seconds"] = self.max_duration_seconds
+        return payload
 
 
 @dataclass(frozen=True)

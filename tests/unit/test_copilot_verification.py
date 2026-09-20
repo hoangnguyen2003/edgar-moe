@@ -147,6 +147,7 @@ def test_verifier_accepts_and_checks_agent_identity() -> None:
         "policy_sha256": copilot_policy_sha256(),
         "tool_contract_sha256": "1" * 64,
         "max_tool_calls": 4,
+        "max_duration_seconds": 300.0,
     }
     verify_copilot_answer_report(report)
 
@@ -168,6 +169,11 @@ def test_verifier_accepts_and_checks_agent_identity() -> None:
     invalid = deepcopy(report)
     invalid["agent_identity"]["max_tool_calls"] = 0
     with pytest.raises(CopilotVerificationError, match="max_tool_calls"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["max_duration_seconds"] = 0
+    with pytest.raises(CopilotVerificationError, match="max_duration_seconds"):
         verify_copilot_answer_report(invalid)
 
 
@@ -225,6 +231,15 @@ def test_verifier_accepts_bounded_usage_and_rejects_unsafe_mutations() -> None:
     invalid = deepcopy(report)
     invalid["usage"]["provider_payload"] = "must not be retained"
     with pytest.raises(CopilotVerificationError, match="unknown"):
+        verify_copilot_answer_report(invalid)
+
+    bounded = deepcopy(report)
+    bounded["usage"]["request_count"] = 36
+    verify_copilot_answer_report(bounded)
+
+    invalid = deepcopy(report)
+    invalid["usage"]["request_count"] = 37
+    with pytest.raises(CopilotVerificationError, match="usage.request_count"):
         verify_copilot_answer_report(invalid)
 
 

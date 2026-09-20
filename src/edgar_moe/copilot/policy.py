@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 
 from .contracts import CopilotAgentIdentity, ToolDefinition, content_hash
@@ -24,9 +25,11 @@ include a reminder that it is research-only when the question asks for a
 decision or recommendation.
 """
 
-_AGENT_IDENTITY_KEYS = frozenset(
+_LEGACY_AGENT_IDENTITY_KEYS = frozenset(
     {"max_tool_calls", "policy_id", "policy_sha256", "tool_contract_sha256"}
 )
+_CURRENT_AGENT_IDENTITY_KEYS = _LEGACY_AGENT_IDENTITY_KEYS | {"max_duration_seconds"}
+_MAX_AGENT_DURATION_SECONDS = 900.0
 
 
 def copilot_policy_sha256() -> str:
@@ -40,7 +43,9 @@ def copilot_policy_sha256() -> str:
 
 
 def build_agent_identity(
-    tool_definitions: Sequence[ToolDefinition], max_tool_calls: int
+    tool_definitions: Sequence[ToolDefinition],
+    max_tool_calls: int,
+    max_duration_seconds: float | None = None,
 ) -> CopilotAgentIdentity:
     """Build the non-secret identity of one bounded agent configuration."""
     return CopilotAgentIdentity(
@@ -50,6 +55,7 @@ def build_agent_identity(
             [tool.as_provider_schema() for tool in tool_definitions]
         ),
         max_tool_calls=max_tool_calls,
+        max_duration_seconds=max_duration_seconds,
     )
 
 
@@ -57,8 +63,8 @@ def validate_agent_identity(value: object) -> dict[str, object]:
     """Validate and normalize a non-secret agent identity from a JSON report."""
     if not isinstance(value, Mapping):
         raise ValueError("agent_identity must be an object")
-    unknown = sorted(str(key) for key in value if key not in _AGENT_IDENTITY_KEYS)
-    missing = sorted(key for key in _AGENT_IDENTITY_KEYS if key not in value)
+    unknown = sorted(str(key) for key in value if key not in _CURRENT_AGENT_IDENTITY_KEYS)
+    missing = sorted(key for key in _LEGACY_AGENT_IDENTITY_KEYS if key not in value)
     if unknown or missing:
         details: list[str] = []
         if missing:
@@ -78,7 +84,24 @@ def validate_agent_identity(value: object) -> dict[str, object]:
     max_tool_calls = value["max_tool_calls"]
     if isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int) or not 1 <= max_tool_calls <= 8:
         raise ValueError("agent_identity max_tool_calls must be between 1 and 8")
-    return {key: value[key] for key in sorted(_AGENT_IDENTITY_KEYS)}
+    if "max_duration_seconds" in value:
+        max_duration_seconds = value["max_duration_seconds"]
+        if (
+            isinstance(max_duration_seconds, bool)
+            or not isinstance(max_duration_seconds, (int, float))
+            or not math.isfinite(max_duration_seconds)
+            or not 1 <= max_duration_seconds <= _MAX_AGENT_DURATION_SECONDS
+        ):
+            raise ValueError(
+                "agent_identity max_duration_seconds must be between 1 and "
+                f"{_MAX_AGENT_DURATION_SECONDS:g}"
+            )
+    identity_keys = (
+        _CURRENT_AGENT_IDENTITY_KEYS
+        if "max_duration_seconds" in value
+        else _LEGACY_AGENT_IDENTITY_KEYS
+    )
+    return {key: value[key] for key in sorted(identity_keys)}
 
 
 def _is_digest(value: object) -> bool:

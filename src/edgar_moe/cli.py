@@ -1271,6 +1271,15 @@ def research_copilot(
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound the agent tool-call loop."),
     ] = None,
+    max_duration_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--max-duration-seconds",
+            min=1,
+            max=900,
+            help="Bound total copilot wall-clock time before another provider call.",
+        ),
+    ] = None,
     max_retries: Annotated[
         int | None,
         typer.Option(
@@ -1363,6 +1372,11 @@ def research_copilot(
                 provider=provider,
                 toolset=toolset,
                 max_tool_calls=max_tool_calls or settings.edgar_moe_copilot_max_tool_calls,
+                max_duration_seconds=(
+                    settings.edgar_moe_copilot_max_duration_seconds
+                    if max_duration_seconds is None
+                    else max_duration_seconds
+                ),
             ).ask(question)
             report = answer.as_dict()
     finally:
@@ -1531,6 +1545,15 @@ def research_copilot_benchmark(
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound each agent tool-call loop."),
     ] = None,
+    max_duration_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--max-duration-seconds",
+            min=1,
+            max=900,
+            help="Bound total copilot wall-clock time before another provider call.",
+        ),
+    ] = None,
     max_retries: Annotated[
         int | None,
         typer.Option(
@@ -1656,6 +1679,11 @@ def research_copilot_benchmark(
             provider=provider,
             toolset=toolset,
             max_tool_calls=max_tool_calls or settings.edgar_moe_copilot_max_tool_calls,
+            max_duration_seconds=(
+                settings.edgar_moe_copilot_max_duration_seconds
+                if max_duration_seconds is None
+                else max_duration_seconds
+            ),
         )
         benchmark = run_benchmark(selected_corpus, copilot, output_dir)
     finally:

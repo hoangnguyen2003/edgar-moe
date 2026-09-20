@@ -88,6 +88,7 @@ def test_agent_executes_read_tool_then_returns_citation_backed_answer() -> None:
     assert identity["policy_sha256"] == copilot_policy_sha256()
     assert len(identity["tool_contract_sha256"]) == 64
     assert identity["max_tool_calls"] == 4
+    assert identity["max_duration_seconds"] == 300.0
 
 
 def test_agent_aggregates_bounded_usage_without_retaining_provider_metadata() -> None:
@@ -131,6 +132,35 @@ def test_agent_rejects_a_tool_loop_that_exceeds_the_budget() -> None:
 
     with pytest.raises(CopilotError, match="budget"):
         copilot.ask("Keep calling tools")
+
+
+def test_agent_stops_before_a_provider_call_when_run_budget_is_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    provider = FakeProvider([_tool_call("get_methodology")])
+    clock = iter((0.0, 0.0, 1.0))
+    monkeypatch.setattr("edgar_moe.copilot.agent.monotonic", lambda: next(clock))
+
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+        max_duration_seconds=1.0,
+    )
+
+    with pytest.raises(CopilotError, match="execution time budget"):
+        copilot.ask("Keep calling tools")
+
+    assert len(provider.messages) == 1
+
+
+def test_agent_rejects_invalid_run_duration_budget() -> None:
+    provider = FakeProvider([])
+    toolset = ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json")))
+
+    with pytest.raises(ValueError, match="max_duration_seconds"):
+        ResearchCopilot(provider=provider, toolset=toolset, max_duration_seconds=0)
+    with pytest.raises(ValueError, match="max_duration_seconds"):
+        ResearchCopilot(provider=provider, toolset=toolset, max_duration_seconds=901)
 
 
 def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
