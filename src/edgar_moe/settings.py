@@ -136,6 +136,9 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_copilot_max_tokens: int = Field(default=800, ge=1, le=8_000)
     edgar_moe_copilot_max_tool_calls: int = Field(default=4, ge=1, le=8)
     edgar_moe_copilot_max_duration_seconds: float = Field(default=300.0, ge=1, le=900)
+    edgar_moe_copilot_max_context_bytes: int = Field(
+        default=512 * 1024, ge=16 * 1024, le=2 * 1024 * 1024
+    )
     edgar_moe_copilot_max_retries: int = Field(default=2, ge=0, le=3)
     edgar_moe_copilot_retry_backoff_seconds: float = Field(default=0.25, ge=0, le=5)
 

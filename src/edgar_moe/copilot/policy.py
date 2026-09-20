@@ -28,8 +28,13 @@ decision or recommendation.
 _LEGACY_AGENT_IDENTITY_KEYS = frozenset(
     {"max_tool_calls", "policy_id", "policy_sha256", "tool_contract_sha256"}
 )
-_CURRENT_AGENT_IDENTITY_KEYS = _LEGACY_AGENT_IDENTITY_KEYS | {"max_duration_seconds"}
+_CURRENT_AGENT_IDENTITY_KEYS = _LEGACY_AGENT_IDENTITY_KEYS | {
+    "max_context_bytes",
+    "max_duration_seconds",
+}
 _MAX_AGENT_DURATION_SECONDS = 900.0
+_MIN_AGENT_CONTEXT_BYTES = 16 * 1024
+_MAX_AGENT_CONTEXT_BYTES = 2 * 1024 * 1024
 
 
 def copilot_policy_sha256() -> str:
@@ -46,6 +51,7 @@ def build_agent_identity(
     tool_definitions: Sequence[ToolDefinition],
     max_tool_calls: int,
     max_duration_seconds: float | None = None,
+    max_context_bytes: int | None = None,
 ) -> CopilotAgentIdentity:
     """Build the non-secret identity of one bounded agent configuration."""
     return CopilotAgentIdentity(
@@ -56,6 +62,7 @@ def build_agent_identity(
         ),
         max_tool_calls=max_tool_calls,
         max_duration_seconds=max_duration_seconds,
+        max_context_bytes=max_context_bytes,
     )
 
 
@@ -96,12 +103,22 @@ def validate_agent_identity(value: object) -> dict[str, object]:
                 "agent_identity max_duration_seconds must be between 1 and "
                 f"{_MAX_AGENT_DURATION_SECONDS:g}"
             )
-    identity_keys = (
-        _CURRENT_AGENT_IDENTITY_KEYS
-        if "max_duration_seconds" in value
-        else _LEGACY_AGENT_IDENTITY_KEYS
-    )
-    return {key: value[key] for key in sorted(identity_keys)}
+    if "max_context_bytes" in value:
+        max_context_bytes = value["max_context_bytes"]
+        if (
+            isinstance(max_context_bytes, bool)
+            or not isinstance(max_context_bytes, int)
+            or not _MIN_AGENT_CONTEXT_BYTES <= max_context_bytes <= _MAX_AGENT_CONTEXT_BYTES
+        ):
+            raise ValueError(
+                "agent_identity max_context_bytes must be between "
+                f"{_MIN_AGENT_CONTEXT_BYTES} and {_MAX_AGENT_CONTEXT_BYTES}"
+            )
+    normalized = {key: value[key] for key in sorted(_LEGACY_AGENT_IDENTITY_KEYS)}
+    for optional_key in ("max_duration_seconds", "max_context_bytes"):
+        if optional_key in value:
+            normalized[optional_key] = value[optional_key]
+    return normalized
 
 
 def _is_digest(value: object) -> bool:

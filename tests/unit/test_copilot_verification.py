@@ -148,8 +148,13 @@ def test_verifier_accepts_and_checks_agent_identity() -> None:
         "tool_contract_sha256": "1" * 64,
         "max_tool_calls": 4,
         "max_duration_seconds": 300.0,
+        "max_context_bytes": 512 * 1024,
     }
     verify_copilot_answer_report(report)
+
+    earlier = deepcopy(report)
+    earlier["agent_identity"].pop("max_context_bytes")
+    verify_copilot_answer_report(earlier)
 
     invalid = deepcopy(report)
     invalid["agent_identity"]["policy_id"] = "other-policy"
@@ -174,6 +179,11 @@ def test_verifier_accepts_and_checks_agent_identity() -> None:
     invalid = deepcopy(report)
     invalid["agent_identity"]["max_duration_seconds"] = 0
     with pytest.raises(CopilotVerificationError, match="max_duration_seconds"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["agent_identity"]["max_context_bytes"] = 16_383
+    with pytest.raises(CopilotVerificationError, match="max_context_bytes"):
         verify_copilot_answer_report(invalid)
 
 
@@ -215,6 +225,7 @@ def test_verifier_accepts_bounded_usage_and_rejects_unsafe_mutations() -> None:
         "prompt_tokens": 32,
         "completion_tokens": 8,
         "total_tokens": 40,
+        "peak_context_bytes": 16_384,
     }
     verify_copilot_answer_report(report)
 
@@ -226,6 +237,11 @@ def test_verifier_accepts_bounded_usage_and_rejects_unsafe_mutations() -> None:
     invalid = deepcopy(report)
     invalid["usage"]["duration_ms"] = 2_000_001
     with pytest.raises(CopilotVerificationError, match="usage.duration_ms"):
+        verify_copilot_answer_report(invalid)
+
+    invalid = deepcopy(report)
+    invalid["usage"]["peak_context_bytes"] = 2 * 1024 * 1024 + 1
+    with pytest.raises(CopilotVerificationError, match="usage.peak_context_bytes"):
         verify_copilot_answer_report(invalid)
 
     invalid = deepcopy(report)
