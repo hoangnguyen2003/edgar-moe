@@ -1271,6 +1271,24 @@ def research_copilot(
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound the agent tool-call loop."),
     ] = None,
+    max_retries: Annotated[
+        int | None,
+        typer.Option(
+            "--max-retries",
+            min=0,
+            max=3,
+            help="Bound retries for transient provider/network failures.",
+        ),
+    ] = None,
+    retry_backoff_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--retry-backoff-seconds",
+            min=0,
+            max=5,
+            help="Initial capped exponential retry backoff in seconds.",
+        ),
+    ] = None,
     plan_only: Annotated[
         bool,
         typer.Option(
@@ -1330,6 +1348,16 @@ def research_copilot(
                 model=model or settings.edgar_moe_copilot_model,
                 timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
                 max_tokens=settings.edgar_moe_copilot_max_tokens,
+                max_retries=(
+                    settings.edgar_moe_copilot_max_retries
+                    if max_retries is None
+                    else max_retries
+                ),
+                retry_backoff_seconds=(
+                    settings.edgar_moe_copilot_retry_backoff_seconds
+                    if retry_backoff_seconds is None
+                    else retry_backoff_seconds
+                ),
             )
             answer = ResearchCopilot(
                 provider=provider,
@@ -1503,6 +1531,24 @@ def research_copilot_benchmark(
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound each agent tool-call loop."),
     ] = None,
+    max_retries: Annotated[
+        int | None,
+        typer.Option(
+            "--max-retries",
+            min=0,
+            max=3,
+            help="Bound retries for transient provider/network failures.",
+        ),
+    ] = None,
+    retry_backoff_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--retry-backoff-seconds",
+            min=0,
+            max=5,
+            help="Initial capped exponential retry backoff in seconds.",
+        ),
+    ] = None,
     fail_under: Annotated[
         float,
         typer.Option(min=0.0, max=1.0, help="Minimum structural pass rate."),
@@ -1597,6 +1643,14 @@ def research_copilot_benchmark(
             model=model or settings.edgar_moe_copilot_model,
             timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
             max_tokens=settings.edgar_moe_copilot_max_tokens,
+            max_retries=(
+                settings.edgar_moe_copilot_max_retries if max_retries is None else max_retries
+            ),
+            retry_backoff_seconds=(
+                settings.edgar_moe_copilot_retry_backoff_seconds
+                if retry_backoff_seconds is None
+                else retry_backoff_seconds
+            ),
         )
         copilot = ResearchCopilot(
             provider=provider,

@@ -241,7 +241,8 @@ digest, and tool-call budget so reviewers can reproduce the agent boundary
 without retaining prompts, provider payloads, or secrets. The aggregate marks
 that boundary `consistent`, `legacy`, or `mixed`; only `consistent` runs can
 pass the copilot readiness gate, while legacy and mixed runs remain
-`review_required`.
+`review_required`. Provider transport failures use a bounded transient retry
+policy, and private usage counts include those actual attempts for cost review.
 After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.

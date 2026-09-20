@@ -23,3 +23,13 @@ def test_api_pool_settings_are_bounded_and_configurable(monkeypatch) -> None:
     assert settings.edgar_moe_registry_api_pool_size == 3
     assert settings.edgar_moe_registry_api_max_overflow == 2
     assert settings.edgar_moe_registry_api_pool_timeout_seconds == 7.5
+
+
+def test_copilot_retry_settings_are_bounded_and_configurable(monkeypatch) -> None:
+    monkeypatch.setenv("EDGAR_MOE_COPILOT_MAX_RETRIES", "3")
+    monkeypatch.setenv("EDGAR_MOE_COPILOT_RETRY_BACKOFF_SECONDS", "1.5")
+
+    settings = RuntimeSettings(_env_file=None)
+
+    assert settings.edgar_moe_copilot_max_retries == 3
+    assert settings.edgar_moe_copilot_retry_backoff_seconds == 1.5
