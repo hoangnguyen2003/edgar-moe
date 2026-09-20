@@ -536,6 +536,30 @@ def research_drift_history(
     )
 
 
+@app.command("research-drift-history-verify")
+def research_drift_history_verify(
+    history: Annotated[Path, typer.Argument(help="Content-addressed research-drift history JSON.")],
+) -> None:
+    """Verify a retained prospective drift history without rebuilding it."""
+    from edgar_moe.features.drift_history import DriftHistoryError, verify_research_drift_history
+
+    try:
+        payload = orjson.loads(history.read_bytes())
+    except (OSError, orjson.JSONDecodeError) as error:
+        raise typer.BadParameter(f"cannot read drift history: {history}") from error
+    if not isinstance(payload, dict):
+        raise typer.BadParameter("drift history must be a JSON object")
+    try:
+        verify_research_drift_history(payload)
+    except DriftHistoryError as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(
+        f"Verified research drift history {payload['history_hash']} "
+        f"({payload['report_count']} reports; status={payload['status']}; "
+        f"warning_streak={payload['warning_streak']})"
+    )
+
+
 @app.command("run-study")
 def run_study(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
