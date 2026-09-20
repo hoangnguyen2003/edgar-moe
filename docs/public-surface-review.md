@@ -25,13 +25,34 @@ license.
 It also publishes `data-provenance.json`, a conservative machine-readable
 contract for the snapshot's source families, content-addressed identity, and
 redistribution boundary. It explicitly declares that raw sources are not public
-and that legal/provider review remains required. CI and the Vercel build
+and that legal/provider review remains required until an operator records
+explicit approval. CI and the Vercel build
 cross-check the published identity against `config/public_snapshot.lock.json`;
 this is evidence of the repository's disclosure posture, not evidence that any
 provider has approved redistribution. The read-only `/api/v1/governance`
 endpoint presents the same boundary together with the content-addressed frozen-v1
 identity and the current forward-registry state; it deliberately labels
 provider-side controls as pending operator evidence.
+
+The release decision aid is deliberately separate from the serving build:
+
+```bash
+python3 scripts/public_release_readiness.py \
+  --output /tmp/public-release-readiness.json
+```
+
+It composes the public-bundle and snapshot-lock validators into three explicit
+states:
+
+- `blocked`: a structural bundle or immutable snapshot check failed;
+- `review_required`: the published structure is sound, but source terms or legal
+  approval are still pending; or
+- `ready`: every source is marked `approved`, `legal_approval` is `true`, and a
+  UTC `last_reviewed_at` timestamp is present.
+
+The report contains only error codes, counts, the locked snapshot identity, and
+review state. It is not a license grant and does not assert provider-side WAF,
+rate-limit, backup, or account evidence.
 
 ## Failure behavior
 
@@ -55,6 +76,7 @@ npm ci --prefix apps/web
 npm run build:public --prefix apps/web
 python3 scripts/validate_public_bundle.py
 python3 scripts/verify_public_snapshot_lock.py
+python3 scripts/public_release_readiness.py --allow-review-required
 git diff --exit-code -- public
 uv run pytest -q tests/integration/test_api.py
 ```

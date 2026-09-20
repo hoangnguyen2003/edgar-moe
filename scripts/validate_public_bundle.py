@@ -37,6 +37,9 @@ _SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)
 _SECURITY_EXPIRES = re.compile(
     r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$"
 )
+_ISO_TIMESTAMP = re.compile(
+    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$"
+)
 _HTTPS_URL = re.compile(r"^https://\S+$")
 
 
@@ -166,10 +169,32 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
     if not isinstance(review, dict):
         errors.append("public/data-provenance.json review must be an object")
     else:
-        if review.get("redistribution_status") != "operator_review_required":
-            errors.append("public provenance redistribution status must require review")
-        if review.get("legal_approval") is not False:
-            errors.append("public provenance legal_approval must remain false")
+        redistribution_status = review.get("redistribution_status")
+        if redistribution_status not in {"operator_review_required", "approved"}:
+            errors.append(
+                "public provenance redistribution status must be operator_review_required or approved"
+            )
+        legal_approval = review.get("legal_approval")
+        if legal_approval not in {False, True}:
+            errors.append("public provenance legal_approval must be a boolean")
+        last_reviewed_at = review.get("last_reviewed_at")
+        if redistribution_status == "approved":
+            if legal_approval is not True:
+                errors.append("approved public provenance requires legal_approval=true")
+            if not isinstance(last_reviewed_at, str) or not _ISO_TIMESTAMP.fullmatch(
+                last_reviewed_at
+            ):
+                errors.append("approved public provenance requires a UTC last_reviewed_at timestamp")
+        else:
+            if legal_approval is not False:
+                errors.append(
+                    "operator-review-required public provenance must keep legal_approval=false"
+                )
+            if last_reviewed_at is not None and (
+                not isinstance(last_reviewed_at, str)
+                or not _ISO_TIMESTAMP.fullmatch(last_reviewed_at)
+            ):
+                errors.append("public provenance last_reviewed_at must be a UTC timestamp or null")
 
     sources = payload.get("sources")
     if not isinstance(sources, list) or not sources:
@@ -185,9 +210,9 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
                 errors.append(f"public provenance source {index} is missing identity fields")
             if not _HTTPS_URL.fullmatch(str(source.get("terms_url", ""))):
                 errors.append(f"public provenance source {index} must have an HTTPS terms_url")
-            if source.get("redistribution_status") != "review_required":
+            if source.get("redistribution_status") not in {"review_required", "approved"}:
                 errors.append(
-                    f"public provenance source {index} redistribution status must require review"
+                    f"public provenance source {index} redistribution status must be review_required or approved"
                 )
 
 

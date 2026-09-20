@@ -53,6 +53,8 @@ jobs:
         run: uv run python scripts/validate_redacted_artifacts.py --help
       - name: Check provider evidence preflight command is runnable
         run: uv run python scripts/check_provider_evidence_prerequisites.py --help
+      - name: Check public release readiness command is runnable
+        run: uv run python scripts/public_release_readiness.py --help
       - name: Validate provider workflow safety contracts
         run: uv run python scripts/validate_provider_workflows.py
       - name: Check artifact reconciliation command is runnable
@@ -290,6 +292,7 @@ jobs:
       - run: python scripts/validate_deployment_contract.py
       - run: python scripts/verify_public_snapshot_lock.py
       - run: python scripts/validate_public_bundle.py
+      - run: python scripts/public_release_readiness.py --allow-review-required
       - run: python -m json.tool vercel.json >/dev/null
       - run: git diff --exit-code -- public
 

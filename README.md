@@ -222,6 +222,20 @@ After a private run, human reviewers can append rubric decisions to a
 content-addressed history with `research-copilot-review`; the history retains
 case and answer hashes, not answer text, and never triggers retraining.
 
+Before treating the anonymous site as a distributable release, run the
+provider-neutral public-surface readiness report:
+
+```bash
+python3 scripts/public_release_readiness.py \
+  --output /tmp/public-release-readiness.json
+```
+
+The report returns `blocked` when the bundle or immutable snapshot lock fails,
+`review_required` while source redistribution terms remain unresolved, and
+`ready` only when the manifest contains explicit approval for every source.
+It is an operator/release decision aid; it does not grant a license or replace
+provider-side rate limits, WAF controls, or legal review.
+
 For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
@@ -326,6 +340,8 @@ uv run pytest
 uv run ruff check .
 uv run mypy src
 python scripts/validate_public_bundle.py
+python scripts/verify_public_snapshot_lock.py
+python scripts/public_release_readiness.py --allow-review-required
 npm --prefix apps/web run test
 npm --prefix apps/web run build
 ```
