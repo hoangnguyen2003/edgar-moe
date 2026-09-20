@@ -25,7 +25,9 @@ The agent can make at most four tool calls by default. The provider transport
 allows at most two retries for explicitly transient HTTP/network failures, with
 a capped exponential backoff; authentication, validation, malformed-response,
 and oversized-response failures are not retried. Each tool result is
-content-hashed and returned with a citation. The JSON answer envelope retains
+content-hashed and returned with a citation; the runtime rejects a citation
+whose digest does not match that exact sanitized payload, or whose result name
+does not match the requested capability. The JSON answer envelope retains
 the question, answer, frozen identity, citations, and a non-sensitive tool
 trace. A report with no tool citations is marked `uncited`; it is not silently
 treated as evidence.
@@ -60,11 +62,13 @@ or atomically writing it, and benchmark/evaluation commands reject unverified
 reports before they enter private case files or aggregate scores.
 
 Citation closure is also enforced at the generation boundary. Every allowlisted
-evidence-tool result must carry a citation, and the final answer must retain at
-least one citation emitted by that tool; otherwise the run fails closed instead
-of saving an apparently valid uncited answer. A refusal after only rejected or
-unknown tool requests may remain explicitly uncited because no evidence was
-obtained. The offline verifier repeats these rules for saved envelopes.
+evidence-tool result must carry a citation bound to its payload hash, and the
+final answer must retain at least one citation emitted by that tool; otherwise
+the run fails closed instead of saving an apparently valid uncited answer. A
+refusal after only rejected or unknown tool requests may remain explicitly
+uncited because no evidence was obtained. The offline verifier repeats the
+presence and closure rules for saved envelopes; payload binding is enforced at
+the live tool boundary before provider egress.
 
 Each generated private answer may also include a bounded `usage` summary: the
 number of provider requests, total local elapsed milliseconds, and standard
@@ -127,6 +131,8 @@ copilot:
 - records an unknown or write-like tool request only as the neutral
   `rejected_tool_request` trace marker, never as an executable or allowlisted
   write capability; and
+- binds every accepted citation digest to the exact canonical payload returned
+  by its requested tool, rejecting mismatched result names or hashes; and
 - rejects a final answer that follows an allowlisted evidence-tool call without
   a retained tool citation; and
 - sends remote provider requests only to an exact configured hostname allowlist

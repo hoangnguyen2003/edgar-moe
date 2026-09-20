@@ -41,13 +41,15 @@ transient retry policy. The provider key and evidence context remain outside
 the public API and browser bundle. Remote HTTPS endpoints must also match the
 exact hostname allowlist configured for the operator; loopback HTTP is the
 explicit local-development exception. Once an allowlisted evidence tool is called,
-the agent and its offline verifier also require citation closure: a final
-answer without a tool-generated citation is rejected rather than retained as
-an apparently valid uncited response.
+the agent binds every citation digest to the exact canonical tool payload and
+the requested capability, then requires citation closure: a final answer
+without a tool-generated citation is rejected rather than retained as an
+apparently valid uncited response.
 
 The provider egress decision is recorded in [ADR 0010](adr/0010-copilot-provider-redirect-boundary.md).
 The provider-host decision is recorded in [ADR 0013](adr/0013-copilot-provider-host-allowlist.md).
 The citation-closure decision is recorded in [ADR 0012](adr/0012-copilot-citation-closure.md).
+The citation-payload binding decision is recorded in [ADR 0014](adr/0014-copilot-citation-payload-binding.md).
 The API database-session decision is recorded in [ADR 0011](adr/0011-api-read-only-statement-boundary.md).
 
 ## Architecture baseline — September 18, 2026
