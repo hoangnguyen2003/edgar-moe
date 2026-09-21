@@ -9,7 +9,7 @@ import orjson
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from edgar_moe.data.storage import sha256_file
+from edgar_moe.utils.hashing import sha256_file
 
 
 class FrozenModelSpec(BaseModel):

@@ -150,6 +150,26 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
     )
 
 
+def require_replaceable_demo_output(path: Path) -> None:
+    """Refuse to replace anything except an earlier synthetic fixture.
+
+    The committed public snapshot is authenticated, hash-locked evidence; a
+    synthetic run must never overwrite it or any other non-synthetic file.
+    """
+    if not path.exists():
+        return
+    try:
+        existing = orjson.loads(path.read_bytes())
+    except (OSError, orjson.JSONDecodeError) as error:
+        raise FileExistsError(f"Refusing to overwrite unreadable file {path}") from error
+    metadata = existing.get("metadata") if isinstance(existing, dict) else None
+    if not isinstance(metadata, dict) or metadata.get("data_mode") != "synthetic_fixture":
+        raise FileExistsError(
+            f"Refusing to overwrite non-synthetic snapshot {path}; "
+            "write the synthetic demo to a separate path"
+        )
+
+
 def build_demo_snapshot(
     output: str | Path,
     config: ResearchConfig | None = None,
@@ -157,6 +177,7 @@ def build_demo_snapshot(
     max_epochs: int = 35,
 ) -> dict[str, Any]:
     """Train the full model on synthetic fixtures and export a recruiter-facing snapshot."""
+    require_replaceable_demo_output(Path(output))
     if torch is None:
         raise RuntimeError(
             "The demo trains the real MoE. Install with `uv sync --extra research --extra dev`."

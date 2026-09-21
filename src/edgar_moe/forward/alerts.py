@@ -12,6 +12,8 @@ from urllib.request import Request, urlopen
 
 import orjson
 
+from edgar_moe.utils.timestamps import NaiveTimestampError, parse_aware_timestamp
+
 AlertKind = Literal[
     "failed_run",
     "stale_runner",
@@ -85,6 +87,10 @@ def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
         return "quality_warning"
     if status.get("health_status") == "warning":
         return "quality_warning"
+    if status.get("health_status") == "degraded":
+        # For example, no successful run has ever been recorded, so there is no
+        # age to compare with the freshness window.
+        return "stale_runner"
     return None
 
 
@@ -192,12 +198,13 @@ def _build_alert(
 
 def _timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
-        parsed = value
-    else:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("Alert timestamps must be timezone-aware")
-    return parsed.astimezone(UTC)
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Alert timestamps must be timezone-aware")
+        return value.astimezone(UTC)
+    try:
+        return parse_aware_timestamp(str(value))
+    except NaiveTimestampError as error:
+        raise ValueError("Alert timestamps must be timezone-aware") from error
 
 
 def _text(value: Any) -> str:

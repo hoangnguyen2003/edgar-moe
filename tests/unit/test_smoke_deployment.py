@@ -103,6 +103,14 @@ def complete_responses() -> dict[str, FakeResponse]:
             ),
             "application/json",
         ),
+        f"{base}/api/docs": FakeResponse(
+            f"{base}/api/docs",
+            '<div id="swagger-ui"></div>'
+            '<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0/swagger-ui-bundle.js"'
+            ' integrity="sha384-test" crossorigin="anonymous"></script>'
+            '<script src="/api/docs/swagger-init.js"></script>',
+            "text/html; charset=utf-8",
+        ),
         f"{base}/api/v1/governance": FakeResponse(
             f"{base}/api/v1/governance",
             json.dumps(
@@ -160,7 +168,7 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
     api_checks = [check for check in report["checks"] if check["path"].startswith("/api/")]
-    assert len(api_checks) == 2
+    assert len(api_checks) == 3
     for check in api_checks:
         request_id = check["request_id"]
         assert isinstance(request_id, str)
@@ -204,6 +212,26 @@ def test_smoke_rejects_public_raw_source_contract(monkeypatch: pytest.MonkeyPatc
     assert report["status"] == "failed"
     provenance = next(check for check in report["checks"] if check["name"] == "provenance")
     assert provenance["error"] == "provenance_review_contract_invalid"
+
+
+def test_smoke_rejects_api_docs_that_the_csp_would_blank(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    responses["https://terminal.example/api/docs"] = FakeResponse(
+        "https://terminal.example/api/docs",
+        '<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>'
+        "<script>const ui = SwaggerUIBundle({url: '/api/openapi.json'})</script>",
+        "text/html; charset=utf-8",
+    )
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    docs = next(check for check in report["checks"] if check["name"] == "api_docs")
+    assert docs["error"] == "api_docs_inline_script"
+    assert "_body" not in docs
 
 
 def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

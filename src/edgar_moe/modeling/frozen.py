@@ -15,7 +15,7 @@ import pandas as pd
 from edgar_moe.backtest.engine import BacktestResult, run_event_backtest
 from edgar_moe.backtest.metrics import predictive_metrics
 from edgar_moe.data.storage import sha256_file
-from edgar_moe.features.dataset import ResearchDataset
+from edgar_moe.features.dataset import ResearchDataset, dataset_xbrl_fact_policy
 from edgar_moe.modeling.comparisons import train_comparisons
 from edgar_moe.modeling.experiment import ArrayTransform, portfolio_outputs
 from edgar_moe.modeling.moe import RegimeGatedMoE, torch
@@ -26,7 +26,7 @@ from edgar_moe.modeling.train import (
     set_deterministic_seed,
     train_moe,
 )
-from edgar_moe.settings import ResearchConfig
+from edgar_moe.settings import LEGACY_XBRL_FACT_POLICY, ResearchConfig
 
 
 @dataclass(frozen=True)
@@ -63,6 +63,9 @@ class FrozenEvaluationResult:
     moe_training: TrainingResult | None
     fundamental_model: Any | None
     comparison_models: dict[str, Any]
+    # XBRL fact policy of the training dataset; the frozen predictor only scores
+    # prospective datasets built with the same policy.
+    xbrl_fact_policy: str = LEGACY_XBRL_FACT_POLICY
 
 
 def verify_frozen_selection(
@@ -264,6 +267,7 @@ def evaluate_frozen_selection(
         moe_training=moe_training,
         fundamental_model=fundamental.model,
         comparison_models={item.name: item.model for item in comparisons if item.model is not None},
+        xbrl_fact_policy=dataset_xbrl_fact_policy(dataset),
     )
 
 
@@ -314,6 +318,7 @@ def _write_frozen_evaluation(
         "champion_parameters": result.champion_parameters,
         "target_mean": result.target_mean,
         "target_std": result.target_std,
+        "xbrl_fact_policy": result.xbrl_fact_policy,
         "preprocessor": {
             name: {
                 "medians": transform.medians,

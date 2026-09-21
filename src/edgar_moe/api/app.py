@@ -10,6 +10,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi import Path as APIPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.responses import HTMLResponse
 from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response as StarletteResponse
@@ -88,7 +89,11 @@ app = FastAPI(
     title="EDGAR-MoE Research API",
     version=__version__,
     description="Snapshot API for point-in-time SEC filing alpha research.",
-    docs_url="/api/docs",
+    # FastAPI's built-in docs pages bootstrap with inline script, which the
+    # Content-Security-Policy below blocks. Swagger UI is served by the
+    # CSP-compatible routes near the end of this module instead.
+    docs_url=None,
+    redoc_url=None,
     openapi_url="/api/openapi.json",
 )
 app.add_middleware(
@@ -221,6 +226,12 @@ def events(
     to_date: date | None = None,
     cursor: str | None = Query(default=None, max_length=20, pattern=r"^\d+$"),
     limit: int = Query(default=25, ge=1, le=100),
+    q: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+        description="Case-insensitive substring match on ticker or company name.",
+    ),
 ) -> EventPage:
     _cache(response)
     try:
@@ -232,6 +243,7 @@ def events(
             to_date=to_date,
             cursor=cursor,
             limit=limit,
+            query=q,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail="Invalid event query") from error
@@ -373,7 +385,8 @@ def forward_forecasts(
     ticker: str | None = Query(default=None, min_length=1, max_length=32),
     model_id: str | None = Query(default=None, min_length=1, max_length=160),
     limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    # Bounded so an oversized value is a 422 rather than a database overflow.
+    offset: int = Query(default=0, ge=0, le=1_000_000),
 ) -> ForwardForecastPage:
     _cache(response, seconds=60)
     if registry is None:
@@ -439,6 +452,56 @@ def forward_data_quality(
         ]
     except SQLAlchemyError as error:
         raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
+
+
+_SWAGGER_UI_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0"
+# Subresource Integrity pins the exact CDN bytes that the CSP allows.
+_SWAGGER_UI_BUNDLE_INTEGRITY = (
+    "sha384-YDALVcy8kj8yltLBVi1vBiBAUqdxvus673gM8XKwiy6aDUJFXivF/KCufekjYbVf"
+)
+_SWAGGER_UI_CSS_INTEGRITY = (
+    "sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW"
+)
+_SWAGGER_UI_HTML = f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{app.title} - Swagger UI</title>
+<link rel="stylesheet" href="{_SWAGGER_UI_CDN}/swagger-ui.css" integrity="{_SWAGGER_UI_CSS_INTEGRITY}" crossorigin="anonymous">
+</head>
+<body>
+<div id="swagger-ui"></div>
+<script src="{_SWAGGER_UI_CDN}/swagger-ui-bundle.js" integrity="{_SWAGGER_UI_BUNDLE_INTEGRITY}" crossorigin="anonymous"></script>
+<script src="/api/docs/swagger-init.js"></script>
+</body>
+</html>
+"""
+_SWAGGER_UI_INITIALIZER = """window.ui = SwaggerUIBundle({
+  url: "/api/openapi.json",
+  dom_id: "#swagger-ui",
+  layout: "BaseLayout",
+  deepLinking: true,
+  showExtensions: true,
+  showCommonExtensions: true,
+  presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+});
+"""
+
+
+@app.get("/api/docs", include_in_schema=False)
+def api_docs() -> HTMLResponse:
+    """Serve Swagger UI with only external scripts so the strict CSP still applies."""
+    return HTMLResponse(_SWAGGER_UI_HTML, headers={"Cache-Control": "public, max-age=3600"})
+
+
+@app.get("/api/docs/swagger-init.js", include_in_schema=False)
+def api_docs_initializer() -> Response:
+    return Response(
+        _SWAGGER_UI_INITIALIZER,
+        media_type="text/javascript",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
 
 
 class SpaStaticFiles(StaticFiles):

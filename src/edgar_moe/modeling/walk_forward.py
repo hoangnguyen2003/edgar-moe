@@ -28,6 +28,15 @@ SELECTION_RULE = (
     "maximize worst-fold rank IC; then validation-count-weighted mean fold rank IC; "
     "then minimize pooled out-of-fold RMSE"
 )
+# Share of each fold's training window, by acceptance time, held out for MoE
+# early stopping so the scored validation fold never picks the stopping epoch.
+EARLY_STOPPING_FRACTION = 0.15
+# Recorded in selection artifacts; frozen v1 predates both revisions (it early-
+# stopped on the scored fold and fit Elastic Net baselines on raw returns).
+PROTOCOL_REVISIONS = {
+    "moe_early_stopping": "purged chronological holdout from each training window",
+    "linear_baselines": "elastic net fit on a standardized target",
+}
 
 
 @dataclass(frozen=True)
@@ -169,6 +178,9 @@ def run_walk_forward_study(
             dataset,
             fold,
         )
+        inner_positions, holdout_positions = _early_stopping_split(dataset, fold)
+        inner_values = _subset(train_values, inner_positions)
+        holdout_values = _subset(train_values, holdout_positions)
         validation_target = dataset.target[fold.validation]
         for specification in specifications:
             set_deterministic_seed(config.project.random_seed)
@@ -184,8 +196,8 @@ def run_walk_forward_study(
             )
             training = train_moe(
                 model,
-                train_values,
-                validation_values,
+                inner_values,
+                holdout_values,
                 learning_rate=config.model.learning_rate,
                 weight_decay=config.model.weight_decay,
                 entropy_regularization=config.model.entropy_regularization,
@@ -304,6 +316,7 @@ def save_walk_forward_artifacts(
         "dataset_id": result.dataset_id,
         "configuration": config.model_dump(mode="json"),
         "protocol": "expanding-window pre-test model selection",
+        "protocol_revisions": dict(PROTOCOL_REVISIONS),
         "selection_rule": result.selection_rule,
         "locked_test_start": result.locked_test_start,
         "locked_test_evaluated": result.locked_test_evaluated,
@@ -324,6 +337,33 @@ def save_walk_forward_artifacts(
     )
     temporary_selection.replace(selection_path)
     return output
+
+
+def _early_stopping_split(
+    dataset: ResearchDataset,
+    fold: WalkForwardFold,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Split a fold's training window into purged inner-train and holdout positions.
+
+    The holdout is the most recent ``EARLY_STOPPING_FRACTION`` of training events
+    by acceptance time. Inner-train events must mature before the holdout starts,
+    so no label overlaps it. Positions index into ``fold.train``.
+    """
+    accepted = pd.to_datetime(dataset.events["accepted_at"], utc=True).iloc[fold.train]
+    horizon = pd.to_datetime(dataset.events["horizon_at"], utc=True).iloc[fold.train]
+    holdout_count = max(1, math.ceil(len(fold.train) * EARLY_STOPPING_FRACTION))
+    holdout_start = accepted.sort_values(kind="stable").iloc[-holdout_count]
+    holdout = np.flatnonzero((accepted >= holdout_start).to_numpy())
+    inner = np.flatnonzero((horizon < holdout_start).to_numpy())
+    if not len(inner) or not len(holdout):
+        raise ValueError(
+            f"Walk-forward fold {fold.name} is too small for a purged early-stopping holdout"
+        )
+    return inner, holdout
+
+
+def _subset(values: dict[str, np.ndarray], positions: np.ndarray) -> dict[str, np.ndarray]:
+    return {name: array[positions] for name, array in values.items()}
 
 
 def _prepare_fold(

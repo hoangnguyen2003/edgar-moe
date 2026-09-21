@@ -150,21 +150,26 @@ class SnapshotRepository:
         to_date: date | None = None,
         cursor: str | None = None,
         limit: int = 25,
+        query: str | None = None,
     ) -> dict[str, Any]:
         rows = self.load()["events"]
+        needle = query.strip().lower() if query else ""
         filtered = []
         for row in rows:
-            event_date = date.fromisoformat(row["entry_date"])
             if ticker and row["ticker"].upper() != ticker.upper():
                 continue
             if form and row["form"] != form:
                 continue
             if direction and row["direction"] != direction:
                 continue
-            if from_date and event_date < from_date:
+            if needle and needle not in f"{row['ticker']} {row['company_name']}".lower():
                 continue
-            if to_date and event_date > to_date:
-                continue
+            if from_date or to_date:
+                event_date = date.fromisoformat(row["entry_date"])
+                if from_date and event_date < from_date:
+                    continue
+                if to_date and event_date > to_date:
+                    continue
             filtered.append(row)
         offset = _decode_cursor(cursor)
         items = filtered[offset : offset + limit]

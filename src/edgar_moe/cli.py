@@ -14,8 +14,14 @@ import typer
 
 from edgar_moe.capacity import DEFAULT_BASELINE_PATHS, build_capacity_baseline
 from edgar_moe.settings import runtime_settings
+from edgar_moe.utils.timestamps import (
+    NaiveTimestampError,
+    TimestampFormatError,
+    parse_aware_timestamp,
+)
 
 if TYPE_CHECKING:
+    from edgar_moe.api.repository import SnapshotRepository
     from edgar_moe.settings import RuntimeSettings
 
 app = typer.Typer(
@@ -27,9 +33,15 @@ app = typer.Typer(
 
 @app.command()
 def demo(
-    output: Annotated[Path, typer.Option(help="Destination snapshot JSON.")] = Path(
-        "data/demo/snapshot.json"
-    ),
+    output: Annotated[
+        Path,
+        typer.Option(
+            help=(
+                "Destination for the synthetic snapshot. The locked public snapshot "
+                "at data/demo/snapshot.json is never overwritten."
+            )
+        ),
+    ] = Path("data/interim/synthetic-snapshot.json"),
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
     epochs: Annotated[int, typer.Option(min=1, max=200)] = 35,
 ) -> None:
@@ -1321,7 +1333,6 @@ def research_copilot(
     key through the public API and never mutates the model, registry, labels, or
     deployment state. Use --plan-only to inspect the agent boundary for free.
     """
-    from edgar_moe.api.repository import SnapshotRepository
     from edgar_moe.copilot import (
         OpenAICompatibleProvider,
         ReadOnlyToolset,
@@ -1332,7 +1343,7 @@ def research_copilot(
     from edgar_moe.forward.registry import ForwardRegistry
 
     settings = runtime_settings()
-    repository = SnapshotRepository(snapshot)
+    repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
     resolved_database_url = _copilot_database_url(settings, database_url)
@@ -1611,7 +1622,6 @@ def research_copilot_benchmark(
     aggregate report contains hashes and structural observations, not answer
     text, provider payloads, credentials, or endpoint URLs.
     """
-    from edgar_moe.api.repository import SnapshotRepository
     from edgar_moe.copilot import (
         OpenAICompatibleProvider,
         ReadOnlyToolset,
@@ -1669,7 +1679,7 @@ def research_copilot_benchmark(
         return
 
     settings = runtime_settings()
-    repository = SnapshotRepository(snapshot)
+    repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
     resolved_database_url = _copilot_database_url(settings, database_url)
@@ -1907,6 +1917,20 @@ def _require_source_configuration(settings: RuntimeSettings, *, needs_fred: bool
         )
 
 
+def _copilot_snapshot_repository(settings: RuntimeSettings, snapshot: Path) -> SnapshotRepository:
+    """Open the snapshot the copilot cites, lock-verified when it is the public one.
+
+    The API refuses a public snapshot whose bytes or identity drifted from its
+    lock; the copilot applies the same check so it never cites tampered evidence
+    as the frozen v1 study.
+    """
+    from edgar_moe.api.repository import SnapshotRepository
+
+    public = settings.edgar_moe_demo_snapshot
+    lock = settings.edgar_moe_public_snapshot_lock if snapshot.resolve() == public.resolve() else None
+    return SnapshotRepository(snapshot, lock_path=lock)
+
+
 def _forward_database_url(settings: RuntimeSettings, override: str | None) -> str:
     return (
         override
@@ -1930,12 +1954,11 @@ def _parse_timestamp(value: str | None) -> datetime:
     if value is None:
         return datetime.now(UTC)
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
+        return parse_aware_timestamp(value)
+    except NaiveTimestampError as error:
+        raise typer.BadParameter("Timestamp must include a timezone") from error
+    except TimestampFormatError as error:
         raise typer.BadParameter("Timestamp must be ISO-8601") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise typer.BadParameter("Timestamp must include a timezone")
-    return parsed.astimezone(UTC)
 
 
 def _code_revision() -> str:

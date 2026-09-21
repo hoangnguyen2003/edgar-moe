@@ -8,7 +8,8 @@ install-research:
 	uv sync --extra dev --extra research --extra operations
 
 demo:
-	uv run edgar-moe demo --output data/demo/snapshot.json
+	uv run edgar-moe demo --output data/interim/synthetic-snapshot.json
+	uv run python scripts/validate_snapshot.py data/interim/synthetic-snapshot.json
 
 api:
 	uv run uvicorn edgar_moe.api.app:app --reload --port 8000
@@ -22,7 +23,7 @@ test:
 
 lint:
 	uv run ruff check .
-	uv run mypy src
+	uv run mypy src scripts
 	npm --prefix apps/web run lint
 
 build:

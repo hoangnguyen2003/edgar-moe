@@ -16,13 +16,26 @@ import type {
 
 const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
+/** Turn an error body (a string or FastAPI validation list) into readable text. */
+export function describeApiError(payload: unknown, status: number, statusText: string): string {
+  const detail = payload && typeof payload === "object" ? (payload as { detail?: unknown }).detail : undefined;
+  if (typeof detail === "string" && detail.trim()) return detail;
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => (item && typeof item === "object" ? (item as { msg?: unknown }).msg : undefined))
+      .filter((message): message is string => typeof message === "string" && message.trim() !== "");
+    if (messages.length) return messages.join("; ");
+  }
+  return statusText ? `Request failed (${status} ${statusText})` : `Request failed (${status})`;
+}
+
 async function request<T>(path: string): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(payload.detail ?? `Request failed (${response.status})`);
+    const payload: unknown = await response.json().catch(() => null);
+    throw new Error(describeApiError(payload, response.status, response.statusText));
   }
   return response.json() as Promise<T>;
 }

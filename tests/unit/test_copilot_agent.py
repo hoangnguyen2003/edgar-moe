@@ -415,6 +415,84 @@ def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "arguments"),
+    [
+        ("search_filing_events", '{"limit": 20}'),
+        ("search_filing_events", '{"limit": 5.0}'),
+        ("search_filing_events", '{"direction": "LONG"}'),
+        ("get_filing_event", '{"accession_number": "0000320193-23-106"}'),
+    ],
+)
+def test_invalid_arguments_to_an_allowlisted_tool_are_returned_for_recovery(
+    tool_name: str, arguments: str
+) -> None:
+    provider = FakeProvider(
+        [
+            _tool_call(tool_name, arguments),
+            _tool_call("get_study_summary"),
+            ProviderResponse(
+                content="The cited study summary answers the question.",
+                tool_calls=(),
+                model="fake-model",
+            ),
+        ]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+
+    answer = copilot.ask("What does the frozen study report?")
+
+    assert answer.evidence_status == "grounded"
+    assert [item.name for item in answer.trace] == [
+        "rejected_tool_request",
+        "get_study_summary",
+    ]
+    assert answer.trace[0].citation_count == 0
+    assert any(
+        '"error": "tool request rejected by the read-only contract"' in str(message)
+        for message in provider.messages[-1]
+    )
+
+
+def test_rejected_arguments_alone_produce_an_uncited_answer() -> None:
+    provider = FakeProvider(
+        [
+            _tool_call("search_filing_events", '{"limit": 20}'),
+            ProviderResponse(content="No evidence was retrieved.", tool_calls=(), model="fake-model"),
+        ]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+
+    answer = copilot.ask("Show me some filing events")
+
+    assert answer.evidence_status == "uncited"
+    assert answer.citations == ()
+    assert answer.trace[0].name == "rejected_tool_request"
+
+
+def test_question_limit_counts_utf8_bytes_before_any_provider_call() -> None:
+    provider = FakeProvider([])
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+    # 1,960 characters but 2,404 UTF-8 bytes: previously accepted, billed, then
+    # rejected by the envelope verifier after the provider call.
+    question = ("Mô hình này có hiệu quả sau chi phí giao dịch không? " * 37).strip()
+    assert len(question) < 2_000 < len(question.encode("utf-8"))
+
+    with pytest.raises(ValueError, match="UTF-8 bytes"):
+        copilot.ask(question)
+
+    assert provider.messages == []
+
+
 def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
     assert normalize_provider_endpoint("http://localhost:11434/v1/chat/completions").startswith(
         "http://localhost"

@@ -12,13 +12,14 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import orjson
 
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, read_forward_diagnostic_summary
+from edgar_moe.utils.timestamps import parse_aware_timestamp
 
 HISTORY_VERSION = 1
 OFFICIAL_HORIZON_SESSIONS = 20
@@ -524,15 +525,10 @@ def _metric(value: object, label: str) -> float | None:
 
 
 def _parse_timestamp(value: object, label: str) -> datetime:
-    if not isinstance(value, str) or not value.strip():
-        raise DiagnosticHistoryError(f"{label} must be an ISO-8601 timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_aware_timestamp(value)
     except ValueError as error:
-        raise DiagnosticHistoryError(f"{label} must be an ISO-8601 timestamp") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise DiagnosticHistoryError(f"{label} must include a timezone")
-    return parsed.astimezone(UTC)
+        raise DiagnosticHistoryError(f"{label} {error}") from error
 
 
 def _optional_timestamp(value: object, label: str) -> str | None:

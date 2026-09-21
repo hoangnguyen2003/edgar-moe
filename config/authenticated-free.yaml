@@ -1,7 +1,11 @@
 # Tractable authenticated study for free IEX data and local/free-notebook compute.
+# This is the frozen v1 protocol, and the prospective runner scores v1 with it.
 data:
   universe_size: 300
 
 features:
   embedding_chunk_tokens: 510
   embedding_max_chunks: 4
+  # Keep v1 features identical to the frozen study (ADR 0015). New studies
+  # should use config/authenticated-v2.yaml instead.
+  xbrl_fact_policy: legacy_v1

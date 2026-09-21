@@ -14,9 +14,14 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
+
+from edgar_moe.utils.timestamps import (
+    NaiveTimestampError,
+    TimestampFormatError,
+    parse_aware_timestamp,
+)
 
 MAX_DIAGNOSTIC_BYTES = 4_000_000
 DIAGNOSTIC_DISCLAIMER = (
@@ -183,15 +188,12 @@ def _metric(value: object, field: str) -> float | None:
 
 
 def _timestamp(value: object, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise DiagnosticSummaryError(f"diagnostic {field} must be a timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
+        return parse_aware_timestamp(value).isoformat()
+    except NaiveTimestampError as error:
+        raise DiagnosticSummaryError(f"diagnostic {field} must include a timezone") from error
+    except TimestampFormatError as error:
         raise DiagnosticSummaryError(f"diagnostic {field} must be a timestamp") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise DiagnosticSummaryError(f"diagnostic {field} must include a timezone")
-    return parsed.astimezone(UTC).isoformat()
 
 
 def _optional_timestamp(value: object, field: str) -> str | None:

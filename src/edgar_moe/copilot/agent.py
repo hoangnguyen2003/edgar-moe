@@ -16,6 +16,7 @@ from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .contracts import (
+    MAX_QUESTION_BYTES,
     Citation,
     CopilotAnswer,
     CopilotUsage,
@@ -28,7 +29,6 @@ from .policy import COPILOT_SYSTEM_PROMPT, build_agent_identity
 from .tools import ReadOnlyToolset, ToolInputError
 from .verification import verify_copilot_answer_report
 
-_MAX_QUESTION_LENGTH = 2_000
 _MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 _MAX_PROVIDER_USAGE_TOKENS = 100_000_000
 _MAX_RETRIES = 3
@@ -282,9 +282,12 @@ class ResearchCopilot:
 
     def ask(self, question: str) -> CopilotAnswer:
         normalized_question = question.strip()
-        if not normalized_question or len(normalized_question) > _MAX_QUESTION_LENGTH:
+        if (
+            not normalized_question
+            or len(normalized_question.encode("utf-8")) > MAX_QUESTION_BYTES
+        ):
             raise ValueError(
-                f"question must be between 1 and {_MAX_QUESTION_LENGTH} characters"
+                f"question must be non-empty and at most {MAX_QUESTION_BYTES} UTF-8 bytes"
             )
 
         messages: list[dict[str, object]] = [
@@ -362,9 +365,13 @@ class ResearchCopilot:
                 tool_calls_seen += 1
                 if tool_calls_seen > self.max_tool_calls:
                     raise CopilotError("copilot tool-call budget exceeded")
-                result, arguments = self._execute_call(call)
+                result, arguments, accepted = self._execute_call(call)
                 _verify_tool_result_name(call.name, result)
-                if call.name in allowed_tool_names:
+                # A rejected request (unknown tool or invalid arguments) is
+                # returned to the model so it can recover; it never counts as
+                # evidence, even when it names an allowlisted tool.
+                evidence_call = accepted and call.name in allowed_tool_names
+                if evidence_call:
                     _verify_evidence_tool_result(result)
                     evidence_tool_call_seen = True
                 elif result.citations:
@@ -373,11 +380,7 @@ class ResearchCopilot:
                 trace.append(
                     ToolTrace(
                         call_index=tool_calls_seen,
-                        name=(
-                            call.name
-                            if call.name in allowed_tool_names
-                            else _REJECTED_TOOL_TRACE_NAME
-                        ),
+                        name=call.name if evidence_call else _REJECTED_TOOL_TRACE_NAME,
                         arguments_sha256=content_hash(arguments),
                         result_sha256=content_hash(result.payload),
                         citation_count=len(result.citations),
@@ -395,7 +398,8 @@ class ResearchCopilot:
 
     def _execute_call(
         self, call: ProviderToolCall
-    ) -> tuple[ToolResult, dict[str, object]]:
+    ) -> tuple[ToolResult, dict[str, object], bool]:
+        """Execute one call; the flag is False when the contract rejected it."""
         try:
             decoded = json.loads(call.arguments or "{}")
         except JSONDecodeError:
@@ -406,14 +410,14 @@ class ResearchCopilot:
             decoded = {}
         arguments = {str(key): value for key, value in decoded.items()}
         try:
-            return self.toolset.execute(call.name, arguments), arguments
+            return self.toolset.execute(call.name, arguments), arguments, True
         except ToolInputError:
             rejected = ToolResult(
                 name=call.name,
                 payload={"error": "tool request rejected by the read-only contract"},
                 citations=(),
             )
-            return rejected, arguments
+            return rejected, arguments, False
 
 
 def _verify_tool_result_name(call_name: str, result: ToolResult) -> None:

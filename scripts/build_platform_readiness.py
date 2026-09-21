@@ -9,7 +9,7 @@ import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import orjson
@@ -35,7 +35,7 @@ def _public_release_verifier() -> Verifier:
     verifier = getattr(module, "verify_public_release_readiness", None)
     if not callable(verifier):
         raise RuntimeError("public release readiness verifier is unavailable")
-    return verifier
+    return cast(Verifier, verifier)
 
 
 def _verifier(control_id: str) -> Verifier:

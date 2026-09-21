@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import io
 from dataclasses import dataclass
 from datetime import UTC, datetime, time, timedelta
 from pathlib import Path
@@ -9,8 +11,7 @@ import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
-from edgar_moe.data.storage import sha256_file
-from edgar_moe.features.dataset import ResearchDataset
+from edgar_moe.features.dataset import ResearchDataset, dataset_xbrl_fact_policy
 from edgar_moe.features.point_in_time import audit_feature_availability
 from edgar_moe.forward.domain import ForecastDraft, QualityCheckDraft
 from edgar_moe.forward.metrics import percentile_ranks
@@ -18,8 +19,17 @@ from edgar_moe.modeling.experiment import ArrayTransform
 from edgar_moe.modeling.moe import RegimeGatedMoE, torch
 from edgar_moe.modeling.preprocess import ModalityTransform, MultimodalPreprocessor
 from edgar_moe.modeling.train import predict_moe
+from edgar_moe.settings import LEGACY_XBRL_FACT_POLICY
 
 MODALITY_NAMES = ("text", "fundamental", "market")
+
+
+class ForecastQualityError(ValueError):
+    """A blocking quality gate failed; its checks are kept for the failed run."""
+
+    def __init__(self, message: str, *, checks: list[QualityCheckDraft]) -> None:
+        super().__init__(message)
+        self.checks = checks
 
 
 @dataclass(frozen=True)
@@ -46,6 +56,7 @@ class FrozenPredictor:
         fundamental_intercept: float | None,
         selection_hash: str,
         artifact_sha256: str,
+        xbrl_fact_policy: str = LEGACY_XBRL_FACT_POLICY,
     ) -> None:
         self.model = model
         self.preprocessor = preprocessor
@@ -58,6 +69,9 @@ class FrozenPredictor:
         self.fundamental_intercept = fundamental_intercept
         self.selection_hash = selection_hash
         self.artifact_sha256 = artifact_sha256
+        # The XBRL fact policy of the model's training data; artifacts that
+        # predate the field (including frozen v1) were trained on legacy_v1.
+        self.xbrl_fact_policy = xbrl_fact_policy
 
     @classmethod
     def load(
@@ -70,11 +84,16 @@ class FrozenPredictor:
     ) -> FrozenPredictor:
         if torch is None:
             raise RuntimeError("Install research dependencies with `uv sync --extra research`")
-        model_path = Path(path)
-        observed_hash = sha256_file(model_path)
+        # Hash and unpickle the same in-memory bytes so the file cannot change
+        # between verification and loading.
+        content = Path(path).read_bytes()
+        observed_hash = hashlib.sha256(content).hexdigest()
         if observed_hash != expected_sha256:
             raise ValueError("Refusing to load a frozen model with an unexpected SHA-256")
-        payload = torch.load(model_path, map_location=device, weights_only=False)
+        # The reviewed payload stores numpy arrays and scikit-learn comparison
+        # models, which weights_only=True cannot restore; the SHA-256 pin above
+        # is the trust boundary.
+        payload = torch.load(io.BytesIO(content), map_location=device, weights_only=False)
         if not isinstance(payload, dict):
             raise ValueError("Frozen model artifact must contain a mapping")
         if str(payload.get("selection_hash", "")) != expected_selection_hash:
@@ -140,6 +159,7 @@ class FrozenPredictor:
             fundamental_intercept=intercept,
             selection_hash=expected_selection_hash,
             artifact_sha256=observed_hash,
+            xbrl_fact_policy=str(payload.get("xbrl_fact_policy", LEGACY_XBRL_FACT_POLICY)),
         )
 
     def forecast(
@@ -150,6 +170,7 @@ class FrozenPredictor:
         device: str = "cpu",
     ) -> ForecastBatch:
         forecast_as_of = _aware_utc(as_of)
+        self._require_feature_policy(dataset)
         candidate_indices = _candidate_indices(dataset, as_of=forecast_as_of)
         violations = audit_feature_availability(dataset.availability)
         checks = [
@@ -174,8 +195,10 @@ class FrozenPredictor:
             preview = ", ".join(
                 f"{item.event_id}:{item.feature_name}" for item in violations[:5]
             )
-            raise ValueError(
-                f"Point-in-time availability audit failed ({len(violations)} rows): {preview}"
+            # Carry the failed check so the failed run records why it failed.
+            raise ForecastQualityError(
+                f"Point-in-time availability audit failed ({len(violations)} rows): {preview}",
+                checks=checks,
             )
         if not len(candidate_indices):
             return ForecastBatch(forecasts=[], checks=checks, candidate_indices=candidate_indices)
@@ -262,6 +285,7 @@ class FrozenPredictor:
         reports can compare component behavior without changing the frozen
         artifact or opening the locked test.
         """
+        self._require_feature_policy(dataset)
         modalities = {
             name: np.asarray(dataset.modalities[name]) for name in MODALITY_NAMES
         }
@@ -316,6 +340,15 @@ class FrozenPredictor:
             final_scores = moe_scores
         outputs["final_score"] = np.asarray(final_scores, dtype=np.float64)
         return outputs
+
+    def _require_feature_policy(self, dataset: ResearchDataset) -> None:
+        """Refuse features built differently from the model's training data."""
+        observed = dataset_xbrl_fact_policy(dataset)
+        if observed != self.xbrl_fact_policy:
+            raise ValueError(
+                f"Dataset XBRL fact policy {observed!r} does not match the frozen model's "
+                f"{self.xbrl_fact_policy!r}; rebuild the dataset with the model's policy"
+            )
 
     def _verify_dimensions(
         self,

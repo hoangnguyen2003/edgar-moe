@@ -9,6 +9,9 @@ from typing import Any
 import duckdb
 import polars as pl
 
+# Re-exported: callers import sha256_file from here.
+from edgar_moe.utils.hashing import sha256_file as sha256_file
+
 
 class ResearchStore:
     """Local analytical store backed by Parquet and DuckDB metadata."""
@@ -84,12 +87,6 @@ class ResearchStore:
         ]
 
 
-def sha256_file(path: str | Path) -> str:
-    digest = hashlib.sha256()
-    with Path(path).open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def stable_json_hash(payload: Any) -> str:

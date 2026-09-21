@@ -11,6 +11,8 @@ from typing import Any, cast
 
 import orjson
 
+from edgar_moe.utils.timestamps import parse_aware_timestamp
+
 from .policy import validate_agent_identity
 
 
@@ -517,15 +519,10 @@ def _non_empty_string(value: object, label: str) -> str:
 
 
 def _parse_timestamp(value: object, label: str) -> datetime:
-    if not isinstance(value, str) or not value.strip():
-        raise ReviewInputError(f"{label} must be an ISO-8601 timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_aware_timestamp(value)
     except ValueError as error:
-        raise ReviewInputError(f"{label} must be an ISO-8601 timestamp") from error
-    if parsed.tzinfo is None:
-        raise ReviewInputError(f"{label} must include a timezone")
-    return parsed.astimezone(UTC)
+        raise ReviewInputError(f"{label} {error}") from error
 
 
 def _isoformat(value: datetime) -> str:

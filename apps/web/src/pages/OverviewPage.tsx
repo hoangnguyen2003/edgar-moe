@@ -57,9 +57,10 @@ export function OverviewPage() {
         <article className="panel split-panel">
           <header><div><span className="panel__kicker">Evaluation contract</span><h2>Time stays in order</h2></div><FileText size={20} /></header>
           <div className="timeline">
-            <div style={{ flex: 5 }}><strong>Development</strong><span>2018–2022</span><small>{compact(data.summary.development_events)} events</small></div>
-            <div style={{ flex: 2 }}><strong>Validation</strong><span>2023–2024</span><small>{compact(data.summary.validation_events)} events</small></div>
-            <div className="timeline__test" style={{ flex: 2 }}><strong>Locked test</strong><span>2025–2026</span><small>{compact(data.summary.test_events)} events</small></div>
+            {/* The frozen study's first matured development event is from 2020. */}
+            <div style={{ flex: Math.max(data.summary.development_events, 1) }}><strong>Development</strong><span>2020–2022</span><small>{compact(data.summary.development_events)} events</small></div>
+            <div style={{ flex: Math.max(data.summary.validation_events, 1) }}><strong>Validation</strong><span>2023–2024</span><small>{compact(data.summary.validation_events)} events</small></div>
+            <div className="timeline__test" style={{ flex: Math.max(data.summary.test_events, 1) }}><strong>Locked test</strong><span>2025–2026</span><small>{compact(data.summary.test_events)} events</small></div>
           </div>
           <p className="panel__note">Feature timestamps are audited and a 20-session embargo separates tuning data from every evaluation boundary.</p>
         </article>

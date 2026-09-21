@@ -11,7 +11,7 @@ import torch
 
 from edgar_moe.data.storage import sha256_file
 from edgar_moe.features.dataset import ResearchDataset
-from edgar_moe.forward.inference import FrozenPredictor
+from edgar_moe.forward.inference import ForecastQualityError, FrozenPredictor
 from edgar_moe.modeling.moe import RegimeGatedMoE
 
 
@@ -168,3 +168,119 @@ def event(
         "horizon_at": forecast_as_of + timedelta(days=30),
         "industry_code": "3571",
     }
+
+
+def _write_artifact(path: Path, **extra: object) -> str:
+    model = RegimeGatedMoE(
+        text_dim=2,
+        fundamental_dim=2,
+        market_dim=2,
+        regime_dim=1,
+        hidden_dim=4,
+        expert_dim=3,
+        dropout=0.0,
+        gate_strength=0.5,
+    )
+    torch.save(
+        {
+            "selection_hash": "a" * 64,
+            "champion_family": "multimodal",
+            "champion_parameters": {},
+            "target_mean": 0.0,
+            "target_std": 1.0,
+            "moe_state_dict": model.state_dict(),
+            "moe_config": model.export_config(),
+            "preprocessor": {
+                name: {"medians": np.zeros(2), "mean": np.zeros(2), "scale": np.ones(2)}
+                for name in ("text", "fundamental", "market")
+            },
+            "regime": {"medians": np.zeros(1), "mean": np.zeros(1), "scale": np.ones(1)},
+            **extra,
+        },
+        path,
+    )
+    return sha256_file(path)
+
+
+def _one_event_dataset(
+    forecast_as_of: datetime,
+    *,
+    provenance: dict[str, str] | None = None,
+    feature_available_at: datetime | None = None,
+) -> ResearchDataset:
+    return ResearchDataset(
+        dataset_id="fixture",
+        as_of=date(2026, 8, 7),
+        events=pd.DataFrame([event("event-1", "AAA", forecast_as_of, entry_offset_hours=12)]),
+        modalities={
+            name: np.array([[0.1, 0.2]], dtype=np.float32)
+            for name in ("text", "fundamental", "market")
+        },
+        regime=np.array([[0.2]], dtype=np.float32),
+        target=np.array([np.nan]),
+        daily_returns=pd.DataFrame(),
+        availability=pd.DataFrame(
+            {
+                "event_id": ["event-1"],
+                "feature_name": ["fixture"],
+                "available_at": [feature_available_at or forecast_as_of - timedelta(hours=1)],
+                "prediction_at": [forecast_as_of - timedelta(minutes=30)],
+            }
+        ),
+        feature_names={},
+        attrition={},
+        source_manifest_hash="b" * 64,
+        provenance=provenance or {},
+    )
+
+
+def test_frozen_predictor_refuses_features_built_under_another_fact_policy(
+    tmp_path: Path,
+) -> None:
+    forecast_as_of = datetime(2026, 8, 7, 1, 0, tzinfo=UTC)
+    legacy_artifact = tmp_path / "legacy.pt"
+    legacy = FrozenPredictor.load(
+        legacy_artifact,
+        expected_sha256=_write_artifact(legacy_artifact),
+        expected_selection_hash="a" * 64,
+    )
+    v2_dataset = _one_event_dataset(
+        forecast_as_of, provenance={"xbrl_fact_policy": "duration_aware_v2"}
+    )
+
+    # Artifacts without the field (frozen v1) were trained on legacy features.
+    assert legacy.xbrl_fact_policy == "legacy_v1"
+    with pytest.raises(ValueError, match="XBRL fact policy"):
+        legacy.forecast(v2_dataset, as_of=forecast_as_of)
+    with pytest.raises(ValueError, match="XBRL fact policy"):
+        legacy.component_outputs(v2_dataset)
+    assert len(legacy.forecast(_one_event_dataset(forecast_as_of), as_of=forecast_as_of).forecasts) == 1
+
+    v2_artifact = tmp_path / "v2.pt"
+    v2 = FrozenPredictor.load(
+        v2_artifact,
+        expected_sha256=_write_artifact(v2_artifact, xbrl_fact_policy="duration_aware_v2"),
+        expected_selection_hash="a" * 64,
+    )
+    assert len(v2.forecast(v2_dataset, as_of=forecast_as_of).forecasts) == 1
+    with pytest.raises(ValueError, match="XBRL fact policy"):
+        v2.forecast(_one_event_dataset(forecast_as_of), as_of=forecast_as_of)
+
+
+def test_point_in_time_violation_carries_its_failed_quality_check(tmp_path: Path) -> None:
+    forecast_as_of = datetime(2026, 8, 7, 1, 0, tzinfo=UTC)
+    artifact = tmp_path / "frozen-model.pt"
+    predictor = FrozenPredictor.load(
+        artifact,
+        expected_sha256=_write_artifact(artifact),
+        expected_selection_hash="a" * 64,
+    )
+    leaked = _one_event_dataset(forecast_as_of, feature_available_at=forecast_as_of)
+
+    with pytest.raises(ForecastQualityError, match="Point-in-time availability audit failed") as error:
+        predictor.forecast(leaked, as_of=forecast_as_of)
+
+    availability_check = error.value.checks[0]
+    assert availability_check.name == "point_in_time_availability"
+    assert availability_check.status == "failed"
+    assert availability_check.observed_value == 1.0

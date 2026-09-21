@@ -4,6 +4,7 @@ import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YA
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
 import { decimal, percent, shortDate } from "../lib/format";
+import { intervalLayout } from "../lib/interval";
 
 export function PortfolioPage() {
   const [cost, setCost] = useState(10);
@@ -11,6 +12,7 @@ export function PortfolioPage() {
   if (curve.isLoading) return <div className="page"><LoadingState label="Repricing portfolio costs" /></div>;
   if (curve.error) return <div className="page"><ErrorState error={curve.error} /></div>;
   const data = curve.data!;
+  const sharpeInterval = intervalLayout(data.metrics.sharpe_ci_low, data.metrics.sharpe, data.metrics.sharpe_ci_high);
   return (
     <div className="page">
       <header className="page-header page-header--inline"><div><span>Cost-aware backtest</span><h1>Returns after friction.</h1><p>Overlapping 20-session signals are rebalanced under gross, net, beta, industry, and name constraints. Negative outcomes remain visible.</p></div><div className="segmented" aria-label="Transaction cost scenario">{[10, 25, 50].map((value) => <button className={cost === value ? "active" : ""} onClick={() => setCost(value)} key={value}>{value} bps</button>)}</div></header>
@@ -37,7 +39,7 @@ export function PortfolioPage() {
         </div>
       </article>
       <section className="content-grid content-grid--two">
-        <article className="panel"><header><div><span className="panel__kicker">Inference strength</span><h2>Uncertainty stays visible</h2></div></header><div className="confidence"><span>{decimal(data.metrics.sharpe_ci_low)}</span><div><i style={{ left: "18%", right: "21%" }} /><b style={{ left: "49%" }} /></div><span>{decimal(data.metrics.sharpe_ci_high)}</span></div><p className="panel__note">95% block-bootstrap interval for annualized Sharpe. Blocks preserve short-range serial dependence.</p></article>
+        <article className="panel"><header><div><span className="panel__kicker">Inference strength</span><h2>Uncertainty stays visible</h2></div></header><div className="confidence"><span>{decimal(data.metrics.sharpe_ci_low)}</span>{sharpeInterval ? <div role="img" aria-label={`Sharpe ${decimal(data.metrics.sharpe)} with 95% interval ${decimal(data.metrics.sharpe_ci_low)} to ${decimal(data.metrics.sharpe_ci_high)}`}><i style={{ left: `${sharpeInterval.low}%`, width: `${sharpeInterval.high - sharpeInterval.low}%` }} /><b style={{ left: `${sharpeInterval.point}%` }} /><em style={{ left: `${sharpeInterval.zero}%` }} title="Sharpe = 0" /></div> : <div />}<span>{decimal(data.metrics.sharpe_ci_high)}</span></div><p className="panel__note">95% block-bootstrap interval for annualized Sharpe; the tick marks zero. Blocks preserve short-range serial dependence.</p></article>
         <article className="panel"><header><div><span className="panel__kicker">Portfolio contract</span><h2>Constraints before returns</h2></div></header><dl className="constraint-grid"><div><dt>Gross</dt><dd>100%</dd></div><div><dt>Net</dt><dd>≤ 2%</dd></div><div><dt>Beta</dt><dd>≤ 0.05</dd></div><div><dt>Name</dt><dd>≤ 2%</dd></div><div><dt>Industry</dt><dd>≤ 5%</dd></div><div><dt>Hold</dt><dd>20D</dd></div></dl></article>
       </section>
     </div>

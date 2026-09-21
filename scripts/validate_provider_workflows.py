@@ -16,7 +16,8 @@ PROVIDER_WORKFLOWS = (
     "provider-restore-rehearsal.yml",
 )
 
-_PINNED_ACTION = re.compile(r"^[^@]+@v\d+$")
+# Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
+_PINNED_ACTION = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
 _SECRET_EXPRESSION = "${{ secrets."
 
 
@@ -95,17 +96,18 @@ def _validate_common(name: str, workflow: dict[str, Any]) -> list[str]:
     ]
     for action in uses:
         if not _PINNED_ACTION.fullmatch(action):
-            errors.append(f"{name}: action must use a version tag (found {action!r})")
-    for required_action in ("actions/checkout@v7", "astral-sh/setup-uv@v7"):
-        if required_action not in uses:
+            errors.append(f"{name}: action must be pinned to a full commit SHA (found {action!r})")
+    for required_action in ("actions/checkout", "astral-sh/setup-uv"):
+        if not any(action.startswith(f"{required_action}@") for action in uses):
             errors.append(f"{name}: missing required action {required_action}")
     upload_indexes = [
         index
         for index, step in enumerate(steps)
-        if isinstance(step, dict) and step.get("uses") == "actions/upload-artifact@v7"
+        if isinstance(step, dict)
+        and str(step.get("uses", "")).startswith("actions/upload-artifact@")
     ]
     if len(upload_indexes) != 1:
-        errors.append(f"{name}: provider workflow must have one upload-artifact@v7 step")
+        errors.append(f"{name}: provider workflow must have one actions/upload-artifact step")
         return errors
     upload_index = upload_indexes[0]
     upload = steps[upload_index]
@@ -214,7 +216,7 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
     text = _workflow_text(workflow)
     errors: list[str] = []
     for required in (
-        "actions/setup-go@v6",
+        "actions/setup-go@",
         "AUDITOR_DATABASE_URL",
         "AUDITOR_R2_ACCESS_KEY_ID",
         "AUDITOR_R2_SECRET_ACCESS_KEY",

@@ -8,9 +8,9 @@ def test_provider_reader_workflow_is_manual_and_read_only() -> None:
 
     assert "workflow_dispatch:" in text
     assert "permissions:\n  contents: read" in text
-    assert "actions/checkout@v7" in text
-    assert "astral-sh/setup-uv@v7" in text
-    assert "actions/upload-artifact@v7" in text
+    assert "actions/checkout@" in text
+    assert "astral-sh/setup-uv@" in text
+    assert "actions/upload-artifact@" in text
     assert "EDGAR_MOE_REGISTRY_READ_DATABASE_URL" in text
     assert "EDGAR_MOE_REGISTRY_DATABASE_URL" not in text
     assert "scripts/verify_postgres_reader.py" in text

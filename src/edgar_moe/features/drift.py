@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 import orjson
 
-from edgar_moe.features.dataset import ResearchDataset
+from edgar_moe.features.dataset import ResearchDataset, dataset_xbrl_fact_policy
 
 DRIFT_MODALITIES = ("text", "fundamental", "market", "regime")
 _EPSILON = 1e-12
@@ -63,6 +63,15 @@ def build_research_drift_report(
     if prospective.as_of < baseline.as_of:
         raise ValueError(
             "Prospective dataset as_of must not precede the baseline dataset as_of"
+        )
+    baseline_policy = dataset_xbrl_fact_policy(baseline)
+    prospective_policy = dataset_xbrl_fact_policy(prospective)
+    if baseline_policy != prospective_policy:
+        # Different fact policies define different fundamental features, so
+        # their distributions are not comparable.
+        raise ValueError(
+            "Research drift requires one XBRL fact policy; "
+            f"baseline {baseline_policy!r} differs from prospective {prospective_policy!r}"
         )
 
     feature_reports: dict[str, Any] = {}

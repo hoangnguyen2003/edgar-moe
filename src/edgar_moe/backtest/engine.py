@@ -19,7 +19,13 @@ def run_event_backtest(
     daily_returns: pd.DataFrame,
     config: PortfolioConfig | None = None,
 ) -> BacktestResult:
-    """Simulate overlapping event signals with daily re-optimization and costs."""
+    """Simulate overlapping event signals with daily re-optimization and costs.
+
+    ``base_transaction_cost_bps`` is charged per unit of one-sided turnover
+    (half the summed absolute weight changes), so it is a round-trip cost:
+    replacing a fully invested book once costs the quoted bps, which is
+    ``bps / 2`` per dollar traded on each side.
+    """
     config = config or PortfolioConfig()
     signal_required = {
         "entry_date",

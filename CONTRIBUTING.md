@@ -19,7 +19,7 @@ Every change follows this sequence:
 
    ```sh
    uv run ruff check .
-   uv run mypy src
+   uv run mypy src scripts
    uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
    ```
 
@@ -32,6 +32,13 @@ Every change follows this sequence:
    Go changes additionally run `gofmt`, `go vet ./...`, and `go test -race ./...`
    from the relevant module. Web changes run the commands in
    `.github/workflows/ci.yml`.
+
+   Workflow changes pin every action to a full commit SHA with its release as
+   a trailing comment (`uses: actions/checkout@<sha> # v7.0.1`), and pass
+   secrets only to the `run` steps that need them
+   ([ADR 0018](docs/adr/0018-workflow-supply-chain.md)). Registry schema
+   changes go through Alembic; changing the append-only triggers requires a
+   new revision ([ADR 0016](docs/adr/0016-database-append-only-triggers.md)).
 4. Commit locally with a clear imperative message, then push the branch to
    `origin`.
 5. Open a GitHub pull request. Fill in the PR template, link relevant evidence

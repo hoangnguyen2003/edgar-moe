@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import re
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
-from .contracts import COPILOT_DISCLAIMER
+from edgar_moe.utils.timestamps import parse_aware_timestamp
+
+from .contracts import COPILOT_DISCLAIMER, MAX_QUESTION_BYTES
 from .policy import validate_agent_identity
 
 
@@ -90,7 +92,7 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
         raise CopilotVerificationError("copilot answer research_only must be true")
     if report.get("disclaimer") != COPILOT_DISCLAIMER:
         raise CopilotVerificationError("copilot answer disclaimer does not match the safety contract")
-    question = _safe_text(report.get("question"), "question", max_bytes=2_000)
+    question = _safe_text(report.get("question"), "question", max_bytes=MAX_QUESTION_BYTES)
     _safe_text(report.get("answer"), "answer", max_bytes=_MAX_ANSWER_BYTES)
     if not question:
         raise CopilotVerificationError("copilot answer question must be non-empty")
@@ -326,14 +328,7 @@ def _digest(value: object, label: str) -> str:
 
 
 def _parse_timestamp(value: object, label: str) -> datetime:
-    if not isinstance(value, str) or not value.strip():
-        raise CopilotVerificationError(f"copilot answer {label} must be an ISO-8601 timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_aware_timestamp(value)
     except ValueError as error:
-        raise CopilotVerificationError(
-            f"copilot answer {label} must be an ISO-8601 timestamp"
-        ) from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise CopilotVerificationError(f"copilot answer {label} must include a timezone")
-    return parsed.astimezone(UTC)
+        raise CopilotVerificationError(f"copilot answer {label} {error}") from error
