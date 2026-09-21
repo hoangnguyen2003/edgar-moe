@@ -12,11 +12,23 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # The forward runner embeds new filings with FinBERT for the frozen v1
+      # model (ADR 0002). A transformers major can change tokenization or model
+      # loading, so it needs a deliberate upgrade that shows the embeddings are
+      # unchanged rather than an automated bump.
+      - dependency-name: transformers
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /apps/web
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # Node types follow the runtime major in package.json `engines`; bump
+      # them together with the runtime.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

@@ -17,6 +17,9 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+          # torch and CUDA wheels are ~3 GB; pruning keeps this cache small
+          # (setup-uv v9 stopped pruning by default).
+          prune-cache: true
       - run: uv sync --locked --extra dev --extra research --extra operations
       - run: uv run ruff check .
       - run: uv run ruff format --check .
