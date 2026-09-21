@@ -16,8 +16,7 @@ from .evaluation import EvaluationCorpus, EvaluationSuite, answer_report, evalua
 class CopilotRunner(Protocol):
     """Minimal runner contract used by the benchmark and its offline tests."""
 
-    def ask(self, question: str) -> CopilotAnswer:
-        ...
+    def ask(self, question: str) -> CopilotAnswer: ...
 
 
 @dataclass(frozen=True)
@@ -139,18 +138,14 @@ def _aggregate_usage(reports: tuple[dict[str, object], ...]) -> BenchmarkUsage |
     )
 
 
-def _sum_required_counter(
-    usage_records: list[Mapping[str, object]], field: str
-) -> int | None:
+def _sum_required_counter(usage_records: list[Mapping[str, object]], field: str) -> int | None:
     values = [usage.get(field) for usage in usage_records]
     if not all(isinstance(value, int) and not isinstance(value, bool) for value in values):
         return None
     return sum(cast(int, value) for value in values)
 
 
-def _sum_optional_counter(
-    usage_records: list[Mapping[str, object]], field: str
-) -> int | None:
+def _sum_optional_counter(usage_records: list[Mapping[str, object]], field: str) -> int | None:
     values = [usage.get(field) for usage in usage_records]
     if any(value is None for value in values):
         return None
@@ -159,12 +154,12 @@ def _sum_optional_counter(
     return sum(cast(int, value) for value in values)
 
 
-def _max_optional_counter(
-    usage_records: list[Mapping[str, object]], field: str
-) -> int | None:
+def _max_optional_counter(usage_records: list[Mapping[str, object]], field: str) -> int | None:
     values = [usage.get(field) for usage in usage_records]
     if any(value is None for value in values):
         return None
-    if not all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in values):
+    if not all(
+        isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in values
+    ):
         return None
     return max(cast(int, value) for value in values)

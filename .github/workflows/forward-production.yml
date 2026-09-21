@@ -30,29 +30,19 @@ jobs:
     runs-on: ubuntu-24.04
     # The inner compute deadline leaves a full hour to persist resumable caches.
     timeout-minutes: 360
+    # Secrets are scoped to the run steps that use them, so third-party actions
+    # (checkout, setup-uv, setup-go, cache, upload-artifact) never receive the
+    # registry writer, R2 keys, data-source keys, or the alert webhook.
     env:
-      ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
-      ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
-      FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
-      SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
-      EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
       EDGAR_MOE_ARTIFACT_BACKEND: local
       EDGAR_MOE_ARTIFACT_MIRROR_BACKEND: r2
       EDGAR_MOE_ARTIFACT_DIR: data/forward/artifacts
-      EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
-      EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
-      EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
-      EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
-      EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
-      EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
-      EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
-      EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
       HF_HOME: ${{ github.workspace }}/data/cache/huggingface
       PYTHONUNBUFFERED: "1"
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7.6.0
         with:
           python-version: "3.12"
           enable-cache: true
@@ -61,12 +51,35 @@ jobs:
         run: uv sync --locked --extra research --extra operations
 
       - name: Validate private runtime configuration
+        id: runtime
         shell: bash
-        run: python3 scripts/validate_forward_runtime_config.py
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+          EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+          EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+          EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+          EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+          EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
+        run: |
+          python3 scripts/validate_forward_runtime_config.py
+          # `if:` cannot read secrets, so later steps gate on these flags.
+          auditor=false
+          if [[ -n "$EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL" ]]; then auditor=true; fi
+          alerts=false
+          if [[ -n "$EDGAR_MOE_ALERT_WEBHOOK_URL" ]]; then alerts=true; fi
+          echo "auditor=$auditor" >> "$GITHUB_OUTPUT"
+          echo "alerts=$alerts" >> "$GITHUB_OUTPUT"
 
       - name: Set up Go evidence auditor (optional)
-        if: ${{ env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL != '' }}
-        uses: actions/setup-go@v6
+        if: ${{ steps.runtime.outputs.auditor == 'true' }}
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: tools/evidence-auditor/go.mod
           cache-dependency-path: tools/evidence-auditor/go.sum
@@ -87,7 +100,7 @@ jobs:
 
       - name: Restore immutable filing and embedding caches
         id: runtime_cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             data/cache/forward-filings
@@ -109,6 +122,16 @@ jobs:
 
       - name: Refresh, forecast, and settle append-only evidence
         id: forward_cycle
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+          EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+          EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
         run: >-
           timeout --signal=INT --kill-after=30s 300m
           uv run python scripts/run_forward_cycle.py
@@ -119,26 +142,29 @@ jobs:
 
       - name: Audit R2 evidence after cycle (optional)
         id: evidence_audit
-        if: ${{ always() && !cancelled() && env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.runtime.outputs.auditor == 'true' }}
         working-directory: tools/evidence-auditor
         env:
-          AUDITOR_DATABASE_URL: ${{ env.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
-          AUDITOR_R2_ENDPOINT_URL: ${{ env.EDGAR_MOE_R2_ENDPOINT_URL }}
-          AUDITOR_R2_BUCKET: ${{ env.EDGAR_MOE_R2_BUCKET }}
-          AUDITOR_R2_ACCESS_KEY_ID: ${{ env.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
-          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ env.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         shell: bash
         run: |
           mkdir -p ../../data/forward/diagnostics
           set +e
-          go run . -timeout 5m -stale-after 96h > ../../data/forward/diagnostics/evidence-audit.json
+          # Failures from earlier cycles were already reported and can never be
+          # cleared from the append-only registry; judge only this cycle's runs.
+          go run . -timeout 5m -stale-after 96h -failed-run-window 12h \
+            > ../../data/forward/diagnostics/evidence-audit.json
           audit_code=$?
           cat ../../data/forward/diagnostics/evidence-audit.json
           exit "$audit_code"
 
       - name: Upload evidence-audit report (optional)
         if: ${{ always() && !cancelled() && steps.evidence_audit.outcome != 'skipped' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: forward-evidence-audit-${{ github.run_id }}-${{ github.run_attempt }}
           path: data/forward/diagnostics/evidence-audit.json
@@ -157,9 +183,10 @@ jobs:
           uv run python scripts/write_forward_failure_context.py
 
       - name: Notify failed cycle (optional)
-        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') && steps.runtime.outputs.alerts == 'true' }}
         continue-on-error: true
         env:
+          EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
           EDGAR_MOE_FAILURE_CONTEXT_PATH: data/forward/diagnostics/forward-failure-context.json
           EDGAR_MOE_ALERT_RECEIPT_PATH: data/forward/diagnostics/forward-alert-receipt.json
         shell: bash
@@ -167,7 +194,7 @@ jobs:
 
       - name: Upload failure evidence
         if: ${{ always() && !cancelled() && (steps.forward_cycle.outcome != 'success' || steps.evidence_audit.outcome == 'failure') }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: forward-failure-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -197,7 +224,7 @@ jobs:
 
       - name: Upload short-horizon diagnostic
         if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: forward-diagnostic-${{ steps.cutoff.outputs.date }}
           path: data/forward/diagnostics/diagnostic-${{ steps.cutoff.outputs.date }}.json
@@ -205,8 +232,10 @@ jobs:
           retention-days: 30
 
       - name: Capture registry health status (optional)
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && steps.runtime.outputs.alerts == 'true' }}
         shell: bash
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
         run: |
           status_path=data/forward/diagnostics/forward-status.json
           mkdir -p "$(dirname "$status_path")"
@@ -215,16 +244,17 @@ jobs:
           fi
 
       - name: Notify registry health (optional)
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && steps.runtime.outputs.alerts == 'true' }}
         continue-on-error: true
         env:
+          EDGAR_MOE_ALERT_WEBHOOK_URL: ${{ secrets.EDGAR_MOE_ALERT_WEBHOOK_URL }}
           EDGAR_MOE_ALERT_RECEIPT_PATH: data/forward/diagnostics/forward-alert-receipt.json
         shell: bash
         run: uv run python scripts/notify_forward_alert.py --status-file data/forward/diagnostics/forward-status.json
 
       - name: Upload optional health alert evidence
-        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && env.EDGAR_MOE_ALERT_WEBHOOK_URL != '' }}
-        uses: actions/upload-artifact@v7
+        if: ${{ always() && !cancelled() && steps.forward_cycle.outcome == 'success' && steps.evidence_audit.outcome != 'failure' && steps.runtime.outputs.alerts == 'true' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: forward-health-alert-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -261,7 +291,7 @@ jobs:
 
       - name: Upload forward evidence manifest
         if: ${{ always() && !cancelled() }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: forward-evidence-manifest-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
@@ -276,7 +306,7 @@ jobs:
 
       - name: Save resumable filing and embedding caches
         if: ${{ always() && steps.runtime_cache.outcome == 'success' }}
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
         with:
           path: |
             data/cache/forward-filings
@@ -287,6 +317,8 @@ jobs:
       - name: Publish registry summary
         if: success()
         shell: bash
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
         run: |
           {
             echo '## Prospective registry status'

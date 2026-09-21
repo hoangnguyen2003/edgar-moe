@@ -1,3 +1,4 @@
+import math
 from dataclasses import replace
 from datetime import date
 
@@ -18,6 +19,8 @@ from edgar_moe.modeling.frozen import (
     save_frozen_evaluation,
 )
 from edgar_moe.modeling.walk_forward import (
+    PROTOCOL_REVISIONS,
+    _early_stopping_split,
     run_walk_forward_study,
     save_walk_forward_artifacts,
 )
@@ -35,15 +38,18 @@ from edgar_moe.settings import ResearchConfig
 def study_fixture() -> ResearchDataset:
     generator = np.random.default_rng(19)
     securities = [f"asset-{index:02d}" for index in range(30)]
-    split_dates = [
-        ("2022-06-01T21:30:00Z", "2022-06-02", "2022-06-30"),
-        ("2023-06-01T21:30:00Z", "2023-06-02", "2023-06-30"),
-        ("2024-06-03T21:30:00Z", "2024-06-04", "2024-07-02"),
-        ("2025-01-01T21:30:00Z", "2025-01-02", "2025-02-03"),
-    ]
     rows = []
-    for split_index, (accepted, entry, horizon) in enumerate(split_dates):
+    for split_index, year in enumerate((2022, 2023, 2024, 2025)):
         for security_index, security_id in enumerate(securities):
+            if year < 2025:
+                # Filings arrive through the year, as in real data, so each
+                # training window has a chronological early-stopping holdout.
+                accepted_day = pd.Timestamp(f"{year}-02-01") + pd.Timedelta(days=6 * security_index)
+                accepted = f"{accepted_day.date()}T21:30:00Z"
+                entry = str((accepted_day + pd.Timedelta(days=1)).date())
+                horizon = str((accepted_day + pd.Timedelta(days=29)).date())
+            else:
+                accepted, entry, horizon = "2025-01-01T21:30:00Z", "2025-01-02", "2025-02-03"
             rows.append(
                 {
                     "event_id": f"event-{split_index}-{security_index}",
@@ -220,6 +226,17 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
     assert [fold.validation_year for fold in result.folds] == [2023, 2024]
     assert [len(fold.train) for fold in result.folds] == [30, 60]
     assert [len(fold.validation) for fold in result.folds] == [30, 30]
+    accepted = pd.to_datetime(dataset.events["accepted_at"], utc=True).to_numpy()
+    horizon = pd.to_datetime(dataset.events["horizon_at"], utc=True).to_numpy()
+    for fold in result.folds:
+        inner, holdout = _early_stopping_split(dataset, fold)
+        inner_events, holdout_events = fold.train[inner], fold.train[holdout]
+        # Early stopping uses the latest training events, never the scored fold,
+        # and inner-train labels mature before the holdout begins.
+        assert not set(holdout_events) & set(fold.validation)
+        assert not set(inner_events) & set(holdout_events)
+        assert horizon[inner_events].max() < accepted[holdout_events].min()
+        assert len(holdout_events) == math.ceil(0.15 * len(fold.train))
     assert len(result.models) == 9
     assert not result.locked_test_evaluated
     assert len(result.locked_indices) == 30
@@ -256,6 +273,7 @@ def test_walk_forward_selection_never_scores_locked_test(tmp_path) -> None:
 
     assert payload["locked_test_evaluated"] is False
     assert payload["locked_test_prediction_count"] == 0
+    assert payload["protocol_revisions"] == PROTOCOL_REVISIONS
     assert payload["champion"]["name"] == result.champion.name
     assert (artifact_directory / "oof-predictions.npz").exists()
     assert "locked test was not transformed" in report.read_text(encoding="utf-8")

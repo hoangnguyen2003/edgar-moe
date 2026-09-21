@@ -11,9 +11,14 @@ export function compact(value: number): string {
 }
 
 export function shortDate(value: string): string {
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(
-    new Date(`${value}T00:00:00Z`),
-  );
+  // Calendar dates are parsed as UTC midnight, so they must also be formatted
+  // in UTC; the viewer's zone would show the previous day west of Greenwich.
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
 }
 
 export function dateTime(value: string | null | undefined): string {

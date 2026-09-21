@@ -38,7 +38,7 @@ def test_failed_production_deployments_retain_redacted_evidence() -> None:
     assert "github.event.deployment_status.state == 'inactive'" in text
     assert "deployment-failure.json" in text
     assert "deployment_failed" in script
-    assert "actions/upload-artifact@v7" in text
+    assert "actions/upload-artifact@" in text
     assert "retention-days: 30" in text
     assert "Fail the deployment gate" in text
 

@@ -12,13 +12,14 @@ from __future__ import annotations
 import hashlib
 import math
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import orjson
 
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, read_forward_diagnostic_summary
+from edgar_moe.utils.timestamps import parse_aware_timestamp
 
 HISTORY_VERSION = 1
 OFFICIAL_HORIZON_SESSIONS = 20
@@ -154,9 +155,7 @@ def build_forward_diagnostic_history(
     """
     minimum = _positive_int(minimum_reports, "minimum_reports")
     if minimum > MAX_HISTORY_REPORTS:
-        raise DiagnosticHistoryError(
-            f"minimum_reports cannot exceed {MAX_HISTORY_REPORTS}"
-        )
+        raise DiagnosticHistoryError(f"minimum_reports cannot exceed {MAX_HISTORY_REPORTS}")
     if len(reports) == 0:
         raise DiagnosticHistoryError("at least one diagnostic report is required")
     if len(reports) > MAX_HISTORY_REPORTS:
@@ -166,10 +165,7 @@ def build_forward_diagnostic_history(
 
     normalized = [_normalize_summary(report, index) for index, report in enumerate(reports)]
     normalized.sort(key=lambda item: (item["as_of"], item["source_sha256"]))
-    normalized = [
-        {**item, "sequence": index}
-        for index, item in enumerate(normalized, start=1)
-    ]
+    normalized = [{**item, "sequence": index} for index, item in enumerate(normalized, start=1)]
     _validate_sequence(normalized)
     horizon = int(normalized[0]["horizon_sessions"])
     statuses = [str(item["status"]) for item in normalized]
@@ -209,7 +205,9 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
         raise DiagnosticHistoryError("diagnostic history must be an object")
     unknown = sorted(str(key) for key in history if key not in _HISTORY_KEYS)
     if unknown:
-        raise DiagnosticHistoryError("diagnostic history contains unknown fields: " + ", ".join(unknown))
+        raise DiagnosticHistoryError(
+            "diagnostic history contains unknown fields: " + ", ".join(unknown)
+        )
     required = _HISTORY_KEYS
     missing = sorted(key for key in required if key not in history)
     if missing:
@@ -288,7 +286,9 @@ def _normalize_summary(report: Mapping[str, Any], index: int) -> dict[str, Any]:
     if report.get("diagnostic") is not True:
         raise DiagnosticHistoryError(f"diagnostic report {index + 1} is not diagnostic-only")
     if report.get("official_horizon_sessions") != OFFICIAL_HORIZON_SESSIONS:
-        raise DiagnosticHistoryError(f"diagnostic report {index + 1} has an invalid official horizon")
+        raise DiagnosticHistoryError(
+            f"diagnostic report {index + 1} has an invalid official horizon"
+        )
     horizon = _bounded_int(report.get("horizon_sessions"), f"report {index + 1} horizon_sessions")
     if not 2 <= horizon < OFFICIAL_HORIZON_SESSIONS:
         raise DiagnosticHistoryError(f"diagnostic report {index + 1} horizon is invalid")
@@ -316,9 +316,7 @@ def _normalize_summary(report: Mapping[str, Any], index: int) -> dict[str, Any]:
     result["latest_maturity_at"] = _optional_timestamp(
         report.get("latest_maturity_at"), f"report {index + 1} latest_maturity_at"
     )
-    unique = _normalize_unique(
-        report.get("unique_event_evaluation"), index
-    )
+    unique = _normalize_unique(report.get("unique_event_evaluation"), index)
     if unique.get("status") != "unavailable":
         if unique["official_horizon_sessions"] != OFFICIAL_HORIZON_SESSIONS:
             raise DiagnosticHistoryError(
@@ -381,7 +379,9 @@ def _normalize_unique(value: object, index: int) -> dict[str, Any]:
         result[field] = _bounded_int(value.get(field), f"unique {field}")
     for field in _METRIC_FIELDS:
         result[field] = _metric(value.get(field), f"unique {field}")
-    result["next_maturity_at"] = _optional_timestamp(value.get("next_maturity_at"), "unique next_maturity_at")
+    result["next_maturity_at"] = _optional_timestamp(
+        value.get("next_maturity_at"), "unique next_maturity_at"
+    )
     result["latest_maturity_at"] = _optional_timestamp(
         value.get("latest_maturity_at"), "unique latest_maturity_at"
     )
@@ -394,8 +394,7 @@ def _verify_observation(value: object, index: int, horizon: int) -> dict[str, An
     unknown = sorted(str(key) for key in value if key not in _OBSERVATION_KEYS)
     if unknown:
         raise DiagnosticHistoryError(
-            f"diagnostic history observation {index} contains unknown fields: "
-            + ", ".join(unknown)
+            f"diagnostic history observation {index} contains unknown fields: " + ", ".join(unknown)
         )
     missing = sorted(key for key in _OBSERVATION_KEYS if key not in value)
     if missing:
@@ -407,7 +406,9 @@ def _verify_observation(value: object, index: int, horizon: int) -> dict[str, An
     if value.get("horizon_sessions") != horizon:
         raise DiagnosticHistoryError("diagnostic history reports use mixed horizons")
     if not _is_sha256(value.get("source_sha256")):
-        raise DiagnosticHistoryError(f"diagnostic history observation {index} source_sha256 is invalid")
+        raise DiagnosticHistoryError(
+            f"diagnostic history observation {index} source_sha256 is invalid"
+        )
     status = value.get("status")
     if status not in _REPORT_STATUSES:
         raise DiagnosticHistoryError(f"diagnostic history observation {index} status is invalid")
@@ -446,7 +447,9 @@ def _verify_observation(value: object, index: int, horizon: int) -> dict[str, An
 
 def _verify_unique(value: object, index: int) -> dict[str, Any]:
     if not isinstance(value, Mapping):
-        raise DiagnosticHistoryError(f"diagnostic history observation {index} unique evaluation is invalid")
+        raise DiagnosticHistoryError(
+            f"diagnostic history observation {index} unique evaluation is invalid"
+        )
     if value.get("status") == "unavailable":
         if set(value) != {"status", "reason"}:
             raise DiagnosticHistoryError(
@@ -469,7 +472,9 @@ def _validate_sequence(observations: Sequence[Mapping[str, Any]]) -> None:
         seen_sources.add(source)
         as_of_text = str(observation["as_of"])
         if as_of_text in seen_as_of:
-            raise DiagnosticHistoryError("diagnostic history contains duplicate observation timestamps")
+            raise DiagnosticHistoryError(
+                "diagnostic history contains duplicate observation timestamps"
+            )
         seen_as_of.add(as_of_text)
         parsed = _parse_timestamp(as_of_text, "observation as_of")
         current = (parsed, source)
@@ -524,15 +529,10 @@ def _metric(value: object, label: str) -> float | None:
 
 
 def _parse_timestamp(value: object, label: str) -> datetime:
-    if not isinstance(value, str) or not value.strip():
-        raise DiagnosticHistoryError(f"{label} must be an ISO-8601 timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parse_aware_timestamp(value)
     except ValueError as error:
-        raise DiagnosticHistoryError(f"{label} must be an ISO-8601 timestamp") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise DiagnosticHistoryError(f"{label} must include a timezone")
-    return parsed.astimezone(UTC)
+        raise DiagnosticHistoryError(f"{label} {error}") from error
 
 
 def _optional_timestamp(value: object, label: str) -> str | None:

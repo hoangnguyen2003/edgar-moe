@@ -49,6 +49,16 @@ The default output is one JSON report. Exit codes are:
 prevents an unexpected object from consuming unbounded memory or time. Objects
 are streamed through SHA-256; the auditor does not load an artifact into memory.
 
+`-failed-run-window` defaults to `0`, which reports every failed run in the
+registry. Because failed runs are append-only evidence that can never be
+cleared, a recurring audit would otherwise exit `1` forever after the first
+failure. With a positive window, failed runs that started earlier are counted in
+`historical_failed_runs` instead of producing `failed_run` or
+`missing_batch_evidence` findings; their artifacts are still hash-verified. The
+scheduled forward cycle uses `-failed-run-window 12h` so its post-cycle audit
+judges only that cycle, while restore rehearsals and manual provider audits keep
+the default and review the full history.
+
 ## Repeatable provider audit
 
 The repository also includes a manual GitHub Actions workflow named **Provider R2

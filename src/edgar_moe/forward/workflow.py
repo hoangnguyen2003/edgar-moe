@@ -10,8 +10,7 @@ from typing import Any, Protocol
 import orjson
 import pandas as pd
 
-from edgar_moe.data.storage import sha256_file
-from edgar_moe.features.dataset import ResearchDataset
+from edgar_moe.features.dataset import RECENT_DOWNLOAD_FAILURE_DAYS, ResearchDataset
 from edgar_moe.forward.artifacts import ArtifactStore, ArtifactWriteError
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.domain import (
@@ -22,9 +21,10 @@ from edgar_moe.forward.domain import (
     RunRegistration,
 )
 from edgar_moe.forward.failure_context import safe_exception_message
-from edgar_moe.forward.inference import ForecastBatch, FrozenPredictor
+from edgar_moe.forward.inference import ForecastBatch, ForecastQualityError, FrozenPredictor
 from edgar_moe.forward.models import utc_now
 from edgar_moe.forward.registry import ForwardRegistry
+from edgar_moe.utils.hashing import sha256_file
 
 
 class Predictor(Protocol):
@@ -75,6 +75,10 @@ class ForwardWorkflow:
         dataset = ResearchDataset.load(dataset_dir)
         _require_dataset_not_future(dataset, as_of=forecast_as_of)
         locked = self._ensure_registrations(dataset, dataset_dir=dataset_dir)
+        # Read before this run starts, so it is the previous opportunity to score.
+        previous_forecast_as_of = self.registry.latest_forecast_as_of(
+            model_id=self.model_spec.model_id
+        )
         run = self.registry.start_run(
             RunRegistration(
                 run_type="forecast",
@@ -107,10 +111,16 @@ class ForwardWorkflow:
                 threshold=4.0,
                 details={"dataset_as_of": dataset.as_of.isoformat()},
             )
-            all_checks = [*batch.checks, freshness_check]
-            quality_counts = self.registry.add_quality_checks(
-                run.run_id, all_checks
-            )
+            all_checks = [
+                *batch.checks,
+                freshness_check,
+                *_source_coverage_checks(
+                    dataset,
+                    forecast_as_of=forecast_as_of,
+                    previous_forecast_as_of=previous_forecast_as_of,
+                ),
+            ]
+            quality_counts = self.registry.add_quality_checks(run.run_id, all_checks)
             forecast_counts = self.registry.append_forecasts(run.run_id, batch.forecasts)
             evidence = {
                 "schema_version": 1,
@@ -147,9 +157,20 @@ class ForwardWorkflow:
                 error=error,
             )
             raise
+        except ForecastQualityError as error:
+            self._record_failed_checks(run.run_id, error.checks)
+            self.registry.fail_run(run.run_id, error_message=safe_exception_message(error))
+            raise
         except Exception as error:
             self.registry.fail_run(run.run_id, error_message=safe_exception_message(error))
             raise
+
+    def _record_failed_checks(self, run_id: str, checks: list[QualityCheckDraft]) -> None:
+        """Keep the failed gate's checks with the failed run, without masking the failure."""
+        try:
+            self.registry.add_quality_checks(run_id, checks)
+        except Exception:  # noqa: BLE001 - the quality failure is the error to report
+            return
 
     def settle(
         self,
@@ -351,6 +372,52 @@ def dataset_registration(
         row_counts={str(name): int(value) for name, value in raw_counts.items()},
         provenance={str(name): str(value) for name, value in raw_provenance.items()},
     )
+
+
+def _source_coverage_checks(
+    dataset: ResearchDataset,
+    *,
+    forecast_as_of: datetime,
+    previous_forecast_as_of: datetime | None,
+) -> list[QualityCheckDraft]:
+    """Report forecastable filings the run could not score."""
+    checks: list[QualityCheckDraft] = []
+    recent_failures = dataset.attrition.get("recent_download_failures")
+    if recent_failures is not None:
+        checks.append(
+            QualityCheckDraft(
+                name="recent_filing_download_failures",
+                status="warning" if recent_failures else "passed",
+                observed_value=float(recent_failures),
+                threshold=0.0,
+                details={
+                    "window_days": RECENT_DOWNLOAD_FAILURE_DAYS,
+                    "effect": "filings that failed to download cannot be forecast",
+                },
+            )
+        )
+    events = dataset.events
+    if previous_forecast_as_of is not None and {"accepted_at", "entry_at"}.issubset(events.columns):
+        accepted = pd.to_datetime(events["accepted_at"], utc=True)
+        entry = pd.to_datetime(events["entry_at"], utc=True)
+        missed = int(((accepted > previous_forecast_as_of) & (entry <= forecast_as_of)).sum())
+        checks.append(
+            QualityCheckDraft(
+                # Informational: a once-daily pre-dawn run cannot score filings
+                # accepted before the same morning's open (see docs/forward-testing.md).
+                name="missed_before_entry",
+                status="passed",
+                observed_value=float(missed),
+                details={
+                    "rule": (
+                        "accepted after the previous successful forecast run and "
+                        "entered before this run"
+                    ),
+                    "previous_forecast_as_of": previous_forecast_as_of.isoformat(),
+                },
+            )
+        )
+    return checks
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:

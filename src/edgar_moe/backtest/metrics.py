@@ -23,20 +23,44 @@ def newey_west_t_stat(returns: np.ndarray, lags: int = 5) -> float:
     return float(values.mean() / standard_error) if standard_error else float("nan")
 
 
+def annualized_return(returns: np.ndarray) -> float:
+    """Geometric (compounded) annualized return of daily returns."""
+    values = np.asarray(returns, dtype=float)
+    if not len(values):
+        return 0.0
+    growth = float(np.prod(1 + values))
+    # A total loss cannot be annualized geometrically; report -100%.
+    return growth ** (252 / len(values)) - 1 if growth > 0 else -1.0
+
+
+def annualized_sharpe(returns: np.ndarray) -> float:
+    """Geometric annualized return over annualized volatility.
+
+    Both the reported Sharpe ratio and its bootstrap interval use this statistic,
+    so the interval describes the same quantity as the point estimate.
+    """
+    values = np.asarray(returns, dtype=float)
+    if len(values) < 2:
+        return 0.0
+    volatility = float(values.std(ddof=1) * np.sqrt(252))
+    return annualized_return(values) / volatility if volatility else 0.0
+
+
 def performance_metrics(daily: pd.DataFrame, return_column: str = "net_return") -> dict[str, float]:
     returns = pd.to_numeric(daily[return_column], errors="coerce").dropna()
     if returns.empty:
         return {name: 0.0 for name in _metric_names()}
-    periods = len(returns)
-    annualized_return = float((1 + returns).prod() ** (252 / periods) - 1)
+    values = returns.to_numpy(dtype=float)
+    annual_return = annualized_return(values)
     annualized_volatility = float(returns.std(ddof=1) * np.sqrt(252))
-    sharpe = annualized_return / annualized_volatility if annualized_volatility else 0.0
-    downside = returns.clip(upper=0).std(ddof=1) * np.sqrt(252)
-    sortino = annualized_return / downside if downside else 0.0
+    sharpe = annualized_sharpe(values)
+    # Downside deviation: root mean square of below-zero returns.
+    downside = float(np.sqrt(np.mean(np.minimum(values, 0.0) ** 2)) * np.sqrt(252))
+    sortino = annual_return / downside if downside else 0.0
     equity = (1 + returns).cumprod()
     drawdown = equity / equity.cummax() - 1
     return {
-        "annualized_return": annualized_return,
+        "annualized_return": annual_return,
         "annualized_volatility": annualized_volatility,
         "sharpe": float(sharpe),
         "sortino": float(sortino),
@@ -81,8 +105,7 @@ def block_bootstrap_sharpe_interval(
         sample = np.concatenate([values[start : start + block_size] for start in starts])[
             : len(values)
         ]
-        volatility = sample.std(ddof=1)
-        sharpes.append(float(sample.mean() / volatility * np.sqrt(252)) if volatility else 0.0)
+        sharpes.append(annualized_sharpe(sample))
     low, high = np.quantile(sharpes, [0.025, 0.975])
     return float(low), float(high)
 

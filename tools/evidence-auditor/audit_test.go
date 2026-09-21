@@ -32,7 +32,10 @@ func fixture() Snapshot {
 	return Snapshot{Version: 1, Runs: []Run{{ID: "run-1", Type: "forecast", Status: "succeeded", StartedAt: time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)}}, Artifacts: []Artifact{{ID: "artifact-1", RunID: "run-1", Kind: "forecast_batch", URI: "local://sha256/" + digest[:2] + "/" + digest + "/forecast-batch.json", SHA256: digest, Size: 8}}}
 }
 func check(s Snapshot, store ObjectStore) (Report, int) {
-	return audit(context.Background(), s, store, "bucket", time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), 6*time.Hour, 1024)
+	return checkWindow(s, store, 0)
+}
+func checkWindow(s Snapshot, store ObjectStore, failedRunWindow time.Duration) (Report, int) {
+	return audit(context.Background(), s, store, "bucket", time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC), 6*time.Hour, failedRunWindow, 1024)
 }
 func has(r Report, code string) bool {
 	for _, f := range r.Findings {
@@ -186,5 +189,55 @@ func TestPythonGoldenContract(t *testing.T) {
 	result, code := check(snapshot, memoryStore{data: body})
 	if code != 0 || result.Verified != 1 {
 		t.Fatal(result)
+	}
+}
+
+func TestFailedRunWindow(t *testing.T) {
+	withFailure := func(started time.Time) Snapshot {
+		s := fixture()
+		// Failed before writing its batch, as a failed quality gate does.
+		s.Runs = append(s.Runs, Run{ID: "run-failed", Type: "forecast", Status: "failed", StartedAt: started})
+		return s
+	}
+	evidence := memoryStore{data: []byte("evidence")}
+	old := withFailure(time.Date(2025, 12, 20, 7, 17, 0, 0, time.UTC))
+
+	r, code := check(old, evidence)
+	if code != 1 || !has(r, "failed_run") || !has(r, "missing_batch_evidence") || r.HistoricalFailedRuns != 0 {
+		t.Fatalf("default window must report every failed run: %+v exit %d", r, code)
+	}
+
+	r, code = checkWindow(old, evidence, 12*time.Hour)
+	if code != 0 || r.Status != "passed" || len(r.Findings) != 0 || r.HistoricalFailedRuns != 1 || r.Verified != 1 {
+		t.Fatalf("an old failure must not fail every later audit: %+v exit %d", r, code)
+	}
+
+	recent := withFailure(time.Date(2026, 1, 1, 23, 0, 0, 0, time.UTC))
+	r, code = checkWindow(recent, evidence, 12*time.Hour)
+	if code != 1 || !has(r, "failed_run") || r.HistoricalFailedRuns != 0 {
+		t.Fatalf("a failure inside the window must still be reported: %+v exit %d", r, code)
+	}
+
+	r, code = checkWindow(old, memoryStore{data: []byte("tampered")}, 12*time.Hour)
+	if code != 1 || !has(r, "hash_mismatch") {
+		t.Fatalf("the window must not suppress integrity findings: %+v exit %d", r, code)
+	}
+}
+
+func TestHistoricalFailedRunsAreOmittedWhenZero(t *testing.T) {
+	r, _ := check(fixture(), memoryStore{data: []byte("evidence")})
+	data, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "historical_failed_runs") {
+		t.Fatalf("report schema changed without the window: %s", data)
+	}
+}
+
+func TestNegativeFailedRunWindowIsRejected(t *testing.T) {
+	var out bytes.Buffer
+	if run([]string{"--failed-run-window", "-1h"}, &out, io.Discard) != 2 || !strings.Contains(out.String(), "invalid_arguments") {
+		t.Fatal(out.String())
 	}
 }

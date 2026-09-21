@@ -9,7 +9,7 @@ import orjson
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from edgar_moe.data.storage import sha256_file
+from edgar_moe.utils.hashing import sha256_file
 
 
 class FrozenModelSpec(BaseModel):
@@ -61,7 +61,10 @@ class FrozenModelSpec(BaseModel):
         computed_locked_hash = hashlib.sha256(
             orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
         ).hexdigest()
-        if stored_locked_hash != self.locked_test_hash or computed_locked_hash != self.locked_test_hash:
+        if (
+            stored_locked_hash != self.locked_test_hash
+            or computed_locked_hash != self.locked_test_hash
+        ):
             raise ValueError("Locked-test hash verification failed")
         expected = {
             "dataset_id": self.training_dataset_id,

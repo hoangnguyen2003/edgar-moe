@@ -14,9 +14,14 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, cast
+
+from edgar_moe.utils.timestamps import (
+    NaiveTimestampError,
+    TimestampFormatError,
+    parse_aware_timestamp,
+)
 
 MAX_DIAGNOSTIC_BYTES = 4_000_000
 DIAGNOSTIC_DISCLAIMER = (
@@ -121,7 +126,9 @@ def _summary(raw: Mapping[str, Any]) -> dict[str, object]:
         result[field] = _bounded_int(raw.get(field), field)
     for field in _METRIC_FIELDS:
         result[field] = _metric(raw.get(field), field)
-    result["next_maturity_at"] = _optional_timestamp(raw.get("next_maturity_at"), "next_maturity_at")
+    result["next_maturity_at"] = _optional_timestamp(
+        raw.get("next_maturity_at"), "next_maturity_at"
+    )
     result["latest_maturity_at"] = _optional_timestamp(
         raw.get("latest_maturity_at"), "latest_maturity_at"
     )
@@ -140,9 +147,7 @@ def _unique_summary(raw: Mapping[str, Any]) -> dict[str, object]:
     # report may contain an extra event/repetition count.
     summary = _summary(raw)
     result: dict[str, object] = {
-        key: summary[key]
-        for key in _UNIQUE_SUMMARY_FIELDS
-        if key in summary
+        key: summary[key] for key in _UNIQUE_SUMMARY_FIELDS if key in summary
     }
     result["event_count"] = _bounded_int(raw.get("event_count"), "event_count")
     result["repeated_forecast_count"] = _bounded_int(
@@ -183,15 +188,12 @@ def _metric(value: object, field: str) -> float | None:
 
 
 def _timestamp(value: object, field: str) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise DiagnosticSummaryError(f"diagnostic {field} must be a timestamp")
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError as error:
+        return parse_aware_timestamp(value).isoformat()
+    except NaiveTimestampError as error:
+        raise DiagnosticSummaryError(f"diagnostic {field} must include a timezone") from error
+    except TimestampFormatError as error:
         raise DiagnosticSummaryError(f"diagnostic {field} must be a timestamp") from error
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise DiagnosticSummaryError(f"diagnostic {field} must include a timezone")
-    return parsed.astimezone(UTC).isoformat()
 
 
 def _optional_timestamp(value: object, field: str) -> str | None:

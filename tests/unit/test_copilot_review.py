@@ -146,7 +146,9 @@ def test_review_history_records_review_required_and_rejected_statuses() -> None:
         prose="fail",
         review_codes=["unclear_prose"],
     )
-    assert append_copilot_reviews(benchmark, revise, minimum_reviews=1)["status"] == "review_required"
+    assert (
+        append_copilot_reviews(benchmark, revise, minimum_reviews=1)["status"] == "review_required"
+    )
 
     reject = _review_for(
         benchmark,

@@ -25,7 +25,10 @@ def main() -> int:
             raise OperatorReadinessError("operator readiness report must be a JSON object")
         verify_operator_readiness_report(report)
     except (OSError, TypeError, ValueError) as error:
-        print(f"Operator readiness report verification failed: {type(error).__name__}", file=sys.stderr)
+        print(
+            f"Operator readiness report verification failed: {type(error).__name__}",
+            file=sys.stderr,
+        )
         return 2
 
     print(

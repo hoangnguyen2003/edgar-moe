@@ -5,10 +5,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session, sessionmaker
 
+from edgar_moe.forward.immutability import append_only_statements
 from edgar_moe.forward.models import IMMUTABLE_RECORD_TYPES, Base
 
 
@@ -95,8 +96,16 @@ class RegistryDatabase:
         )
 
     def create_schema(self) -> None:
-        """Create tables for local development and tests; production uses Alembic."""
+        """Create tables for local development and tests; production uses Alembic.
+
+        The database-level append-only triggers are installed as well, so tests
+        exercise the same write contract as a migrated registry.
+        """
         Base.metadata.create_all(self.engine)
+        with self.engine.begin() as connection:
+            for statement in append_only_statements(connection.dialect.name):
+                # text() escapes the % in PL/pgSQL RAISE formats for psycopg.
+                connection.execute(text(statement))
 
     @contextmanager
     def session(self) -> Generator[Session, None, None]:

@@ -62,7 +62,9 @@ def seed_fixture(database_url: str, artifact_root: Path) -> dict[str, object]:
     store = LocalArtifactStore(artifact_root)
     registry = ForwardRegistry(database, actor="restore-fixture")
     try:
-        model_reference = store.put_bytes(b"restore-fixture-frozen-model", logical_name="frozen-model.pt")
+        model_reference = store.put_bytes(
+            b"restore-fixture-frozen-model", logical_name="frozen-model.pt"
+        )
         registry.register_dataset(
             DatasetRegistration(
                 dataset_id="restore-fixture-dataset",

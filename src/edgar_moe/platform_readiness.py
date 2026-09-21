@@ -102,7 +102,9 @@ def build_platform_readiness(
             details.append("missing controls: " + ", ".join(missing))
         if unknown:
             details.append("unknown controls: " + ", ".join(unknown))
-        raise PlatformReadinessError("platform readiness controls are invalid (" + "; ".join(details) + ")")
+        raise PlatformReadinessError(
+            "platform readiness controls are invalid (" + "; ".join(details) + ")"
+        )
 
     controls: list[dict[str, Any]] = []
     blocked_reasons: list[str] = []
@@ -159,7 +161,9 @@ def verify_platform_readiness(report: Mapping[str, Any]) -> None:
     unknown = sorted(str(key) for key in report if key not in _PLATFORM_KEYS)
     missing = sorted(key for key in _PLATFORM_KEYS if key not in report)
     if unknown:
-        raise PlatformReadinessError("platform readiness contains unknown fields: " + ", ".join(unknown))
+        raise PlatformReadinessError(
+            "platform readiness contains unknown fields: " + ", ".join(unknown)
+        )
     if missing:
         raise PlatformReadinessError("platform readiness is missing fields: " + ", ".join(missing))
     if report.get("schema_version") != 1 or report.get("scope") != PLATFORM_SCOPE:
@@ -195,16 +199,24 @@ def verify_platform_readiness(report: Mapping[str, Any]) -> None:
         _verify_reasons(item.get("blocked_reasons"), f"{control_id}.blocked_reasons")
         _verify_reasons(item.get("review_reasons"), f"{control_id}.review_reasons")
         digest = item.get("report_sha256")
-        if digest is not None and (not isinstance(digest, str) or not _REPORT_DIGEST.fullmatch(digest)):
-            raise PlatformReadinessError(f"platform readiness report digest is invalid for {control_id}")
+        if digest is not None and (
+            not isinstance(digest, str) or not _REPORT_DIGEST.fullmatch(digest)
+        ):
+            raise PlatformReadinessError(
+                f"platform readiness report digest is invalid for {control_id}"
+            )
         if status == "missing" and digest is not None:
-            raise PlatformReadinessError(f"missing control {control_id} must not have a report digest")
+            raise PlatformReadinessError(
+                f"missing control {control_id} must not have a report digest"
+            )
         if status != "missing" and digest is None:
             raise PlatformReadinessError(f"present control {control_id} must have a report digest")
         if status in {"blocked", "stale", "missing"} and not item["blocked_reasons"]:
             raise PlatformReadinessError(f"blocked control {control_id} must include a reason")
         if status == "review_required" and not item["review_reasons"]:
-            raise PlatformReadinessError(f"review-required control {control_id} must include a reason")
+            raise PlatformReadinessError(
+                f"review-required control {control_id} must include a reason"
+            )
         if status == "ready" and (item["blocked_reasons"] or item["review_reasons"]):
             raise PlatformReadinessError(f"ready control {control_id} cannot include reasons")
         observed[str(control_id)] = item
@@ -296,8 +308,7 @@ def _verify_reasons(value: object, label: str) -> None:
 
 def _reason_list(value: object, label: str) -> list[str]:
     if not isinstance(value, list) or not all(
-        isinstance(item, str) and re.fullmatch(r"[a-z0-9_.:-]{1,160}", item)
-        for item in value
+        isinstance(item, str) and re.fullmatch(r"[a-z0-9_.:-]{1,160}", item) for item in value
     ):
         raise PlatformReadinessError(f"{label} must be a list of safe reason codes")
     return list(value)

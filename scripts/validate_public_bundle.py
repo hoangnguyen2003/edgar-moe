@@ -34,12 +34,8 @@ _EXPECTED_SNAPSHOT_PATH = "data/demo/snapshot.json"
 _SECURITY_CONTACT = re.compile(r"(?m)^Contact:\s*\S+\s*$")
 _SECURITY_POLICY = re.compile(r"(?m)^Policy:\s*\S+\s*$")
 _SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)*\s*$")
-_SECURITY_EXPIRES = re.compile(
-    r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$"
-)
-_ISO_TIMESTAMP = re.compile(
-    r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$"
-)
+_SECURITY_EXPIRES = re.compile(r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$")
+_ISO_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 _HTTPS_URL = re.compile(r"^https://\S+$")
 
 
@@ -148,16 +144,16 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
         errors.append("public/data-provenance.json snapshot must be an object")
     else:
         if snapshot.get("path") != _EXPECTED_SNAPSHOT_PATH:
-            errors.append(
-                "public provenance snapshot path must be " + _EXPECTED_SNAPSHOT_PATH
-            )
+            errors.append("public provenance snapshot path must be " + _EXPECTED_SNAPSHOT_PATH)
         if snapshot.get("data_mode") != "authenticated_locked_test":
             errors.append("public provenance data_mode must remain authenticated_locked_test")
         if not _SHA256.fullmatch(str(snapshot.get("sha256", ""))):
             errors.append("public provenance snapshot sha256 must be a lowercase SHA-256 digest")
         for field in ("selection_hash", "locked_test_hash"):
             if not _SHA256.fullmatch(str(snapshot.get(field, ""))):
-                errors.append(f"public provenance snapshot {field} must be a lowercase SHA-256 digest")
+                errors.append(
+                    f"public provenance snapshot {field} must be a lowercase SHA-256 digest"
+                )
         if snapshot.get("research_only") is not True:
             errors.append("public provenance snapshot research_only must remain true")
         if snapshot.get("raw_sources_public") is not False:
@@ -184,7 +180,9 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
             if not isinstance(last_reviewed_at, str) or not _ISO_TIMESTAMP.fullmatch(
                 last_reviewed_at
             ):
-                errors.append("approved public provenance requires a UTC last_reviewed_at timestamp")
+                errors.append(
+                    "approved public provenance requires a UTC last_reviewed_at timestamp"
+                )
         else:
             if legal_approval is not False:
                 errors.append(
@@ -204,9 +202,10 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
             if not isinstance(source, dict):
                 errors.append(f"public provenance source {index} must be an object")
                 continue
-            if not all(isinstance(source.get(field), str) and source[field] for field in (
-                "id", "name", "role"
-            )):
+            if not all(
+                isinstance(source.get(field), str) and source[field]
+                for field in ("id", "name", "role")
+            ):
                 errors.append(f"public provenance source {index} is missing identity fields")
             if not _HTTPS_URL.fullmatch(str(source.get("terms_url", ""))):
                 errors.append(f"public provenance source {index} must have an HTTPS terms_url")

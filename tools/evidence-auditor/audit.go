@@ -43,7 +43,9 @@ type Report struct {
 	Runs      int       `json:"runs_seen"`
 	Artifacts int       `json:"artifacts_seen"`
 	Verified  int       `json:"objects_verified"`
-	Findings  []Finding `json:"findings"`
+	// Failed runs older than -failed-run-window; omitted when the window is off.
+	HistoricalFailedRuns int       `json:"historical_failed_runs,omitempty"`
+	Findings             []Finding `json:"findings"`
 }
 type ObjectStore interface {
 	Open(context.Context, string) (io.ReadCloser, error)
@@ -76,7 +78,11 @@ func artifactKey(a Artifact, bucket string) (string, error) {
 	return key, nil
 }
 
-func audit(ctx context.Context, snapshot Snapshot, store ObjectStore, bucket string, now time.Time, staleAfter time.Duration, maxBytes int64) (Report, int) {
+// A positive failedRunWindow treats failed runs that started earlier as
+// historical: earlier audits already reported them and the append-only registry
+// can never clear them, so they are counted instead of failing every later audit.
+// Their artifacts are still verified. Zero reports every failed run.
+func audit(ctx context.Context, snapshot Snapshot, store ObjectStore, bucket string, now time.Time, staleAfter, failedRunWindow time.Duration, maxBytes int64) (Report, int) {
 	report := Report{Version: 1, AuditedAt: now.UTC(), Status: "passed", Runs: len(snapshot.Runs), Artifacts: len(snapshot.Artifacts), Findings: []Finding{}}
 	code := 0
 	add := func(kind, run, id string, operational bool) {
@@ -147,10 +153,14 @@ func audit(ctx context.Context, snapshot Snapshot, store ObjectStore, bucket str
 	}
 	for _, r := range snapshot.Runs {
 		completed := r.Status == "succeeded" || r.Status == "failed"
-		if r.Status == "failed" {
+		validStart := !r.StartedAt.IsZero() && !r.StartedAt.After(now)
+		historical := r.Status == "failed" && failedRunWindow > 0 && validStart && now.Sub(r.StartedAt) > failedRunWindow
+		if historical {
+			report.HistoricalFailedRuns++
+		} else if r.Status == "failed" {
 			add("failed_run", r.ID, "", false)
 		}
-		if r.StartedAt.IsZero() || r.StartedAt.After(now) {
+		if !validStart {
 			add("invalid_run_timestamp", r.ID, "", false)
 		}
 		if r.Status == "running" && now.Sub(r.StartedAt) > staleAfter {
@@ -166,7 +176,9 @@ func audit(ctx context.Context, snapshot Snapshot, store ObjectStore, bucket str
 		case "settlement":
 			expected = "settlement_batch"
 		}
-		if completed && expected != "" && !batches[r.ID][expected] {
+		// A run that failed before writing its batch has no batch to verify; that
+		// is part of the historical failure rather than a new integrity gap.
+		if completed && !historical && expected != "" && !batches[r.ID][expected] {
 			add("missing_batch_evidence", r.ID, "", false)
 		}
 	}

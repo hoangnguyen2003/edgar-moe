@@ -23,7 +23,7 @@ This check binds `ops/frozen/SHA256SUMS`, `ops/frozen/frozen-model.pt`,
 `ops/frozen/locked-test.json`, and `config/forward.yaml` to one reviewed v1
 identity. It does not permit prospective observations to replace that identity.
 
-The application prevents normal ORM updates and deletes for evidence tables and stores canonical payload hashes in an audit trail. Database administrators still have physical write authority, so durable evidence should also be exported to a versioned, access-restricted R2 bucket with retention policies.
+The application prevents ORM updates and deletes for evidence tables and stores canonical payload hashes in an audit trail. Migration `20260921_0002` also enforces the contract in the database: evidence rows reject `UPDATE`, `DELETE`, and `TRUNCATE` from any client, and a run may record its outcome only once, while it is `running` ([ADR 0016](adr/0016-database-append-only-triggers.md)). Database owners can still drop triggers with DDL, so durable evidence should also be exported to a versioned, access-restricted R2 bucket with retention policies.
 
 ## Local setup
 
@@ -192,6 +192,16 @@ filings for text deltas, and keeps frozen-model inference tractable on a free CP
 runner. `--lookback-days` can increase the window but cannot reduce it below 400
 calendar days.
 
+The schedule has a structural coverage gap. A filing accepted before the open
+(06:00-09:30 ET) enters at that same morning's open, after the pre-dawn run has
+already finished, so no scheduled run can score it before entry. In the frozen
+study, 13.1% of events were pre-market filings, and 12.9% could not be reached by
+a 03:17 ET Tuesday-Saturday schedule. The prospective sample therefore
+under-represents pre-market filers relative to the locked test. Each forecast
+run records the gap as an informational `missed_before_entry` quality check: the
+number of events accepted after the previous successful forecast run whose entry
+had already passed.
+
 Configure these GitHub Actions repository secrets before merging the workflow to
 the default branch:
 
@@ -300,8 +310,12 @@ If `EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL` is configured, the same scheduled
 job runs the independent Go auditor against the R2 mirror after the cycle. It
 uses the separate `EDGAR_MOE_R2_AUDITOR_*` read-only token, uploads the JSON
 report for 30 days, and fails the workflow on an integrity finding or an
-unavailable dependency. A missing optional auditor URL skips this step; it does
-not prove that the production mirror was audited.
+unavailable dependency. It passes `-failed-run-window 12h`, so failed runs from
+earlier cycles are counted in `historical_failed_runs` instead of failing every
+later cycle; they are immutable and were reported when they happened. A missing
+optional auditor URL skips this step; it does not prove that the production
+mirror was audited. The workflow passes each secret only to the steps that use
+it ([ADR 0018](adr/0018-workflow-supply-chain.md)).
 
 ## Research drift review
 
@@ -404,6 +418,19 @@ uv run edgar-moe forward-forecast \
 ```
 
 A successful zero-row batch is valid: it proves the checks ran but no event met the strict pre-entry condition. Do not loosen the timestamp rule to populate the UI.
+
+The run also records these source-coverage checks:
+
+- `dataset_freshness_days`, a warning when the dataset is more than four days old;
+- `recent_filing_download_failures`, a warning when filings accepted within seven
+  days failed to download and so could not be scored;
+- `missed_before_entry`, informational coverage telemetry for the schedule gap
+  described above.
+
+When a blocking gate fails, such as the point-in-time availability audit, the
+failed check is recorded with the failed run. The frozen predictor also refuses
+datasets built with a different XBRL fact policy than its training data
+([ADR 0015](adr/0015-xbrl-fact-selection-policy.md)).
 
 The run writes:
 

@@ -12,7 +12,7 @@ Point-in-time research on whether information in US issuer 10-K and 10-Q filings
 
 ## Universe construction
 
-At each month end, rank eligible NYSE, Nasdaq, and AMEX common stocks by trailing 60-session median dollar volume. Require price of at least $5 and 252 prior sessions. The broad protocol supports up to 1,000 names; `config/authenticated-free.yaml` uses a top-300 universe drawn from 500 trailing-liquidity-screened candidates. Probable funds/ETPs and issuers without a 10-K/10-Q in the study window are excluded. Include inactive securities when CIK/symbol mapping confidence passes the configured threshold.
+At each month end, rank eligible NYSE, Nasdaq, and AMEX common stocks by trailing 60-session median dollar volume. Require price of at least $5 and 252 prior sessions. The broad protocol supports up to 1,000 names; `config/authenticated-free.yaml` uses a top-300 universe drawn from 500 trailing-liquidity-screened candidates. The frozen v1 candidate list was screened as of 2026-07-31, inside its locked-test period, so its universe selection used test-period information. Probable funds/ETPs and issuers without a 10-K/10-Q in the study window are excluded. Include inactive securities when CIK/symbol mapping confidence passes the configured threshold.
 
 ## Availability
 
@@ -23,11 +23,30 @@ At each month end, rank eligible NYSE, Nasdaq, and AMEX common stocks by trailin
 
 The dataset builder stores the source timestamp beside every feature and rejects violations.
 
+## XBRL fact selection
+
+`features.xbrl_fact_policy` decides which company facts feed the fundamental
+ratios, and each dataset records it in its identity and provenance
+([ADR 0015](adr/0015-xbrl-fact-selection-policy.md)):
+
+- `duration_aware_v2` (default for new studies, `config/authenticated-v2.yaml`)
+  uses facts that end within 120 days of the filing's period. Flows must span 60
+  to 380 days; the quarter is preferred over year-to-date and values are
+  annualized. `Revenues` and contract revenue compete as one input.
+- `legacy_v1` (`config/authenticated-free.yaml`) reproduces the frozen study
+  exactly, including its known defects: quarterly and year-to-date flows are
+  mixed, and a discontinued `Revenues` tag can outrank current contract revenue
+  however stale it is. The prospective runner keeps it so v1 is scored on the
+  features it was trained on.
+
 ## Known limitations
 
 - Free sources do not provide a perfect historical CIK/ticker master. Corporate actions and mapping evidence reduce, but do not eliminate, survivorship and identifier bias.
 - Historical short availability and realized borrow fees are unavailable; portfolio results use explicit cost sensitivities.
 - Filing structures vary and some sections cannot be parsed reliably.
+- Filing downloads that fail are excluded from that dataset. Prospective runs
+  record recent failures as a `recent_filing_download_failures` quality warning
+  because an excluded filing cannot be forecast before its entry.
 - Frozen text embeddings uniformly sample at most 12 spans from long configured
   sections; they are not full-token representations of every filing.
 - Free IEX bars represent one venue rather than the consolidated SIP tape.
@@ -38,7 +57,7 @@ The dataset builder stores the source timestamp beside every feature and rejects
 
 ## Public snapshot and synthetic fixture
 
-`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; `public/data-provenance.json` publishes the same identity without raw data, and CI plus the Vercel build reject drift between those records. The `edgar-moe demo` command can generate an explicitly marked `synthetic_fixture` at a separate path for software verification; it must not replace the frozen public snapshot.
+`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; `public/data-provenance.json` publishes the same identity without raw data, and CI plus the Vercel build reject drift between those records. The `edgar-moe demo` command generates an explicitly marked `synthetic_fixture` for software verification, by default at `data/interim/synthetic-snapshot.json`; it refuses to overwrite any snapshot that is not itself a synthetic fixture, including the frozen public snapshot.
 
 ## Authenticated refresh bundle
 

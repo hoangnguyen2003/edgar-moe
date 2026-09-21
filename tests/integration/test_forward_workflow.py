@@ -22,7 +22,7 @@ from edgar_moe.forward.artifacts import (
 from edgar_moe.forward.config import FrozenModelSpec
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.domain import ForecastDraft, QualityCheckDraft
-from edgar_moe.forward.inference import ForecastBatch
+from edgar_moe.forward.inference import ForecastBatch, ForecastQualityError
 from edgar_moe.forward.reconciliation import reconcile_registry_artifacts
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.forward.workflow import ForwardWorkflow
@@ -85,9 +85,7 @@ class FailOnceMirror:
         self.delegate = LocalArtifactStore(root)
         self.fail_next_bytes = True
 
-    def put_file(
-        self, source: str | Path, *, logical_name: str | None = None
-    ) -> ArtifactReference:
+    def put_file(self, source: str | Path, *, logical_name: str | None = None) -> ArtifactReference:
         return self.delegate.put_file(source, logical_name=logical_name)
 
     def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
@@ -133,9 +131,7 @@ def build_workflow_fixture(
         orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS)
     ).hexdigest()
     locked_payload["locked_test_hash"] = locked_hash
-    locked_result_path.write_bytes(
-        orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS)
-    )
+    locked_result_path.write_bytes(orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS))
     spec = FrozenModelSpec(
         model_id="model-1",
         name="Fixture MoE",
@@ -271,6 +267,116 @@ def test_external_failure_is_redacted_in_public_run_record(tmp_path: Path) -> No
     database.dispose()
 
 
+class QualityGatePredictor:
+    def forecast(
+        self,
+        dataset: ResearchDataset,
+        *,
+        as_of: datetime,
+        device: str = "cpu",
+    ) -> ForecastBatch:
+        del dataset, as_of, device
+        raise ForecastQualityError(
+            "Point-in-time availability audit failed (2 rows): event-1:fixture",
+            checks=[
+                QualityCheckDraft(
+                    name="point_in_time_availability",
+                    status="failed",
+                    observed_value=2.0,
+                    threshold=0.0,
+                )
+            ],
+        )
+
+
+def test_quality_gate_failure_keeps_its_failed_check_with_the_run(tmp_path: Path) -> None:
+    workflow, registry, database, training_dir, forecast_as_of, _ = build_workflow_fixture(tmp_path)
+
+    with pytest.raises(ForecastQualityError):
+        workflow.forecast(
+            training_dir,
+            as_of=forecast_as_of,
+            code_revision="deadbeef",
+            predictor=QualityGatePredictor(),
+        )
+
+    failed_run = registry.list_runs(limit=1)[0]
+    assert failed_run["status"] == "failed"
+    checks = [
+        check for check in registry.list_quality_checks() if check["run_id"] == failed_run["run_id"]
+    ]
+    assert [(check["name"], check["status"]) for check in checks] == [
+        ("point_in_time_availability", "failed")
+    ]
+    status = registry.status(now=forecast_as_of)
+    assert status["latest_quality_failures"] == 1
+    assert registry.list_forecasts(limit=10)["total"] == 0
+    database.dispose()
+
+
+def test_forecast_reports_missed_entries_and_recent_download_failures(tmp_path: Path) -> None:
+    workflow, registry, database, training_dir, first_as_of, clock = build_workflow_fixture(
+        tmp_path
+    )
+    workflow.forecast(
+        training_dir,
+        as_of=first_as_of,
+        code_revision="deadbeef",
+        predictor=FixturePredictor(),
+    )
+    first_checks = {check["name"] for check in registry.list_quality_checks()}
+    # No earlier successful run exists, so there is no coverage gap to measure.
+    assert "missed_before_entry" not in first_checks
+
+    second_as_of = first_as_of + timedelta(days=1)
+    clock[0] = second_as_of
+    events = pd.DataFrame(
+        [
+            {
+                # A pre-market filing: accepted after the first run and entered
+                # at the open before the second run could score it.
+                "event_id": "event-missed",
+                "accepted_at": first_as_of + timedelta(hours=5),
+                "entry_at": second_as_of - timedelta(hours=10),
+                "horizon_at": second_as_of + timedelta(days=28),
+            },
+            {
+                "event_id": "event-1",
+                "accepted_at": second_as_of - timedelta(hours=1),
+                "entry_at": second_as_of + timedelta(hours=12),
+                "horizon_at": second_as_of + timedelta(days=30),
+            },
+        ]
+    )
+    later_dir = save_dataset(
+        tmp_path / "datasets",
+        dataset_id="later-dataset",
+        as_of=second_as_of.date(),
+        target=np.array([np.nan, np.nan]),
+        horizon_at=second_as_of + timedelta(days=30),
+        events=events,
+        attrition={"included_events": 2, "recent_download_failures": 2},
+    )
+
+    result = workflow.forecast(
+        later_dir,
+        as_of=second_as_of,
+        code_revision="deadbeef",
+        predictor=FixturePredictor(),
+    )
+
+    checks = {
+        check["name"]: check
+        for check in registry.list_quality_checks()
+        if check["run_id"] == result.run_id
+    }
+    assert checks["missed_before_entry"]["status"] == "passed"
+    assert checks["missed_before_entry"]["observed_value"] == 1.0
+    assert checks["recent_filing_download_failures"]["status"] == "warning"
+    assert checks["recent_filing_download_failures"]["observed_value"] == 2.0
+    database.dispose()
+
+
 def save_dataset(
     output_root: Path,
     *,
@@ -278,14 +384,20 @@ def save_dataset(
     as_of: date,
     target: np.ndarray,
     horizon_at: datetime,
+    events: pd.DataFrame | None = None,
+    attrition: dict[str, int] | None = None,
 ) -> Path:
-    events = pd.DataFrame(
-        [
-            {
-                "event_id": "event-1",
-                "horizon_at": horizon_at,
-            }
-        ]
+    events = (
+        events
+        if events is not None
+        else pd.DataFrame(
+            [
+                {
+                    "event_id": "event-1",
+                    "horizon_at": horizon_at,
+                }
+            ]
+        )
     )
     availability = pd.DataFrame(
         [
@@ -317,7 +429,7 @@ def save_dataset(
             "market": ["market"],
             "regime": ["regime"],
         },
-        attrition={"included_events": 1},
+        attrition=attrition or {"included_events": 1},
         source_manifest_hash=SOURCE_HASH,
         provenance={"fixture": "true"},
     )

@@ -35,6 +35,7 @@ _REQUIRED_SECURITY_HEADERS = {
 }
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_SCRIPT_TAG = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | re.DOTALL)
 
 
 class _CrossOriginRedirectError(ValueError):
@@ -102,6 +103,7 @@ def run_smoke(
             "application/json",
             timeout,
         ),
+        _check_endpoint(base, origin, "/api/docs", "api_docs", "text/html", timeout),
         _check_endpoint(
             base,
             origin,
@@ -126,6 +128,10 @@ def run_smoke(
                 field not in body for field in _REQUIRED_SECURITY_FIELDS
             ):
                 check.update(status="failed", error="security_txt_field_missing")
+        elif check["name"] == "api_docs":
+            body = check.pop("_body", "")
+            if check["status"] == "passed" and not _scripts_are_external(body):
+                check.update(status="failed", error="api_docs_inline_script")
         elif check["name"] == "health":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -146,7 +152,9 @@ def run_smoke(
                 frozen = payload.get("frozen_v1") if isinstance(payload, dict) else None
                 public_data = payload.get("public_data") if isinstance(payload, dict) else None
                 controls = payload.get("controls") if isinstance(payload, dict) else None
-                forward_status = payload.get("forward_status") if isinstance(payload, dict) else None
+                forward_status = (
+                    payload.get("forward_status") if isinstance(payload, dict) else None
+                )
                 frozen_valid = isinstance(frozen, dict) and all(
                     (
                         frozen.get("path") == "data/demo/snapshot.json",
@@ -162,11 +170,15 @@ def run_smoke(
                     and public_data.get("derived_output_public") is True
                     and public_data.get("redistribution_status") == "operator_review_required"
                 )
-                controls_valid = isinstance(controls, list) and bool(controls) and all(
-                    isinstance(control, dict)
-                    and control.get("status") in {"enforced", "pending_operator_evidence"}
-                    and control.get("owner") in {"repository", "operator"}
-                    for control in controls
+                controls_valid = (
+                    isinstance(controls, list)
+                    and bool(controls)
+                    and all(
+                        isinstance(control, dict)
+                        and control.get("status") in {"enforced", "pending_operator_evidence"}
+                        and control.get("owner") in {"repository", "operator"}
+                        for control in controls
+                    )
                 )
                 forward_valid = isinstance(forward_status, dict) and all(
                     isinstance(forward_status.get(field), bool)
@@ -274,7 +286,7 @@ def _check_endpoint(
                 except json.JSONDecodeError:
                     check["error"] = "invalid_json"
                     return check
-            elif name in {"robots", "security_txt"}:
+            elif name in {"robots", "security_txt", "api_docs"}:
                 check["_body"] = decoded
             check["status"] = "passed"
             return check
@@ -285,6 +297,14 @@ def _check_endpoint(
     except (OSError, URLError, UnicodeDecodeError, ValueError) as error:
         check["error"] = type(error).__name__
     return check
+
+
+def _scripts_are_external(body: str) -> bool:
+    """Return whether a page loads only external scripts, as its CSP requires."""
+    scripts = _SCRIPT_TAG.findall(body)
+    return bool(scripts) and all(
+        "src=" in attributes.lower() and not content.strip() for attributes, content in scripts
+    )
 
 
 def _security_header_matches(key: str, actual: str, expected: str) -> bool:

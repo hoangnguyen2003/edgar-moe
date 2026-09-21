@@ -55,8 +55,7 @@ def test_external_driver_errors_are_reduced_to_type_only() -> None:
 
 def test_redact_sensitive_text_is_safe_for_registry_callers() -> None:
     message = redact_sensitive_text(
-        "provider rejected https://reader:super-secret@example.test/api "
-        "token=abcdef123"
+        "provider rejected https://reader:super-secret@example.test/api token=abcdef123"
     )
 
     assert "example.test" not in message

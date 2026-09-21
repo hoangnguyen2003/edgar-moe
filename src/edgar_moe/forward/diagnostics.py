@@ -24,9 +24,7 @@ def diagnostic_report(
     horizon_sessions: int = DEFAULT_DIAGNOSTIC_HORIZON_SESSIONS,
 ) -> dict[str, Any]:
     """Return forecast-level and earliest-per-model/event diagnostic results."""
-    report = _diagnostic_report(
-        dataset, forecasts, as_of=as_of, horizon_sessions=horizon_sessions
-    )
+    report = _diagnostic_report(dataset, forecasts, as_of=as_of, horizon_sessions=horizon_sessions)
     selection = _first_event_forecasts(forecasts)
     if selection is None:
         report["unique_event_evaluation"] = {
@@ -38,13 +36,15 @@ def diagnostic_report(
         unique_report = _diagnostic_report(
             dataset, selection, as_of=as_of, horizon_sessions=horizon_sessions
         )
-        unique_report.update({
-            "selection_rule": "earliest_forecast_per_model_and_event",
-            "tie_breaker": "forecast_id_ascending",
-            "event_count": len(selection),
-            "repeated_forecast_count": len(forecasts) - len(selection),
-            "selected_forecast_ids": [str(item["forecast_id"]) for item in selection],
-        })
+        unique_report.update(
+            {
+                "selection_rule": "earliest_forecast_per_model_and_event",
+                "tie_breaker": "forecast_id_ascending",
+                "event_count": len(selection),
+                "repeated_forecast_count": len(forecasts) - len(selection),
+                "selected_forecast_ids": [str(item["forecast_id"]) for item in selection],
+            }
+        )
         report["unique_event_evaluation"] = unique_report
     return report
 
@@ -113,22 +113,20 @@ def _diagnostic_report(
 
     def record_unmatched(forecast: Mapping[str, Any], reason: str) -> None:
         unmatched_reasons[reason] = unmatched_reasons.get(reason, 0) + 1
-        unmatched_forecasts.append({
-            "forecast_id": str(forecast.get("forecast_id", "")),
-            "ticker": str(forecast.get("ticker", "")),
-            "reason": reason,
-        })
+        unmatched_forecasts.append(
+            {
+                "forecast_id": str(forecast.get("forecast_id", "")),
+                "ticker": str(forecast.get("ticker", "")),
+                "reason": reason,
+            }
+        )
 
     pending_horizons: list[datetime] = []
 
     for forecast in forecasts:
         event = event_rows.get(str(forecast.get("event_id", "")))
-        security_id = str(
-            getattr(event, "security_id", "") or forecast.get("security_id", "")
-        )
-        entry_date = (
-            _forecast_entry_date(forecast) if event is None else _event_entry_date(event)
-        )
+        security_id = str(getattr(event, "security_id", "") or forecast.get("security_id", ""))
+        entry_date = _forecast_entry_date(forecast) if event is None else _event_entry_date(event)
         if not security_id or entry_date is None:
             unmatched += 1
             record_unmatched(forecast, "missing_event_metadata")
@@ -243,10 +241,14 @@ def _schedule(returns: pd.DataFrame, *, end_date: date | None = None) -> pd.Data
     latest_date = max(dates)
     if end_date is not None:
         latest_date = max(latest_date, end_date)
-    schedule = mcal.get_calendar("NYSE").schedule(
-        start_date=min(dates),
-        end_date=latest_date,
-    ).reset_index()
+    schedule = (
+        mcal.get_calendar("NYSE")
+        .schedule(
+            start_date=min(dates),
+            end_date=latest_date,
+        )
+        .reset_index()
+    )
     schedule = schedule.rename(columns={schedule.columns[0]: "session"})
     schedule["session_date"] = pd.to_datetime(schedule["session"]).dt.date
     schedule["market_close"] = pd.to_datetime(schedule["market_close"], utc=True)
@@ -314,13 +316,11 @@ def _estimate_beta(
     window: int = 252,
 ) -> tuple[float, str]:
     asset = returns.loc[
-        (returns["security_id"].astype(str).eq(security_id))
-        & (returns["date"] < entry_date),
+        (returns["security_id"].astype(str).eq(security_id)) & (returns["date"] < entry_date),
         ["date", "return"],
     ].rename(columns={"return": "asset_return"})
     benchmark = returns.loc[
-        (returns["symbol"].astype(str).str.upper().eq("SPY"))
-        & (returns["date"] < entry_date),
+        (returns["symbol"].astype(str).str.upper().eq("SPY")) & (returns["date"] < entry_date),
         ["date", "return"],
     ].rename(columns={"return": "benchmark_return"})
     joined = asset.merge(benchmark, on="date", how="inner").dropna().tail(window)

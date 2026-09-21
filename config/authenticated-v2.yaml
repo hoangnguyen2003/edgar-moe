@@ -1,0 +1,11 @@
+# Free-tier authenticated protocol for studies after frozen v1 (ADR 0015).
+# Same data budget as config/authenticated-free.yaml, with duration-aware,
+# staleness-bounded XBRL fundamentals. Models trained on it record the policy,
+# and the frozen predictor refuses datasets built under a different one.
+data:
+  universe_size: 300
+
+features:
+  embedding_chunk_tokens: 510
+  embedding_max_chunks: 4
+  xbrl_fact_policy: duration_aware_v2

@@ -36,9 +36,7 @@ def main() -> None:
             event.horizon_date > summary.metadata.as_of
             and event.realized_abnormal_return is not None
         ):
-            raise ValueError(
-                f"Event {event.accession_number} exposes an unmatured forward label"
-            )
+            raise ValueError(f"Event {event.accession_number} exposes an unmatured forward label")
     MethodologyResponse.model_validate(snapshot["methodology"])
     FreshnessResponse.model_validate(snapshot["freshness"])
     print(f"Validated {path} ({len(snapshot['events'])} public events)")

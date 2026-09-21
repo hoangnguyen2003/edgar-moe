@@ -8,7 +8,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from uuid import uuid4
 
 import orjson
@@ -102,7 +102,7 @@ def _build_packet(draft: dict[str, object], root: Path, *, max_bytes: int) -> di
 
     packet_draft = dict(draft)
     packet_draft["artifacts"] = [declared[name] for name in declared]
-    return cast(dict[str, Any], prepare_operator_evidence_packet(packet_draft))
+    return prepare_operator_evidence_packet(packet_draft)
 
 
 def main() -> int:

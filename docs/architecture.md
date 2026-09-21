@@ -51,6 +51,10 @@ The provider-host decision is recorded in [ADR 0013](adr/0013-copilot-provider-h
 The citation-closure decision is recorded in [ADR 0012](adr/0012-copilot-citation-closure.md).
 The citation-payload binding decision is recorded in [ADR 0014](adr/0014-copilot-citation-payload-binding.md).
 The API database-session decision is recorded in [ADR 0011](adr/0011-api-read-only-statement-boundary.md).
+The XBRL fact-selection policy is recorded in [ADR 0015](adr/0015-xbrl-fact-selection-policy.md).
+Database-level registry immutability is recorded in [ADR 0016](adr/0016-database-append-only-triggers.md).
+The post-v1 model-selection protocol is recorded in [ADR 0017](adr/0017-post-v1-selection-protocol.md).
+Workflow action pinning and secret scoping are recorded in [ADR 0018](adr/0018-workflow-supply-chain.md).
 
 ## Architecture baseline — September 18, 2026
 

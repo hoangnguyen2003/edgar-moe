@@ -36,9 +36,7 @@ def validation_errors(environment: Mapping[str, str]) -> list[str]:
     errors: list[str] = []
     missing_required = [name for name in REQUIRED_ENVIRONMENT if not environment.get(name, "")]
     if missing_required:
-        errors.append(
-            "Missing required forward-runner secret(s): " + ", ".join(missing_required)
-        )
+        errors.append("Missing required forward-runner secret(s): " + ", ".join(missing_required))
 
     configured_auditor = [name for name in AUDITOR_ENVIRONMENT if environment.get(name, "")]
     if configured_auditor and len(configured_auditor) != len(AUDITOR_ENVIRONMENT):
@@ -57,7 +55,9 @@ def main() -> int:
             print(error, file=sys.stderr)
         return 1
 
-    auditor_state = "enabled" if all(os.environ.get(name, "") for name in AUDITOR_ENVIRONMENT) else "disabled"
+    auditor_state = (
+        "enabled" if all(os.environ.get(name, "") for name in AUDITOR_ENVIRONMENT) else "disabled"
+    )
     print(f"Forward runtime configuration validated (auditor={auditor_state}).")
     return 0
 

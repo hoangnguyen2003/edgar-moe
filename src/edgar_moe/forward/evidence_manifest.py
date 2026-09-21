@@ -10,6 +10,8 @@ from typing import Any
 
 import orjson
 
+from edgar_moe.utils.hashing import sha256_file
+
 _CONTEXT_KEYS = (
     "workflow",
     "run_id",
@@ -55,7 +57,7 @@ def build_evidence_manifest(
                 "path": relative,
                 "status": "present",
                 "size_bytes": absolute.stat().st_size,
-                "sha256": _sha256(absolute),
+                "sha256": sha256_file(absolute),
             }
         )
 
@@ -108,7 +110,7 @@ def verify_evidence_manifest(
                 raise EvidenceManifestError(f"manifest file is no longer present: {item['path']}")
             if int(item.get("size_bytes", -1)) != absolute.stat().st_size:
                 raise EvidenceManifestError(f"manifest size mismatch: {item['path']}")
-            if str(item.get("sha256", "")) != _sha256(absolute):
+            if str(item.get("sha256", "")) != sha256_file(absolute):
                 raise EvidenceManifestError(f"manifest hash mismatch: {item['path']}")
         elif status == "missing":
             if absolute.exists():
@@ -141,14 +143,4 @@ def _safe_context(context: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _content_hash(payload: Mapping[str, Any]) -> str:
-    return hashlib.sha256(
-        orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+    return hashlib.sha256(orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)).hexdigest()

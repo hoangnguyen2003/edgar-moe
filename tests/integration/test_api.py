@@ -1,4 +1,5 @@
 import json
+import re
 from hashlib import sha256
 from pathlib import Path
 
@@ -114,10 +115,63 @@ def test_api_contracts(tmp_path: Path) -> None:
         assert status.headers["cross-origin-opener-policy"] == "same-origin"
         assert status.headers["cross-origin-resource-policy"] == "same-site"
         assert status.headers["content-security-policy"].find("object-src 'none'") >= 0
+        # Free-text search runs server-side over every event, not one loaded page.
+        assert client.get("/api/v1/events?q=test%20comp").json()["total"] == 1
+        assert client.get("/api/v1/events?q=TEST").json()["total"] == 1
+        assert client.get("/api/v1/events?q=missing").json() == {
+            "items": [],
+            "next_cursor": None,
+            "total": 0,
+        }
+        assert client.get("/api/v1/events?q=").status_code == 422
+        assert client.get("/api/v1/events?q=" + "a" * 65).status_code == 422
         assert client.get("/api/v1/events?ticker=" + "A" * 33).status_code == 422
         assert client.get("/api/v1/events?cursor=" + "1" * 21).status_code == 422
         assert client.get("/api/v1/events/not-an-accession").status_code == 422
     app.dependency_overrides.clear()
+
+
+def _csp_directive(policy: str, name: str) -> list[str]:
+    for directive in policy.split(";"):
+        tokens = directive.split()
+        if tokens and tokens[0] == name:
+            return tokens[1:]
+    raise AssertionError(f"CSP is missing {name}")
+
+
+def test_api_docs_render_under_the_content_security_policy() -> None:
+    with TestClient(app) as client:
+        docs = client.get("/api/docs")
+        assert docs.status_code == 200
+        assert docs.headers["content-type"].startswith("text/html")
+        script_sources = _csp_directive(docs.headers["content-security-policy"], "script-src")
+        assert "'unsafe-inline'" not in script_sources
+
+        scripts = re.findall(r"<script\b([^>]*)>(.*?)</script>", docs.text, re.S)
+        assert len(scripts) == 2
+        for attributes, body in scripts:
+            # Browsers block inline script under this CSP, which blanked the page.
+            assert not body.strip()
+            source = re.search(r'src="([^"]+)"', attributes)
+            assert source is not None
+            assert source.group(1).startswith("/") or any(
+                source.group(1).startswith(allowed) for allowed in script_sources
+            )
+        cdn_tags = re.findall(r"<(?:script|link)\b[^>]*https://cdn\.jsdelivr\.net[^>]*>", docs.text)
+        assert len(cdn_tags) == 2
+        for tag in cdn_tags:
+            assert re.search(r'integrity="sha384-[A-Za-z0-9+/=]{64}"', tag)
+            assert 'crossorigin="anonymous"' in tag
+
+        initializer = client.get("/api/docs/swagger-init.js")
+        assert initializer.status_code == 200
+        assert initializer.headers["content-type"].startswith("text/javascript")
+        assert "SwaggerUIBundle" in initializer.text
+        assert "/api/openapi.json" in initializer.text
+        assert client.get("/api/openapi.json").status_code == 200
+        # FastAPI's default ReDoc and root docs pages are not part of the public surface.
+        assert client.get("/redoc").status_code == 404
+        assert client.get("/docs").status_code == 404
 
 
 def test_spa_static_files_fall_back_to_index(tmp_path: Path) -> None:

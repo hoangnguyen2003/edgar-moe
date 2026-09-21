@@ -46,9 +46,9 @@ def make_dataset(
             "fundamental": fundamental,
             "market": np.asarray(market_values, dtype=np.float32),
         },
-        regime=np.column_stack(
-            [np.linspace(-1.0, 1.0, row_count), np.zeros(row_count)]
-        ).astype(np.float32),
+        regime=np.column_stack([np.linspace(-1.0, 1.0, row_count), np.zeros(row_count)]).astype(
+            np.float32
+        ),
         target=np.full(row_count, np.nan, dtype=np.float32),
         daily_returns=pd.DataFrame(),
         availability=availability,
@@ -119,6 +119,17 @@ def test_drift_report_is_incomplete_without_model_components() -> None:
     assert report["status"] == "incomplete"
     assert report["component_outputs"]["status"] == "not_supplied"
     assert report["features"]["text"]["status"] == "stable"
+
+
+def test_drift_report_rejects_datasets_built_with_different_fact_policies() -> None:
+    baseline = make_dataset("training", date(2025, 2, 1), text=np.ones((2, 2)))
+    prospective = make_dataset("prospective", date(2025, 3, 1), text=np.ones((2, 2)))
+    prospective.provenance["xbrl_fact_policy"] = "duration_aware_v2"
+
+    # The frozen v1 training dataset predates the setting and is legacy_v1, so
+    # comparing it with duration-aware features would report spurious drift.
+    with pytest.raises(ValueError, match="one XBRL fact policy"):
+        build_research_drift_report(baseline, prospective)
 
 
 def test_drift_report_rejects_dimension_and_temporal_mismatch() -> None:

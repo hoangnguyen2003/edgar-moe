@@ -395,7 +395,9 @@ def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
     provider = FakeProvider(
         [
             _tool_call("execute_trade"),
-            ProviderResponse(content="I cannot support that request.", tool_calls=(), model="fake-model"),
+            ProviderResponse(
+                content="I cannot support that request.", tool_calls=(), model="fake-model"
+            ),
         ]
     )
     copilot = ResearchCopilot(
@@ -415,14 +417,97 @@ def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("tool_name", "arguments"),
+    [
+        ("search_filing_events", '{"limit": 20}'),
+        ("search_filing_events", '{"limit": 5.0}'),
+        ("search_filing_events", '{"direction": "LONG"}'),
+        ("get_filing_event", '{"accession_number": "0000320193-23-106"}'),
+    ],
+)
+def test_invalid_arguments_to_an_allowlisted_tool_are_returned_for_recovery(
+    tool_name: str, arguments: str
+) -> None:
+    provider = FakeProvider(
+        [
+            _tool_call(tool_name, arguments),
+            _tool_call("get_study_summary"),
+            ProviderResponse(
+                content="The cited study summary answers the question.",
+                tool_calls=(),
+                model="fake-model",
+            ),
+        ]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+
+    answer = copilot.ask("What does the frozen study report?")
+
+    assert answer.evidence_status == "grounded"
+    assert [item.name for item in answer.trace] == [
+        "rejected_tool_request",
+        "get_study_summary",
+    ]
+    assert answer.trace[0].citation_count == 0
+    assert any(
+        '"error": "tool request rejected by the read-only contract"' in str(message)
+        for message in provider.messages[-1]
+    )
+
+
+def test_rejected_arguments_alone_produce_an_uncited_answer() -> None:
+    provider = FakeProvider(
+        [
+            _tool_call("search_filing_events", '{"limit": 20}'),
+            ProviderResponse(
+                content="No evidence was retrieved.", tool_calls=(), model="fake-model"
+            ),
+        ]
+    )
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+
+    answer = copilot.ask("Show me some filing events")
+
+    assert answer.evidence_status == "uncited"
+    assert answer.citations == ()
+    assert answer.trace[0].name == "rejected_tool_request"
+
+
+def test_question_limit_counts_utf8_bytes_before_any_provider_call() -> None:
+    provider = FakeProvider([])
+    copilot = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+    )
+    # 1,960 characters but 2,404 UTF-8 bytes: previously accepted, billed, then
+    # rejected by the envelope verifier after the provider call.
+    question = ("Mô hình này có hiệu quả sau chi phí giao dịch không? " * 37).strip()
+    assert len(question) < 2_000 < len(question.encode("utf-8"))
+
+    with pytest.raises(ValueError, match="UTF-8 bytes"):
+        copilot.ask(question)
+
+    assert provider.messages == []
+
+
 def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
     assert normalize_provider_endpoint("http://localhost:11434/v1/chat/completions").startswith(
         "http://localhost"
     )
-    assert normalize_provider_endpoint(
-        "https://api.example.com/v1/chat/completions",
-        allowed_hosts=("api.example.com",),
-    ) == "https://api.example.com/v1/chat/completions"
+    assert (
+        normalize_provider_endpoint(
+            "https://api.example.com/v1/chat/completions",
+            allowed_hosts=("api.example.com",),
+        )
+        == "https://api.example.com/v1/chat/completions"
+    )
     with pytest.raises(ValueError):
         normalize_provider_endpoint("http://provider.example/v1/chat/completions")
     with pytest.raises(ValueError):
@@ -432,10 +517,13 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
 
 
 def test_provider_endpoint_requires_an_exact_remote_host_allowlist() -> None:
-    assert normalize_provider_endpoint(
-        "https://api.example.com/v1/chat/completions",
-        allowed_hosts=("api.example.com",),
-    ) == "https://api.example.com/v1/chat/completions"
+    assert (
+        normalize_provider_endpoint(
+            "https://api.example.com/v1/chat/completions",
+            allowed_hosts=("api.example.com",),
+        )
+        == "https://api.example.com/v1/chat/completions"
+    )
     assert normalize_provider_endpoint(
         "http://localhost:11434/v1/chat/completions",
         allowed_hosts=("api.openai.com",),
@@ -539,7 +627,9 @@ def test_provider_does_not_retry_authentication_failures(monkeypatch: pytest.Mon
         del timeout
         nonlocal calls
         calls += 1
-        raise HTTPError("https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None)
+        raise HTTPError(
+            "https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None
+        )
 
     monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
 
@@ -567,9 +657,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
         calls += 1
         if calls < 3:
             raise URLError("temporary network failure")
-        return io.BytesIO(
-            json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
-        )
+        return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
 
     monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
     monkeypatch.setattr("edgar_moe.copilot.agent.sleep", lambda _delay: None)

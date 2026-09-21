@@ -38,9 +38,12 @@ def test_failure_alert_is_allowlisted_and_deduplicable() -> None:
     assert payload["observed_at"] == "2026-09-19T01:02:03+00:00"
     assert len(payload["dedupe_key"]) == 24
     assert "secret" not in str(payload)
-    assert build_failure_alert(payload["details"] | {"observed_at": payload["observed_at"]})[
-        "dedupe_key"
-    ] == payload["dedupe_key"]
+    assert (
+        build_failure_alert(payload["details"] | {"observed_at": payload["observed_at"]})[
+            "dedupe_key"
+        ]
+        == payload["dedupe_key"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -52,6 +55,17 @@ def test_failure_alert_is_allowlisted_and_deduplicable() -> None:
         ({"age_seconds": 100, "stale_after_seconds": 96}, "stale_runner"),
         ({"latest_quality_warnings": 1}, "quality_warning"),
         ({"health_status": "ok"}, None),
+        # A registry that has never recorded a success is degraded with no age;
+        # it previously produced no alert at all.
+        (
+            {
+                "health_status": "degraded",
+                "latest_run_status": "running",
+                "latest_successful_run_at": None,
+                "age_seconds": None,
+            },
+            "stale_runner",
+        ),
     ],
 )
 def test_forward_status_classification(status: dict[str, object], expected: str | None) -> None:

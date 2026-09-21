@@ -8,6 +8,25 @@ from sklearn.linear_model import ElasticNet
 from sklearn.metrics import mean_squared_error
 
 
+def fit_on_standardized_target(
+    estimator: ElasticNet, features: np.ndarray, target: np.ndarray
+) -> ElasticNet:
+    """Fit an Elastic Net whose penalty is defined on a unit-variance target.
+
+    Raw 20-session returns have a standard deviation near 0.08, so a fixed alpha
+    silently zeroes weak coefficients (the frozen v1 Text-Only baseline kept 0 of
+    776). The coefficients are rescaled afterwards, so ``predict`` and persisted
+    weights remain in return units.
+    """
+    values = np.asarray(target, dtype=np.float64)
+    mean = float(values.mean())
+    scale = float(values.std()) or 1.0
+    estimator.fit(features, (values - mean) / scale)
+    estimator.coef_ = np.asarray(estimator.coef_) * scale
+    estimator.intercept_ = float(estimator.intercept_) * scale + mean
+    return estimator
+
+
 @dataclass(frozen=True)
 class BaselineResult:
     name: str
@@ -34,7 +53,10 @@ def train_baselines(
     }
     results: list[BaselineResult] = []
     for name, model in models.items():
-        model.fit(train_features, train_target)
+        if isinstance(model, ElasticNet):
+            fit_on_standardized_target(model, train_features, train_target)
+        else:
+            model.fit(train_features, train_target)
         predictions = model.predict(validation_features)
         results.append(
             BaselineResult(

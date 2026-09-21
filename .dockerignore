@@ -1,6 +1,9 @@
 .git
 .github
-.env
+.env*
+.vercel
+.coverage
+**/.DS_Store
 .venv
 **/__pycache__
 **/*.pyc
@@ -11,10 +14,13 @@
 .mypy_cache
 htmlcov
 data/raw
+data/cache
+data/forward
 data/interim
 data/processed
 data/artifacts
 mlruns
+mlflow.db
 *.duckdb
 *.duckdb.wal
 reports

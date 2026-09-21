@@ -9,6 +9,7 @@ from sklearn.linear_model import ElasticNet
 from sklearn.neural_network import MLPRegressor
 
 from edgar_moe.backtest.metrics import predictive_metrics
+from edgar_moe.modeling.baselines import fit_on_standardized_target
 
 
 @dataclass(frozen=True)
@@ -118,7 +119,11 @@ def train_comparisons(
     for name, family, columns, estimator in specifications:
         train_values = _stack(train, columns)
         validation_values = _stack(validation, columns)
-        estimator.fit(train_values, train["target"])
+        if isinstance(estimator, ElasticNet):
+            # Frozen v1 fit these on raw returns; see fit_on_standardized_target.
+            fit_on_standardized_target(estimator, train_values, train["target"])
+        else:
+            estimator.fit(train_values, train["target"])
         validation_prediction = np.asarray(estimator.predict(validation_values), dtype=np.float64)
         test_prediction = (
             np.asarray(estimator.predict(_stack(test, columns)), dtype=np.float64)

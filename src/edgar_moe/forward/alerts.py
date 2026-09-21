@@ -12,6 +12,8 @@ from urllib.request import Request, urlopen
 
 import orjson
 
+from edgar_moe.utils.timestamps import NaiveTimestampError, parse_aware_timestamp
+
 AlertKind = Literal[
     "failed_run",
     "stale_runner",
@@ -42,9 +44,7 @@ class AlertDeliveryError(RuntimeError):
 
 def hash_alert_payload(payload: Mapping[str, Any]) -> str:
     """Return a stable SHA-256 identity for a redacted alert payload."""
-    return hashlib.sha256(
-        orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    return hashlib.sha256(orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)).hexdigest()
 
 
 def verify_alert_receipt(receipt: Mapping[str, Any]) -> None:
@@ -54,9 +54,7 @@ def verify_alert_receipt(receipt: Mapping[str, Any]) -> None:
         raise ValueError("Alert receipt is missing a SHA-256 receipt_hash")
     unsigned = dict(receipt)
     unsigned.pop("receipt_hash", None)
-    observed = hashlib.sha256(
-        orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    observed = hashlib.sha256(orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)).hexdigest()
     if observed != expected:
         raise ValueError("Alert receipt hash does not match content")
 
@@ -85,6 +83,10 @@ def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
         return "quality_warning"
     if status.get("health_status") == "warning":
         return "quality_warning"
+    if status.get("health_status") == "degraded":
+        # For example, no successful run has ever been recorded, so there is no
+        # age to compare with the freshness window.
+        return "stale_runner"
     return None
 
 
@@ -192,12 +194,13 @@ def _build_alert(
 
 def _timestamp(value: Any) -> datetime:
     if isinstance(value, datetime):
-        parsed = value
-    else:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("Alert timestamps must be timezone-aware")
-    return parsed.astimezone(UTC)
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Alert timestamps must be timezone-aware")
+        return value.astimezone(UTC)
+    try:
+        return parse_aware_timestamp(str(value))
+    except NaiveTimestampError as error:
+        raise ValueError("Alert timestamps must be timezone-aware") from error
 
 
 def _text(value: Any) -> str:

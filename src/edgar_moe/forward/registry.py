@@ -34,6 +34,8 @@ from edgar_moe.forward.models import (
     utc_now,
 )
 
+_MAX_PAGE_OFFSET = 1_000_000
+
 
 class RegistryConflictError(RuntimeError):
     """Raised when an idempotency key is reused with different evidence."""
@@ -374,7 +376,9 @@ class ForwardRegistry:
 
     def list_artifacts(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         """Return immutable artifact references for independent verification."""
-        statement = select(ArtifactRecord).order_by(ArtifactRecord.created_at, ArtifactRecord.artifact_id)
+        statement = select(ArtifactRecord).order_by(
+            ArtifactRecord.created_at, ArtifactRecord.artifact_id
+        )
         if limit is not None:
             if limit < 1:
                 raise ValueError("Artifact limit must be positive")
@@ -490,6 +494,18 @@ class ForwardRegistry:
                 "latest_quality_failures": quality_failures,
             }
 
+    def latest_forecast_as_of(self, *, model_id: str) -> datetime | None:
+        """Return when a model's most recent successful forecast run scored events."""
+        with self.database.session() as session:
+            value = session.scalar(
+                select(func.max(RunRecord.as_of)).where(
+                    RunRecord.run_type == "forecast",
+                    RunRecord.status == "succeeded",
+                    RunRecord.model_id == model_id,
+                )
+            )
+        return _as_utc(value) if value is not None else None
+
     def list_runs(self, *, limit: int = 25) -> list[dict[str, Any]]:
         with self.database.session() as session:
             records = session.scalars(
@@ -520,6 +536,8 @@ class ForwardRegistry:
         limit: int = 50,
         offset: int = 0,
     ) -> dict[str, Any]:
+        if limit < 1 or not 0 <= offset <= _MAX_PAGE_OFFSET:
+            raise ValueError(f"limit must be positive and offset within 0..{_MAX_PAGE_OFFSET}")
         filters: list[Any] = []
         if ticker:
             filters.append(ForecastRecord.ticker == ticker.upper())

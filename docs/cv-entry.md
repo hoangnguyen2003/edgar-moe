@@ -22,4 +22,4 @@ The core hypothesis is that the usefulness of each modality changes by regime: f
 
 ## Accuracy note
 
-The public snapshot is an authenticated historical research artifact, not live alpha or investment advice. State both the positive locked-test rank IC and the negative cost-aware portfolio result; do not describe the strategy as profitable. The synthetic generator is only for software verification.
+The public snapshot is an authenticated historical research artifact, not live alpha or investment advice. State both the positive locked-test rank IC and the negative cost-aware portfolio result; do not describe the strategy as profitable. The synthetic generator is only for software verification. Be ready to discuss the v1 caveats disclosed in the [model card](model-card.md#known-v1-limitations): the 0.0632 pre-test IC is development evidence, the fundamental anchor used mixed-period income and some stale revenue, the Elastic Net baselines were over-regularized, and the 10/25/50 bps costs are round-trip.

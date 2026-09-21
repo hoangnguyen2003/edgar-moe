@@ -86,9 +86,7 @@ def validate_public_snapshot_lock(
     return errors
 
 
-def _validate_public_provenance(
-    root: Path, lock: dict[str, object], errors: list[str]
-) -> None:
+def _validate_public_provenance(root: Path, lock: dict[str, object], errors: list[str]) -> None:
     """Cross-check the published identity without requiring raw source data."""
     manifest_path = root / "public" / "data-provenance.json"
     if not manifest_path.is_file():

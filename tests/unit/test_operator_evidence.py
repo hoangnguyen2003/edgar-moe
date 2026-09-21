@@ -403,7 +403,7 @@ def test_cli_rejects_undeclared_or_sensitive_artifacts(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "reader-audit.json").write_text('{"status":"passed"}\n', encoding="utf-8")
-    (artifact_root / "unexpected.json").write_text('{}\n', encoding="utf-8")
+    (artifact_root / "unexpected.json").write_text("{}\n", encoding="utf-8")
     draft_path = tmp_path / "draft.json"
     draft_path.write_text(json.dumps(_draft(status="passed")), encoding="utf-8")
     packet_path = tmp_path / "packet.json"
@@ -426,9 +426,7 @@ def test_cli_rejects_undeclared_or_sensitive_artifacts(tmp_path: Path) -> None:
     assert not packet_path.exists()
 
     (artifact_root / "unexpected.json").unlink()
-    (artifact_root / "reader-audit.json").write_text(
-        '{"token":"secret-value"}\n', encoding="utf-8"
-    )
+    (artifact_root / "reader-audit.json").write_text('{"token":"secret-value"}\n', encoding="utf-8")
     sensitive = subprocess.run(
         [
             sys.executable,
@@ -449,9 +447,7 @@ def test_cli_rejects_undeclared_or_sensitive_artifacts(tmp_path: Path) -> None:
 
 def test_cli_reports_operator_readiness_without_exposing_packet_contents(tmp_path: Path) -> None:
     packet_path = tmp_path / "packet.json"
-    packet_path.write_bytes(
-        orjson.dumps(prepare_operator_evidence_packet(_complete_draft()))
-    )
+    packet_path.write_bytes(orjson.dumps(prepare_operator_evidence_packet(_complete_draft())))
 
     ready = subprocess.run(
         [
@@ -471,9 +467,7 @@ def test_cli_reports_operator_readiness_without_exposing_packet_contents(tmp_pat
     assert "isolated-target" not in ready.stdout
 
     incomplete_path = tmp_path / "incomplete.json"
-    incomplete_path.write_bytes(
-        orjson.dumps(prepare_operator_evidence_packet(_draft()))
-    )
+    incomplete_path.write_bytes(orjson.dumps(prepare_operator_evidence_packet(_draft())))
     blocked = subprocess.run(
         [
             sys.executable,
@@ -490,9 +484,7 @@ def test_cli_reports_operator_readiness_without_exposing_packet_contents(tmp_pat
 
 def test_cli_selects_readiness_profile(tmp_path: Path) -> None:
     packet_path = tmp_path / "packet.json"
-    packet_path.write_bytes(
-        orjson.dumps(prepare_operator_evidence_packet(_complete_draft()))
-    )
+    packet_path.write_bytes(orjson.dumps(prepare_operator_evidence_packet(_complete_draft())))
 
     result = subprocess.run(
         [
@@ -516,9 +508,7 @@ def test_cli_selects_readiness_profile(tmp_path: Path) -> None:
 def test_cli_builds_verifies_and_refuses_to_overwrite_readiness_report(tmp_path: Path) -> None:
     packet_path = tmp_path / "packet.json"
     report_path = tmp_path / "readiness.json"
-    packet_path.write_bytes(
-        orjson.dumps(prepare_operator_evidence_packet(_complete_draft()))
-    )
+    packet_path.write_bytes(orjson.dumps(prepare_operator_evidence_packet(_complete_draft())))
 
     built = subprocess.run(
         [

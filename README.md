@@ -10,11 +10,20 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 
 > **Authenticated-study status (cutoff 2026-07-31):** complete. The frozen 75%
 > fundamental / 25% MoE hybrid achieved rank IC 0.0632 across 2,305 pre-test
-> out-of-fold events and 0.0316 across 1,794 locked 2025–2026 events. Its
-> cost-aware portfolio was not profitable: at 10 bps, annualized return was
-> -3.28% and Sharpe was -0.63 (95% block-bootstrap interval [-2.31, 0.94]). The
-> positive predictive relationship weakened out of sample and did not survive
-> implementation costs. See the [locked report](reports/authenticated_research_report.md).
+> out-of-fold events and 0.0316 across 1,794 locked 2025–2026 events. The pre-test
+> figure is development evidence, not an independent estimate: each fold
+> early-stopped on itself and the champion was the best of 33 candidates, so part
+> of the gap is selection bias. The cost-aware portfolio was not profitable: at
+> 10 bps round-trip cost, annualized return was -3.28% and Sharpe was -0.63 (95%
+> block-bootstrap interval [-2.31, 0.94]). The weak positive ordering did not
+> survive implementation costs. See the [locked report](reports/authenticated_research_report.md).
+>
+> **Known v1 defects:** the frozen fundamental features mix quarterly with
+> year-to-date income and can reuse years-old revenue, and the Elastic Net
+> baselines were over-regularized. v1 stays frozen and these limitations are
+> disclosed in the [model card](docs/model-card.md#known-v1-limitations); later
+> studies use corrected fundamentals ([ADR 0015](docs/adr/0015-xbrl-fact-selection-policy.md))
+> and a revised selection protocol ([ADR 0017](docs/adr/0017-post-v1-selection-protocol.md)).
 
 ## What makes this a quant project
 
@@ -102,7 +111,7 @@ move the private forecasting runner into the public serving container.
 
 ## Prospective forward testing
 
-The production-quality v2 layer is deliberately separate from the historical locked test. It adds SQLAlchemy models and Alembic migrations for datasets, frozen models, runs, forecasts, labels, quality checks, artifacts, and audit events. Immutable records are protected against update/delete operations, batch writes are idempotent, and evidence artifacts use content-addressed SHA-256 keys locally or in Cloudflare R2.
+The production-quality v2 layer is deliberately separate from the historical locked test. It adds SQLAlchemy models and Alembic migrations for datasets, frozen models, runs, forecasts, labels, quality checks, artifacts, and audit events. Immutable records are protected against update/delete operations by both the ORM and database triggers ([ADR 0016](docs/adr/0016-database-append-only-triggers.md)), batch writes are idempotent, and evidence artifacts use content-addressed SHA-256 keys locally or in Cloudflare R2.
 
 The `Prospective forward cycle` GitHub Actions workflow runs at 07:17 UTC Tuesday
 through Saturday. It resolves the cutoff in `America/New_York`, restores only
@@ -112,6 +121,12 @@ the next NYSE entry, settles any matured labels, and mirrors the exact local
 content identities into private Cloudflare R2. The window retains the history
 needed for 252-session market features and prior annual filings without rebuilding
 the 2016-present training corpus. It never retrains or reselects the frozen model.
+
+Because the run finishes before the open, it cannot score filings accepted
+pre-market (06:00-09:30 ET), whose entry is that same morning's open. In the frozen
+study, 12.9% of events were unreachable by this schedule, so the prospective sample
+under-represents pre-market filers. Each run records the gap as a
+`missed_before_entry` quality check ([forward-testing guide](docs/forward-testing.md)).
 
 The runner checkpoints verified filing bodies before FinBERT starts and writes
 each embedding atomically. A five-hour inner compute deadline leaves GitHub one
@@ -342,7 +357,7 @@ uv run edgar-moe open-frozen-test \
 
 `refresh-data` downloads complete 10-K/10-Q histories and filing HTML, point-in-time company facts, split-adjusted Alpaca/IEX daily bars and corporate actions, and initial-release FRED/ALFRED observations. It excludes issuers without eligible periodic forms before market collection, stores large SEC payloads and filings as gzip, streams bars to disk, supports resuming an interrupted cutoff, and verifies SHA-256 hashes before returning.
 
-`build-dataset` constructs a prior-month liquid universe, attaches an availability record to every feature, rejects look-ahead violations, caches text embeddings, and censors labels that have not matured. `walk-forward-study` refits preprocessing and models independently in expanding 2023 and 2024 folds, compares 33 standalone and anchored candidates, and freezes the champion by worst-fold rank IC. It writes content-hashed out-of-fold predictions and never transforms, predicts, or evaluates the locked rows.
+`build-dataset` constructs a prior-month liquid universe, attaches an availability record to every feature, rejects look-ahead violations, caches text embeddings, and censors labels that have not matured. `walk-forward-study` refits preprocessing and models independently in expanding 2023 and 2024 folds, compares 33 standalone and anchored candidates, and freezes the champion by worst-fold rank IC. New studies should build datasets with `config/authenticated-v2.yaml`, whose duration-aware XBRL fundamentals replace the v1 definition; `config/authenticated-free.yaml` keeps the frozen v1 features for the prospective runner. It writes content-hashed out-of-fold predictions and never transforms, predicts, or evaluates the locked rows.
 
 The earlier single-window diagnostic remains in `reports/validation_report.md`;
 the walk-forward report supersedes it for model selection. `open-frozen-test`

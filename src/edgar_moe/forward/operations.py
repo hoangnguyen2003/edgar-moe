@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import shutil
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from zoneinfo import ZoneInfo
+
+from edgar_moe.utils.hashing import sha256_file
 
 SOURCE_TIMEZONE = ZoneInfo("America/New_York")
 MINIMUM_FORWARD_LOOKBACK_DAYS = 400
@@ -22,9 +23,11 @@ def source_cutoff(now: datetime | None = None) -> str:
 
 def validate_cutoff(cutoff: str, *, now: datetime | None = None) -> str:
     parsed = datetime.strptime(cutoff, "%Y-%m-%d").date()
-    current = datetime.now(SOURCE_TIMEZONE).date() if now is None else now.astimezone(
-        SOURCE_TIMEZONE
-    ).date()
+    current = (
+        datetime.now(SOURCE_TIMEZONE).date()
+        if now is None
+        else now.astimezone(SOURCE_TIMEZONE).date()
+    )
     if parsed > current:
         raise ValueError(
             f"Forward cutoff {parsed.isoformat()} is after the source-system date "
@@ -79,7 +82,7 @@ def find_processed_dataset(
     checkpoint_manifest: Path,
     cutoff: str,
 ) -> Path:
-    source_hash = _sha256(checkpoint_manifest)
+    source_hash = sha256_file(checkpoint_manifest)
     matches: list[Path] = []
     if processed_root.is_dir():
         for manifest_path in processed_root.glob("*/manifest.json"):
@@ -129,11 +132,3 @@ def _merge_tree(source: Path, destination: Path) -> int:
             shutil.copy2(source_file, target)
         copied += 1
     return copied
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

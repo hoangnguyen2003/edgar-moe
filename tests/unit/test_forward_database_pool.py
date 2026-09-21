@@ -46,11 +46,14 @@ def test_postgres_read_only_session_options_are_applied_without_connecting() -> 
         read_only=True,
         statement_timeout_ms=5_000,
     ) == {"options": "-c default_transaction_read_only=on -c statement_timeout=5000"}
-    assert _build_connect_args(
-        "postgresql+psycopg://writer:password@db.example.test/edgar_moe",
-        read_only=False,
-        statement_timeout_ms=None,
-    ) == {}
+    assert (
+        _build_connect_args(
+            "postgresql+psycopg://writer:password@db.example.test/edgar_moe",
+            read_only=False,
+            statement_timeout_ms=None,
+        )
+        == {}
+    )
 
 
 @pytest.mark.parametrize(

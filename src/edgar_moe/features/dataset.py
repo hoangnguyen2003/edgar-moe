@@ -25,7 +25,7 @@ from edgar_moe.features.point_in_time import (
 )
 from edgar_moe.features.tabular import build_fundamental_ratios
 from edgar_moe.features.text import FinBertEmbedder, TextFeatures, filing_change_features
-from edgar_moe.settings import ResearchConfig
+from edgar_moe.settings import LEGACY_XBRL_FACT_POLICY, ResearchConfig, XbrlFactPolicy
 
 FUNDAMENTAL_CONCEPTS = (
     "Assets",
@@ -40,6 +40,28 @@ FUNDAMENTAL_CONCEPTS = (
     "LiabilitiesCurrent",
     "NetCashProvidedByUsedInOperatingActivities",
 )
+# Concepts measured over a reporting period rather than at an instant.
+FLOW_CONCEPTS = frozenset(
+    {
+        "Revenues",
+        "RevenueFromContractWithCustomerExcludingAssessedTax",
+        "NetIncomeLoss",
+        "OperatingIncomeLoss",
+        "NetCashProvidedByUsedInOperatingActivities",
+    }
+)
+# Revenue aliases compete as one "Revenues" input under duration_aware_v2.
+REVENUE_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax")
+# duration_aware_v2 parameters (ADR 0015): facts must end within a quarter plus
+# slack of the filing's period, and flows must span 60-380 days (12-week quarters
+# through 53-week years) before being annualized.
+MAXIMUM_FACT_AGE_DAYS = 120
+MINIMUM_FLOW_DAYS = 60
+MAXIMUM_FLOW_DAYS = 380
+DAYS_PER_YEAR = 365.25
+# Failed filing downloads accepted this recently may still have been tradable,
+# so the prospective runner reports them instead of dropping them silently.
+RECENT_DOWNLOAD_FAILURE_DAYS = 7
 
 
 class TextEncoder(Protocol):
@@ -150,6 +172,13 @@ class FactObservation:
     end: date
     available_at: datetime
     accession_number: str
+    # First day of the reporting period; None for instant (balance-sheet) facts.
+    start: date | None = None
+
+
+def dataset_xbrl_fact_policy(dataset: ResearchDataset) -> str:
+    """Return the XBRL policy a dataset was built with; older datasets are legacy v1."""
+    return dataset.provenance.get("xbrl_fact_policy", LEGACY_XBRL_FACT_POLICY)
 
 
 def build_research_dataset(
@@ -245,6 +274,7 @@ def build_research_dataset(
     attrition = {
         "filing_records": len(filing_index),
         "download_failures": 0,
+        "recent_download_failures": 0,
         "mapping_exclusions": 0,
         "universe_exclusions": 0,
         "missing_market_cutoff": 0,
@@ -281,6 +311,8 @@ def build_research_dataset(
             report_progress(filing_number - 1)
         if filing.get("status") != "ok" or not filing.get("localPath"):
             attrition["download_failures"] += 1
+            if _accepted_since(filing, as_of - timedelta(days=RECENT_DOWNLOAD_FAILURE_DAYS)):
+                attrition["recent_download_failures"] += 1
             continue
         cik = str(filing.get("cik") or "").zfill(10)
         member = member_by_cik.get(cik)
@@ -347,19 +379,12 @@ def build_research_dataset(
         else:
             attrition["text_parse_failures"] += 1
 
-        concept_values, fundamental_available_at = _latest_fundamentals(
-            fact_groups.get(cik, {}), accepted_at, report_period
+        concept_values, fundamental_available_at = select_fundamentals(
+            fact_groups.get(cik, {}),
+            accepted_at,
+            report_period,
+            policy=config.features.xbrl_fact_policy,
         )
-        if (
-            "Revenues" not in concept_values
-            and (
-                replacement := concept_values.get(
-                    "RevenueFromContractWithCustomerExcludingAssessedTax"
-                )
-            )
-            is not None
-        ):
-            concept_values["Revenues"] = replacement
         availability_rows.extend(
             _availability_records(
                 event_id,
@@ -498,6 +523,7 @@ def build_research_dataset(
             "text_encoder": text_encoder.cache_identity,
             "market_adjustment": "split",
             "market_feed": str(source_manifest.configuration.get("feed", "unknown")),
+            "xbrl_fact_policy": config.features.xbrl_fact_policy,
         },
     )
 
@@ -601,9 +627,119 @@ def extract_company_facts(
             except (KeyError, TypeError, ValueError):
                 continue
             if math.isfinite(value):
-                observations.append(FactObservation(concept, value, end, available_at, accession))
+                # A malformed start date must not change which rows legacy v1 keeps.
+                start = _optional_date(row.get("start"))
+                observations.append(
+                    FactObservation(concept, value, end, available_at, accession, start)
+                )
         result[concept] = sorted(observations, key=lambda item: (item.available_at, item.end))
     return result
+
+
+def select_fundamentals(
+    facts: dict[str, list[FactObservation]],
+    cutoff: datetime,
+    report_period: date,
+    *,
+    policy: XbrlFactPolicy,
+) -> tuple[dict[str, float], datetime | None]:
+    """Choose the XBRL values behind one filing's fundamental ratios."""
+    if policy == LEGACY_XBRL_FACT_POLICY:
+        return _legacy_v1_fundamentals(facts, cutoff, report_period)
+    if policy == "duration_aware_v2":
+        return _duration_aware_fundamentals(facts, cutoff, report_period)
+    raise ValueError(f"Unsupported XBRL fact policy: {policy}")
+
+
+def _legacy_v1_fundamentals(
+    facts: dict[str, list[FactObservation]],
+    cutoff: datetime,
+    report_period: date,
+) -> tuple[dict[str, float], datetime | None]:
+    """Reproduce the frozen v1 selection exactly.
+
+    Known defects, retained only so v1 features stay identical (ADR 0015):
+    flow concepts mix quarterly and year-to-date periods, and a discontinued
+    ``Revenues`` concept outranks a current contract-revenue fact however old
+    it is.
+    """
+    values, available_at = _latest_fundamentals(facts, cutoff, report_period)
+    replacement = values.get("RevenueFromContractWithCustomerExcludingAssessedTax")
+    if "Revenues" not in values and replacement is not None:
+        values["Revenues"] = replacement
+    return values, available_at
+
+
+def _duration_aware_fundamentals(
+    facts: dict[str, list[FactObservation]],
+    cutoff: datetime,
+    report_period: date,
+) -> tuple[dict[str, float], datetime | None]:
+    """Select current, comparable facts (duration_aware_v2, ADR 0015).
+
+    Facts must be available by the cutoff and end within
+    ``MAXIMUM_FACT_AGE_DAYS`` of the filing's report period. Flow concepts also
+    need an explicit reporting period: the latest period end wins, the shortest
+    eligible period is preferred (the quarter over year-to-date), and the value
+    is annualized so quarterly, year-to-date, and annual facts share one scale.
+    """
+    earliest_end = report_period - timedelta(days=MAXIMUM_FACT_AGE_DAYS)
+    groups = {
+        concept: facts.get(concept, [])
+        for concept in FUNDAMENTAL_CONCEPTS
+        if concept not in REVENUE_CONCEPTS
+    }
+    groups["Revenues"] = [item for concept in REVENUE_CONCEPTS for item in facts.get(concept, [])]
+    values: dict[str, float] = {}
+    available_times: list[datetime] = []
+    for concept, observations in groups.items():
+        flow = concept in FLOW_CONCEPTS
+        eligible = [
+            item
+            for item in observations
+            if item.available_at <= cutoff
+            and earliest_end <= item.end <= report_period
+            and (not flow or _flow_days(item) is not None)
+        ]
+        if not eligible:
+            continue
+        chosen = max(
+            eligible,
+            key=lambda item: (
+                item.end,
+                -(_flow_days(item) or 0),
+                item.available_at,
+                # Total revenue outranks contract revenue for the same period.
+                item.concept == "Revenues",
+            ),
+        )
+        days = _flow_days(chosen)
+        values[concept] = chosen.value * DAYS_PER_YEAR / days if flow and days else chosen.value
+        available_times.append(chosen.available_at)
+    return values, max(available_times, default=None)
+
+
+def _flow_days(item: FactObservation) -> int | None:
+    """Return the inclusive length of a usable flow period, or None."""
+    if item.start is None:
+        return None
+    days = (item.end - item.start).days + 1
+    return days if MINIMUM_FLOW_DAYS <= days <= MAXIMUM_FLOW_DAYS else None
+
+
+def _accepted_since(filing: dict[str, Any], earliest: date) -> bool:
+    try:
+        accepted_at = parse_sec_acceptance(str(filing["acceptanceDateTime"]))
+    except (KeyError, TypeError, ValueError):
+        return False
+    return accepted_at.date() >= earliest
+
+
+def _optional_date(value: Any) -> date | None:
+    try:
+        return date.fromisoformat(str(value)) if value else None
+    except ValueError:
+        return None
 
 
 def _latest_fundamentals(

@@ -25,7 +25,9 @@ def main() -> int:
             raise OperatorEvidenceError("packet must be a JSON object")
         summary = packet_summary(payload)
     except (OSError, TypeError, ValueError) as error:
-        print(f"Operator evidence packet verification failed: {type(error).__name__}", file=sys.stderr)
+        print(
+            f"Operator evidence packet verification failed: {type(error).__name__}", file=sys.stderr
+        )
         return 2
     summary["packet"] = str(args.packet)
     print(json.dumps(summary, indent=2, sort_keys=True))

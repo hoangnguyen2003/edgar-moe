@@ -2,10 +2,16 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+XbrlFactPolicy = Literal["legacy_v1", "duration_aware_v2"]
+# The frozen v1 study and its prospective evaluation were built with this
+# policy; datasets that predate the setting are treated as legacy (ADR 0015).
+LEGACY_XBRL_FACT_POLICY: XbrlFactPolicy = "legacy_v1"
 
 
 class DataConfig(BaseModel):
@@ -29,6 +35,10 @@ class FeatureConfig(BaseModel):
     embedding_model: str = "ProsusAI/finbert"
     embedding_chunk_tokens: int = 510
     embedding_max_chunks: int = 12
+    # How XBRL facts become fundamental inputs. "legacy_v1" reproduces the frozen
+    # v1 features, which mix quarterly and year-to-date flows and can reuse stale
+    # concepts; new studies use duration-aware, staleness-bounded selection.
+    xbrl_fact_policy: XbrlFactPolicy = "duration_aware_v2"
 
 
 class ModelConfig(BaseModel):
@@ -70,6 +80,7 @@ class PortfolioConfig(BaseModel):
     maximum_name_weight: float = 0.02
     long_quantile: float = 0.9
     short_quantile: float = 0.1
+    # Round-trip cost per unit of one-sided turnover (bps / 2 per side).
     base_transaction_cost_bps: float = 10.0
     base_borrow_cost_annual: float = 0.02
 
@@ -118,14 +129,10 @@ class RuntimeSettings(BaseSettings):
     # The private runner does not use these settings.
     edgar_moe_registry_api_pool_size: int = Field(default=1, ge=1, le=20)
     edgar_moe_registry_api_max_overflow: int = Field(default=0, ge=0, le=20)
-    edgar_moe_registry_api_pool_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=60
-    )
+    edgar_moe_registry_api_pool_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     # API Postgres sessions fail closed on writes and bound database work. The
     # setting is ignored for the local SQLite compatibility path.
-    edgar_moe_registry_api_statement_timeout_ms: int = Field(
-        default=5_000, ge=100, le=600_000
-    )
+    edgar_moe_registry_api_statement_timeout_ms: int = Field(default=5_000, ge=100, le=600_000)
     edgar_moe_artifact_backend: str = "local"
     edgar_moe_artifact_mirror_backend: str = "none"
     edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")

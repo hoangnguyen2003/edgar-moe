@@ -77,8 +77,7 @@ def test_diagnostic_report_computes_matured_short_horizon() -> None:
     assert report["pending_count"] == 0
     assert report["coverage"] == 1.0
     assert report["observations"][0]["realized_abnormal_return"] == pytest.approx(
-        (1.01 * 1.02 * 1.01 * 1.0 * 1.03 - 1.0)
-        - (1.005 * 1.01 * 1.0 * 1.01 * 1.005 - 1.0)
+        (1.01 * 1.02 * 1.01 * 1.0 * 1.03 - 1.0) - (1.005 * 1.01 * 1.0 * 1.01 * 1.005 - 1.0)
     )
 
 
@@ -138,7 +137,8 @@ def test_missing_benchmark_is_reported_as_data_gap_not_waiting() -> None:
 def test_coverage_includes_unmatched_forecasts_in_denominator() -> None:
     missing = {**forecast(), "event_id": "missing", "security_id": "missing"}
     report = diagnostic_report(
-        diagnostic_fixture(), [forecast(), missing],
+        diagnostic_fixture(),
+        [forecast(), missing],
         as_of=datetime(2026, 8, 8, tzinfo=UTC),
     )
     assert report["matured_count"] == 1
@@ -149,12 +149,17 @@ def test_coverage_includes_unmatched_forecasts_in_denominator() -> None:
 
 def test_unique_events_select_earliest_forecast_independent_of_input_order() -> None:
     early = forecast()
-    later = {**early, "forecast_id": "forecast-2", "score": -0.8,
-             "forecast_as_of": "2026-08-03T12:00:00Z"}
+    later = {
+        **early,
+        "forecast_id": "forecast-2",
+        "score": -0.8,
+        "forecast_as_of": "2026-08-03T12:00:00Z",
+    }
     other_model = {**early, "model_id": "model-2", "forecast_id": "forecast-3"}
-    reports = [diagnostic_report(
-        diagnostic_fixture(), rows, as_of=datetime(2026, 8, 8, tzinfo=UTC)
-    ) for rows in ([later, other_model, early], [early, other_model, later])]
+    reports = [
+        diagnostic_report(diagnostic_fixture(), rows, as_of=datetime(2026, 8, 8, tzinfo=UTC))
+        for rows in ([later, other_model, early], [early, other_model, later])
+    ]
     unique = reports[0]["unique_event_evaluation"]
     assert unique == reports[1]["unique_event_evaluation"]
     assert reports[0]["matured_count"] == 3
@@ -167,8 +172,12 @@ def test_unique_events_select_earliest_forecast_independent_of_input_order() -> 
 
 def test_unique_events_do_not_replace_unmatched_first_forecast() -> None:
     early = {**forecast(), "event_id": "absent", "security_id": "absent"}
-    later = {**early, "forecast_id": "later", "security_id": "asset-1",
-             "forecast_as_of": "2026-08-03T12:00:00Z"}
+    later = {
+        **early,
+        "forecast_id": "later",
+        "security_id": "asset-1",
+        "forecast_as_of": "2026-08-03T12:00:00Z",
+    }
     report = diagnostic_report(
         diagnostic_fixture(), [later, early], as_of=datetime(2026, 8, 8, tzinfo=UTC)
     )
@@ -188,7 +197,8 @@ def test_unique_events_tie_break_and_missing_timestamp() -> None:
     assert report["unique_event_evaluation"]["selected_forecast_ids"] == ["forecast-0"]
     for timestamp in (None, "2026-08-03T10:00:00", "invalid"):
         report = diagnostic_report(
-            diagnostic_fixture(), [{**first, "forecast_as_of": timestamp}],
+            diagnostic_fixture(),
+            [{**first, "forecast_as_of": timestamp}],
             as_of=datetime(2026, 8, 8, tzinfo=UTC),
         )
         assert report["unique_event_evaluation"]["status"] == "unavailable"

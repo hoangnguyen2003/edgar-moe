@@ -93,7 +93,10 @@ def build_research_drift_history(
             raise DriftHistoryError(f"report {index + 1} failed hash verification") from error
         if report.get("scope") != "research_drift_only":
             raise DriftHistoryError(f"report {index + 1} has an unsupported scope")
-        if report.get("v1_immutable") is not True or report.get("automatic_retraining") is not False:
+        if (
+            report.get("v1_immutable") is not True
+            or report.get("automatic_retraining") is not False
+        ):
             raise DriftHistoryError(
                 f"report {index + 1} does not preserve the frozen-model contract"
             )
@@ -202,7 +205,9 @@ def verify_research_drift_history(history: Mapping[str, Any]) -> None:
     minimum_reports = _positive_int(history.get("minimum_reports"), "minimum_reports")
     report_count = _positive_int(history.get("report_count"), "report_count")
     if report_count > _MAX_HISTORY_REPORTS:
-        raise DriftHistoryError(f"drift history report_count must be at most {_MAX_HISTORY_REPORTS}")
+        raise DriftHistoryError(
+            f"drift history report_count must be at most {_MAX_HISTORY_REPORTS}"
+        )
     _parse_history_timestamp(history.get("observed_at"), "observed_at")
 
     baseline = _exact_mapping(history.get("baseline"), _BASELINE_KEYS, "baseline")
@@ -244,7 +249,9 @@ def verify_research_drift_history(history: Mapping[str, Any]) -> None:
         report_hash = raw_observation.get("report_hash")
         _sha256(report_hash, f"observation {index} report_hash")
         prospective = _exact_mapping(
-            raw_observation.get("prospective"), _PROSPECTIVE_KEYS, f"observation {index} prospective"
+            raw_observation.get("prospective"),
+            _PROSPECTIVE_KEYS,
+            f"observation {index} prospective",
         )
         dataset_id = _non_empty_string(
             prospective.get("dataset_id"), f"observation {index} prospective.dataset_id"
@@ -303,8 +310,13 @@ def verify_research_drift_history(history: Mapping[str, Any]) -> None:
         path = report_file.get("path")
         if path is not None and (not isinstance(path, str) or not path.strip()):
             raise DriftHistoryError(f"drift history report file {index} path is invalid")
-        if _sha256(report_file.get("report_hash"), f"report file {index} report_hash") != report_hash:
-            raise DriftHistoryError(f"drift history report file {index} hash does not match observation")
+        if (
+            _sha256(report_file.get("report_hash"), f"report file {index} report_hash")
+            != report_hash
+        ):
+            raise DriftHistoryError(
+                f"drift history report file {index} hash does not match observation"
+            )
 
     expected_status = _history_status(statuses, report_count, minimum_reports)
     if status != expected_status:
@@ -444,9 +456,7 @@ def _string(payload: Mapping[str, Any], key: str, label: str, index: int) -> str
     return str(value)
 
 
-def _parse_timestamp(
-    payload: Mapping[str, Any], key: str, label: str, index: int
-) -> datetime:
+def _parse_timestamp(payload: Mapping[str, Any], key: str, label: str, index: int) -> datetime:
     value = _string(payload, key, label, index)
     try:
         parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -460,6 +470,4 @@ def _parse_timestamp(
 
 
 def _content_hash(payload: Mapping[str, Any]) -> str:
-    return hashlib.sha256(
-        orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    return hashlib.sha256(orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)).hexdigest()

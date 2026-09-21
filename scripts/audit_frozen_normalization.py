@@ -33,11 +33,13 @@ def main() -> None:
     spec = FrozenModelSpec.from_yaml(args.config)
     locked = spec.verify_locked_evidence()
     selection = verify_frozen_selection(
-        args.selection, dataset_id=spec.training_dataset_id,
+        args.selection,
+        dataset_id=spec.training_dataset_id,
         confirmation_hash=spec.selection_hash,
     )
     predictor = FrozenPredictor.load(
-        spec.model_path, expected_sha256=spec.artifact_sha256,
+        spec.model_path,
+        expected_sha256=spec.artifact_sha256,
         expected_selection_hash=spec.selection_hash,
     )
     dataset = ResearchDataset.load(spec.training_dataset_dir)
@@ -55,10 +57,16 @@ def main() -> None:
         np.testing.assert_allclose(saved.scaler.scale_, fresh.scaler.scale_, rtol=0, atol=0)
     np.testing.assert_allclose(predictor.regime_transform.medians, regime.medians, rtol=0, atol=0)
     np.testing.assert_allclose(
-        predictor.regime_transform.scaler.mean_, regime.scaler.mean_, rtol=0, atol=0,
+        predictor.regime_transform.scaler.mean_,
+        regime.scaler.mean_,
+        rtol=0,
+        atol=0,
     )
     np.testing.assert_allclose(
-        predictor.regime_transform.scaler.scale_, regime.scaler.scale_, rtol=0, atol=0,
+        predictor.regime_transform.scaler.scale_,
+        regime.scaler.scale_,
+        rtol=0,
+        atol=0,
     )
     prediction = predict_moe(predictor.model, test, device="cpu")
     neural = prediction.scores * predictor.target_std + predictor.target_mean
@@ -76,13 +84,22 @@ def main() -> None:
         np.testing.assert_array_equal(archive["test_indices"], split.test)
         error = float(np.max(np.abs(scores - archive["scores"])))
         np.testing.assert_allclose(scores, archive["scores"], rtol=1e-5, atol=1e-7)
-    print(json.dumps({
-        "status": "passed", "artifact_sha256": spec.artifact_sha256,
-        "train_events": len(split.train), "test_events": len(split.test),
-        "target_mean": mean, "target_std": std,
-        "champion_parameters": weights, "max_saved_score_error": error,
-        "scope": "Artifact reproduction, not a new test or model selection",
-    }, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "passed",
+                "artifact_sha256": spec.artifact_sha256,
+                "train_events": len(split.train),
+                "test_events": len(split.test),
+                "target_mean": mean,
+                "target_std": std,
+                "champion_parameters": weights,
+                "max_saved_score_error": error,
+                "scope": "Artifact reproduction, not a new test or model selection",
+            },
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

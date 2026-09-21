@@ -165,7 +165,9 @@ def verify_public_release_readiness(report: Mapping[str, Any]) -> None:
         check_id = item.get("id")
         check_status = item.get("status")
         if check_id not in _CHECK_IDS or check_id in observed:
-            raise PublicReleaseReadinessError("public release readiness check identifiers are invalid")
+            raise PublicReleaseReadinessError(
+                "public release readiness check identifiers are invalid"
+            )
         if check_status not in {"passed", "failed", "review_required"}:
             raise PublicReleaseReadinessError("public release readiness check status is invalid")
         error_codes = item.get("error_codes")
@@ -175,10 +177,14 @@ def verify_public_release_readiness(report: Mapping[str, Any]) -> None:
         ):
             raise PublicReleaseReadinessError("public release readiness error codes are invalid")
         if check_status == "passed" and error_codes:
-            raise PublicReleaseReadinessError("passed public release readiness checks cannot contain errors")
+            raise PublicReleaseReadinessError(
+                "passed public release readiness checks cannot contain errors"
+            )
         observed[str(check_id)] = item
     if set(observed) != set(_CHECK_IDS):
-        raise PublicReleaseReadinessError("public release readiness check identifiers are incomplete")
+        raise PublicReleaseReadinessError(
+            "public release readiness check identifiers are incomplete"
+        )
 
     _verify_reasons(report.get("blocked_reasons"), "blocked_reasons")
     _verify_reasons(report.get("review_reasons"), "review_reasons")
@@ -194,7 +200,9 @@ def verify_public_release_readiness(report: Mapping[str, Any]) -> None:
     if review.get("status") not in {"failed", "review_required", "passed"}:
         raise PublicReleaseReadinessError("public release readiness review status is invalid")
     if review.get("redistribution_status") not in {None, "operator_review_required", "approved"}:
-        raise PublicReleaseReadinessError("public release readiness redistribution status is invalid")
+        raise PublicReleaseReadinessError(
+            "public release readiness redistribution status is invalid"
+        )
     if review.get("legal_approval") not in {None, False, True}:
         raise PublicReleaseReadinessError("public release readiness legal approval is invalid")
     for key in ("source_review_required", "source_approved"):
@@ -219,11 +227,15 @@ def verify_public_release_readiness(report: Mapping[str, Any]) -> None:
     if status == "blocked" and not blocked:
         raise PublicReleaseReadinessError("blocked public release readiness must include reasons")
     if status != "blocked" and blocked:
-        raise PublicReleaseReadinessError("non-blocked public release readiness cannot include blocked reasons")
+        raise PublicReleaseReadinessError(
+            "non-blocked public release readiness cannot include blocked reasons"
+        )
     if status == "review_required" and not review_reasons:
         raise PublicReleaseReadinessError("review-required readiness must include review reasons")
     if status == "ready" and review_reasons:
-        raise PublicReleaseReadinessError("ready public release readiness cannot include review reasons")
+        raise PublicReleaseReadinessError(
+            "ready public release readiness cannot include review reasons"
+        )
     expected_hash = report.get("readiness_sha256")
     if not isinstance(expected_hash, str) or not _SHA256.fullmatch(expected_hash):
         raise PublicReleaseReadinessError("public release readiness hash is invalid")
@@ -259,9 +271,7 @@ def _review_state(manifest: dict[str, Any] | None) -> dict[str, Any]:
     redistribution_status = review.get("redistribution_status")
     legal_approval = review.get("legal_approval")
     source_statuses = [
-        source.get("redistribution_status")
-        for source in sources
-        if isinstance(source, dict)
+        source.get("redistribution_status") for source in sources if isinstance(source, dict)
     ]
     source_review_required = sum(status != "approved" for status in source_statuses)
     source_approved = sum(status == "approved" for status in source_statuses)
@@ -308,7 +318,9 @@ def _resolve_under_root(root: Path, path: Path) -> Path:
     try:
         resolved.relative_to(root)
     except ValueError as error:
-        raise PublicReleaseReadinessError("public release input path escapes repository root") from error
+        raise PublicReleaseReadinessError(
+            "public release input path escapes repository root"
+        ) from error
     return resolved
 
 
@@ -330,15 +342,16 @@ def _error_code(message: str) -> str:
 
 def _verify_reasons(value: object, label: str) -> None:
     if not isinstance(value, list) or not all(
-        isinstance(reason, str) and re.fullmatch(r"[a-z0-9_]{1,120}", reason)
-        for reason in value
+        isinstance(reason, str) and re.fullmatch(r"[a-z0-9_]{1,120}", reason) for reason in value
     ):
         raise PublicReleaseReadinessError(f"public release readiness {label} are invalid")
 
 
 def _verify_timestamp(value: object, label: str) -> None:
     if not isinstance(value, str) or not _ISO_TIMESTAMP.fullmatch(value):
-        raise PublicReleaseReadinessError(f"public release readiness {label} must be a UTC timestamp")
+        raise PublicReleaseReadinessError(
+            f"public release readiness {label} must be a UTC timestamp"
+        )
 
 
 def _content_hash(payload: Mapping[str, Any]) -> str:
@@ -377,9 +390,12 @@ def main() -> int:
         temporary.replace(args.output)
         print(f"Wrote public release readiness to {args.output}")
     print(serialized, end="")
-    return 0 if report["status"] == "ready" or (
-        report["status"] == "review_required" and args.allow_review_required
-    ) else 1
+    return (
+        0
+        if report["status"] == "ready"
+        or (report["status"] == "review_required" and args.allow_review_required)
+        else 1
+    )
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@ import pytest
 
 from edgar_moe.backtest.engine import run_event_backtest
 from edgar_moe.backtest.metrics import (
+    annualized_sharpe,
     block_bootstrap_sharpe_interval,
     performance_metrics,
     predictive_metrics,
@@ -32,6 +33,28 @@ def test_predictive_and_performance_metrics_are_finite() -> None:
     )
     assert np.isfinite(low)
     assert low <= high
+
+
+def test_bootstrap_interval_uses_the_same_sharpe_as_the_point_estimate() -> None:
+    # A drawdown-heavy series where arithmetic and geometric Sharpe differ.
+    returns = np.tile([0.03, -0.028, 0.012, -0.015, 0.004], 60)
+    point = performance_metrics(pd.DataFrame({"net_return": returns}))["sharpe"]
+    arithmetic = returns.mean() / returns.std(ddof=1) * np.sqrt(252)
+    assert abs(point - arithmetic) > 0.05
+
+    # Blocks spanning whole periods give every resample the same multiset of
+    # returns, so the interval collapses onto whichever estimator it uses.
+    low, high = block_bootstrap_sharpe_interval(returns, block_size=10, samples=20)
+    assert low == pytest.approx(point) and high == pytest.approx(point)
+    assert annualized_sharpe(returns) == pytest.approx(point)
+
+
+def test_sortino_uses_downside_deviation() -> None:
+    returns = np.array([0.02, -0.01, 0.015, -0.03, 0.01, 0.005] * 20)
+    metrics = performance_metrics(pd.DataFrame({"net_return": returns}))
+    downside = np.sqrt(np.mean(np.minimum(returns, 0.0) ** 2)) * np.sqrt(252)
+
+    assert metrics["sortino"] == pytest.approx(metrics["annualized_return"] / downside)
 
 
 def test_event_backtest_holds_overlapping_signals() -> None:

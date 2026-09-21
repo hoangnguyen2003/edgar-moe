@@ -9,7 +9,6 @@ used by the API.  It never deletes or mutates the source or an existing target.
 
 from __future__ import annotations
 
-import hashlib
 import sqlite3
 import time
 from datetime import UTC, datetime
@@ -19,6 +18,7 @@ from urllib.parse import quote
 
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.registry import ForwardRegistry
+from edgar_moe.utils.hashing import sha256_file
 
 REGISTRY_TABLES: tuple[str, ...] = (
     "forward_datasets",
@@ -178,13 +178,5 @@ def _file_identity(path: Path) -> dict[str, Any]:
     return {
         "name": path.name,
         "size_bytes": path.stat().st_size,
-        "sha256": _sha256(path),
+        "sha256": sha256_file(path),
     }
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()

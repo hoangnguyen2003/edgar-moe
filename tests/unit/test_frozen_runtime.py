@@ -25,9 +25,7 @@ def _write_fixture(root: Path) -> tuple[Path, Path]:
         "selection_hash": selection_hash,
         "model_sha256": model_hash,
     }
-    locked_hash = hashlib.sha256(
-        orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    locked_hash = hashlib.sha256(orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)).hexdigest()
     (bundle / "locked-test.json").write_bytes(
         orjson.dumps({**unsigned, "locked_test_hash": locked_hash})
     )

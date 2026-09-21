@@ -17,9 +17,7 @@ _SPEC.loader.exec_module(_MODULE)
 
 def test_reader_contract_covers_every_forward_registry_table() -> None:
     expected = {
-        table.name
-        for table in Base.metadata.sorted_tables
-        if table.name.startswith("forward_")
+        table.name for table in Base.metadata.sorted_tables if table.name.startswith("forward_")
     }
     assert set(READER_TABLES) == expected
 

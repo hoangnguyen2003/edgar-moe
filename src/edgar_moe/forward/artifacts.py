@@ -8,6 +8,7 @@ from typing import Any, Protocol
 from uuid import uuid4
 
 from edgar_moe.settings import RuntimeSettings
+from edgar_moe.utils.hashing import hash_file
 
 
 @dataclass(frozen=True)
@@ -58,7 +59,7 @@ class LocalArtifactStore:
         logical_name: str | None = None,
     ) -> ArtifactReference:
         source_path = Path(source)
-        digest, size_bytes = _hash_file(source_path)
+        digest, size_bytes = hash_file(source_path)
         key = _content_key(digest, logical_name or source_path.name)
         destination = self._path(key)
         if not destination.exists():
@@ -66,7 +67,7 @@ class LocalArtifactStore:
             temporary = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
             try:
                 shutil.copyfile(source_path, temporary)
-                copied_digest, copied_size = _hash_file(temporary)
+                copied_digest, copied_size = hash_file(temporary)
                 if copied_digest != digest or copied_size != size_bytes:
                     raise OSError("Artifact changed while it was being copied")
                 temporary.replace(destination)
@@ -147,7 +148,7 @@ class R2ArtifactStore:
         logical_name: str | None = None,
     ) -> ArtifactReference:
         source_path = Path(source)
-        digest, size_bytes = _hash_file(source_path)
+        digest, size_bytes = hash_file(source_path)
         key = _content_key(digest, logical_name or source_path.name)
         if not self._exists_with_hash(key, digest):
             self.client.upload_file(
@@ -291,7 +292,7 @@ def mirror_local_artifacts(
         if len(parts) != 4 or parts[0] != "sha256":
             raise ValueError(f"Unexpected local artifact path: {relative}")
         expected_digest = parts[2]
-        digest, size_bytes = _hash_file(source)
+        digest, size_bytes = hash_file(source)
         if len(expected_digest) != 64 or digest != expected_digest:
             raise ValueError(f"Local artifact path/hash mismatch: {relative}")
         local_reference = ArtifactReference(
@@ -331,13 +332,3 @@ def _content_key(digest: str, logical_name: str) -> str:
     if not name or name in {".", ".."}:
         raise ValueError("Artifact logical name must contain a file name")
     return f"sha256/{digest[:2]}/{digest}/{name}"
-
-
-def _hash_file(path: Path) -> tuple[str, int]:
-    digest = hashlib.sha256()
-    size_bytes = 0
-    with path.open("rb") as stream:
-        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(chunk)
-            size_bytes += len(chunk)
-    return digest.hexdigest(), size_bytes

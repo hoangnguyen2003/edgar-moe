@@ -177,7 +177,9 @@ def test_history_input_bounds_are_rejected(tmp_path: Path) -> None:
     with pytest.raises(DiagnosticHistoryError, match="at most"):
         build_forward_diagnostic_history([{}] * (MAX_HISTORY_REPORTS + 1))
     with pytest.raises(DiagnosticHistoryError, match="cannot exceed"):
-        build_forward_diagnostic_history(_summaries(tmp_path), minimum_reports=MAX_HISTORY_REPORTS + 1)
+        build_forward_diagnostic_history(
+            _summaries(tmp_path), minimum_reports=MAX_HISTORY_REPORTS + 1
+        )
 
 
 @pytest.mark.parametrize(
@@ -201,9 +203,7 @@ def test_history_input_bounds_are_rejected(tmp_path: Path) -> None:
         ("history_sha256", "not-a-sha"),
     ),
 )
-def test_history_metadata_tampering_is_rejected(
-    tmp_path: Path, field: str, value: object
-) -> None:
+def test_history_metadata_tampering_is_rejected(tmp_path: Path, field: str, value: object) -> None:
     history = build_forward_diagnostic_history(_summaries(tmp_path))
     mutated = copy.deepcopy(history)
     mutated[field] = value
@@ -218,7 +218,9 @@ def test_unavailable_unique_event_summary_remains_safe(tmp_path: Path) -> None:
     path = tmp_path / "diagnostic-unavailable.json"
     path.write_text(json.dumps(report), encoding="utf-8")
 
-    history = build_forward_diagnostic_history(load_forward_diagnostic_reports([path]), minimum_reports=1)
+    history = build_forward_diagnostic_history(
+        load_forward_diagnostic_reports([path]), minimum_reports=1
+    )
 
     assert history["observations"][0]["unique_event_evaluation"] == {
         "status": "unavailable",

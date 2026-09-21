@@ -39,7 +39,9 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
     if output.exists():
         raise RestoreRehearsalError(f"output report already exists; refusing to overwrite: {path}")
     if not output.parent.is_dir():
-        raise RestoreRehearsalError(f"output report parent directory does not exist: {output.parent}")
+        raise RestoreRehearsalError(
+            f"output report parent directory does not exist: {output.parent}"
+        )
     with output.open("x", encoding="utf-8") as stream:
         json.dump(report, stream, indent=2, sort_keys=True)
         stream.write("\n")

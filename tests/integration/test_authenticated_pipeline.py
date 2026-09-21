@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import numpy as np
@@ -7,7 +7,12 @@ import pandas as pd
 import pandas_market_calendars as mcal
 
 from edgar_moe.data.refresh import UniverseMember, refresh_authenticated_to_disk
-from edgar_moe.features.dataset import ResearchDataset, build_research_dataset
+from edgar_moe.features.dataset import (
+    FLOW_CONCEPTS,
+    ResearchDataset,
+    build_research_dataset,
+    dataset_xbrl_fact_policy,
+)
 from edgar_moe.features.text import HashingTextEmbedder
 from edgar_moe.forward.diagnostics import diagnostic_report
 from edgar_moe.settings import ResearchConfig
@@ -71,6 +76,16 @@ class PipelineSec:
                                     "filed": acceptance[:10],
                                     "accn": accession,
                                     "form": "10-Q",
+                                    # Flow facts carry their quarter, as in SEC companyfacts.
+                                    **(
+                                        {
+                                            "start": (
+                                                date.fromisoformat(report_date) - timedelta(days=89)
+                                            ).isoformat()
+                                        }
+                                        if concept in FLOW_CONCEPTS
+                                        else {}
+                                    ),
                                 }
                                 for value, report_date, acceptance, accession in zip(
                                     concept_values,
@@ -185,12 +200,21 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     assert dataset.attrition["included_events"] == 3
     assert restored.dataset_id == dataset.dataset_id
     assert restored.provenance["text_encoder"].startswith("hashing-blake2b-v1")
+    assert dataset_xbrl_fact_policy(restored) == "duration_aware_v2"
+    fundamental_names = dataset.feature_names["fundamental"]
+    return_on_assets = dataset.modalities["fundamental"][
+        :, fundamental_names.index("return_on_assets")
+    ]
+    # Net income for a 90-day quarter is annualized under duration_aware_v2.
+    assert return_on_assets[0] == np.float32(5.0 * 365.25 / 90 / 100.0)
     assert np.allclose(restored.target, dataset.target)
     assert "SPY" in set(restored.daily_returns["symbol"])
     diagnostic = diagnostic_report(
         restored,
-        [dict(row, forecast_id=row["event_id"], score=0.1, rank=1.0)
-         for row in restored.events.to_dict("records")],
+        [
+            dict(row, forecast_id=row["event_id"], score=0.1, rank=1.0)
+            for row in restored.events.to_dict("records")
+        ],
         as_of=pd.Timestamp("2026-08-01", tz="UTC").to_pydatetime(),
     )
     assert diagnostic["matured_count"] == 3
@@ -230,3 +254,17 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     )
     assert refreshed.source_manifest_hash != dataset.source_manifest_hash
     assert refreshed.dataset_id != dataset.dataset_id
+
+    # The frozen v1 feature definition stays available, and a different fact
+    # policy always yields a different immutable dataset identity.
+    config.features.xbrl_fact_policy = "legacy_v1"
+    legacy = build_research_dataset(
+        checkpoint,
+        config=config,
+        embedder=HashingTextEmbedder(dimensions=16),
+        embedding_cache=tmp_path / "embedding-cache",
+    )
+    assert dataset_xbrl_fact_policy(legacy) == "legacy_v1"
+    assert legacy.dataset_id != refreshed.dataset_id
+    legacy_roa = legacy.modalities["fundamental"][:, fundamental_names.index("return_on_assets")]
+    assert legacy_roa[0] == np.float32(5.0 / 100.0)

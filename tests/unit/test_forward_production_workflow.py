@@ -6,10 +6,10 @@ WORKFLOW = Path(".github/workflows/forward-production.yml")
 def test_forward_workflow_validates_secrets_before_installing_runtime() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 
-    setup_uv = text.index("astral-sh/setup-uv@v7")
+    setup_uv = text.index("astral-sh/setup-uv@")
     install = text.index("uv sync --locked --extra research --extra operations")
     validation = text.index("scripts/validate_forward_runtime_config.py")
-    setup_go = text.index("actions/setup-go@v6")
+    setup_go = text.index("actions/setup-go@")
 
     assert setup_uv < install < validation < setup_go
     assert "Require every private runtime secret" not in text

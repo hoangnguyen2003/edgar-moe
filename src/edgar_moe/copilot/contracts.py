@@ -7,6 +7,10 @@ import json
 from dataclasses import dataclass
 from typing import Any, Literal
 
+# Shared by the agent (checked before any provider call) and the envelope
+# verifier, so a question can never pass one boundary and fail the other.
+MAX_QUESTION_BYTES = 2_000
+
 
 def content_hash(value: object) -> str:
     """Return a stable hash for a JSON-serializable evidence payload."""
