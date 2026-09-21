@@ -15,7 +15,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from .contracts import CopilotAnswer, content_hash
 from .verification import verify_copilot_answer_report
@@ -328,7 +328,7 @@ def _parse_case(raw: Mapping[str, object]) -> EvaluationCase:
     return EvaluationCase(
         case_id=case_id,
         question=question.strip(),
-        expected_evidence_status=cast(EvidenceStatus, status),
+        expected_evidence_status=status,
         required_tools=required_tools,
         forbidden_tools=forbidden_tools,
         required_sources=required_sources,
