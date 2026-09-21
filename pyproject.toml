@@ -39,7 +39,7 @@ research = [
   "scipy>=1.14,<2",
   "tenacity>=9,<10",
   "torch>=2.7,<3",
-  "transformers>=4.53,<5",
+  "transformers>=4.53,<6",
 ]
 dev = [
   "mypy>=1.17,<2",
