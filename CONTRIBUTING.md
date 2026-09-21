@@ -28,7 +28,10 @@ Every change follows this sequence:
    dependencies change, update the lockfile deliberately with `uv lock`, then
    include the resulting lockfile diff in the pull request. The web job uses
    `npm ci`, so `apps/web/package-lock.json` must stay synchronized with
-   `package.json`.
+   `package.json`. CI also rejects drift in the committed `public/` bundle, so
+   any change that affects the build, including a Dependabot update of a
+   runtime web dependency, needs `npm run build:public` and the rebuilt
+   `public/` committed.
 
    Go changes additionally run `gofmt`, `go vet ./...`, and `go test -race ./...`
    from the relevant module. Web changes run the commands in
