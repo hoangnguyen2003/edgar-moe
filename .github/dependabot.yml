@@ -24,6 +24,15 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # react and react-dom must share one version or React throws at startup
+      # (#127 bumped only react); their type packages move with them.
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
     ignore:
       # Node types follow the runtime major in package.json `engines`; bump
       # them together with the runtime.
