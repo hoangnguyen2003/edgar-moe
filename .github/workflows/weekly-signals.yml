@@ -24,6 +24,9 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+          # torch and CUDA wheels are ~3 GB; pruning keeps this cache small
+          # (setup-uv v9 stopped pruning by default).
+          prune-cache: true
       - run: uv sync --locked --extra research
       - name: Build transparent verification snapshot
         run: uv run edgar-moe demo --epochs 12 --output /tmp/edgar-moe-synthetic.json
@@ -40,6 +43,9 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+          # torch and CUDA wheels are ~3 GB; pruning keeps this cache small
+          # (setup-uv v9 stopped pruning by default).
+          prune-cache: true
       - run: uv sync --locked --extra research
       - name: Require reviewed research universe
         run: test -f config/universe.research.csv

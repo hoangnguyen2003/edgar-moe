@@ -46,6 +46,9 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
+          # torch and CUDA wheels are ~3 GB; pruning keeps this cache small
+          # (setup-uv v9 stopped pruning by default).
+          prune-cache: true
 
       - name: Install frozen research and operations runtime
         run: uv sync --locked --extra research --extra operations
