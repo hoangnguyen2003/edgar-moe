@@ -85,9 +85,7 @@ class FailOnceMirror:
         self.delegate = LocalArtifactStore(root)
         self.fail_next_bytes = True
 
-    def put_file(
-        self, source: str | Path, *, logical_name: str | None = None
-    ) -> ArtifactReference:
+    def put_file(self, source: str | Path, *, logical_name: str | None = None) -> ArtifactReference:
         return self.delegate.put_file(source, logical_name=logical_name)
 
     def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
@@ -133,9 +131,7 @@ def build_workflow_fixture(
         orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS)
     ).hexdigest()
     locked_payload["locked_test_hash"] = locked_hash
-    locked_result_path.write_bytes(
-        orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS)
-    )
+    locked_result_path.write_bytes(orjson.dumps(locked_payload, option=orjson.OPT_SORT_KEYS))
     spec = FrozenModelSpec(
         model_id="model-1",
         name="Fixture MoE",
@@ -306,7 +302,9 @@ def test_quality_gate_failure_keeps_its_failed_check_with_the_run(tmp_path: Path
 
     failed_run = registry.list_runs(limit=1)[0]
     assert failed_run["status"] == "failed"
-    checks = [check for check in registry.list_quality_checks() if check["run_id"] == failed_run["run_id"]]
+    checks = [
+        check for check in registry.list_quality_checks() if check["run_id"] == failed_run["run_id"]
+    ]
     assert [(check["name"], check["status"]) for check in checks] == [
         ("point_in_time_availability", "failed")
     ]
@@ -317,7 +315,9 @@ def test_quality_gate_failure_keeps_its_failed_check_with_the_run(tmp_path: Path
 
 
 def test_forecast_reports_missed_entries_and_recent_download_failures(tmp_path: Path) -> None:
-    workflow, registry, database, training_dir, first_as_of, clock = build_workflow_fixture(tmp_path)
+    workflow, registry, database, training_dir, first_as_of, clock = build_workflow_fixture(
+        tmp_path
+    )
     workflow.forecast(
         training_dir,
         as_of=first_as_of,

@@ -16,7 +16,8 @@ from edgar_moe.modeling.moe import RegimeGatedMoE
 
 
 def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     model = RegimeGatedMoE(
         text_dim=2,
@@ -81,9 +82,7 @@ def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(
         events=events,
         modalities={
             "text": np.array([[0.1, 0.2], [0.3, 0.1], [0.0, 0.0]], dtype=np.float32),
-            "fundamental": np.array(
-                [[0.2, -0.1], [-0.3, 0.4], [0.0, 0.0]], dtype=np.float32
-            ),
+            "fundamental": np.array([[0.2, -0.1], [-0.3, 0.4], [0.0, 0.0]], dtype=np.float32),
             "market": np.array([[0.4, 0.2], [0.1, -0.2], [0.0, 0.0]], dtype=np.float32),
         },
         regime=np.array([[0.2], [-0.1], [0.0]], dtype=np.float32),
@@ -133,7 +132,10 @@ def test_hash_pinned_frozen_predictor_scores_only_pre_entry_events(
     expected_anchor = [0.07, -0.08]
     expected_neural = [0.21, -0.09]
     for row, anchor, neural in zip(
-        known_batch.forecasts, expected_anchor, expected_neural, strict=True,
+        known_batch.forecasts,
+        expected_anchor,
+        expected_neural,
+        strict=True,
     ):
         assert row.fundamental_score == pytest.approx(anchor)
         assert row.score == pytest.approx(0.75 * anchor + 0.25 * neural)
@@ -254,7 +256,10 @@ def test_frozen_predictor_refuses_features_built_under_another_fact_policy(
         legacy.forecast(v2_dataset, as_of=forecast_as_of)
     with pytest.raises(ValueError, match="XBRL fact policy"):
         legacy.component_outputs(v2_dataset)
-    assert len(legacy.forecast(_one_event_dataset(forecast_as_of), as_of=forecast_as_of).forecasts) == 1
+    assert (
+        len(legacy.forecast(_one_event_dataset(forecast_as_of), as_of=forecast_as_of).forecasts)
+        == 1
+    )
 
     v2_artifact = tmp_path / "v2.pt"
     v2 = FrozenPredictor.load(
@@ -277,7 +282,9 @@ def test_point_in_time_violation_carries_its_failed_quality_check(tmp_path: Path
     )
     leaked = _one_event_dataset(forecast_as_of, feature_available_at=forecast_as_of)
 
-    with pytest.raises(ForecastQualityError, match="Point-in-time availability audit failed") as error:
+    with pytest.raises(
+        ForecastQualityError, match="Point-in-time availability audit failed"
+    ) as error:
         predictor.forecast(leaked, as_of=forecast_as_of)
 
     availability_check = error.value.checks[0]

@@ -54,9 +54,7 @@ _PACKET_KEYS = frozenset(
 )
 _CHECK_KEYS = frozenset({"check_id", "status", "observed_at", "evidence_refs", "notes"})
 _ARTIFACT_KEYS = frozenset({"name", "sha256", "size_bytes", "retention_days"})
-_REDACTION_KEYS = frozenset(
-    {"secrets_excluded", "provider_urls_excluded", "raw_payloads_excluded"}
-)
+_REDACTION_KEYS = frozenset({"secrets_excluded", "provider_urls_excluded", "raw_payloads_excluded"})
 _PACKET_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{2,63}$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _RELATIVE_ARTIFACT = re.compile(r"^[^/][^\r\n]*$")
@@ -165,9 +163,7 @@ def operator_readiness(
     if max_age <= timedelta(0):
         raise ValueError("max_age must be positive")
     if not isinstance(profile, str) or profile not in PROVIDER_EVIDENCE_PROFILES:
-        raise ValueError(
-            "profile must be one of: " + ", ".join(PROVIDER_EVIDENCE_PROFILES)
-        )
+        raise ValueError("profile must be one of: " + ", ".join(PROVIDER_EVIDENCE_PROFILES))
     verify_operator_evidence_packet(payload)
     observed_now = now or datetime.now(UTC)
     if observed_now.tzinfo is None or observed_now.utcoffset() is None:
@@ -176,11 +172,7 @@ def operator_readiness(
 
     checks = payload["checks"]
     assert isinstance(checks, list)
-    by_id = {
-        str(check["check_id"]): check
-        for check in checks
-        if isinstance(check, Mapping)
-    }
+    by_id = {str(check["check_id"]): check for check in checks if isinstance(check, Mapping)}
     results: list[dict[str, Any]] = []
     blocked: list[str] = []
     stale: list[str] = []
@@ -317,7 +309,9 @@ def verify_operator_readiness_report(report: Mapping[str, Any]) -> None:
     stale: list[str] = []
     for expected_id, result in zip(expected_ids, results, strict=True):
         if not isinstance(result, Mapping) or result.get("check_id") != expected_id:
-            raise OperatorReadinessError("required_checks are out of order or contain an invalid id")
+            raise OperatorReadinessError(
+                "required_checks are out of order or contain an invalid id"
+            )
         status = result.get("status")
         if status == "missing":
             if set(result) != {"check_id", "status", "fresh"} or result.get("fresh") is not False:
@@ -463,9 +457,7 @@ def _validate_artifacts(value: Any) -> list[str]:
             raise OperatorEvidenceError("each artifact must be an object")
         unknown = set(artifact) - _ARTIFACT_KEYS
         if unknown:
-            raise OperatorEvidenceError(
-                f"artifact contains unsupported fields: {sorted(unknown)}"
-            )
+            raise OperatorEvidenceError(f"artifact contains unsupported fields: {sorted(unknown)}")
         for field in ("name", "sha256", "size_bytes"):
             if field not in artifact:
                 raise OperatorEvidenceError(f"artifact is missing {field}")
@@ -478,7 +470,9 @@ def _validate_artifacts(value: Any) -> list[str]:
         ):
             raise OperatorEvidenceError(f"artifact name must be a relative file name: {name}")
         if "/../" in f"/{name}/" or name.endswith("/.."):
-            raise OperatorEvidenceError(f"artifact name must not escape its evidence directory: {name}")
+            raise OperatorEvidenceError(
+                f"artifact name must not escape its evidence directory: {name}"
+            )
         if name in names:
             raise OperatorEvidenceError(f"duplicate artifact name: {name}")
         names.append(name)
@@ -540,11 +534,15 @@ def _require_timestamp(value: Any, field: str) -> None:
 
 def _require_text(value: Any, field: str, *, maximum: int) -> None:
     if not isinstance(value, str) or not value.strip() or len(value) > maximum:
-        raise OperatorEvidenceError(f"{field} must be a non-empty string of at most {maximum} chars")
+        raise OperatorEvidenceError(
+            f"{field} must be a non-empty string of at most {maximum} chars"
+        )
 
 
 def _require_string_list(value: Any, field: str) -> list[str]:
-    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+    if not isinstance(value, list) or any(
+        not isinstance(item, str) or not item.strip() for item in value
+    ):
         raise OperatorEvidenceError(f"{field} must be a list of non-empty strings")
     return [str(item) for item in value]
 

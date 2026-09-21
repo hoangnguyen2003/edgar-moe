@@ -13,7 +13,9 @@ from edgar_moe.copilot.readiness import (
 from edgar_moe.copilot.review import append_copilot_reviews
 
 
-def _benchmark(*, corpus_id: str = "copilot-v1", answer_sha256: str = "a" * 64) -> dict[str, object]:
+def _benchmark(
+    *, corpus_id: str = "copilot-v1", answer_sha256: str = "a" * 64
+) -> dict[str, object]:
     return {
         "schema_version": 1,
         "corpus_id": corpus_id,

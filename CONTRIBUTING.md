@@ -19,6 +19,7 @@ Every change follows this sequence:
 
    ```sh
    uv run ruff check .
+   uv run ruff format --check .
    uv run mypy src scripts
    uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
    ```

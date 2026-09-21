@@ -68,7 +68,9 @@ def test_summary_is_strictly_redacted_and_content_addressed(tmp_path: Path) -> N
     path = tmp_path / "diagnostic.json"
     path.write_text(json.dumps(_diagnostic()), encoding="utf-8")
 
-    toolset = ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json")), diagnostic_path=path)
+    toolset = ReadOnlyToolset(
+        SnapshotRepository(Path("data/demo/snapshot.json")), diagnostic_path=path
+    )
     result = toolset.execute("get_forward_diagnostic", {})
 
     assert result.citations[0].source == "snapshot:forward-diagnostic"
@@ -92,7 +94,9 @@ def test_diagnostic_tool_is_not_advertised_without_explicit_path() -> None:
 def test_invalid_diagnostic_is_reported_without_raw_error_or_path(tmp_path: Path) -> None:
     path = tmp_path / "diagnostic.json"
     path.write_text(json.dumps({"diagnostic": True}), encoding="utf-8")
-    toolset = ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json")), diagnostic_path=path)
+    toolset = ReadOnlyToolset(
+        SnapshotRepository(Path("data/demo/snapshot.json")), diagnostic_path=path
+    )
 
     result = toolset.execute("get_forward_diagnostic", {})
 
@@ -152,7 +156,7 @@ def test_history_tool_is_verified_redacted_and_does_not_reopen_sources(tmp_path:
     assert result.citations[0].evidence_sha256
 
 
-@pytest.mark.parametrize("history_contents", ("{\"status\": \"tampered\"}", "not-json"))
+@pytest.mark.parametrize("history_contents", ('{"status": "tampered"}', "not-json"))
 def test_invalid_history_is_reported_without_raw_error_or_path(
     tmp_path: Path, history_contents: str
 ) -> None:

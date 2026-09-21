@@ -99,9 +99,7 @@ def _validate_locked_identity(
     stored_hash = str(payload.get("locked_test_hash", ""))
     unsigned = dict(payload)
     unsigned.pop("locked_test_hash", None)
-    computed_hash = hashlib.sha256(
-        orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    computed_hash = hashlib.sha256(orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)).hexdigest()
     if not _SHA256.fullmatch(stored_hash) or stored_hash != computed_hash:
         errors.append("locked-test artifact content hash is invalid")
     expected = {

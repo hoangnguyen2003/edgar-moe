@@ -21,8 +21,12 @@ runner = CliRunner()
 
 
 def test_validate_config_reports_each_protocols_fact_policy() -> None:
-    frozen = runner.invoke(cli.app, ["validate-config", "--config", "config/authenticated-free.yaml"])
-    current = runner.invoke(cli.app, ["validate-config", "--config", "config/authenticated-v2.yaml"])
+    frozen = runner.invoke(
+        cli.app, ["validate-config", "--config", "config/authenticated-free.yaml"]
+    )
+    current = runner.invoke(
+        cli.app, ["validate-config", "--config", "config/authenticated-v2.yaml"]
+    )
 
     assert frozen.exit_code == 0 and current.exit_code == 0
     assert json.loads(frozen.stdout)["features"]["xbrl_fact_policy"] == "legacy_v1"
@@ -81,12 +85,20 @@ def test_copilot_refuses_a_public_snapshot_that_drifted_from_its_lock(
 ) -> None:
     snapshot = _copy_locked_repository(tmp_path)
     monkeypatch.setenv("EDGAR_MOE_DEMO_SNAPSHOT", str(snapshot))
-    monkeypatch.setenv("EDGAR_MOE_PUBLIC_SNAPSHOT_LOCK", str(tmp_path / "config/public_snapshot.lock.json"))
+    monkeypatch.setenv(
+        "EDGAR_MOE_PUBLIC_SNAPSHOT_LOCK", str(tmp_path / "config/public_snapshot.lock.json")
+    )
     runtime_settings.cache_clear()
 
-    verified = runner.invoke(cli.app, ["research-copilot", "q", "--plan-only", "--snapshot", str(snapshot)])
-    snapshot.write_bytes(snapshot.read_bytes().replace(b'"research_only": true', b'"research_only": true '))
-    tampered = runner.invoke(cli.app, ["research-copilot", "q", "--plan-only", "--snapshot", str(snapshot)])
+    verified = runner.invoke(
+        cli.app, ["research-copilot", "q", "--plan-only", "--snapshot", str(snapshot)]
+    )
+    snapshot.write_bytes(
+        snapshot.read_bytes().replace(b'"research_only": true', b'"research_only": true ')
+    )
+    tampered = runner.invoke(
+        cli.app, ["research-copilot", "q", "--plan-only", "--snapshot", str(snapshot)]
+    )
 
     assert verified.exit_code == 0, verified.output
     assert tampered.exit_code != 0
@@ -109,14 +121,18 @@ def test_copilot_answer_is_written_and_verifiable_end_to_end(
         ),
     ]
 
-    def fake_complete(self: OpenAICompatibleProvider, messages: object, tools: object) -> ProviderResponse:
+    def fake_complete(
+        self: OpenAICompatibleProvider, messages: object, tools: object
+    ) -> ProviderResponse:
         del self, messages, tools
         return responses.pop(0)
 
     monkeypatch.setattr(OpenAICompatibleProvider, "complete", fake_complete)
     output = tmp_path / "answer.json"
 
-    asked = runner.invoke(cli.app, ["research-copilot", "What does the study report?", "--output", str(output)])
+    asked = runner.invoke(
+        cli.app, ["research-copilot", "What does the study report?", "--output", str(output)]
+    )
     verified = runner.invoke(cli.app, ["research-copilot-verify", str(output)])
 
     assert asked.exit_code == 0, asked.output
@@ -137,7 +153,9 @@ def test_copilot_verify_rejects_an_invalid_envelope(tmp_path: Path) -> None:
 
 
 def test_diagnostic_history_verify_rejects_unreadable_input(tmp_path: Path) -> None:
-    result = runner.invoke(cli.app, ["forward-diagnostic-history-verify", str(tmp_path / "missing.json")])
+    result = runner.invoke(
+        cli.app, ["forward-diagnostic-history-verify", str(tmp_path / "missing.json")]
+    )
 
     assert result.exit_code == 2
 
@@ -147,7 +165,9 @@ def _settings(**values: str) -> RuntimeSettings:
 
 
 def test_forward_database_url_prefers_the_override_then_settings_then_local_sqlite() -> None:
-    assert cli._forward_database_url(_settings(), "sqlite:///override.db") == "sqlite:///override.db"
+    assert (
+        cli._forward_database_url(_settings(), "sqlite:///override.db") == "sqlite:///override.db"
+    )
     configured = _settings(edgar_moe_registry_database_url="postgresql://writer")
     assert cli._forward_database_url(configured, None) == "postgresql://writer"
     assert cli._forward_database_url(_settings(), None) == "sqlite:///data/forward/registry.sqlite3"
@@ -177,5 +197,8 @@ def test_timestamps_must_be_timezone_aware_and_are_normalized_to_utc() -> None:
 
 
 def test_database_labels_never_echo_postgres_credentials() -> None:
-    assert cli._safe_database_label("postgresql://user:secret@host/db") == "configured Postgres database"
+    assert (
+        cli._safe_database_label("postgresql://user:secret@host/db")
+        == "configured Postgres database"
+    )
     assert cli._safe_database_label("sqlite:///local.db") == "sqlite:///local.db"

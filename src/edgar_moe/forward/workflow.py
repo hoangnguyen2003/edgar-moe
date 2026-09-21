@@ -120,9 +120,7 @@ class ForwardWorkflow:
                     previous_forecast_as_of=previous_forecast_as_of,
                 ),
             ]
-            quality_counts = self.registry.add_quality_checks(
-                run.run_id, all_checks
-            )
+            quality_counts = self.registry.add_quality_checks(run.run_id, all_checks)
             forecast_counts = self.registry.append_forecasts(run.run_id, batch.forecasts)
             evidence = {
                 "schema_version": 1,
@@ -399,9 +397,7 @@ def _source_coverage_checks(
             )
         )
     events = dataset.events
-    if previous_forecast_as_of is not None and {"accepted_at", "entry_at"}.issubset(
-        events.columns
-    ):
+    if previous_forecast_as_of is not None and {"accepted_at", "entry_at"}.issubset(events.columns):
         accepted = pd.to_datetime(events["accepted_at"], utc=True)
         entry = pd.to_datetime(events["entry_at"], utc=True)
         missed = int(((accepted > previous_forecast_as_of) & (entry <= forecast_as_of)).sum())

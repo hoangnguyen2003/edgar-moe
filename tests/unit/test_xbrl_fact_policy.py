@@ -39,9 +39,7 @@ def _row(
 def _facts(concepts: dict[str, list[dict]]) -> dict:
     payload = {
         "facts": {
-            "us-gaap": {
-                concept: {"units": {"USD": rows}} for concept, rows in concepts.items()
-            }
+            "us-gaap": {concept: {"units": {"USD": rows}} for concept, rows in concepts.items()}
         }
     }
     return extract_company_facts(payload, {ACCESSION: FILED})

@@ -152,7 +152,9 @@ def run_smoke(
                 frozen = payload.get("frozen_v1") if isinstance(payload, dict) else None
                 public_data = payload.get("public_data") if isinstance(payload, dict) else None
                 controls = payload.get("controls") if isinstance(payload, dict) else None
-                forward_status = payload.get("forward_status") if isinstance(payload, dict) else None
+                forward_status = (
+                    payload.get("forward_status") if isinstance(payload, dict) else None
+                )
                 frozen_valid = isinstance(frozen, dict) and all(
                     (
                         frozen.get("path") == "data/demo/snapshot.json",
@@ -168,11 +170,15 @@ def run_smoke(
                     and public_data.get("derived_output_public") is True
                     and public_data.get("redistribution_status") == "operator_review_required"
                 )
-                controls_valid = isinstance(controls, list) and bool(controls) and all(
-                    isinstance(control, dict)
-                    and control.get("status") in {"enforced", "pending_operator_evidence"}
-                    and control.get("owner") in {"repository", "operator"}
-                    for control in controls
+                controls_valid = (
+                    isinstance(controls, list)
+                    and bool(controls)
+                    and all(
+                        isinstance(control, dict)
+                        and control.get("status") in {"enforced", "pending_operator_evidence"}
+                        and control.get("owner") in {"repository", "operator"}
+                        for control in controls
+                    )
                 )
                 forward_valid = isinstance(forward_status, dict) and all(
                     isinstance(forward_status.get(field), bool)

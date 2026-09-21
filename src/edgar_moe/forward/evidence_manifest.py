@@ -143,7 +143,4 @@ def _safe_context(context: Mapping[str, Any]) -> dict[str, str]:
 
 
 def _content_hash(payload: Mapping[str, Any]) -> str:
-    return hashlib.sha256(
-        orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
-
+    return hashlib.sha256(orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)).hexdigest()

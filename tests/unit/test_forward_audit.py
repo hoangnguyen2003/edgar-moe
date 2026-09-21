@@ -8,15 +8,17 @@ from edgar_moe.forward.audit import audit_diagnostic, audit_official
 
 
 def report(scores: list[float], labels: list[float]) -> dict:
-    return {"diagnostic": True, "unique_event_evaluation": {
-        "selection_rule": "earliest_forecast_per_model_and_event",
-        "matured_count": len(scores),
-        "observations": [
-            {"model_id": "v1", "event_id": str(i), "score": s,
-             "realized_abnormal_return": y}
-            for i, (s, y) in enumerate(zip(scores, labels, strict=True))
-        ],
-    }}
+    return {
+        "diagnostic": True,
+        "unique_event_evaluation": {
+            "selection_rule": "earliest_forecast_per_model_and_event",
+            "matured_count": len(scores),
+            "observations": [
+                {"model_id": "v1", "event_id": str(i), "score": s, "realized_abnormal_return": y}
+                for i, (s, y) in enumerate(zip(scores, labels, strict=True))
+            ],
+        },
+    }
 
 
 def test_audit_baselines_and_no_mutation() -> None:
@@ -53,17 +55,39 @@ def test_reject_invalid_evaluation() -> None:
 
 
 def official_page() -> dict:
-    return {"offset": 0, "total": 3, "items": [
-        {"forecast_id": "early", "model_id": "v1", "event_id": "a",
-         "forecast_as_of": "2026-08-01T00:00:00Z", "score": 0.1,
-         "fundamental_score": 0.2, "realized_abnormal_return": None},
-        {"forecast_id": "late", "model_id": "v1", "event_id": "a",
-         "forecast_as_of": "2026-08-02T00:00:00Z", "score": 0.1,
-         "fundamental_score": 0.2, "realized_abnormal_return": 0.2},
-        {"forecast_id": "other", "model_id": "v1", "event_id": "b",
-         "forecast_as_of": "2026-08-01T00:00:00Z", "score": 0.1,
-         "fundamental_score": 0.2, "realized_abnormal_return": 0.2},
-    ]}
+    return {
+        "offset": 0,
+        "total": 3,
+        "items": [
+            {
+                "forecast_id": "early",
+                "model_id": "v1",
+                "event_id": "a",
+                "forecast_as_of": "2026-08-01T00:00:00Z",
+                "score": 0.1,
+                "fundamental_score": 0.2,
+                "realized_abnormal_return": None,
+            },
+            {
+                "forecast_id": "late",
+                "model_id": "v1",
+                "event_id": "a",
+                "forecast_as_of": "2026-08-02T00:00:00Z",
+                "score": 0.1,
+                "fundamental_score": 0.2,
+                "realized_abnormal_return": 0.2,
+            },
+            {
+                "forecast_id": "other",
+                "model_id": "v1",
+                "event_id": "b",
+                "forecast_as_of": "2026-08-01T00:00:00Z",
+                "score": 0.1,
+                "fundamental_score": 0.2,
+                "realized_abnormal_return": 0.2,
+            },
+        ],
+    }
 
 
 def test_official_selection_and_paired_comparison() -> None:
@@ -81,9 +105,13 @@ def test_official_selection_and_paired_comparison() -> None:
     assert audit["component_comparison"]["missing_component_count"] == 1
 
 
-@pytest.mark.parametrize("field,value", [
-    ("total", 4), ("offset", 1),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("total", 4),
+        ("offset", 1),
+    ],
+)
 def test_official_rejects_partial_export(field: str, value: int) -> None:
     source = official_page()
     source[field] = value
@@ -91,13 +119,16 @@ def test_official_rejects_partial_export(field: str, value: int) -> None:
         audit_official(source)
 
 
-@pytest.mark.parametrize("field,value,match", [
-    ("forecast_id", "early", "Duplicate"),
-    ("model_id", "v2", "one model"),
-    ("forecast_as_of", "2026-08-01", "aware"),
-    ("score", float("inf"), "Non-finite"),
-    ("fundamental_score", float("nan"), "Non-finite"),
-])
+@pytest.mark.parametrize(
+    "field,value,match",
+    [
+        ("forecast_id", "early", "Duplicate"),
+        ("model_id", "v2", "one model"),
+        ("forecast_as_of", "2026-08-01", "aware"),
+        ("score", float("inf"), "Non-finite"),
+        ("fundamental_score", float("nan"), "Non-finite"),
+    ],
+)
 def test_official_rejects_invalid_rows(field: str, value: object, match: str) -> None:
     source = official_page()
     source["items"][2][field] = value

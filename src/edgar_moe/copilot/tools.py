@@ -391,9 +391,7 @@ def _required_string(arguments: dict[str, object], key: str, *, max_length: int)
     return value.strip()
 
 
-def _optional_string(
-    arguments: dict[str, object], key: str, *, max_length: int
-) -> str | None:
+def _optional_string(arguments: dict[str, object], key: str, *, max_length: int) -> str | None:
     if key not in arguments or arguments[key] is None:
         return None
     return _required_string(arguments, key, max_length=max_length)

@@ -129,14 +129,10 @@ class RuntimeSettings(BaseSettings):
     # The private runner does not use these settings.
     edgar_moe_registry_api_pool_size: int = Field(default=1, ge=1, le=20)
     edgar_moe_registry_api_max_overflow: int = Field(default=0, ge=0, le=20)
-    edgar_moe_registry_api_pool_timeout_seconds: float = Field(
-        default=5.0, gt=0, le=60
-    )
+    edgar_moe_registry_api_pool_timeout_seconds: float = Field(default=5.0, gt=0, le=60)
     # API Postgres sessions fail closed on writes and bound database work. The
     # setting is ignored for the local SQLite compatibility path.
-    edgar_moe_registry_api_statement_timeout_ms: int = Field(
-        default=5_000, ge=100, le=600_000
-    )
+    edgar_moe_registry_api_statement_timeout_ms: int = Field(default=5_000, ge=100, le=600_000)
     edgar_moe_artifact_backend: str = "local"
     edgar_moe_artifact_mirror_backend: str = "none"
     edgar_moe_artifact_dir: Path = Path("data/forward/artifacts")

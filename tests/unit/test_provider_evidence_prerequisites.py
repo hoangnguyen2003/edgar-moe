@@ -5,14 +5,19 @@ import json
 from pathlib import Path
 
 _SCRIPT_PATH = Path(__file__).parents[2] / "scripts" / "check_provider_evidence_prerequisites.py"
-_SPEC = importlib.util.spec_from_file_location("check_provider_evidence_prerequisites", _SCRIPT_PATH)
+_SPEC = importlib.util.spec_from_file_location(
+    "check_provider_evidence_prerequisites", _SCRIPT_PATH
+)
 assert _SPEC is not None and _SPEC.loader is not None
 _MODULE = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(_MODULE)
 
 
 def _configured_environment() -> dict[str, str]:
-    values = {name: f"configured-{index}" for index, name in enumerate(_MODULE.GROUPS["restore_rehearsal"])}
+    values = {
+        name: f"configured-{index}"
+        for index, name in enumerate(_MODULE.GROUPS["restore_rehearsal"])
+    }
     values.update({name: "configured-reader" for name in _MODULE.READER_SECRETS})
     values.update(
         {
@@ -50,9 +55,12 @@ def test_missing_secret_names_are_reported_and_values_are_never_echoed() -> None
     }
     reader = next(group for group in report["groups"] if group["group_id"] == "reader_contract")
     assert reader["status"] == "configured"
-    assert "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY" in next(
-        group for group in report["groups"] if group["group_id"] == "r2_read_audit"
-    )["missing_secret_names"]
+    assert (
+        "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY"
+        in next(group for group in report["groups"] if group["group_id"] == "r2_read_audit")[
+            "missing_secret_names"
+        ]
+    )
     assert "reader-password-in-url" not in json.dumps(report)
 
 

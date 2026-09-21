@@ -25,18 +25,16 @@ def main() -> None:
     parser.add_argument("--print-cutoff", action="store_true")
     parser.add_argument("--cutoff")
     parser.add_argument("--raw-root", type=Path, default=Path("data/raw/authenticated"))
-    parser.add_argument(
-        "--filing-cache", type=Path, default=Path("data/cache/forward-filings")
-    )
-    parser.add_argument(
-        "--processed-root", type=Path, default=Path("data/processed/finbert")
-    )
+    parser.add_argument("--filing-cache", type=Path, default=Path("data/cache/forward-filings"))
+    parser.add_argument("--processed-root", type=Path, default=Path("data/processed/finbert"))
     parser.add_argument(
         "--embedding-cache",
         type=Path,
         default=Path("data/artifacts/embedding-cache-finbert"),
     )
-    parser.add_argument("--research-config", type=Path, default=Path("config/authenticated-free.yaml"))
+    parser.add_argument(
+        "--research-config", type=Path, default=Path("config/authenticated-free.yaml")
+    )
     parser.add_argument("--model-config", type=Path, default=Path("config/forward.yaml"))
     parser.add_argument("--universe", type=Path, default=Path("config/universe.research.csv"))
     parser.add_argument(

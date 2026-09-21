@@ -441,9 +441,7 @@ def research_drift(
         Path,
         typer.Option("--output", help="JSON drift report destination."),
     ] = Path("reports/research-drift.json"),
-    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
-        "config/forward.yaml"
-    ),
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path("config/forward.yaml"),
     device: Annotated[
         str,
         typer.Option(help="Frozen predictor device: 'cpu' or 'mps'."),
@@ -947,9 +945,7 @@ def forward_forecast(
         str | None,
         typer.Option(help="Timezone-aware recording timestamp; defaults to the current UTC clock."),
     ] = None,
-    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
-        "config/forward.yaml"
-    ),
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path("config/forward.yaml"),
     database_url: Annotated[
         str | None,
         typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
@@ -997,9 +993,7 @@ def forward_settle(
         str | None,
         typer.Option(help="Timezone-aware settlement cutoff; defaults to the current UTC clock."),
     ] = None,
-    model_config: Annotated[Path, typer.Option("--model-config")] = Path(
-        "config/forward.yaml"
-    ),
+    model_config: Annotated[Path, typer.Option("--model-config")] = Path("config/forward.yaml"),
     database_url: Annotated[
         str | None,
         typer.Option("--database-url", envvar="EDGAR_MOE_REGISTRY_DATABASE_URL"),
@@ -1379,9 +1373,7 @@ def research_copilot(
                 timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
                 max_tokens=settings.edgar_moe_copilot_max_tokens,
                 max_retries=(
-                    settings.edgar_moe_copilot_max_retries
-                    if max_retries is None
-                    else max_retries
+                    settings.edgar_moe_copilot_max_retries if max_retries is None else max_retries
                 ),
                 retry_backoff_seconds=(
                     settings.edgar_moe_copilot_retry_backoff_seconds
@@ -1743,7 +1735,9 @@ def research_copilot_benchmark(
 def research_copilot_review(
     benchmark: Annotated[
         Path,
-        typer.Option("--benchmark", help="Private evaluation.json from research-copilot-benchmark."),
+        typer.Option(
+            "--benchmark", help="Private evaluation.json from research-copilot-benchmark."
+        ),
     ],
     review: Annotated[
         Path,
@@ -1837,7 +1831,9 @@ def research_copilot_review_verify(
 def research_copilot_readiness(
     benchmark: Annotated[
         Path,
-        typer.Option("--benchmark", help="Private evaluation.json from research-copilot-benchmark."),
+        typer.Option(
+            "--benchmark", help="Private evaluation.json from research-copilot-benchmark."
+        ),
     ],
     history: Annotated[
         Path,
@@ -1927,7 +1923,9 @@ def _copilot_snapshot_repository(settings: RuntimeSettings, snapshot: Path) -> S
     from edgar_moe.api.repository import SnapshotRepository
 
     public = settings.edgar_moe_demo_snapshot
-    lock = settings.edgar_moe_public_snapshot_lock if snapshot.resolve() == public.resolve() else None
+    lock = (
+        settings.edgar_moe_public_snapshot_lock if snapshot.resolve() == public.resolve() else None
+    )
     return SnapshotRepository(snapshot, lock_path=lock)
 
 

@@ -85,9 +85,7 @@ def build_copilot_readiness(
     corpus_id = _required_text(benchmark.get("corpus_id"), "benchmark corpus_id")
     corpus_sha256 = _required_digest(benchmark.get("corpus_sha256"), "benchmark corpus_sha256")
     history_corpus_id = _required_text(history.get("corpus_id"), "history corpus_id")
-    history_corpus_sha256 = _required_digest(
-        history.get("corpus_sha256"), "history corpus_sha256"
-    )
+    history_corpus_sha256 = _required_digest(history.get("corpus_sha256"), "history corpus_sha256")
 
     cases = benchmark.get("cases")
     if not isinstance(cases, list) or not cases:
@@ -96,13 +94,9 @@ def build_copilot_readiness(
     missing_case_ids = _missing_current_reviews(current_cases, history, benchmark_digest)
     pass_rate = _pass_rate(benchmark.get("pass_rate"), "benchmark pass_rate")
     case_count = _positive_int(benchmark.get("case_count"), "benchmark case_count")
-    history_minimum = _positive_int(
-        history.get("minimum_reviews"), "history minimum_reviews"
-    )
+    history_minimum = _positive_int(history.get("minimum_reviews"), "history minimum_reviews")
     history_entry_count = _nonnegative_int(history.get("entry_count"), "history entry_count")
-    benchmark_complete = benchmark.get("complete") is True and not benchmark.get(
-        "missing_case_ids"
-    )
+    benchmark_complete = benchmark.get("complete") is True and not benchmark.get("missing_case_ids")
     agent_identity_status, agent_identity = _benchmark_agent_identity(benchmark)
     cases_passed = all(
         isinstance(case, Mapping)
@@ -157,7 +151,9 @@ def verify_copilot_readiness(report: Mapping[str, Any]) -> None:
         raise CopilotReadinessError("copilot readiness must be a JSON object")
     unknown = sorted(str(key) for key in report if key not in _READINESS_KEYS)
     if unknown:
-        raise CopilotReadinessError("copilot readiness contains unknown fields: " + ", ".join(unknown))
+        raise CopilotReadinessError(
+            "copilot readiness contains unknown fields: " + ", ".join(unknown)
+        )
     missing = sorted(key for key in _READINESS_KEYS if key not in report)
     if missing:
         raise CopilotReadinessError("copilot readiness is missing fields: " + ", ".join(missing))
@@ -212,7 +208,9 @@ def verify_copilot_readiness(report: Mapping[str, Any]) -> None:
         raise CopilotReadinessError("copilot readiness blocked_reasons do not match checks")
     identity_check = next(check for check in checks if check["check_id"] == "agent_identity")
     if identity_check["status"] != (
-        "passed" if agent_identity_status == "consistent" and agent_identity is not None else "failed"
+        "passed"
+        if agent_identity_status == "consistent" and agent_identity is not None
+        else "failed"
     ):
         raise CopilotReadinessError("copilot readiness agent_identity check is inconsistent")
     expected_hash = _required_digest(report.get("readiness_sha256"), "readiness_sha256")
@@ -304,8 +302,10 @@ def _required_text(value: object, label: str) -> str:
 
 
 def _required_digest(value: object, label: str) -> str:
-    if not isinstance(value, str) or len(value) != _SHA256_LENGTH or any(
-        char not in "0123456789abcdef" for char in value
+    if (
+        not isinstance(value, str)
+        or len(value) != _SHA256_LENGTH
+        or any(char not in "0123456789abcdef" for char in value)
     ):
         raise CopilotReadinessError(f"{label} must be a lowercase SHA-256 digest")
     return value

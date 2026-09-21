@@ -58,12 +58,8 @@ class FakeResponse:
         return self._url
 
 
-def fake_urlopen_factory(
-    responses: dict[str, FakeResponse], *, echo_request_id: bool = True
-):
-    def fake_open(
-        request: Any, *, timeout: float, origin: tuple[str, str]
-    ) -> FakeResponse:
+def fake_urlopen_factory(responses: dict[str, FakeResponse], *, echo_request_id: bool = True):
+    def fake_open(request: Any, *, timeout: float, origin: tuple[str, str]) -> FakeResponse:
         assert timeout == 2.0
         assert origin == ("https", "terminal.example")
         response = responses[request.full_url]

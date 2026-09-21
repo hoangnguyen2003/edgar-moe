@@ -73,9 +73,7 @@ def append_copilot_reviews(
 
     seen_records = {(entry["case_id"], entry["answer_sha256"]) for entry in prior_entries}
     last_reviewed_at = _entry_timestamp(prior_entries[-1]) if prior_entries else None
-    previous_entry_sha256 = (
-        prior_entries[-1]["entry_sha256"] if prior_entries else None
-    )
+    previous_entry_sha256 = prior_entries[-1]["entry_sha256"] if prior_entries else None
     new_entries: list[dict[str, Any]] = []
     for item in batch:
         record_key = (item["case_id"], item["answer_sha256"])
@@ -233,9 +231,10 @@ def _parse_review_batch(
     if review_batch.get("corpus_sha256") != benchmark_info["corpus_sha256"]:
         raise ReviewInputError("review batch corpus_sha256 does not match the benchmark")
     supplied_benchmark_sha256 = review_batch.get("benchmark_sha256")
-    if supplied_benchmark_sha256 is not None and supplied_benchmark_sha256 != benchmark_info[
-        "benchmark_sha256"
-    ]:
+    if (
+        supplied_benchmark_sha256 is not None
+        and supplied_benchmark_sha256 != benchmark_info["benchmark_sha256"]
+    ):
         raise ReviewInputError("review batch benchmark_sha256 does not match the benchmark")
     raw_reviews = review_batch.get("reviews")
     if not isinstance(raw_reviews, list) or not 1 <= len(raw_reviews) <= _MAX_ENTRIES:
@@ -276,7 +275,9 @@ def _parse_review_batch(
         reviewer = raw_review.get("reviewer")
         if not isinstance(reviewer, str) or not _REVIEWER.fullmatch(reviewer):
             raise ReviewInputError(f"review {case_id} reviewer must be a safe identifier")
-        reviewed_at = _parse_timestamp(raw_review.get("reviewed_at"), f"review {case_id} reviewed_at")
+        reviewed_at = _parse_timestamp(
+            raw_review.get("reviewed_at"), f"review {case_id} reviewed_at"
+        )
         if previous_reviewed_at is not None and reviewed_at < previous_reviewed_at:
             raise ReviewInputError("review batch reviewed_at values must be chronological")
         rubric: dict[str, str] = {}
@@ -373,11 +374,19 @@ def _validate_history(history: Mapping[str, Any]) -> dict[str, Any]:
     corpus_id = _identifier(history.get("corpus_id"), "review history corpus_id")
     corpus_sha256 = _digest(history.get("corpus_sha256"), "review history corpus_sha256")
     minimum_reviews = history.get("minimum_reviews")
-    if isinstance(minimum_reviews, bool) or not isinstance(minimum_reviews, int) or not 1 <= minimum_reviews <= _MAX_ENTRIES:
-        raise ReviewInputError(f"review history minimum_reviews must be between 1 and {_MAX_ENTRIES}")
+    if (
+        isinstance(minimum_reviews, bool)
+        or not isinstance(minimum_reviews, int)
+        or not 1 <= minimum_reviews <= _MAX_ENTRIES
+    ):
+        raise ReviewInputError(
+            f"review history minimum_reviews must be between 1 and {_MAX_ENTRIES}"
+        )
     entries = history.get("entries")
     if not isinstance(entries, list) or len(entries) > _MAX_ENTRIES:
-        raise ReviewInputError(f"review history entries must contain at most {_MAX_ENTRIES} entries")
+        raise ReviewInputError(
+            f"review history entries must contain at most {_MAX_ENTRIES} entries"
+        )
     previous_reviewed_at: datetime | None = None
     seen_records: set[tuple[str, str]] = set()
     for expected_sequence, raw_entry in enumerate(entries, start=1):
@@ -438,8 +447,10 @@ def _validate_history(history: Mapping[str, Any]) -> dict[str, Any]:
         if raw_entry.get("decision") not in _DECISIONS:
             raise ReviewInputError("review history contains an invalid decision")
         review_codes = raw_entry.get("review_codes")
-        if not isinstance(review_codes, list) or len(review_codes) > 8 or not all(
-            isinstance(code, str) and code in _REVIEW_CODES for code in review_codes
+        if (
+            not isinstance(review_codes, list)
+            or len(review_codes) > 8
+            or not all(isinstance(code, str) and code in _REVIEW_CODES for code in review_codes)
         ):
             raise ReviewInputError("review history contains an invalid review code")
         failed_rubric = any(raw_entry.get(field) == "fail" for field in _RUBRIC_FIELDS)
@@ -486,7 +497,9 @@ def _validate_history(history: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _history_status(revise_count: int, rejected_count: int, count: int, minimum_reviews: int) -> str:
+def _history_status(
+    revise_count: int, rejected_count: int, count: int, minimum_reviews: int
+) -> str:
     if rejected_count:
         return "rejected"
     if revise_count:

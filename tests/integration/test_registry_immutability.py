@@ -111,7 +111,10 @@ def test_sql_cannot_rewrite_evidence_or_completed_runs(tmp_path: Path, statement
     database.create_schema()
     _seed(database)
 
-    with pytest.raises(IntegrityError, match="append-only|outcome once"), database.engine.begin() as connection:
+    with (
+        pytest.raises(IntegrityError, match="append-only|outcome once"),
+        database.engine.begin() as connection,
+    ):
         connection.execute(text(statement))
     database.dispose()
 

@@ -114,13 +114,7 @@ def build_research_drift_readiness(
         or history_status in _HARD_BLOCK_STATUSES
         or "frozen_identity" in failed_ids
     )
-    status = (
-        "ready"
-        if not failed_ids
-        else "blocked"
-        if hard_blocked
-        else "review_required"
-    )
+    status = "ready" if not failed_ids else "blocked" if hard_blocked else "review_required"
     payload: dict[str, Any] = {
         "schema_version": 1,
         "scope": "research_drift_readiness",
@@ -134,9 +128,7 @@ def build_research_drift_readiness(
         "history_contract_minimum": history_contract_minimum,
         "report_count": report_count,
         "warning_streak": warning_streak,
-        "baseline_dataset_id": _required_text(
-            baseline.get("dataset_id"), "baseline dataset_id"
-        ),
+        "baseline_dataset_id": _required_text(baseline.get("dataset_id"), "baseline dataset_id"),
         "baseline_source_manifest_hash": _required_text(
             baseline.get("source_manifest_hash"), "baseline source_manifest_hash"
         ),
@@ -190,9 +182,7 @@ def verify_research_drift_readiness(report: Mapping[str, Any]) -> None:
         "frozen_at",
     ):
         _required_text(report.get(field), field)
-    required_reports = _positive_int(
-        report.get("required_report_count"), "required_report_count"
-    )
+    required_reports = _positive_int(report.get("required_report_count"), "required_report_count")
     history_minimum = _positive_int(
         report.get("history_contract_minimum"), "history_contract_minimum"
     )
@@ -242,11 +232,7 @@ def verify_research_drift_readiness(report: Mapping[str, Any]) -> None:
         or "frozen_identity" in failed_ids
     )
     expected_status = (
-        "ready"
-        if not failed_ids
-        else "blocked"
-        if hard_blocked
-        else "review_required"
+        "ready" if not failed_ids else "blocked" if hard_blocked else "review_required"
     )
     if report.get("status") != expected_status:
         raise DriftReadinessError("drift readiness status is inconsistent with checks")
@@ -274,8 +260,10 @@ def _required_text(value: object, label: str) -> str:
 
 
 def _required_digest(value: object, label: str) -> str:
-    if not isinstance(value, str) or len(value) != _SHA256_LENGTH or any(
-        char not in "0123456789abcdef" for char in value
+    if (
+        not isinstance(value, str)
+        or len(value) != _SHA256_LENGTH
+        or any(char not in "0123456789abcdef" for char in value)
     ):
         raise DriftReadinessError(f"{label} must be a lowercase SHA-256 digest")
     return value

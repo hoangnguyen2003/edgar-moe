@@ -57,9 +57,7 @@ def build_agent_identity(
     return CopilotAgentIdentity(
         policy_id=COPILOT_POLICY_ID,
         policy_sha256=copilot_policy_sha256(),
-        tool_contract_sha256=content_hash(
-            [tool.as_provider_schema() for tool in tool_definitions]
-        ),
+        tool_contract_sha256=content_hash([tool.as_provider_schema() for tool in tool_definitions]),
         max_tool_calls=max_tool_calls,
         max_duration_seconds=max_duration_seconds,
         max_context_bytes=max_context_bytes,
@@ -89,7 +87,11 @@ def validate_agent_identity(value: object) -> dict[str, object]:
     if not _is_digest(value["tool_contract_sha256"]):
         raise ValueError("agent_identity tool_contract_sha256 must be a lowercase SHA-256 digest")
     max_tool_calls = value["max_tool_calls"]
-    if isinstance(max_tool_calls, bool) or not isinstance(max_tool_calls, int) or not 1 <= max_tool_calls <= 8:
+    if (
+        isinstance(max_tool_calls, bool)
+        or not isinstance(max_tool_calls, int)
+        or not 1 <= max_tool_calls <= 8
+    ):
         raise ValueError("agent_identity max_tool_calls must be between 1 and 8")
     if "max_duration_seconds" in value:
         max_duration_seconds = value["max_duration_seconds"]

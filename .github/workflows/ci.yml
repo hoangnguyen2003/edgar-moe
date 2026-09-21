@@ -19,6 +19,7 @@ jobs:
           enable-cache: true
       - run: uv sync --locked --extra dev --extra research --extra operations
       - run: uv run ruff check .
+      - run: uv run ruff format --check .
       - run: uv run mypy src scripts
       - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
       - name: Check the reader-role audit command is runnable

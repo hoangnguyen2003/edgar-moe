@@ -23,9 +23,11 @@ def source_cutoff(now: datetime | None = None) -> str:
 
 def validate_cutoff(cutoff: str, *, now: datetime | None = None) -> str:
     parsed = datetime.strptime(cutoff, "%Y-%m-%d").date()
-    current = datetime.now(SOURCE_TIMEZONE).date() if now is None else now.astimezone(
-        SOURCE_TIMEZONE
-    ).date()
+    current = (
+        datetime.now(SOURCE_TIMEZONE).date()
+        if now is None
+        else now.astimezone(SOURCE_TIMEZONE).date()
+    )
     if parsed > current:
         raise ValueError(
             f"Forward cutoff {parsed.isoformat()} is after the source-system date "
@@ -130,4 +132,3 @@ def _merge_tree(source: Path, destination: Path) -> int:
             shutil.copy2(source_file, target)
         copied += 1
     return copied
-

@@ -95,8 +95,7 @@ def _safe_reasons(value: object, label: str) -> list[str]:
 def build_from_paths(paths: dict[str, Path | None]) -> dict[str, Any]:
     """Load, source-verify, and compose the four readiness reports."""
     reports = {
-        control_id: _load_report(paths.get(control_id), control_id)
-        for control_id in CONTROL_IDS
+        control_id: _load_report(paths.get(control_id), control_id) for control_id in CONTROL_IDS
     }
     return build_platform_readiness(reports)
 
@@ -107,7 +106,9 @@ def _write_immutable(payload: dict[str, Any], output: Path) -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     staging = output.with_name(f".{output.name}.staging-{uuid4().hex}")
     try:
-        staging.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+        staging.write_bytes(
+            orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
+        )
         os.link(staging, output)
     finally:
         staging.unlink(missing_ok=True)

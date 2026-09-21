@@ -51,9 +51,7 @@ def test_checked_in_public_snapshot_lock_is_valid() -> None:
 
 def test_snapshot_lock_rejects_changed_bytes(tmp_path: Path) -> None:
     lock_path, snapshot_path = write_locked_fixture(tmp_path)
-    snapshot_path.write_text(
-        snapshot_path.read_text(encoding="utf-8") + " \n", encoding="utf-8"
-    )
+    snapshot_path.write_text(snapshot_path.read_text(encoding="utf-8") + " \n", encoding="utf-8")
 
     errors = _MODULE.validate_public_snapshot_lock(lock_path, repo_root=tmp_path)
 

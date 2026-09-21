@@ -376,7 +376,9 @@ class ForwardRegistry:
 
     def list_artifacts(self, *, limit: int | None = None) -> list[dict[str, Any]]:
         """Return immutable artifact references for independent verification."""
-        statement = select(ArtifactRecord).order_by(ArtifactRecord.created_at, ArtifactRecord.artifact_id)
+        statement = select(ArtifactRecord).order_by(
+            ArtifactRecord.created_at, ArtifactRecord.artifact_id
+        )
         if limit is not None:
             if limit < 1:
                 raise ValueError("Artifact limit must be positive")

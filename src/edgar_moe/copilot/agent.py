@@ -121,8 +121,7 @@ class CopilotProvider(Protocol):
         self,
         messages: Sequence[dict[str, object]],
         tools: Sequence[ToolDefinition],
-    ) -> ProviderResponse:
-        ...
+    ) -> ProviderResponse: ...
 
 
 class OpenAICompatibleProvider:
@@ -173,8 +172,7 @@ class OpenAICompatibleProvider:
             or not 0 <= retry_backoff_seconds <= _MAX_RETRY_BACKOFF_SECONDS
         ):
             raise ValueError(
-                "copilot retry backoff must be between 0 and "
-                f"{_MAX_RETRY_BACKOFF_SECONDS} seconds"
+                f"copilot retry backoff must be between 0 and {_MAX_RETRY_BACKOFF_SECONDS} seconds"
             )
         self.timeout_seconds = timeout_seconds
         self.max_tokens = max_tokens
@@ -262,8 +260,7 @@ class ResearchCopilot:
             or not 1 <= max_duration_seconds <= _MAX_DURATION_SECONDS
         ):
             raise ValueError(
-                "max_duration_seconds must be between 1 and "
-                f"{_MAX_DURATION_SECONDS:g} seconds"
+                f"max_duration_seconds must be between 1 and {_MAX_DURATION_SECONDS:g} seconds"
             )
         if (
             isinstance(max_context_bytes, bool)
@@ -282,10 +279,7 @@ class ResearchCopilot:
 
     def ask(self, question: str) -> CopilotAnswer:
         normalized_question = question.strip()
-        if (
-            not normalized_question
-            or len(normalized_question.encode("utf-8")) > MAX_QUESTION_BYTES
-        ):
+        if not normalized_question or len(normalized_question.encode("utf-8")) > MAX_QUESTION_BYTES:
             raise ValueError(
                 f"question must be non-empty and at most {MAX_QUESTION_BYTES} UTF-8 bytes"
             )
@@ -332,9 +326,7 @@ class ResearchCopilot:
                 if not answer:
                     raise CopilotProviderError("copilot provider returned an empty answer")
                 if evidence_tool_call_seen and not citations:
-                    raise CopilotError(
-                        "copilot answer omitted citations after evidence tool use"
-                    )
+                    raise CopilotError("copilot answer omitted citations after evidence tool use")
                 envelope = CopilotAnswer(
                     question=normalized_question,
                     answer=answer,
@@ -396,17 +388,13 @@ class ResearchCopilot:
 
         raise CopilotError("copilot did not produce an answer within the tool-call budget")
 
-    def _execute_call(
-        self, call: ProviderToolCall
-    ) -> tuple[ToolResult, dict[str, object], bool]:
+    def _execute_call(self, call: ProviderToolCall) -> tuple[ToolResult, dict[str, object], bool]:
         """Execute one call; the flag is False when the contract rejected it."""
         try:
             decoded = json.loads(call.arguments or "{}")
         except JSONDecodeError:
             decoded = {}
-        if not isinstance(decoded, dict) or not all(
-            isinstance(key, str) for key in decoded
-        ):
+        if not isinstance(decoded, dict) or not all(isinstance(key, str) for key in decoded):
             decoded = {}
         arguments = {str(key): value for key, value in decoded.items()}
         try:
@@ -481,7 +469,9 @@ def normalize_provider_endpoint(
         or scheme not in {"https", "http"}
         or (scheme == "http" and not loopback)
     ):
-        raise ValueError("copilot provider endpoint must be HTTPS or loopback HTTP without credentials")
+        raise ValueError(
+            "copilot provider endpoint must be HTTPS or loopback HTTP without credentials"
+        )
     if scheme == "https" and not loopback:
         normalized_hosts = normalize_provider_allowed_hosts(allowed_hosts)
         if host not in normalized_hosts:
@@ -569,8 +559,7 @@ def _usage_count(value: object) -> int | None:
 def _sum_usage(usages: Sequence[ProviderUsage | None], field: str) -> int | None:
     """Sum a counter only when every provider response reported that counter."""
     values = [
-        cast(int | None, getattr(usage, field)) if usage is not None else None
-        for usage in usages
+        cast(int | None, getattr(usage, field)) if usage is not None else None for usage in usages
     ]
     if not values or any(value is None for value in values):
         return None

@@ -38,9 +38,12 @@ def test_failure_alert_is_allowlisted_and_deduplicable() -> None:
     assert payload["observed_at"] == "2026-09-19T01:02:03+00:00"
     assert len(payload["dedupe_key"]) == 24
     assert "secret" not in str(payload)
-    assert build_failure_alert(payload["details"] | {"observed_at": payload["observed_at"]})[
-        "dedupe_key"
-    ] == payload["dedupe_key"]
+    assert (
+        build_failure_alert(payload["details"] | {"observed_at": payload["observed_at"]})[
+            "dedupe_key"
+        ]
+        == payload["dedupe_key"]
+    )
 
 
 @pytest.mark.parametrize(

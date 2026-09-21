@@ -35,7 +35,9 @@ def test_provider_workflow_policy_rejects_secret_in_step_with_mapping(tmp_path: 
     reader = tmp_path / "provider-reader-contract-audit.yml"
     reader_text = reader.read_text(encoding="utf-8")
     checkout = next(
-        line for line in reader_text.splitlines() if line.startswith("      - uses: actions/checkout@")
+        line
+        for line in reader_text.splitlines()
+        if line.startswith("      - uses: actions/checkout@")
     )
     reader.write_text(
         reader_text.replace(
@@ -77,7 +79,9 @@ def test_provider_workflow_policy_rejects_mutable_action_tags(tmp_path: Path) ->
     reader = tmp_path / "provider-reader-contract-audit.yml"
     reader_text = reader.read_text(encoding="utf-8")
     checkout = next(
-        line for line in reader_text.splitlines() if line.startswith("      - uses: actions/checkout@")
+        line
+        for line in reader_text.splitlines()
+        if line.startswith("      - uses: actions/checkout@")
     )
     reader.write_text(
         reader_text.replace(checkout, "      - uses: actions/checkout@v7"), encoding="utf-8"

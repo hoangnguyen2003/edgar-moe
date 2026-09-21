@@ -192,9 +192,7 @@ class FrozenPredictor:
             ),
         ]
         if violations:
-            preview = ", ".join(
-                f"{item.event_id}:{item.feature_name}" for item in violations[:5]
-            )
+            preview = ", ".join(f"{item.event_id}:{item.feature_name}" for item in violations[:5])
             # Carry the failed check so the failed run records why it failed.
             raise ForecastQualityError(
                 f"Point-in-time availability audit failed ({len(violations)} rows): {preview}",
@@ -204,8 +202,7 @@ class FrozenPredictor:
             return ForecastBatch(forecasts=[], checks=checks, candidate_indices=candidate_indices)
 
         modalities = {
-            name: np.asarray(dataset.modalities[name][candidate_indices])
-            for name in MODALITY_NAMES
+            name: np.asarray(dataset.modalities[name][candidate_indices]) for name in MODALITY_NAMES
         }
         self._verify_dimensions(modalities, dataset.regime[candidate_indices])
         transformed, missing_mask = self.preprocessor.transform(modalities)
@@ -250,9 +247,7 @@ class FrozenPredictor:
                 score=float(scores[position]),
                 rank=float(ranks[position]),
                 fundamental_score=(
-                    float(fundamental_scores[position])
-                    if fundamental_scores is not None
-                    else None
+                    float(fundamental_scores[position]) if fundamental_scores is not None else None
                 ),
                 expert_weights={
                     name: float(prediction.expert_weights[position, expert_index])
@@ -286,9 +281,7 @@ class FrozenPredictor:
         artifact or opening the locked test.
         """
         self._require_feature_policy(dataset)
-        modalities = {
-            name: np.asarray(dataset.modalities[name]) for name in MODALITY_NAMES
-        }
+        modalities = {name: np.asarray(dataset.modalities[name]) for name in MODALITY_NAMES}
         if any(len(values) != len(dataset.events) for values in modalities.values()) or len(
             dataset.regime
         ) != len(dataset.events):
@@ -296,9 +289,7 @@ class FrozenPredictor:
         self._verify_dimensions(modalities, dataset.regime)
         violations = audit_feature_availability(dataset.availability)
         if violations:
-            preview = ", ".join(
-                f"{item.event_id}:{item.feature_name}" for item in violations[:5]
-            )
+            preview = ", ".join(f"{item.event_id}:{item.feature_name}" for item in violations[:5])
             raise ValueError(
                 f"Point-in-time availability audit failed ({len(violations)} rows): {preview}"
             )
@@ -316,8 +307,7 @@ class FrozenPredictor:
                 prediction.expert_weights[:, expert_index], dtype=np.float64
             )
             outputs[f"expert_prediction:{name}"] = np.asarray(
-                prediction.expert_predictions[:, expert_index] * self.target_std
-                + self.target_mean,
+                prediction.expert_predictions[:, expert_index] * self.target_std + self.target_mean,
                 dtype=np.float64,
             )
         if self.fundamental_coef is not None and self.fundamental_intercept is not None:

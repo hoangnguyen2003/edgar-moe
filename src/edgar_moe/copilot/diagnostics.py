@@ -126,7 +126,9 @@ def _summary(raw: Mapping[str, Any]) -> dict[str, object]:
         result[field] = _bounded_int(raw.get(field), field)
     for field in _METRIC_FIELDS:
         result[field] = _metric(raw.get(field), field)
-    result["next_maturity_at"] = _optional_timestamp(raw.get("next_maturity_at"), "next_maturity_at")
+    result["next_maturity_at"] = _optional_timestamp(
+        raw.get("next_maturity_at"), "next_maturity_at"
+    )
     result["latest_maturity_at"] = _optional_timestamp(
         raw.get("latest_maturity_at"), "latest_maturity_at"
     )
@@ -145,9 +147,7 @@ def _unique_summary(raw: Mapping[str, Any]) -> dict[str, object]:
     # report may contain an extra event/repetition count.
     summary = _summary(raw)
     result: dict[str, object] = {
-        key: summary[key]
-        for key in _UNIQUE_SUMMARY_FIELDS
-        if key in summary
+        key: summary[key] for key in _UNIQUE_SUMMARY_FIELDS if key in summary
     }
     result["event_count"] = _bounded_int(raw.get("event_count"), "event_count")
     result["repeated_forecast_count"] = _bounded_int(

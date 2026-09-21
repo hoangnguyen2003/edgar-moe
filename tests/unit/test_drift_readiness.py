@@ -65,9 +65,7 @@ def _report(dataset_id: str, as_of: str, *, status: str = "stable") -> dict[str,
             "dimension_mismatch_modalities": [],
         },
     }
-    report["report_hash"] = sha256(
-        orjson.dumps(report, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    report["report_hash"] = sha256(orjson.dumps(report, option=orjson.OPT_SORT_KEYS)).hexdigest()
     return report
 
 

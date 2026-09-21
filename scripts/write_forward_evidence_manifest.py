@@ -46,7 +46,11 @@ def main() -> int:
         )
     }
     manifest = build_evidence_manifest(args.paths, root=args.root, context=context)
-    output = (args.root / args.output).resolve() if not args.output.is_absolute() else args.output.resolve()
+    output = (
+        (args.root / args.output).resolve()
+        if not args.output.is_absolute()
+        else args.output.resolve()
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary = output.with_suffix(output.suffix + ".tmp")
     temporary.write_bytes(orjson.dumps(manifest, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))

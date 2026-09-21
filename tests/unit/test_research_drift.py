@@ -46,9 +46,9 @@ def make_dataset(
             "fundamental": fundamental,
             "market": np.asarray(market_values, dtype=np.float32),
         },
-        regime=np.column_stack(
-            [np.linspace(-1.0, 1.0, row_count), np.zeros(row_count)]
-        ).astype(np.float32),
+        regime=np.column_stack([np.linspace(-1.0, 1.0, row_count), np.zeros(row_count)]).astype(
+            np.float32
+        ),
         target=np.full(row_count, np.nan, dtype=np.float32),
         daily_returns=pd.DataFrame(),
         availability=availability,

@@ -27,9 +27,7 @@ def test_runner_failure_message_reduces_external_driver_text_to_type() -> None:
 
 
 def test_runner_failure_message_redacts_internal_error_details() -> None:
-    error = RegistryStateError(
-        "failed at https://provider.example/objects token=abcdef123"
-    )
+    error = RegistryStateError("failed at https://provider.example/objects token=abcdef123")
 
     message = _MODULE._failure_message(error)
 

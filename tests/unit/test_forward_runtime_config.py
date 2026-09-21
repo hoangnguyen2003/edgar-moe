@@ -21,13 +21,13 @@ def test_complete_required_configuration_passes_without_optional_auditor() -> No
 def test_missing_required_configuration_reports_names_only() -> None:
     environment = _required_environment()
     environment.pop("EDGAR_MOE_R2_SECRET_ACCESS_KEY")
-    environment["EDGAR_MOE_REGISTRY_DATABASE_URL"] = "postgresql://writer:super-secret@example.test/db"
+    environment["EDGAR_MOE_REGISTRY_DATABASE_URL"] = (
+        "postgresql://writer:super-secret@example.test/db"
+    )
 
     errors = _MODULE.validation_errors(environment)
 
-    assert errors == [
-        "Missing required forward-runner secret(s): EDGAR_MOE_R2_SECRET_ACCESS_KEY"
-    ]
+    assert errors == ["Missing required forward-runner secret(s): EDGAR_MOE_R2_SECRET_ACCESS_KEY"]
     assert "super-secret" not in " ".join(errors)
 
 

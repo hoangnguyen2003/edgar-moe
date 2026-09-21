@@ -60,9 +60,10 @@ def test_locked_repository_verifies_snapshot_and_identity(tmp_path: Path) -> Non
     repository = SnapshotRepository(snapshot_path, lock_path=lock_path)
 
     assert repository.load()["metadata"]["as_of"] == "2026-07-31"
-    assert repository.frozen_identity()["sha256"] == hashlib.sha256(
-        snapshot_path.read_bytes()
-    ).hexdigest()
+    assert (
+        repository.frozen_identity()["sha256"]
+        == hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
+    )
 
 
 def test_locked_repository_rejects_snapshot_tampering_after_cache_warmup(tmp_path: Path) -> None:

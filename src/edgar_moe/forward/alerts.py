@@ -44,9 +44,7 @@ class AlertDeliveryError(RuntimeError):
 
 def hash_alert_payload(payload: Mapping[str, Any]) -> str:
     """Return a stable SHA-256 identity for a redacted alert payload."""
-    return hashlib.sha256(
-        orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    return hashlib.sha256(orjson.dumps(dict(payload), option=orjson.OPT_SORT_KEYS)).hexdigest()
 
 
 def verify_alert_receipt(receipt: Mapping[str, Any]) -> None:
@@ -56,9 +54,7 @@ def verify_alert_receipt(receipt: Mapping[str, Any]) -> None:
         raise ValueError("Alert receipt is missing a SHA-256 receipt_hash")
     unsigned = dict(receipt)
     unsigned.pop("receipt_hash", None)
-    observed = hashlib.sha256(
-        orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    observed = hashlib.sha256(orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)).hexdigest()
     if observed != expected:
         raise ValueError("Alert receipt hash does not match content")
 

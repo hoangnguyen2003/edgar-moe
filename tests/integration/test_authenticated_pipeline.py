@@ -80,8 +80,7 @@ class PipelineSec:
                                     **(
                                         {
                                             "start": (
-                                                date.fromisoformat(report_date)
-                                                - timedelta(days=89)
+                                                date.fromisoformat(report_date) - timedelta(days=89)
                                             ).isoformat()
                                         }
                                         if concept in FLOW_CONCEPTS
@@ -203,15 +202,19 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     assert restored.provenance["text_encoder"].startswith("hashing-blake2b-v1")
     assert dataset_xbrl_fact_policy(restored) == "duration_aware_v2"
     fundamental_names = dataset.feature_names["fundamental"]
-    return_on_assets = dataset.modalities["fundamental"][:, fundamental_names.index("return_on_assets")]
+    return_on_assets = dataset.modalities["fundamental"][
+        :, fundamental_names.index("return_on_assets")
+    ]
     # Net income for a 90-day quarter is annualized under duration_aware_v2.
     assert return_on_assets[0] == np.float32(5.0 * 365.25 / 90 / 100.0)
     assert np.allclose(restored.target, dataset.target)
     assert "SPY" in set(restored.daily_returns["symbol"])
     diagnostic = diagnostic_report(
         restored,
-        [dict(row, forecast_id=row["event_id"], score=0.1, rank=1.0)
-         for row in restored.events.to_dict("records")],
+        [
+            dict(row, forecast_id=row["event_id"], score=0.1, rank=1.0)
+            for row in restored.events.to_dict("records")
+        ],
         as_of=pd.Timestamp("2026-08-01", tz="UTC").to_pydatetime(),
     )
     assert diagnostic["matured_count"] == 3

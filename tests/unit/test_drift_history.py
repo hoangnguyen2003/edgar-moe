@@ -66,9 +66,7 @@ def make_report(
             "dimension_mismatch_modalities": [],
         },
     }
-    report["report_hash"] = sha256(
-        orjson.dumps(report, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    report["report_hash"] = sha256(orjson.dumps(report, option=orjson.OPT_SORT_KEYS)).hexdigest()
     return report
 
 
@@ -121,16 +119,16 @@ def test_history_orders_reports_and_tracks_warning_streak() -> None:
 
     assert history["status"] == "warning"
     assert history["warning_streak"] == 3
-    assert [
-        item["prospective"]["dataset_id"] for item in history["observations"]
-    ] == ["prospective-1", "prospective-2", "prospective-3"]
+    assert [item["prospective"]["dataset_id"] for item in history["observations"]] == [
+        "prospective-1",
+        "prospective-2",
+        "prospective-3",
+    ]
 
 
 def test_history_rejects_identity_threshold_and_duplicate_drift() -> None:
     baseline = make_report("prospective-1", "2025-02-01T00:00:00+00:00")
-    changed_model = make_report(
-        "prospective-2", "2025-03-01T00:00:00+00:00", model_version="2.0.0"
-    )
+    changed_model = make_report("prospective-2", "2025-03-01T00:00:00+00:00", model_version="2.0.0")
     with pytest.raises(DriftHistoryError, match="model identity"):
         build_research_drift_history([baseline, changed_model])
 
@@ -322,9 +320,7 @@ def test_history_rejects_rehashed_invariant_mutations() -> None:
         ),
     ),
 )
-def test_history_rejects_deep_invalid_shapes(
-    message: str, mutate: Any
-) -> None:
+def test_history_rejects_deep_invalid_shapes(message: str, mutate: Any) -> None:
     reports = [
         make_report("prospective-1", "2025-02-01T00:00:00+00:00"),
         make_report("prospective-2", "2025-03-01T00:00:00+00:00"),

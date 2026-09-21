@@ -89,11 +89,7 @@ def _validate_common(name: str, workflow: dict[str, Any]) -> list[str]:
     if not isinstance(steps, list) or not steps:
         errors.append(f"{name}: provider job must define steps")
         return errors
-    uses = [
-        str(step["uses"])
-        for step in steps
-        if isinstance(step, dict) and "uses" in step
-    ]
+    uses = [str(step["uses"]) for step in steps if isinstance(step, dict) and "uses" in step]
     for action in uses:
         if not _PINNED_ACTION.fullmatch(action):
             errors.append(f"{name}: action must be pinned to a full commit SHA (found {action!r})")
@@ -136,10 +132,7 @@ def _validate_common(name: str, workflow: dict[str, Any]) -> list[str]:
         errors.append(f"{name}: artifact upload must require redaction success")
     if "sha256sum" not in text or "SHA256SUMS" not in text:
         errors.append(f"{name}: provider evidence must be hashed before upload")
-    if not any(
-        isinstance(step, dict) and "always()" in str(step.get("if", ""))
-        for step in steps
-    ):
+    if not any(isinstance(step, dict) and "always()" in str(step.get("if", "")) for step in steps):
         errors.append(f"{name}: provider evidence retention must run on failure paths")
     if not any(
         isinstance(step, dict) and str(step.get("name", "")).startswith("Fail unless")
@@ -165,9 +158,7 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
             and _SECRET_EXPRESSION in value
             and ("env" not in path or "with" in path or "run" in path)
         ):
-            errors.append(
-                f"{name}: secret expressions may only appear in job/step env mappings"
-            )
+            errors.append(f"{name}: secret expressions may only appear in job/step env mappings")
 
     visit(workflow, ())
     return errors
@@ -245,7 +236,9 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
             errors.append(f"{name}: restore workflow must define dispatch inputs")
         else:
             inputs = dispatch.get("inputs")
-            confirmation = inputs.get("confirm_isolated_target") if isinstance(inputs, dict) else None
+            confirmation = (
+                inputs.get("confirm_isolated_target") if isinstance(inputs, dict) else None
+            )
             if not isinstance(confirmation, dict) or confirmation.get("default") != "CANCEL":
                 errors.append(f"{name}: restore workflow must default to CANCEL")
             if not isinstance(confirmation, dict) or "I_UNDERSTAND_ISOLATED_TARGET" not in str(

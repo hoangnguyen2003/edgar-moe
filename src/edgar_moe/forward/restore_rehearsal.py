@@ -180,4 +180,3 @@ def _file_identity(path: Path) -> dict[str, Any]:
         "size_bytes": path.stat().st_size,
         "sha256": sha256_file(path),
     }
-

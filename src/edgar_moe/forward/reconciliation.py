@@ -102,7 +102,9 @@ def reconcile_registry_artifacts(
     }
 
 
-def _local_reference(record: dict[str, Any]) -> tuple[ArtifactReference | None, dict[str, Any] | None]:
+def _local_reference(
+    record: dict[str, Any],
+) -> tuple[ArtifactReference | None, dict[str, Any] | None]:
     uri = str(record["uri"])
     if not uri.startswith("local://"):
         return None, _issue(record, "unsupported_primary_uri", uri_scheme=uri.split(":", 1)[0])

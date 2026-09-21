@@ -61,9 +61,7 @@ def build_research_drift_report(
     """
     resolved_thresholds = thresholds or DriftThresholds()
     if prospective.as_of < baseline.as_of:
-        raise ValueError(
-            "Prospective dataset as_of must not precede the baseline dataset as_of"
-        )
+        raise ValueError("Prospective dataset as_of must not precede the baseline dataset as_of")
     baseline_policy = dataset_xbrl_fact_policy(baseline)
     prospective_policy = dataset_xbrl_fact_policy(prospective)
     if baseline_policy != prospective_policy:
@@ -145,9 +143,7 @@ def verify_research_drift_report(report: Mapping[str, Any]) -> None:
         raise ValueError("Research drift report is missing a SHA-256 report_hash")
     unsigned = dict(report)
     unsigned.pop("report_hash", None)
-    observed = hashlib.sha256(
-        orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    observed = hashlib.sha256(orjson.dumps(unsigned, option=orjson.OPT_SORT_KEYS)).hexdigest()
     if observed != expected:
         raise ValueError("Research drift report content hash mismatch")
 
@@ -200,11 +196,7 @@ def _compare_matrix(
     name_match = baseline_names == prospective_names
     rows: list[dict[str, Any]] = []
     for index in range(max(baseline.shape[1], prospective.shape[1])):
-        name = (
-            baseline_names[index]
-            if index < len(baseline_names)
-            else prospective_names[index]
-        )
+        name = baseline_names[index] if index < len(baseline_names) else prospective_names[index]
         if index >= baseline.shape[1] or index >= prospective.shape[1]:
             rows.append(
                 {
@@ -262,7 +254,10 @@ def _compare_vector(
     reasons: list[str] = []
     if abs(missing_rate_delta) > thresholds.missing_rate_delta:
         reasons.append("missing_rate_delta")
-    if standardized_shift is not None and abs(standardized_shift) > thresholds.standardized_mean_shift:
+    if (
+        standardized_shift is not None
+        and abs(standardized_shift) > thresholds.standardized_mean_shift
+    ):
         reasons.append("standardized_mean_shift")
     elif (
         standardized_shift is None
@@ -336,9 +331,9 @@ def _population_stability_index(
     prospective_counts = np.histogram(prospective, bins=edges)[0].astype(np.float64)
     baseline_share = np.maximum(baseline_counts / len(baseline), _EPSILON)
     prospective_share = np.maximum(prospective_counts / len(prospective), _EPSILON)
-    return float(np.sum((prospective_share - baseline_share) * np.log(
-        prospective_share / baseline_share
-    )))
+    return float(
+        np.sum((prospective_share - baseline_share) * np.log(prospective_share / baseline_share))
+    )
 
 
 def _compare_component_outputs(
@@ -430,9 +425,7 @@ def _summary(
     dimension_mismatches: list[str],
 ) -> dict[str, Any]:
     feature_rows = [
-        feature
-        for section in features.values()
-        for feature in section.get("features", [])
+        feature for section in features.values() for feature in section.get("features", [])
     ]
     component_rows = list(components.get("components", []))
     warning_rows = [
@@ -443,9 +436,7 @@ def _summary(
         "feature_count": len(feature_rows),
         "component_count": len(component_rows),
         "feature_warning_count": sum(row.get("status") == "warning" for row in feature_rows),
-        "component_warning_count": sum(
-            row.get("status") == "warning" for row in component_rows
-        ),
+        "component_warning_count": sum(row.get("status") == "warning" for row in component_rows),
         "warning_names": [str(row.get("name")) for row in warning_rows],
         "dimension_mismatch_modalities": dimension_mismatches,
     }

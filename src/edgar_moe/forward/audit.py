@@ -52,19 +52,19 @@ def audit_official(page: dict[str, Any]) -> dict[str, Any]:
         "zero_return_baseline": {"rmse": zero.rmse, "mae": zero.mae},
         "negative_predictions": sum(v < 0 for v in scores),
         "negative_outcomes": sum(v < 0 for v in labels),
-        "always_negative_accuracy": sum(v < 0 for v in labels) / len(labels)
-        if labels else None,
+        "always_negative_accuracy": sum(v < 0 for v in labels) / len(labels) if labels else None,
         "always_nonnegative_accuracy": sum(v >= 0 for v in labels) / len(labels)
-        if labels else None,
+        if labels
+        else None,
         "component_comparison": {
             "paired_count": len(paired),
             "missing_component_count": len(matured) - len(paired),
-            "model": asdict(forward_metrics(
-                paired_scores, paired_labels, forecast_count=len(paired)
-            )),
-            "fundamental_anchor": asdict(forward_metrics(
-                anchor, paired_labels, forecast_count=len(paired)
-            )),
+            "model": asdict(
+                forward_metrics(paired_scores, paired_labels, forecast_count=len(paired))
+            ),
+            "fundamental_anchor": asdict(
+                forward_metrics(anchor, paired_labels, forecast_count=len(paired))
+            ),
         },
         "limitations": (
             "Exploratory audit, not a replacement for published registry metrics. "
@@ -118,9 +118,9 @@ def audit_diagnostic(report: dict[str, Any]) -> dict[str, Any]:
         "zero_return_baseline": {"rmse": zero.rmse, "mae": zero.mae},
         # Match the production metric's non-negative versus negative convention.
         "always_nonnegative_accuracy": sum(value >= 0 for value in labels) / count
-        if count else None,
-        "always_negative_accuracy": sum(value < 0 for value in labels) / count
-        if count else None,
+        if count
+        else None,
+        "always_negative_accuracy": sum(value < 0 for value in labels) / count if count else None,
         "leave_one_out_rank_ic_min": min(finite_ic, default=None),
         "leave_one_out_rank_ic_max": max(finite_ic, default=None),
         "limitations": (
@@ -134,8 +134,11 @@ def audit_diagnostic(report: dict[str, Any]) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("diagnostic", type=Path)
-    parser.add_argument("--official-export", action="store_true",
-                        help="Read a complete forecast API export with recorded labels")
+    parser.add_argument(
+        "--official-export",
+        action="store_true",
+        help="Read a complete forecast API export with recorded labels",
+    )
     args = parser.parse_args()
     report = json.loads(args.diagnostic.read_text())
     audit = audit_official(report) if args.official_export else audit_diagnostic(report)

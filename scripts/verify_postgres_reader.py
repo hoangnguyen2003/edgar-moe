@@ -29,9 +29,7 @@ def _table_ref(table_name: str) -> sql.Composed:
     return sql.SQL("{}.{}").format(sql.Identifier("public"), sql.Identifier(table_name))
 
 
-def _has_table_privilege(
-    connection: Connection[Any], table_name: str, privilege: str
-) -> bool:
+def _has_table_privilege(connection: Connection[Any], table_name: str, privilege: str) -> bool:
     row = connection.execute(
         "SELECT has_table_privilege(current_user, %s, %s)",
         (f"public.{table_name}", privilege),
@@ -101,9 +99,7 @@ def audit_reader_role(database_url: str) -> dict[str, object]:
 
         _assert_denied(
             connection,
-            sql.SQL("UPDATE {} SET run_id = run_id WHERE false").format(
-                _table_ref("forward_runs")
-            ),
+            sql.SQL("UPDATE {} SET run_id = run_id WHERE false").format(_table_ref("forward_runs")),
             "UPDATE",
         )
         _assert_denied(

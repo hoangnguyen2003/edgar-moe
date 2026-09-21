@@ -83,15 +83,15 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
         )
     missing = sorted(key for key in _ANSWER_KEYS if key not in report)
     if missing:
-        raise CopilotVerificationError(
-            "copilot answer is missing fields: " + ", ".join(missing)
-        )
+        raise CopilotVerificationError("copilot answer is missing fields: " + ", ".join(missing))
     if report.get("schema_version") != 1:
         raise CopilotVerificationError("copilot answer schema_version must be 1")
     if report.get("research_only") is not True:
         raise CopilotVerificationError("copilot answer research_only must be true")
     if report.get("disclaimer") != COPILOT_DISCLAIMER:
-        raise CopilotVerificationError("copilot answer disclaimer does not match the safety contract")
+        raise CopilotVerificationError(
+            "copilot answer disclaimer does not match the safety contract"
+        )
     question = _safe_text(report.get("question"), "question", max_bytes=MAX_QUESTION_BYTES)
     _safe_text(report.get("answer"), "answer", max_bytes=_MAX_ANSWER_BYTES)
     if not question:
@@ -117,9 +117,7 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
     if evidence_status == "uncited" and any(
         item["name"] != "rejected_tool_request" for item in trace
     ):
-        raise CopilotVerificationError(
-            "uncited copilot answer cannot follow an evidence tool call"
-        )
+        raise CopilotVerificationError("uncited copilot answer cannot follow an evidence tool call")
     if evidence_status == "grounded" and not citations:
         raise CopilotVerificationError("grounded copilot answer must include citations")
     if evidence_status == "uncited" and citations:
@@ -127,12 +125,9 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
     if sum(item["citation_count"] for item in trace) < len(citations):
         raise CopilotVerificationError("copilot answer trace undercounts citations")
     if any(
-        item["name"] != "rejected_tool_request" and item["citation_count"] == 0
-        for item in trace
+        item["name"] != "rejected_tool_request" and item["citation_count"] == 0 for item in trace
     ):
-        raise CopilotVerificationError(
-            "evidence tool trace item must retain at least one citation"
-        )
+        raise CopilotVerificationError("evidence tool trace item must retain at least one citation")
 
 
 def _verify_frozen_identity(value: object) -> None:
@@ -162,7 +157,9 @@ def _verify_citations(value: object) -> list[dict[str, Any]]:
         if not isinstance(fields, list) or len(fields) > _MAX_FIELDS:
             raise CopilotVerificationError(f"citation {index}.fields must be a bounded list")
         if not all(isinstance(field, str) and field.strip() for field in fields):
-            raise CopilotVerificationError(f"citation {index}.fields must contain non-empty strings")
+            raise CopilotVerificationError(
+                f"citation {index}.fields must contain non-empty strings"
+            )
         key = (source, label, digest, *fields)
         if key in seen:
             raise CopilotVerificationError(f"citation {index} is a duplicate")
@@ -180,8 +177,14 @@ def _verify_trace(value: object) -> list[dict[str, Any]]:
     for expected_index, item in enumerate(value, start=1):
         trace = _exact_mapping(item, _TRACE_KEYS, f"tool trace {expected_index}")
         call_index = trace["call_index"]
-        if isinstance(call_index, bool) or not isinstance(call_index, int) or call_index != expected_index:
-            raise CopilotVerificationError("copilot answer tool_trace call indexes must be contiguous")
+        if (
+            isinstance(call_index, bool)
+            or not isinstance(call_index, int)
+            or call_index != expected_index
+        ):
+            raise CopilotVerificationError(
+                "copilot answer tool_trace call indexes must be contiguous"
+            )
         name = trace["name"]
         if not isinstance(name, str) or not _TOOL_NAME.fullmatch(name):
             raise CopilotVerificationError(f"tool trace {expected_index} name is invalid")
@@ -223,12 +226,14 @@ def _verify_usage(value: object) -> None:
             details.append("missing " + ", ".join(missing))
         if unknown:
             details.append("unknown " + ", ".join(unknown))
-        raise CopilotVerificationError(
-            "copilot answer usage fields invalid: " + "; ".join(details)
-        )
+        raise CopilotVerificationError("copilot answer usage fields invalid: " + "; ".join(details))
     usage = value
-    _bounded_int(usage["request_count"], "usage.request_count", minimum=1, maximum=_MAX_USAGE_REQUESTS)
-    _bounded_int(usage["duration_ms"], "usage.duration_ms", minimum=0, maximum=_MAX_USAGE_DURATION_MS)
+    _bounded_int(
+        usage["request_count"], "usage.request_count", minimum=1, maximum=_MAX_USAGE_REQUESTS
+    )
+    _bounded_int(
+        usage["duration_ms"], "usage.duration_ms", minimum=0, maximum=_MAX_USAGE_DURATION_MS
+    )
     for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
         value = usage[field]
         if value is not None:
@@ -250,11 +255,7 @@ def _verify_agent_identity(value: object) -> None:
 
 
 def _bounded_int(value: object, label: str, *, minimum: int, maximum: int) -> int:
-    if (
-        isinstance(value, bool)
-        or not isinstance(value, int)
-        or not minimum <= value <= maximum
-    ):
+    if isinstance(value, bool) or not isinstance(value, int) or not minimum <= value <= maximum:
         raise CopilotVerificationError(f"copilot answer {label} must be a bounded integer")
     return value
 
@@ -270,7 +271,9 @@ def _exact_mapping(value: object, keys: frozenset[str], label: str) -> Mapping[s
             details.append("missing " + ", ".join(missing))
         if unknown:
             details.append("unknown " + ", ".join(unknown))
-        raise CopilotVerificationError(f"copilot answer {label} fields invalid: {'; '.join(details)}")
+        raise CopilotVerificationError(
+            f"copilot answer {label} fields invalid: {'; '.join(details)}"
+        )
     return value
 
 
@@ -306,8 +309,10 @@ def _safe_source(value: object, label: str) -> str:
 
 def _safe_relative_path(value: object, label: str) -> str:
     path = _non_empty_string(value, label)
-    if path.startswith(("/", "\\")) or ".." in path.split("/") or any(
-        char in path for char in "\r\n"
+    if (
+        path.startswith(("/", "\\"))
+        or ".." in path.split("/")
+        or any(char in path for char in "\r\n")
     ):
         raise CopilotVerificationError(f"copilot answer {label} must be a safe relative path")
     return path
@@ -321,9 +326,7 @@ def _non_empty_string(value: object, label: str) -> str:
 
 def _digest(value: object, label: str) -> str:
     if not isinstance(value, str) or not _SHA256.fullmatch(value):
-        raise CopilotVerificationError(
-            f"copilot answer {label} must be a lowercase SHA-256 digest"
-        )
+        raise CopilotVerificationError(f"copilot answer {label} must be a lowercase SHA-256 digest")
     return value
 
 

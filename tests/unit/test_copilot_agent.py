@@ -395,7 +395,9 @@ def test_invalid_tool_request_is_returned_without_granting_evidence() -> None:
     provider = FakeProvider(
         [
             _tool_call("execute_trade"),
-            ProviderResponse(content="I cannot support that request.", tool_calls=(), model="fake-model"),
+            ProviderResponse(
+                content="I cannot support that request.", tool_calls=(), model="fake-model"
+            ),
         ]
     )
     copilot = ResearchCopilot(
@@ -461,7 +463,9 @@ def test_rejected_arguments_alone_produce_an_uncited_answer() -> None:
     provider = FakeProvider(
         [
             _tool_call("search_filing_events", '{"limit": 20}'),
-            ProviderResponse(content="No evidence was retrieved.", tool_calls=(), model="fake-model"),
+            ProviderResponse(
+                content="No evidence was retrieved.", tool_calls=(), model="fake-model"
+            ),
         ]
     )
     copilot = ResearchCopilot(
@@ -497,10 +501,13 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
     assert normalize_provider_endpoint("http://localhost:11434/v1/chat/completions").startswith(
         "http://localhost"
     )
-    assert normalize_provider_endpoint(
-        "https://api.example.com/v1/chat/completions",
-        allowed_hosts=("api.example.com",),
-    ) == "https://api.example.com/v1/chat/completions"
+    assert (
+        normalize_provider_endpoint(
+            "https://api.example.com/v1/chat/completions",
+            allowed_hosts=("api.example.com",),
+        )
+        == "https://api.example.com/v1/chat/completions"
+    )
     with pytest.raises(ValueError):
         normalize_provider_endpoint("http://provider.example/v1/chat/completions")
     with pytest.raises(ValueError):
@@ -510,10 +517,13 @@ def test_provider_endpoint_rejects_remote_plain_http_and_credentials() -> None:
 
 
 def test_provider_endpoint_requires_an_exact_remote_host_allowlist() -> None:
-    assert normalize_provider_endpoint(
-        "https://api.example.com/v1/chat/completions",
-        allowed_hosts=("api.example.com",),
-    ) == "https://api.example.com/v1/chat/completions"
+    assert (
+        normalize_provider_endpoint(
+            "https://api.example.com/v1/chat/completions",
+            allowed_hosts=("api.example.com",),
+        )
+        == "https://api.example.com/v1/chat/completions"
+    )
     assert normalize_provider_endpoint(
         "http://localhost:11434/v1/chat/completions",
         allowed_hosts=("api.openai.com",),
@@ -617,7 +627,9 @@ def test_provider_does_not_retry_authentication_failures(monkeypatch: pytest.Mon
         del timeout
         nonlocal calls
         calls += 1
-        raise HTTPError("https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None)
+        raise HTTPError(
+            "https://provider.example/v1/chat/completions", 401, "unauthorized", {}, None
+        )
 
     monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
 
@@ -645,9 +657,7 @@ def test_provider_retries_transport_failures_and_caps_configuration(
         calls += 1
         if calls < 3:
             raise URLError("temporary network failure")
-        return io.BytesIO(
-            json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode()
-        )
+        return io.BytesIO(json.dumps({"choices": [{"message": {"content": "ok"}}]}).encode())
 
     monkeypatch.setattr("edgar_moe.copilot.agent._open_provider_request", fake_urlopen)
     monkeypatch.setattr("edgar_moe.copilot.agent.sleep", lambda _delay: None)

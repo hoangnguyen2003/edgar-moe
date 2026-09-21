@@ -106,7 +106,9 @@ def append_only_statements(dialect: str) -> list[str]:
             "CREATE TRIGGER IF NOT EXISTS forward_runs_no_delete BEFORE DELETE ON forward_runs "
             "BEGIN SELECT RAISE(ABORT, 'append-only table forward_runs rejects DELETE'); END"
         )
-        changed = " OR ".join(f"NEW.{column} IS NOT OLD.{column}" for column in _RUN_IDENTITY_COLUMNS)
+        changed = " OR ".join(
+            f"NEW.{column} IS NOT OLD.{column}" for column in _RUN_IDENTITY_COLUMNS
+        )
         statements.append(
             "CREATE TRIGGER IF NOT EXISTS forward_runs_outcome_once BEFORE UPDATE ON forward_runs "
             f"WHEN OLD.status <> 'running' OR NEW.status NOT IN {_RUN_STATUSES} OR {changed} "

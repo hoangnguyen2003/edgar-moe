@@ -23,6 +23,7 @@ test:
 
 lint:
 	uv run ruff check .
+	uv run ruff format --check .
 	uv run mypy src scripts
 	npm --prefix apps/web run lint
 

@@ -83,7 +83,9 @@ def _build_api_registry_database(settings: RuntimeSettings) -> RegistryDatabase 
 
 
 forward_database = _build_api_registry_database(settings)
-forward_registry = ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
+forward_registry = (
+    ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
+)
 
 app = FastAPI(
     title="EDGAR-MoE Research API",
@@ -113,8 +115,10 @@ async def security_headers(
 ) -> StarletteResponse:
     response = await call_next(request)
     request_id = request.headers.get("x-request-id", "")
-    valid_request_id = request_id and len(request_id) <= 128 and all(
-        character.isalnum() or character in "-_." for character in request_id
+    valid_request_id = (
+        request_id
+        and len(request_id) <= 128
+        and all(character.isalnum() or character in "-_." for character in request_id)
     )
     if not valid_request_id:
         request_id = uuid4().hex

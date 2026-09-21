@@ -195,7 +195,11 @@ def load_evaluation_corpus(path: Path) -> EvaluationCorpus:
             raise EvaluationInputError(f"duplicate evaluation case id: {case.case_id}")
         seen_ids.add(case.case_id)
         cases.append(case)
-    canonical = {"schema_version": 1, "corpus_id": corpus_id, "cases": [case.as_dict() for case in cases]}
+    canonical = {
+        "schema_version": 1,
+        "corpus_id": corpus_id,
+        "cases": [case.as_dict() for case in cases],
+    }
     return EvaluationCorpus(corpus_id=corpus_id, cases=tuple(cases), sha256=content_hash(canonical))
 
 
@@ -308,12 +312,18 @@ def _parse_case(raw: Mapping[str, object]) -> EvaluationCase:
             f"case {case_id} expected_evidence_status must be grounded or uncited"
         )
     required_tools = _string_list(raw.get("required_tools", []), f"case {case_id} required_tools")
-    forbidden_tools = _string_list(raw.get("forbidden_tools", []), f"case {case_id} forbidden_tools")
+    forbidden_tools = _string_list(
+        raw.get("forbidden_tools", []), f"case {case_id} forbidden_tools"
+    )
     required_sources = _string_list(
         raw.get("required_sources", []), f"case {case_id} required_sources"
     )
     min_citations = raw.get("min_citations", 0)
-    if isinstance(min_citations, bool) or not isinstance(min_citations, int) or not 0 <= min_citations <= 8:
+    if (
+        isinstance(min_citations, bool)
+        or not isinstance(min_citations, int)
+        or not 0 <= min_citations <= 8
+    ):
         raise EvaluationInputError(f"case {case_id} min_citations must be an integer from 0 to 8")
     return EvaluationCase(
         case_id=case_id,

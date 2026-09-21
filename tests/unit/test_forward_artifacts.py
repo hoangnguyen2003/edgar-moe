@@ -21,9 +21,7 @@ class FailOnceStore:
         self.delegate = LocalArtifactStore(root)
         self.fail_next = True
 
-    def put_file(
-        self, source: str | Path, *, logical_name: str | None = None
-    ) -> ArtifactReference:
+    def put_file(self, source: str | Path, *, logical_name: str | None = None) -> ArtifactReference:
         return self.delegate.put_file(source, logical_name=logical_name)
 
     def put_bytes(self, content: bytes, *, logical_name: str) -> ArtifactReference:
