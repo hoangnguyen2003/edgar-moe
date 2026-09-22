@@ -34,6 +34,29 @@ def next_nyse_open(accepted_at: datetime) -> datetime:
     raise RuntimeError("Unable to find a following NYSE session")
 
 
+def target_nyse_open(observed_at: datetime) -> datetime:
+    """Return the current-session open, or the next open on non-session days.
+
+    A run recorded after a trading day's open has already missed that day's
+    entry point. Returning that same open lets callers represent the missed
+    margin as zero instead of incorrectly measuring to the following session.
+    """
+    observed_at = ensure_utc(observed_at)
+    calendar = mcal.get_calendar("NYSE")
+    local_date = observed_at.astimezone(NEW_YORK).date()
+    schedule = calendar.schedule(
+        start_date=local_date,
+        end_date=local_date + pd.Timedelta(days=10),
+    )
+    for market_open in schedule["market_open"]:
+        candidate = market_open.to_pydatetime().astimezone(UTC)
+        if candidate.astimezone(NEW_YORK).date() == local_date:
+            return cast(datetime, candidate)
+        if candidate > observed_at:
+            return cast(datetime, candidate)
+    raise RuntimeError("Unable to find a target NYSE session")
+
+
 def session_close_after(entry_at: datetime, sessions: int) -> datetime:
     """Return the close of the Nth NYSE session beginning at entry_at's session."""
     if sessions < 1:

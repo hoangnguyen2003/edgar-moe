@@ -172,6 +172,12 @@ def test_forward_workflow_records_then_settles_without_mutation(tmp_path: Path) 
     assert forecast_result.counts["forecasts_inserted"] == 1
     recorded = registry.list_forecasts(limit=10)["items"][0]
     assert recorded["realized_abnormal_return"] is None
+    forecast_checks = {
+        check["name"]: check
+        for check in registry.list_quality_checks()
+        if check["run_id"] == forecast_result.run_id
+    }
+    assert forecast_checks["pre_open_schedule_margin"]["details"]["calendar_status"] == "available"
 
     settlement_as_of = forecast_as_of + timedelta(days=31)
     clock[0] = settlement_as_of

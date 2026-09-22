@@ -180,27 +180,34 @@ substitute for a redacted verification report from the hosted provider.
 
 ## Scheduled production runner
 
-`.github/workflows/forward-production.yml` runs at 07:17 UTC Tuesday through
-Saturday. That is after the prior SEC acceptance window in both U.S. daylight and
-standard time and leaves several hours before the next regular NYSE open. The
-workflow uses `scripts/run_forward_cycle.py`; manual dispatch can provide an
-explicit source cutoff for recovery, but the script refuses a date later than the
-current `America/New_York` date. Production refreshes use a 730-day rolling source
-window rather than the 2016-present model-development history. This preserves more
-than the 252 sessions required by the longest market feature, includes prior annual
-filings for text deltas, and keeps frozen-model inference tractable on a free CPU
-runner. `--lookback-days` can increase the window but cannot reduce it below 400
-calendar days.
+`.github/workflows/forward-production.yml` is scheduled for 07:17 UTC Tuesday
+through Saturday. That is the intended cutoff after the prior SEC acceptance
+window in both U.S. daylight and standard time, but GitHub's scheduler does not
+provide a start-time SLO. The workflow uses `scripts/run_forward_cycle.py`; manual
+dispatch can provide an explicit source cutoff for recovery, but the script
+refuses a date later than the current `America/New_York` date. Production
+refreshes use a 730-day rolling source window rather than the 2016-present
+model-development history. This preserves more than the 252 sessions required by
+the longest market feature, includes prior annual filings for text deltas, and
+keeps frozen-model inference tractable on a free CPU runner. `--lookback-days`
+can increase the window but cannot reduce it below 400 calendar days.
 
 The schedule has a structural coverage gap. A filing accepted before the open
 (06:00-09:30 ET) enters at that same morning's open, after the pre-dawn run has
 already finished, so no scheduled run can score it before entry. In the frozen
 study, 13.1% of events were pre-market filings, and 12.9% could not be reached by
 a 03:17 ET Tuesday-Saturday schedule. The prospective sample therefore
-under-represents pre-market filers relative to the locked test. Each forecast
-run records the gap as an informational `missed_before_entry` quality check: the
+under-represents pre-market filers relative to the locked test. Each forecast run
+records the gap as an informational `missed_before_entry` quality check: the
 number of events accepted after the previous successful forecast run whose entry
-had already passed.
+had already passed. It also records `pre_open_schedule_margin`, the actual time
+between forecast recording and the target entry open. On a trading day, the
+target is that day's open even when the run has already missed it, so a late run
+records zero margin rather than incorrectly measuring to the following session.
+A margin under 90 minutes is a warning and is included in the existing
+status/webhook alert path; it does not change the cutoff, backdate a forecast, or
+authorize a model change. The check measures the application-side margin only;
+resolving scheduler latency still requires an external scheduling decision.
 
 Configure these GitHub Actions repository secrets before merging the workflow to
 the default branch:
@@ -435,7 +442,10 @@ The run also records these source-coverage checks:
 - `recent_filing_download_failures`, a warning when filings accepted within seven
   days failed to download and so could not be scored;
 - `missed_before_entry`, informational coverage telemetry for the schedule gap
-  described above.
+  described above;
+- `pre_open_schedule_margin`, a warning when the actual recording time is less
+  than 90 minutes before the target entry open (including a zero-margin warning
+  when that day's open has already passed).
 
 When a blocking gate fails, such as the point-in-time availability audit, the
 failed check is recorded with the failed run. The frozen predictor also refuses
