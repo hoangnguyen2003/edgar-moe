@@ -7,10 +7,10 @@ export type ExpertKey = keyof EventRecord["expert_weights"];
  * expert, never its position (see `.expert--*` in styles.css), and each
  * edition's set was validated as a categorical palette on its own surface.
  */
-export const EXPERTS: ReadonlyArray<{ key: ExpertKey; label: string }> = [
-  { key: "text", label: "Text" },
-  { key: "fundamental", label: "Fundamental" },
-  { key: "market", label: "Market" },
+export const EXPERTS: ReadonlyArray<{ key: ExpertKey; label: string; name: string }> = [
+  { key: "text", label: "Text", name: "Filing text" },
+  { key: "fundamental", label: "Financials", name: "Financial statements" },
+  { key: "market", label: "Market", name: "Market conditions" },
 ];
 
 /** Mean gate weight per expert, normalised to sum to one. */

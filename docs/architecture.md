@@ -19,7 +19,7 @@
 - `artifacts`: model states, preprocessors, experiment manifests, and reports.
 - `demo`: small public snapshot consumed by FastAPI and React.
 
-Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Historical research pages use a validated snapshot. Forward Lab uses a Postgres registry containing forecast evidence, appended outcomes, and mutable run status. The read-only governance endpoint exposes the frozen-v1 identity, public-data boundary, repository-enforced controls, and current forward status as one machine-readable contract. The public API exposes reads only; the private runner performs writes.
+Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Historical research pages use a validated snapshot. The Live tracking page (`/forward`) uses a Postgres registry containing forecast evidence, appended outcomes, and mutable run status. The read-only governance endpoint exposes the frozen-v1 identity, public-data boundary, repository-enforced controls, and current forward status as one machine-readable contract. The public API exposes reads only; the private runner performs writes.
 
 ## Failure behavior
 

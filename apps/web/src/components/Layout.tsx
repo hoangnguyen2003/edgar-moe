@@ -1,27 +1,27 @@
 import { useQuery } from "@tanstack/react-query";
-import { Moon, X } from "lucide-react";
+import { ArrowRight, Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "../lib/api";
 import { shortDate } from "../lib/format";
-import { navigation, pageTitle } from "../lib/navigation";
+import { navigation, nextPage, pageTitle } from "../lib/navigation";
 import { Link } from "../lib/router";
 import { useRouter } from "../lib/router-context";
 import { useTheme } from "../lib/theme";
-import { COMPACT_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
+import { MENU_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
 
 export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
   const { pathname } = useRouter();
-  const compact = useMediaQuery(COMPACT_LAYOUT);
+  const collapsed = useMediaQuery(MENU_LAYOUT);
   const { theme, setTheme } = useTheme();
   const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
-  const sectionsRef = useRef<HTMLElement>(null);
-  const toggleRef = useRef<HTMLButtonElement>(null);
+  const navRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const initialRoute = useRef(true);
-  const front = pathname === "/";
   const asOf = summary.data?.metadata.as_of;
+  const menuOpen = collapsed && open;
 
   // Client-side navigation loads no document, so the title, focus, and a
   // screen-reader announcement must follow the route explicitly.
@@ -37,104 +37,119 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    if (!open) return;
-    sectionsRef.current?.querySelector<HTMLElement>("ol a")?.focus();
+    if (!menuOpen) return;
+    navRef.current?.querySelector<HTMLElement>("ul a")?.focus();
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       setOpen(false);
-      toggleRef.current?.focus();
+      menuButtonRef.current?.focus();
     };
     document.addEventListener("keydown", closeOnEscape);
     return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [open]);
+  }, [menuOpen]);
 
-  const close = () => {
+  const closeMenu = () => {
     setOpen(false);
-    toggleRef.current?.focus();
+    menuButtonRef.current?.focus();
   };
+  const nextTheme = theme === "dark" ? "light" : "dark";
 
   return (
-    <div className={front ? "shell shell--front" : "shell"}>
+    <div className="shell">
       <a className="skip-link" href="#main-content">Skip to content</a>
-      <header className="masthead">
-        <div className="masthead__bar">
-          <p className="masthead__dateline">
-            <span>Research edition</span>
-            <span>{asOf ? `As of ${shortDate(asOf)}` : "Frozen study v1"}</span>
-            <span className="masthead__notice">Research only · no order execution</span>
-          </p>
-          <button
-            type="button"
-            className="edition-toggle"
-            aria-pressed={theme === "dark"}
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+      <header className="topbar">
+        <div className="topbar__inner">
+          <Link to="/" className="wordmark">EDGAR<span className="wordmark__dash">–</span>MoE</Link>
+          <nav
+            id="site-nav"
+            ref={navRef}
+            aria-label="Main"
+            className={menuOpen ? "site-nav site-nav--open" : "site-nav"}
+            inert={collapsed && !open}
           >
-            <Moon size={14} aria-hidden="true" />
-            <span>Night edition</span>
-          </button>
-        </div>
-        <div className="masthead__plate">
-          <Link to="/" className="nameplate">EDGAR<span className="nameplate__dash">—</span>MoE</Link>
-          {front && <p className="nameplate__tagline">A point-in-time research dossier on SEC filings</p>}
-          <button
-            ref={toggleRef}
-            type="button"
-            className="contents-button"
-            aria-expanded={open}
-            aria-controls="site-sections"
-            onClick={() => setOpen((value) => !value)}
-          >
-            <span aria-hidden="true">§</span> Contents
-          </button>
-        </div>
-        <nav
-          id="site-sections"
-          ref={sectionsRef}
-          aria-label="Sections"
-          className={open ? "sections sections--open" : "sections"}
-          inert={compact && !open}
-        >
-          <div className="sections__head">
-            <p>Contents</p>
-            <button type="button" className="icon-button" aria-label="Close contents" onClick={close}>
-              <X size={20} aria-hidden="true" />
+            <div className="site-nav__head">
+              <p>Menu</p>
+              <button type="button" className="icon-button" aria-label="Close menu" onClick={closeMenu}>
+                <X size={22} aria-hidden="true" />
+              </button>
+            </div>
+            <ul>
+              {navigation.map(({ to, label, description }) => (
+                <li key={to}>
+                  <Link
+                    to={to}
+                    className={pathname === to ? "active" : undefined}
+                    aria-current={pathname === to ? "page" : undefined}
+                    onClick={() => setOpen(false)}
+                  >
+                    <span className="site-nav__label">{label}</span>
+                    <span className="site-nav__description">{description}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          <div className="topbar__actions">
+            <button
+              type="button"
+              className="icon-button theme-toggle"
+              aria-label={`Switch to ${nextTheme} theme`}
+              title={`Switch to ${nextTheme} theme`}
+              onClick={() => setTheme(nextTheme)}
+            >
+              {theme === "dark" ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
+            </button>
+            <button
+              ref={menuButtonRef}
+              type="button"
+              className="menu-button"
+              aria-expanded={menuOpen}
+              aria-controls="site-nav"
+              onClick={() => setOpen((value) => !value)}
+            >
+              <Menu size={19} aria-hidden="true" /> Menu
             </button>
           </div>
-          <ol>
-            {navigation.map(({ to, label, description }, index) => (
-              <li key={to}>
-                <Link
-                  to={to}
-                  className={pathname === to ? "active" : undefined}
-                  aria-current={pathname === to ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                >
-                  <span className="sections__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
-                  <span className="sections__label">{label}</span>
-                  <span className="sections__description">{description}</span>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        </nav>
-      </header>
-      {open && <button type="button" className="backdrop" aria-label="Close contents" tabIndex={-1} onClick={close} />}
-      <main id="main-content" ref={mainRef} tabIndex={-1} inert={compact && open}>
-        {children}
-      </main>
-      <footer className="colophon">
-        <div>
-          <p className="colophon__plate">EDGAR<span className="nameplate__dash">—</span>MoE</p>
-          <p>A research dossier. No orders are created, and historical results do not establish future alpha.</p>
         </div>
-        <nav aria-label="Colophon">
-          <Link to="/methodology">Methodology</Link>
-          <Link to="/governance">Governance</Link>
-          <a href="/api/docs">API reference</a>
-          <a href="https://github.com/hoangnguyen2003/edgar-moe" rel="noreferrer">Source code</a>
-        </nav>
+      </header>
+      {menuOpen && <button type="button" className="backdrop" aria-label="Close menu" tabIndex={-1} onClick={closeMenu} />}
+      <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen}>
+        {children}
+        <NextPage pathname={pathname} />
+      </main>
+      <footer className="site-footer">
+        <div className="site-footer__inner">
+          <p>
+            <strong>EDGAR–MoE</strong> is research software: not investment advice, and it places no orders.
+            {asOf && <> Data through {shortDate(asOf)}.</>}
+          </p>
+          <nav aria-label="Footer">
+            <a href="/api/docs">API reference</a>
+            <a href="https://github.com/hoangnguyen2003/edgar-moe" rel="noreferrer">Source code</a>
+          </nav>
+        </div>
       </footer>
       <p className="sr-only" aria-live="polite">{announcement}</p>
     </div>
+  );
+}
+
+/** Where to go after this page, so reading the site never dead-ends. */
+function NextPage({ pathname }: { pathname: string }) {
+  // The overview ends with its own guide to every page.
+  const next = pathname === "/" ? null : nextPage(pathname);
+  if (!next) return null;
+  const { entry, wraps } = next;
+  return (
+    <nav className="next-page" aria-label="Next page">
+      <Link to={entry.to}>
+        <span className="next-page__text">
+          <small>{wraps ? "Back to the start" : "Next"}</small>
+          <strong>{entry.label}</strong>
+          <span>{entry.description}</span>
+        </span>
+        <ArrowRight size={22} aria-hidden="true" />
+      </Link>
+    </nav>
   );
 }

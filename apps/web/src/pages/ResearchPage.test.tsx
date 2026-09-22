@@ -46,35 +46,38 @@ function bodyRows() {
 describe("Experiment leaderboard", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("shows the selected family with hyperparameters as separate chips", async () => {
+  it("leads with the chosen model, its settings as chips, and its place in the ranking", async () => {
     renderPage();
-    const card = (await screen.findByText("Selected model")).closest("article")!;
-    expect(within(card).getByText("Fundamental-Anchored MoE")).toBeInTheDocument();
-    expect(within(card).getByText("gate=1.00")).toBeInTheDocument();
+    const chosen = await screen.findByRole("region", { name: "Chosen model" });
+    expect(within(chosen).getByText("Fundamental-Anchored MoE")).toBeInTheDocument();
+    expect(within(chosen).getByText("gate=1.00")).toBeInTheDocument();
+    expect(chosen).toHaveTextContent("It ranks #11 of 12");
   });
 
   it("ranks by rank IC and pins the selection when it falls below the preview", async () => {
     renderPage();
     await screen.findByRole("table");
     const table = screen.getByRole("table");
-    expect(within(table).getByRole("columnheader", { name: /Rank IC/ })).toHaveAttribute("aria-sort", "descending");
+    expect(within(table).getByRole("columnheader", { name: /rank IC/ })).toHaveAttribute("aria-sort", "descending");
+    expect(screen.getByRole("button", { name: "Ranking skill" })).toHaveAttribute("aria-pressed", "true");
 
     const rows = bodyRows();
     expect(rows[0]).toHaveTextContent("+0.200");
     const selected = rows.find((row) => row.classList.contains("is-selected"))!;
     expect(selected).toHaveTextContent("11");
-    expect(selected).toHaveTextContent("Selected");
+    expect(selected).toHaveTextContent("Chosen");
     expect(within(table).queryByText("Elastic Net")).not.toBeInTheDocument();
   });
 
-  it("re-sorts by RMSE and expands to every candidate", async () => {
+  it("re-sorts by prediction error and expands to every candidate", async () => {
     renderPage();
     await screen.findByRole("table");
 
-    fireEvent.click(screen.getByRole("button", { name: "RMSE" }));
+    fireEvent.click(screen.getByRole("button", { name: "Prediction error" }));
+    expect(screen.getByRole("button", { name: "Prediction error" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("columnheader", { name: /RMSE/ })).toHaveAttribute("aria-sort", "ascending");
     expect(bodyRows()[0]).toHaveClass("is-selected");
-    expect(bodyRows()[0]).toHaveTextContent("best");
+    expect(bodyRows()[0]).toHaveTextContent("lowest");
 
     fireEvent.click(screen.getByRole("button", { name: "Show all 12 candidates" }));
     expect(bodyRows()).toHaveLength(12);

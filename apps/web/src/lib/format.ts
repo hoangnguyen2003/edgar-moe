@@ -41,6 +41,29 @@ export function shortDate(value: string): string {
   }).format(new Date(`${value}T00:00:00Z`));
 }
 
+/** The EDGAR filing date: SEC dates an acceptance time in New York, so format it there. */
+export function filedDate(acceptedAt: string): string {
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "America/New_York",
+  }).format(new Date(acceptedAt));
+}
+
+/** A percentile rank the way a reader says it: 0.99 -> "Top 1%", 0.13 -> "Bottom 13%". */
+export function standing(rank: number | null | undefined): string {
+  if (rank == null || !Number.isFinite(rank)) return "—";
+  return rank >= 0.5
+    ? `Top ${Math.max(1, Math.round((1 - rank) * 100))}%`
+    : `Bottom ${Math.max(1, Math.round(rank * 100))}%`;
+}
+
+/** Basis points as a percentage, e.g. 10 -> "0.10%". */
+export function bpsPercent(bps: number): string {
+  return `${(bps / 100).toFixed(2)}%`;
+}
+
 /** Compact axis label for a calendar date, e.g. "Feb 2025". */
 export function monthYear(value: string): string {
   return new Intl.DateTimeFormat("en", { month: "short", year: "numeric", timeZone: "UTC" })
@@ -66,18 +89,17 @@ export function humanize(value: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
-/** Model feature keys read as prose; "moe" keeps its acronym casing. */
-export function featureLabel(feature: string): string {
-  return humanize(feature).replace(/\bmoe\b/gi, "MoE");
-}
-
-const FRESHNESS_LABELS: Record<string, string> = {
-  authenticated_locked: "Frozen locked study",
-  demo: "Synthetic demo snapshot",
+/** The model's components, named the way the rest of the site describes them. */
+const FEATURE_LABELS: Record<string, string> = {
+  fundamental_anchor: "Financial-statement anchor",
+  fundamental_moe_expert: "Financial-statement specialist",
+  text_moe_expert: "Filing-text specialist",
+  market_moe_expert: "Market specialist",
 };
 
-export function freshnessLabel(status: string): string {
-  return FRESHNESS_LABELS[status] ?? humanize(status);
+/** Model feature keys read as prose; "moe" keeps its acronym casing. */
+export function featureLabel(feature: string): string {
+  return FEATURE_LABELS[feature] ?? humanize(feature).replace(/\bmoe\b/gi, "MoE");
 }
 
 /**

@@ -53,7 +53,7 @@ flowchart LR
   JOB --> PG[(Postgres registry)]
   JOB --> R2[(Cloudflare R2 evidence)]
   PG --> API[Vercel read-only FastAPI]
-  API --> UI[Forward Lab]
+  API --> UI[Live tracking page]
 ```
 
 - Use a Postgres database such as Neon for the registry and require TLS. Keep the
@@ -76,7 +76,7 @@ flowchart LR
   provider-specific run; do not configure the writer URL as the secret.
 - Use Cloudflare R2 only for non-public model/run evidence. Create a scoped token for one bucket; do not expose R2 credentials to the browser.
 - Vercel serves the React bundle and read-only GET endpoints. It never trains, forecasts, settles labels, or holds market-data credentials.
-- The application remains useful without Postgres: historical v1 pages load normally and Forward Lab reports that its registry is disconnected.
+- The application remains useful without Postgres: historical v1 pages load normally and the Live tracking page reports that its registry is disconnected.
 
 Production environment variables:
 
@@ -536,8 +536,8 @@ uv run edgar-moe forward-status
 The `status` object includes a machine-readable `health_status` (`ok`, `warning`,
 or `degraded`), the latest run state, the age of the latest successful run, the
 freshness threshold, active-run count, and quality-gate counts. The same payload
-is exposed by the read-only `GET /api/v1/forward/status` endpoint and rendered in
-Forward Lab, so the dashboard and the scheduled job summary use the same health
+is exposed by the read-only `GET /api/v1/forward/status` endpoint and rendered on
+the Live tracking page, so the dashboard and the scheduled job summary use the same health
 decision. The default freshness window is 96 hours, which allows for the
 Tuesday–Saturday schedule and its weekend gap.
 
