@@ -112,6 +112,7 @@ class CopilotAgentIdentity:
     max_tool_calls: int
     max_duration_seconds: float | None = None
     max_context_bytes: int | None = None
+    profile_id: str | None = None
 
     def as_dict(self) -> dict[str, object]:
         payload: dict[str, object] = {
@@ -124,6 +125,8 @@ class CopilotAgentIdentity:
             payload["max_duration_seconds"] = self.max_duration_seconds
         if self.max_context_bytes is not None:
             payload["max_context_bytes"] = self.max_context_bytes
+        if self.profile_id is not None:
+            payload["profile_id"] = self.profile_id
         return payload
 
 

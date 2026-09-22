@@ -296,6 +296,10 @@ retains only peak context-size telemetry for capacity review.
 Remote provider requests are restricted to the exact hostname list in
 `EDGAR_MOE_COPILOT_ALLOWED_HOSTS` (default `api.openai.com`); loopback HTTP
 remains available for local runtimes such as Ollama.
+Use `--profile architect` for a solution-architecture review, `--profile quant`
+for point-in-time and performance review, or `--profile operations` for
+deployment and recovery review. The selected perspective is retained in the
+non-secret agent identity; it does not change the read-only tool allowlist.
 The runtime also binds every retained citation digest to the exact canonical
 payload returned by the requested evidence tool, so a malformed or tampered
 tool adapter fails closed before the provider receives unbound evidence.

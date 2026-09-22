@@ -1274,6 +1274,13 @@ def research_copilot(
         str | None,
         typer.Option("--model", help="Optional provider model override."),
     ] = None,
+    profile: Annotated[
+        str,
+        typer.Option(
+            "--profile",
+            help="Review perspective: research, quant, architect, or operations.",
+        ),
+    ] = "research",
     max_tool_calls: Annotated[
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound the agent tool-call loop."),
@@ -1332,12 +1339,17 @@ def research_copilot(
         OpenAICompatibleProvider,
         ReadOnlyToolset,
         ResearchCopilot,
+        normalize_copilot_profile,
         verify_copilot_answer_report,
     )
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
 
     settings = runtime_settings()
+    try:
+        resolved_profile = normalize_copilot_profile(profile)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="--profile") from error
     repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
@@ -1358,6 +1370,7 @@ def research_copilot(
                 "research_only": True,
                 "frozen_identity": repository.frozen_identity(),
                 "tools": [tool.as_provider_schema() for tool in toolset.definitions()],
+                "profile_id": resolved_profile,
                 "provider_contacted": False,
                 "disclaimer": (
                     "The copilot is read-only and cannot modify forecasts, labels, registry records, "
@@ -1396,6 +1409,7 @@ def research_copilot(
                     if max_context_bytes is None
                     else max_context_bytes
                 ),
+                profile=resolved_profile,
             ).ask(question)
             report = answer.as_dict()
     finally:
@@ -1560,6 +1574,13 @@ def research_copilot_benchmark(
         str | None,
         typer.Option("--model", help="Optional provider model override."),
     ] = None,
+    profile: Annotated[
+        str,
+        typer.Option(
+            "--profile",
+            help="Review perspective: research, quant, architect, or operations.",
+        ),
+    ] = "research",
     max_tool_calls: Annotated[
         int | None,
         typer.Option("--max-tool-calls", min=1, max=8, help="Bound each agent tool-call loop."),
@@ -1619,6 +1640,7 @@ def research_copilot_benchmark(
         OpenAICompatibleProvider,
         ReadOnlyToolset,
         ResearchCopilot,
+        normalize_copilot_profile,
     )
     from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
     from edgar_moe.copilot.evaluation import (
@@ -1652,6 +1674,11 @@ def research_copilot_benchmark(
     except (EvaluationInputError, OSError, json.JSONDecodeError) as error:
         raise typer.BadParameter(str(error)) from error
 
+    try:
+        resolved_profile = normalize_copilot_profile(profile)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="--profile") from error
+
     if plan_only:
         typer.echo(
             orjson.dumps(
@@ -1659,6 +1686,7 @@ def research_copilot_benchmark(
                     "schema_version": 1,
                     "corpus_id": selected_corpus.corpus_id,
                     "corpus_sha256": selected_corpus.sha256,
+                    "profile_id": resolved_profile,
                     "cases": [
                         {"id": case.case_id, "question": case.question}
                         for case in selected_corpus.cases
@@ -1717,6 +1745,7 @@ def research_copilot_benchmark(
                 if max_context_bytes is None
                 else max_context_bytes
             ),
+            profile=resolved_profile,
         )
         benchmark = run_benchmark(selected_corpus, copilot, output_dir)
     finally:

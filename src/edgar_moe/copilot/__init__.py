@@ -40,6 +40,12 @@ from .evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from .policy import (
+    COPILOT_PROFILES,
+    CopilotProfile,
+    build_system_prompt,
+    normalize_copilot_profile,
+)
 from .readiness import (
     CopilotReadinessError,
     build_copilot_readiness,
@@ -84,6 +90,10 @@ __all__ = [
     "ToolResult",
     "ToolTrace",
     "CopilotVerificationError",
+    "COPILOT_PROFILES",
+    "CopilotProfile",
+    "build_system_prompt",
+    "normalize_copilot_profile",
     "answer_report",
     "evaluate_report",
     "evaluate_reports",

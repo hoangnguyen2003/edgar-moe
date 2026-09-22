@@ -230,6 +230,27 @@ def test_agent_executes_read_tool_then_returns_citation_backed_answer() -> None:
     assert identity["max_context_bytes"] == 512 * 1024
 
 
+def test_agent_profile_is_prompted_and_pinned_in_identity() -> None:
+    provider = FakeProvider(
+        [
+            ProviderResponse(
+                content="The cited architecture evidence is the source.",
+                tool_calls=(),
+                model="fake-model",
+            )
+        ]
+    )
+
+    answer = ResearchCopilot(
+        provider=provider,
+        toolset=ReadOnlyToolset(SnapshotRepository(Path("data/demo/snapshot.json"))),
+        profile="architect",
+    ).ask("Which system boundaries are documented?")
+
+    assert answer.as_dict()["agent_identity"]["profile_id"] == "architect"
+    assert "solution-architecture reviewer" in str(provider.messages[0][0]["content"])
+
+
 def test_agent_fails_closed_when_evidence_tool_returns_no_citation() -> None:
     provider = FakeProvider(
         [
