@@ -76,6 +76,22 @@ capturing response bodies, credentials, or arbitrary response headers. This is
 an incident-navigation aid, not a rate limit, authentication control, or proof
 that provider-side operations are healthy.
 
+## Served-identity verification
+
+The same probe runs with `--expect-lock config/public_snapshot.lock.json`. For a
+Production `deployment_status` event the workflow checks out the deployed
+commit, so the served frozen identity (path, data mode, as-of date, snapshot
+SHA-256, selection hash, and locked-test hash) must equal the lock reviewed in
+that commit, in both `/api/v1/governance` and `data-provenance.json`. A
+well-formed but unreviewed snapshot therefore fails the gate, not just a
+malformed one. The report records only the mismatched field names. Anyone can
+repeat the check from a clone without credentials:
+
+```bash
+uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app \
+  --expect-lock config/public_snapshot.lock.json
+```
+
 ## Current personal-project mode
 
 Branch protection is not enabled because the repository has a single

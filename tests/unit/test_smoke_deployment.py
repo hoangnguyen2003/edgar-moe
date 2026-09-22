@@ -143,6 +143,40 @@ def complete_responses() -> dict[str, FakeResponse]:
     }
 
 
+_EXPECTED_IDENTITY = {
+    "path": "data/demo/snapshot.json",
+    "data_mode": "authenticated_locked_test",
+    "as_of": "2026-07-31",
+    "sha256": "a" * 64,
+    "selection_hash": "b" * 64,
+    "locked_test_hash": "c" * 64,
+}
+
+
+def identity_responses() -> dict[str, FakeResponse]:
+    """Complete responses whose provenance manifest also publishes the frozen identity."""
+    responses = complete_responses()
+    url = "https://terminal.example/data-provenance.json"
+    responses[url] = FakeResponse(
+        url,
+        json.dumps(
+            {
+                "snapshot": {
+                    **_EXPECTED_IDENTITY,
+                    "raw_sources_public": False,
+                    "derived_output_public": True,
+                },
+                "review": {
+                    "redistribution_status": "operator_review_required",
+                    "legal_approval": False,
+                },
+            }
+        ),
+        "application/json",
+    )
+    return responses
+
+
 def test_normalize_base_url_rejects_credentials_and_non_https() -> None:
     with pytest.raises(ValueError):
         _MODULE.normalize_base_url("https://user:secret@terminal.example")
@@ -247,6 +281,70 @@ def test_smoke_rejects_api_docs_that_the_csp_would_blank(
 )
 def test_script_check_tokenizes_tags_like_a_browser(body: str, external: bool) -> None:
     assert _MODULE._scripts_are_external(body) is external
+
+
+def test_smoke_verifies_the_served_identity_against_the_reviewed_lock(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    lock = tmp_path / "public_snapshot.lock.json"
+    lock.write_text(json.dumps({"schema_version": 1, **_EXPECTED_IDENTITY}), encoding="utf-8")
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(identity_responses()))
+
+    report = _MODULE.run_smoke(
+        "https://terminal.example",
+        timeout=2.0,
+        expected_identity=_MODULE.load_expected_identity(lock),
+    )
+
+    assert report["status"] == "passed"
+    assert report["expected_snapshot_sha256"] == "a" * 64
+    verified = {check["name"] for check in report["checks"] if check.get("identity_verified")}
+    assert verified == {"governance", "provenance"}
+
+
+def test_smoke_rejects_a_well_formed_but_unreviewed_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The deployment serves valid digests that simply are not the reviewed ones.
+    expected = {**_EXPECTED_IDENTITY, "sha256": "d" * 64}
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(identity_responses()))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0, expected_identity=expected)
+
+    assert report["status"] == "failed"
+    failed = {check["name"]: check for check in report["checks"] if check["status"] == "failed"}
+    assert set(failed) == {"governance", "provenance"}
+    assert failed["governance"]["error"] == "governance_identity_mismatch"
+    assert failed["provenance"]["error"] == "provenance_identity_mismatch"
+    assert failed["governance"]["mismatched_fields"] == ["sha256"]
+    # Only field names are reported, never the served values.
+    assert "a" * 64 not in json.dumps(failed)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        "not json",
+        json.dumps({"schema_version": 2, **_EXPECTED_IDENTITY}),
+        json.dumps({"schema_version": 1, **{**_EXPECTED_IDENTITY, "as_of": ""}}),
+        json.dumps({"schema_version": 1, **{**_EXPECTED_IDENTITY, "sha256": "A" * 64}}),
+    ],
+)
+def test_expected_lock_must_be_a_complete_reviewed_identity(tmp_path: Path, content: str) -> None:
+    lock = tmp_path / "public_snapshot.lock.json"
+    lock.write_text(content, encoding="utf-8")
+
+    with pytest.raises(ValueError):
+        _MODULE.load_expected_identity(lock)
+
+
+def test_repository_lock_is_a_usable_expected_identity() -> None:
+    lock = Path(__file__).parents[2] / "config" / "public_snapshot.lock.json"
+
+    identity = _MODULE.load_expected_identity(lock)
+
+    assert identity["path"] == "data/demo/snapshot.json"
+    assert identity["data_mode"] == "authenticated_locked_test"
 
 
 def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

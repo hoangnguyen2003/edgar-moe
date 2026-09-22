@@ -94,7 +94,8 @@ the workflow falls back to the deployment status target when the variable is
 absent. The same workflow keeps a manual HTTPS-origin trigger for rechecks and
 non-GitHub deployments. It performs only bounded `GET` requests to the
 homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`,
-`/api/v1/governance`, and `/api/v1/health`; it rejects cross-origin redirects, unexpected content types,
+`/api/v1/governance`, and `/api/v1/health`; it requires the served frozen identity to equal the
+reviewed `config/public_snapshot.lock.json` at the deployed commit, and rejects cross-origin redirects, unexpected content types,
 any mismatch in the full security-header contract (including a one-year HSTS
 minimum), degraded health, and
 oversized responses. The retained report contains paths, statuses, and health

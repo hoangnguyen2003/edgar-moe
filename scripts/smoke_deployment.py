@@ -36,6 +36,9 @@ _REQUIRED_SECURITY_HEADERS = {
 }
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+# The frozen identity a deployment publishes twice (governance API and provenance
+# manifest) and the repository pins in config/public_snapshot.lock.json.
+_IDENTITY_FIELDS = ("path", "data_mode", "as_of", "sha256", "selection_hash", "locked_test_hash")
 
 
 class _ScriptCollector(HTMLParser):
@@ -127,8 +130,14 @@ def run_smoke(
     timeout: float = 10.0,
     allow_http: bool = False,
     allow_degraded: bool = False,
+    expected_identity: dict[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Check the public deployment boundary without sending credentials or mutations."""
+    """Check the public deployment boundary without sending credentials or mutations.
+
+    With ``expected_identity`` (see :func:`load_expected_identity`), the served
+    frozen identity must also equal the reviewed lock field by field, so a
+    well-formed but unreviewed snapshot cannot pass.
+    """
     base = normalize_base_url(base_url, allow_http=allow_http)
     base_parts = urlsplit(base)
     origin = (base_parts.scheme.lower(), base_parts.netloc.lower())
@@ -242,6 +251,8 @@ def run_smoke(
                     check.update(status="failed", error="governance_controls_invalid")
                 elif not forward_valid:
                     check.update(status="failed", error="governance_forward_status_invalid")
+                elif expected_identity is not None:
+                    _verify_identity(check, frozen, expected_identity, "governance")
         elif check["name"] == "provenance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -256,15 +267,58 @@ def run_smoke(
                     or review.get("legal_approval") is not False
                 ):
                     check.update(status="failed", error="provenance_review_contract_invalid")
+                elif expected_identity is not None:
+                    _verify_identity(check, snapshot, expected_identity, "provenance")
 
     failed = [check for check in checks if check["status"] != "passed"]
-    return {
+    report: dict[str, Any] = {
         "schema_version": 1,
         "checked_at": datetime.now(UTC).isoformat(),
         "base_url": base,
         "status": "failed" if failed else "passed",
         "checks": checks,
     }
+    if expected_identity is not None:
+        # Public digests only: the snapshot identity is published on the site itself.
+        report["expected_snapshot_sha256"] = expected_identity["sha256"]
+    return report
+
+
+def load_expected_identity(path: Path) -> dict[str, str]:
+    """Read the reviewed frozen identity that a deployment must serve."""
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"expected lock is unreadable ({type(error).__name__})") from None
+    if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+        raise ValueError("expected lock must be a schema_version 1 object")
+    identity = {field: payload.get(field) for field in _IDENTITY_FIELDS}
+    if not all(isinstance(value, str) and value for value in identity.values()):
+        raise ValueError("expected lock is missing identity fields")
+    for field in ("sha256", "selection_hash", "locked_test_hash"):
+        if _SHA256.fullmatch(str(identity[field])) is None:
+            raise ValueError(f"expected lock {field} must be a lowercase SHA-256 digest")
+    return {field: str(value) for field, value in identity.items()}
+
+
+def _verify_identity(
+    check: dict[str, Any], served: Any, expected: dict[str, str], source: str
+) -> None:
+    """Fail ``check`` unless ``served`` carries exactly the expected frozen identity."""
+    mismatched = [
+        field
+        for field in _IDENTITY_FIELDS
+        if not isinstance(served, dict) or served.get(field) != expected[field]
+    ]
+    if mismatched:
+        # Field names only; the report never needs to repeat served values.
+        check.update(
+            status="failed",
+            error=f"{source}_identity_mismatch",
+            mismatched_fields=mismatched,
+        )
+    else:
+        check["identity_verified"] = True
 
 
 def _check_endpoint(
@@ -404,6 +458,14 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="accept a health response whose snapshot status is degraded",
     )
+    parser.add_argument(
+        "--expect-lock",
+        type=Path,
+        help=(
+            "require the served frozen identity to equal this reviewed lock "
+            "(for example, config/public_snapshot.lock.json)"
+        ),
+    )
     return parser.parse_args()
 
 
@@ -412,11 +474,15 @@ def main() -> int:
     try:
         if args.timeout <= 0:
             raise ValueError("timeout must be positive")
+        expected_identity = (
+            load_expected_identity(args.expect_lock) if args.expect_lock is not None else None
+        )
         report = run_smoke(
             args.base_url,
             timeout=args.timeout,
             allow_http=args.allow_http,
             allow_degraded=args.allow_degraded,
+            expected_identity=expected_identity,
         )
     except ValueError as error:
         print(f"Deployment smoke check rejected: {error}", file=sys.stderr)
