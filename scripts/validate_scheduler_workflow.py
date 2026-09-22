@@ -69,7 +69,8 @@ def _validate_secret_locations(workflow: dict[str, Any]) -> list[str]:
             for index, child in enumerate(value):
                 visit(child, (*path, str(index)))
         elif isinstance(value, str) and _SECRET_EXPRESSION in value:
-            if "env" not in path or "with" in path or "run" in path:
+            is_step_environment = "steps" in path and len(path) >= 2 and path[-2] == "env"
+            if not is_step_environment:
                 errors.append("secret expressions may only appear in step env mappings")
             if "GITHUB_TOKEN" in value:
                 errors.append("the deploy workflow must not receive a GitHub token")
