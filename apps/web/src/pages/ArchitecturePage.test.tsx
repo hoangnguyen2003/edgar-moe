@@ -59,6 +59,7 @@ describe("Architecture page", () => {
       "href",
       "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0022-copilot-review-profiles.md",
     );
+    expect(within(decisions).getByText(/Seven of the 23 recorded decisions/)).toBeInTheDocument();
     expect(screen.getByText(/--expect-lock config\/public_snapshot.lock.json/)).toBeInTheDocument();
   });
 
