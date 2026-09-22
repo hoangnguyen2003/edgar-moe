@@ -16,7 +16,7 @@ from edgar_moe.forward.domain import (
     QualityCheckDraft,
     RunRegistration,
 )
-from edgar_moe.forward.metrics import forward_metrics, percentile_ranks
+from edgar_moe.forward.metrics import forward_metrics, percentile_ranks, rank_ic_interval
 from edgar_moe.forward.models import ForecastRecord
 from edgar_moe.forward.registry import (
     ForwardRegistry,
@@ -267,3 +267,59 @@ def test_forward_metric_edge_cases_and_percentile_ranks() -> None:
     assert empty.pending_count == 3
     assert empty.rank_ic is None
     assert percentile_ranks([2.0, 1.0, 2.0]) == pytest.approx([5 / 6, 1 / 3, 5 / 6])
+    assert (empty.rank_ic_low, empty.rank_ic_high) == (None, None)
+
+
+def test_the_rank_ic_interval_follows_fishers_transform() -> None:
+    # Bonett-Wright standard error: sqrt((1 + 0.5**2 / 2) / 25) = 0.21213,
+    # so the interval is tanh(atanh(0.5) +/- 1.96 * 0.21213).
+    low, high = rank_ic_interval(0.5, 28)
+    assert low == pytest.approx(0.1327, abs=1e-4)
+    assert high == pytest.approx(0.7465, abs=1e-4)
+    # Asymmetric, because the transform compresses near the ends.
+    assert 0.5 - low > high - 0.5
+
+
+def test_a_handful_of_outcomes_cannot_exclude_zero() -> None:
+    # The live figure on 2026-09-23: 24 settled outcomes.
+    low, high = rank_ic_interval(-0.179, 24)
+
+    assert low is not None and high is not None
+    assert low < 0 < high
+
+
+@pytest.mark.parametrize(
+    ("rank_ic", "pair_count", "expected"),
+    [
+        (None, 40, (None, None)),
+        (0.5, 3, (None, None)),  # n - 3 leaves no degrees of freedom
+        (0.5, 4, None),  # states an interval, however wide
+        (1.0, 30, (1.0, 1.0)),  # Fisher's transform diverges at the ends
+        (-1.0, 30, (-1.0, -1.0)),
+    ],
+)
+def test_the_interval_is_withheld_rather_than_invented(
+    rank_ic: float | None,
+    pair_count: int,
+    expected: tuple[float | None, float | None] | None,
+) -> None:
+    interval = rank_ic_interval(rank_ic, pair_count)
+
+    if expected is None:
+        assert interval[0] is not None and interval[1] is not None
+        assert interval[0] < interval[1]
+    else:
+        assert interval == expected
+
+
+def test_metrics_report_an_interval_alongside_the_rank_ic() -> None:
+    metrics = forward_metrics(
+        [1.0, 2.0, 3.0, 4.0, 5.0],
+        [0.1, 0.3, 0.2, 0.5, 0.4],
+        forecast_count=6,
+    )
+
+    assert metrics.rank_ic == pytest.approx(0.8)
+    assert metrics.rank_ic_low is not None and metrics.rank_ic_high is not None
+    assert metrics.rank_ic_low < metrics.rank_ic < metrics.rank_ic_high
+    assert metrics.rank_ic_low < 0  # five outcomes settle nothing

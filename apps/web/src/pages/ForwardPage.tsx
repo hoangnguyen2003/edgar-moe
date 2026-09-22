@@ -55,6 +55,13 @@ export function ForwardPage() {
 
   const metrics = performance.data!;
   const checks = quality.data!;
+  // An interval that straddles 0 says more than the point estimate does, so it
+  // replaces the coverage line whenever enough outcomes have settled to state one.
+  const hasInterval = metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
+  const rankIcDetail = hasInterval
+    ? `95% interval ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
+    : `${percent(metrics.coverage)} of forecasts have results`;
+  const rankIcInfo = hasInterval ? "confidenceInterval" : "rankIc";
   const historicalFailedChecks = checks.filter((check) => check.status === "failed").length;
   const historicalWarningChecks = checks.filter((check) => check.status === "warning").length;
   const latestQualityLabel = status.data.latest_quality_failures
@@ -81,7 +88,7 @@ export function ForwardPage() {
 
       <section className="figures" aria-label="Live results">
         <MetricCard label="Forecasts recorded" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} still waiting for results`} />
-        <MetricCard label="Ranking skill, live" info="rankIc" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} of forecasts have results`} />
+        <MetricCard label="Ranking skill, live" info={rankIcInfo} value={decimal(metrics.rank_ic, 3)} detail={rankIcDetail} />
         <MetricCard label="Prediction error, live" info="rmse" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} results in so far`} />
         <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>

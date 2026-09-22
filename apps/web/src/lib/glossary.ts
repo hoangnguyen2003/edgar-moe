@@ -8,6 +8,10 @@ export const GLOSSARY = {
     term: "Rank IC",
     definition: "How closely the model's ranking of stocks matched the ranking of their actual returns. 0 is no better than random and 1 would be perfect; for stock returns, even a few hundredths can matter if it holds up.",
   },
+  confidenceInterval: {
+    term: "95% interval",
+    definition: "The range the measurement could plausibly take given how few results it is based on. A range that straddles 0 means the figure cannot yet be told apart from luck. It assumes each filing's outcome is independent; filings scored on the same day are not, so the real range is wider.",
+  },
   rmse: {
     term: "RMSE",
     definition: "Root-mean-square error: the typical size of the model's mistakes when predicting returns. Lower is better.",
@@ -91,6 +95,6 @@ export type GlossaryKey = keyof typeof GLOSSARY;
 /** The order terms appear in on How it works. */
 export const GLOSSARY_ORDER: GlossaryKey[] = [
   "experts", "gate", "xbrl", "target", "direction", "percentile", "runRank",
-  "rankIc", "rmse", "validation", "lockedTest", "embargo", "frozen",
+  "rankIc", "confidenceInterval", "rmse", "validation", "lockedTest", "embargo", "frozen",
   "sharpe", "volatility", "drawdown", "turnover", "tradingCost", "forward", "fingerprint",
 ];
