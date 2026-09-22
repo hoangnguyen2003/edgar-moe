@@ -31,7 +31,7 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 | --- | --- |
 | See what the study found | The [live site](https://edgar-moe.vercel.app), whose pages lead with a one-sentence answer |
 | Understand the system design | [Solution architecture](docs/solution-architecture.md): context, views, security, operations, and a requirement-to-test traceability matrix |
-| Review the decisions | The [ADR index](docs/adr/README.md): 23 decisions grouped by theme |
+| Review the decisions | The [ADR index](docs/adr/README.md): 24 decisions grouped by theme |
 | Check the research is honest | The [research contract](#research-contract), [model card](docs/model-card.md), and [locked report](reports/authenticated_research_report.md) |
 | Verify the live site yourself | Run `uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app --expect-lock config/public_snapshot.lock.json` from a clone. It needs no credentials and checks that production serves the reviewed frozen identity. |
 
