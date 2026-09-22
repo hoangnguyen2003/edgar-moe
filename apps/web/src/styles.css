@@ -504,8 +504,44 @@ main { flex: 1; min-width: 0; }
 .governance-lane span { color: var(--ink-2); font: 600 14px var(--sans); }
 .governance-lane strong { margin-top: 8px; font: 600 28px var(--sans); }
 
-/* ---------- Tablet: page links move behind the Menu button ---------- */
-@media (max-width: 1080px) {
+/* ---------- Architecture ---------- */
+.lanes { display: grid; gap: 14px; margin-bottom: 16px; }
+.lane { padding: 20px 22px 22px; background: var(--sheet); border: 1px solid var(--rule); border-top: 2px solid var(--ink); }
+.lane__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px 24px; margin-bottom: 16px; }
+.lane__head h2 { margin: 0; font: 500 23px/1.2 var(--serif); }
+.lane__head p { max-width: 70ch; margin: 6px 0 0; color: var(--ink-2); font-size: 15px; }
+.zone-badge { padding: 3px 9px; border: 1px solid var(--rule-strong); border-radius: 999px; color: var(--ink-2); font: 600 13px var(--sans); white-space: nowrap; }
+.lane__steps { display: flex; align-items: stretch; }
+.lane__steps li { display: flex; flex: 1; min-width: 0; }
+/* The arrows show direction only; the ordered list already gives the sequence. */
+.lane__steps li + li::before { content: "→" / ""; align-self: center; padding: 0 6px; color: var(--ink-3); font-size: 18px; }
+.step { flex: 1; min-width: 0; padding: 12px 14px; background: var(--paper); border: 1px solid var(--rule); }
+.step strong { display: block; font: 600 15px/1.3 var(--sans); }
+.step span { display: block; margin-top: 4px; color: var(--ink-2); font-size: 14px; line-height: 1.45; }
+.zone-table table { width: 100%; border-collapse: collapse; }
+.zone-table th, .zone-table td { padding: 12px 10px 12px 0; border-bottom: 1px solid var(--rule); font-size: 14px; line-height: 1.5; text-align: left; vertical-align: top; }
+.zone-table thead th { border-bottom: 1px solid var(--ink); color: var(--ink-2); font-weight: 600; }
+.zone-table tbody th { color: var(--ink); font-weight: 700; }
+.zone-table td { color: var(--ink-2); }
+.verify__steps { counter-reset: verify; border-top: 1px solid var(--ink); }
+.verify__steps li { position: relative; padding: 14px 0 14px 42px; border-bottom: 1px solid var(--rule); counter-increment: verify; }
+.verify__steps li::before { content: counter(verify); position: absolute; top: 14px; left: 0; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: var(--ink); color: var(--paper); font: 600 14px var(--sans); }
+.verify__steps strong, .verify__steps span { display: block; }
+.verify__steps strong { font: 600 16px var(--sans); }
+.verify__steps span { margin-top: 3px; color: var(--ink-2); font-size: 15px; line-height: 1.55; }
+.verify__steps code { font: 500 13px var(--mono); overflow-wrap: anywhere; }
+.verify__steps pre { margin: 10px 0 0; padding: 12px 14px; overflow-x: auto; background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink); font: 500 13px/1.55 var(--mono); white-space: pre; }
+.verify a, .decision-list a { color: var(--ink); }
+.decisions { margin-top: 16px; }
+.decision-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.decision-list a { display: flex; flex-direction: column; gap: 6px; height: 100%; padding: 16px 18px; background: var(--paper); border: 1px solid var(--rule); text-decoration: none; transition: border-color .15s ease; }
+.decision-list a:hover { border-color: var(--ink); }
+.decision-list strong { font: 600 16px/1.35 var(--sans); }
+.decision-list span { color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.decision-list small { margin-top: auto; padding-top: 6px; color: var(--ink-2); font: 500 13px var(--mono); }
+
+/* ---------- Narrower than the full page list: links move behind the Menu button ---------- */
+@media (max-width: 1180px) {
   .menu-button { display: inline-flex; }
   .site-nav { position: fixed; inset: 0; z-index: 50; padding: 10px var(--gutter) 40px; overflow-y: auto; background: var(--paper); visibility: hidden; opacity: 0; transition: opacity .18s ease, visibility .18s ease; }
   .site-nav--open { visibility: visible; opacity: 1; }
@@ -516,7 +552,13 @@ main { flex: 1; min-width: 0; }
   .site-nav__label { display: inline-block; padding: 0 6px; margin-left: -6px; font: 600 19px var(--sans); }
   .site-nav a.active .site-nav__label { background: var(--highlight); color: var(--on-highlight); }
   .site-nav__description { display: block; margin-top: 2px; color: var(--ink-2); font: 400 15px var(--sans); }
+}
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1080px) {
   .hero, .content-grid--two, .forward-top-grid { grid-template-columns: minmax(0, 1fr); }
+  .lane__steps { flex-wrap: wrap; }
+  .lane__steps li { flex: 1 1 30%; }
   .figures--five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .figures--five .figure:nth-child(4) { border-left: 0; padding-left: 0; }
   .figures--five .figure:nth-child(n+4) { border-top: 1px solid var(--rule); }
@@ -545,7 +587,17 @@ main { flex: 1; min-width: 0; }
   .figure__value { font-size: 30px; }
   .gate__label, .gate__share { display: none; }
   .gate__legend { display: flex; }
-  .signal-grid, .steps, .reason-list, .protocol, .glossary dl, .explore ul { grid-template-columns: minmax(0, 1fr); }
+  .signal-grid, .steps, .reason-list, .protocol, .glossary dl, .explore ul, .decision-list { grid-template-columns: minmax(0, 1fr); }
+  .lane { padding: 16px 16px 18px; }
+  .lane__steps { flex-direction: column; flex-wrap: nowrap; }
+  .lane__steps li { flex-direction: column; flex: none; }
+  .lane__steps li + li::before { content: "↓" / ""; padding: 4px 0; }
+  /* Trust zones become one card per zone, labelled like the other phone tables. */
+  .zone-table thead { display: none; }
+  .zone-table tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--rule); }
+  .zone-table tr:first-child { border-top: 1px solid var(--ink); }
+  .zone-table th, .zone-table td { display: block; padding: 2px 0; border: 0; }
+  .zone-table td[data-label]::before { content: attr(data-label) ": "; color: var(--ink); font-weight: 600; }
   .panel { padding: 18px 16px 20px; }
   .panel h2 { font-size: 23px; }
   .explorer { grid-template-columns: minmax(0, 1fr); }
