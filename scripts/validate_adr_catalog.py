@@ -16,11 +16,15 @@ ADR_DIR = Path("docs/adr")
 ADR_INDEX = ADR_DIR / "README.md"
 README = Path("README.md")
 ARCHITECTURE_PAGE = Path("apps/web/src/pages/ArchitecturePage.tsx")
+SOLUTION_ARCHITECTURE = Path("docs/solution-architecture.md")
 
 _ADR_NAME = re.compile(r"^(?P<number>[0-9]{4})-[a-z0-9][a-z0-9-]*\.md$")
 _INDEX_COUNT = re.compile(r"\bAll\s+(?P<count>[0-9]+)\s+records\b")
 _README_COUNT = re.compile(r"\bADR index\b[^\n]*?:\s*(?P<count>[0-9]+)\s+decisions\b")
 _PAGE_COUNT = re.compile(r"\bof\s+the\s+(?P<count>[0-9]+)\s+recorded decisions\b")
+_SOLUTION_COUNT = re.compile(
+    r"\bDecision log:\s*\*{0,2}\s*\[(?P<count>[0-9]+)\s+architecture decision records\]"
+)
 
 
 def validate_adr_catalog(
@@ -29,6 +33,7 @@ def validate_adr_catalog(
     index_path: Path = ADR_INDEX,
     readme_path: Path = README,
     architecture_path: Path = ARCHITECTURE_PAGE,
+    solution_architecture_path: Path = SOLUTION_ARCHITECTURE,
 ) -> list[str]:
     """Return violations of the ADR count and numbering contract."""
 
@@ -57,6 +62,7 @@ def validate_adr_catalog(
         (index_path, _INDEX_COUNT, "ADR index"),
         (readme_path, _README_COUNT, "README"),
         (architecture_path, _PAGE_COUNT, "architecture page"),
+        (solution_architecture_path, _SOLUTION_COUNT, "solution architecture"),
     ):
         text = _read(path, label, errors)
         if text is None:
@@ -85,12 +91,14 @@ def main() -> int:
     parser.add_argument("--index", type=Path, default=ADR_INDEX)
     parser.add_argument("--readme", type=Path, default=README)
     parser.add_argument("--architecture-page", type=Path, default=ARCHITECTURE_PAGE)
+    parser.add_argument("--solution-architecture", type=Path, default=SOLUTION_ARCHITECTURE)
     args = parser.parse_args()
     errors = validate_adr_catalog(
         adr_dir=args.adr_dir,
         index_path=args.index,
         readme_path=args.readme,
         architecture_path=args.architecture_page,
+        solution_architecture_path=args.solution_architecture,
     )
     if errors:
         print("ADR catalog contract failed", file=sys.stderr)
