@@ -1,12 +1,13 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
-import { ExternalLink, Search, X } from "lucide-react";
+import { ArrowUp, ExternalLink, Search, X } from "lucide-react";
 import { type KeyboardEvent, useRef, useState } from "react";
 import { ExpertBars } from "../components/Experts";
+import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { SignalBadge } from "../components/SignalBadge";
 import { api } from "../lib/api";
-import { dateTime, featureLabel, percent, shortDate, signedDecimal, signedPercent } from "../lib/format";
+import { dateTime, featureLabel, filedDate, shortDate, signedDecimal, signedPercent, standing } from "../lib/format";
 import type { EventRecord } from "../lib/types";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { COMPACT_LAYOUT, REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
@@ -22,10 +23,17 @@ function eventParams(direction: string, search: string, cursor: string | null) {
   return params;
 }
 
+/** Links such as /filings?q=MU&event=… (from the signals page) open on that filing. */
+function linkedFiling() {
+  const params = new URLSearchParams(window.location.search);
+  return { query: params.get("q") ?? "", eventId: params.get("event") };
+}
+
 export function FilingsPage() {
-  const [query, setQuery] = useState("");
+  const [linked] = useState(linkedFiling);
+  const [query, setQuery] = useState(linked.query);
   const [direction, setDirection] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(linked.eventId);
   const compact = useMediaQuery(COMPACT_LAYOUT);
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
   const listRef = useRef<HTMLUListElement>(null);
@@ -39,20 +47,31 @@ export function FilingsPage() {
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     placeholderData: keepPreviousData,
   });
-  if (events.isLoading) return <div className="page"><LoadingState label="Indexing filing events" /></div>;
-  if (events.error) return <div className="page"><ErrorState error={events.error} onRetry={() => void events.refetch()} /></div>;
+  const header = (
+    <PageHeader title="Filing explorer">
+      Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards.
+    </PageHeader>
+  );
+  if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" /></div>;
+  if (events.error) return <div className="page">{header}<ErrorState error={events.error} onRetry={() => void events.refetch()} /></div>;
   const pages = events.data!.pages;
   const items = pages.flatMap((page) => page.items);
   const total = pages[0]?.total ?? 0;
   const filtered = Boolean(search || direction);
   const active = items.find((item) => item.event_id === selectedId) ?? items[0] ?? null;
+  const scrollBehavior = reducedMotion ? "auto" : "smooth";
 
   const select = (eventId: string, reveal: boolean) => {
     setSelectedId(eventId);
     // In the single-column layout the detail sits below the list; bring it into view.
-    if (reveal && compact) {
-      detailRef.current?.scrollIntoView?.({ behavior: reducedMotion ? "auto" : "smooth", block: "start" });
-    }
+    if (reveal && compact) detailRef.current?.scrollIntoView?.({ behavior: scrollBehavior, block: "start" });
+  };
+
+  const backToList = () => {
+    const buttons = Array.from(listRef.current?.querySelectorAll<HTMLButtonElement>("button[data-event-id]") ?? []);
+    const button = buttons.find((candidate) => candidate.dataset.eventId === active?.event_id);
+    button?.scrollIntoView?.({ behavior: scrollBehavior, block: "center" });
+    button?.focus({ preventScroll: true });
   };
 
   const moveSelection = (event: KeyboardEvent<HTMLUListElement>) => {
@@ -69,52 +88,62 @@ export function FilingsPage() {
 
   return (
     <div className="page">
-      <PageHeader section="04" kicker="Event intelligence" title="Open the black box.">
-        Inspect predictions at the filing level, including modality weights and realized outcomes only after the horizon matures.
-      </PageHeader>
+      {header}
       <div className="filter-bar">
         <label className="search-field">
-          <Search size={17} aria-hidden="true" />
-          <span className="sr-only">Search ticker or company</span>
+          <Search size={18} aria-hidden="true" />
+          <span className="sr-only">Search by ticker or company</span>
           <input
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search ticker or company"
+            placeholder="Search by ticker or company"
             autoComplete="off"
             spellCheck={false}
           />
           {query && (
             <button type="button" className="icon-button" aria-label="Clear search" onClick={() => setQuery("")}>
-              <X size={15} aria-hidden="true" />
+              <X size={16} aria-hidden="true" />
             </button>
           )}
         </label>
-        <select value={direction} onChange={(event) => setDirection(event.target.value)} aria-label="Signal direction">
-          <option value="">All directions</option>
-          <option value="long">Long</option>
-          <option value="short">Short</option>
-          <option value="neutral">Neutral</option>
-        </select>
-        <span className="result-count" role="status">{total} {filtered ? "matching" : "indexed"} {total === 1 ? "event" : "events"}</span>
+        <label className="select-field">
+          <span>Signal</span>
+          <select value={direction} onChange={(event) => setDirection(event.target.value)}>
+            <option value="">All</option>
+            <option value="long">Long</option>
+            <option value="neutral">Neutral</option>
+            <option value="short">Short</option>
+          </select>
+        </label>
+        <span className="result-count" role="status">
+          {`${total} ${filtered ? "matching " : ""}${total === 1 ? "filing" : "filings"}`}
+        </span>
       </div>
       <section className={events.isPlaceholderData ? "explorer is-updating" : "explorer"} aria-busy={events.isPlaceholderData}>
         <div className="event-table">
-          <ul ref={listRef} aria-label="Filing events" onKeyDown={moveSelection}>
+          <ul ref={listRef} aria-label="Filings" onKeyDown={moveSelection}>
             {items.map((event) => (
               <li key={event.event_id}>
                 <EventRow event={event} active={active?.event_id === event.event_id} onSelect={() => select(event.event_id, true)} />
               </li>
             ))}
           </ul>
-          {!items.length && <div className="empty-state">No filing events match these filters.</div>}
+          {!items.length && (
+            <div className="empty-state">
+              No filings match these filters.{" "}
+              {filtered && (
+                <button type="button" className="text-button" onClick={() => { setQuery(""); setDirection(""); }}>Clear filters</button>
+              )}
+            </div>
+          )}
           {events.hasNextPage && (
             <button type="button" className="load-more" onClick={() => void events.fetchNextPage()} disabled={events.isFetchingNextPage}>
               {events.isFetchingNextPage ? "Loading…" : `Load more (${items.length} of ${total})`}
             </button>
           )}
         </div>
-        {active && <EventDetail event={active} ref={detailRef} />}
+        {active && <EventDetail event={active} ref={detailRef} onBack={compact ? backToList : undefined} />}
       </section>
     </div>
   );
@@ -125,38 +154,42 @@ function EventRow({ event, active, onSelect }: { event: EventRecord; active: boo
     <button type="button" data-event-id={event.event_id} className={active ? "active" : undefined} aria-pressed={active} onClick={onSelect}>
       <span className="event-row__head"><strong>{event.ticker}</strong><SignalBadge direction={event.direction} /></span>
       <span className="event-row__company">{event.company_name}</span>
-      <span className="event-row__meta">{event.form} · {shortDate(event.entry_date)}</span>
-      <b>{signedDecimal(event.score, 3)}</b>
+      <span className="event-row__meta">{event.form} filed {filedDate(event.accepted_at)}</span>
+      <span className="event-row__score"><small>Score</small>{signedDecimal(event.score, 3)}</span>
     </button>
   );
 }
 
-function EventDetail({ event, ref }: { event: EventRecord; ref: React.Ref<HTMLElement> }) {
+function EventDetail({ event, ref, onBack }: { event: EventRecord; ref: React.Ref<HTMLElement>; onBack?: () => void }) {
   const largest = Math.max(...event.top_attributions.map((item) => Math.abs(item.contribution)), Number.EPSILON);
   return (
     <article className="panel event-detail" ref={ref} aria-label={`${event.ticker} filing detail`}>
+      {onBack && (
+        <button type="button" className="text-button event-detail__back" onClick={onBack}>
+          <ArrowUp size={15} aria-hidden="true" /> Back to results
+        </button>
+      )}
       <header>
         <div>
-          <span className="panel__kicker">{event.form} · SIC {event.industry_code}</span>
           <h2>{event.company_name}</h2>
-          <p>{event.accession_number}</p>
+          <p>{event.ticker} · {event.form} · industry code {event.industry_code}</p>
         </div>
-        <a className="button button--ghost button--small" href={event.filing_url} target="_blank" rel="noreferrer">
-          SEC filing <ExternalLink size={14} aria-hidden="true" />
+        <a className="button button--secondary button--small" href={event.filing_url} target="_blank" rel="noreferrer">
+          Read on SEC.gov <ExternalLink size={14} aria-hidden="true" /><span className="sr-only"> (opens in a new tab)</span>
         </a>
       </header>
       <dl className="event-score">
         <div><dt>Model score</dt><dd>{signedDecimal(event.score, 4)}</dd></div>
-        <div><dt>Cross-sectional rank</dt><dd>{percent(event.rank, 0)}</dd></div>
+        <div><dt>Rank <InfoTip term="percentile" /></dt><dd>{standing(event.rank)}</dd></div>
         <div>
-          <dt>Realized 20D</dt>
-          <dd>{event.realized_abnormal_return == null ? <span className="pending-label">Pending</span> : signedPercent(event.realized_abnormal_return)}</dd>
+          <dt>20-day result <InfoTip term="target" /></dt>
+          <dd>{event.realized_abnormal_return == null ? <span className="pending-label">Not yet known</span> : signedPercent(event.realized_abnormal_return)}</dd>
         </div>
       </dl>
-      <h3>Expert allocation</h3>
+      <h3>What the model relied on</h3>
       <ExpertBars weights={event.expert_weights} />
-      <h3>Top contributions</h3>
-      <p className="detail-hint">Bars right of center raise the score; bars left of center lower it.</p>
+      <h3>What moved the score</h3>
+      <p className="detail-hint">Bars to the right of the center line pushed the score up; bars to the left pulled it down.</p>
       <ul className="attribution-list">
         {event.top_attributions.map((item) => {
           const width = (Math.abs(item.contribution) / largest) * 50;
@@ -171,7 +204,9 @@ function EventDetail({ event, ref }: { event: EventRecord; ref: React.Ref<HTMLEl
           );
         })}
       </ul>
-      <p className="panel__note">Accepted {dateTime(event.accepted_at)} · entered next market session · horizon {shortDate(event.horizon_date)}</p>
+      <p className="panel__note">
+        Filed {dateTime(event.accepted_at)} · first tradable {shortDate(event.entry_date)} · result measured {shortDate(event.horizon_date)}
+      </p>
     </article>
   );
 }

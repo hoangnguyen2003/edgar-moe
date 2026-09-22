@@ -1,30 +1,23 @@
-import {
-  Activity,
-  BarChart3,
-  BookOpenText,
-  FileSearch,
-  FlaskConical,
-  Orbit,
-  RadioTower,
-  ShieldCheck,
-} from "lucide-react";
-
-/** The dossier's sections, in reading order; the index is the section number. */
+/** The site's pages in reading order, named for what a visitor finds there. */
 export const navigation = [
-  { to: "/", label: "Overview", icon: Activity, description: "The thesis, the headline results, and how the model reads a filing" },
-  { to: "/research", label: "Experiments", icon: FlaskConical, description: "Every candidate on the same folds, and the one that was frozen" },
-  { to: "/portfolio", label: "Portfolio", icon: BarChart3, description: "A cost-aware backtest of the locked test period" },
-  { to: "/filings", label: "Filing explorer", icon: FileSearch, description: "Each scored filing with its expert weights and outcome" },
-  { to: "/signals", label: "Weekly signals", icon: RadioTower, description: "The latest cohort scored by the frozen model" },
-  { to: "/forward", label: "Forward lab", icon: Orbit, description: "Forecasts recorded before their outcomes exist" },
-  { to: "/governance", label: "Governance", icon: ShieldCheck, description: "Frozen identity, public boundary, and controls" },
-  { to: "/methodology", label: "Methodology", icon: BookOpenText, description: "What was known when, and the claims we do not make" },
+  { to: "/", label: "Overview", description: "What the project is and what it found" },
+  { to: "/research", label: "Models", description: "How the candidate models compare, and which one was frozen" },
+  { to: "/portfolio", label: "Backtest", description: "Would trading on the scores have made money after costs?" },
+  { to: "/signals", label: "Signals", description: "The latest filings the model rates highest and lowest" },
+  { to: "/filings", label: "Filings", description: "Search any scored filing and see what drove its score" },
+  { to: "/forward", label: "Live tracking", description: "How the frozen model does on filings it has never seen" },
+  { to: "/governance", label: "Audit", description: "How to check the results weren't changed afterwards" },
+  { to: "/methodology", label: "How it works", description: "The data, the model, and key terms in plain English" },
 ];
 
-/** Two-digit section number for a route, e.g. "03" for the portfolio. */
-export function sectionNumber(pathname: string): string {
+export type NavigationEntry = (typeof navigation)[number];
+
+/** The page after this one in reading order; the last page leads back to the start. */
+export function nextPage(pathname: string): { entry: NavigationEntry; wraps: boolean } | null {
   const index = navigation.findIndex((item) => item.to === pathname);
-  return String(index === -1 ? 1 : index + 1).padStart(2, "0");
+  if (index === -1) return null;
+  const next = navigation[index + 1];
+  return next ? { entry: next, wraps: false } : { entry: navigation[0], wraps: true };
 }
 
 const SITE_TITLE = "EDGAR-MoE Research Terminal";

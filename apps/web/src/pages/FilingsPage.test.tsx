@@ -43,7 +43,10 @@ function renderPage() {
 }
 
 describe("Filing explorer", () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    window.history.replaceState({}, "", "/");
+    vi.unstubAllGlobals();
+  });
 
   it("searches the full server-side index instead of only the loaded page", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
@@ -55,12 +58,12 @@ describe("Filing explorer", () => {
 
     renderPage();
     expect(await screen.findByText("NVDA")).toBeInTheDocument();
-    expect(screen.getByText("236 indexed events")).toBeInTheDocument();
+    expect(screen.getByText("236 filings")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByPlaceholderText("Search ticker or company"), { target: { value: "AAL" } });
+    fireEvent.change(screen.getByPlaceholderText("Search by ticker or company"), { target: { value: "AAL" } });
 
     expect(await screen.findByText("AAL")).toBeInTheDocument();
-    expect(screen.getByText("1 matching event")).toBeInTheDocument();
+    expect(screen.getByText("1 matching filing")).toBeInTheDocument();
     const searched = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
     expect(searched.some((url) => url.searchParams.get("q") === "AAL")).toBe(true);
   });
@@ -86,8 +89,27 @@ describe("Filing explorer", () => {
 
     renderPage();
 
-    expect(await screen.findByText(/horizon Aug 27, 2026/)).toBeInTheDocument();
-    expect(screen.getByText(/Accepted Jul 30, 2026, 09:00 PM UTC/)).toBeInTheDocument();
+    expect(await screen.findByText(/result measured Aug 27, 2026/)).toBeInTheDocument();
+    expect(screen.getByText(/Filed Jul 30, 2026, 09:00 PM UTC/)).toBeInTheDocument();
+    // The list dates the filing as EDGAR does, in New York time.
+    expect(screen.getByText("10-Q filed Jul 30, 2026")).toBeInTheDocument();
     expect(screen.getByText("Median dollar volume 60d")).toBeInTheDocument();
+    expect(screen.getByText("Not yet known")).toBeInTheDocument();
+  });
+
+  it("opens on the filing a signals-page link points to", async () => {
+    window.history.replaceState({}, "", "/filings?q=AAL&event=event-3");
+    const fetchMock = vi.fn<(input: RequestInfo | URL) => Promise<Response>>(
+      () => page([event("AAL", "American Airlines", 2), event("AAL", "American Airlines Q3", 3)], 2, null),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "American Airlines Q3" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search by ticker or company")).toHaveValue("AAL");
+    expect(screen.getByRole("button", { name: /American Airlines Q3/ })).toHaveAttribute("aria-pressed", "true");
+    const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
+    expect(requested.every((url) => url.searchParams.get("q") === "AAL")).toBe(true);
   });
 });

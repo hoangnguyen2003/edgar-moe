@@ -1,20 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import {
-  Activity,
-  CheckCircle2,
-  Clock3,
-  DatabaseZap,
-  GitCommitHorizontal,
-  LockKeyhole,
-  Orbit,
-  ShieldCheck,
-  TriangleAlert,
-} from "lucide-react";
+import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
-import { compact, dateTime, decimal, percent, signedDecimal, signedPercent } from "../lib/format";
+import { compact, dateTime, decimal, percent, signedDecimal, signedPercent, standing } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 export function ForwardPage() {
@@ -38,21 +28,21 @@ export function ForwardPage() {
   });
 
   if (status.isLoading) {
-    return <div className="page"><LoadingState label="Checking forward registry" /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" /></div>;
   }
   if (status.error) {
-    return <div className="page"><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
+    return <div className="page"><ForwardHeader /><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
   }
   if (!status.data?.available) {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
-    return <div className="page"><LoadingState label="Loading prospective evidence" /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
   if (error) {
     const retry = () => void Promise.all([performance.refetch(), runs.refetch(), forecasts.refetch(), quality.refetch()]);
-    return <div className="page"><ErrorState error={error} onRetry={retry} /></div>;
+    return <div className="page"><ForwardHeader /><ErrorState error={error} onRetry={retry} /></div>;
   }
 
   const metrics = performance.data!;
@@ -62,7 +52,7 @@ export function ForwardPage() {
   const latestQualityLabel = status.data.latest_quality_failures
     ? `${status.data.latest_quality_failures} failed`
     : status.data.latest_quality_warnings
-      ? `${status.data.latest_quality_warnings} warn`
+      ? `${status.data.latest_quality_warnings} warning${status.data.latest_quality_warnings === 1 ? "" : "s"}`
       : "Passing";
   const LatestQualityIcon = status.data.latest_quality_failures
     ? TriangleAlert
@@ -70,54 +60,67 @@ export function ForwardPage() {
       ? Activity
       : CheckCircle2;
   const historicalQualityDetail = [
-    `${checks.length} immutable checks`,
-    historicalFailedChecks ? `${historicalFailedChecks} historical failed` : "",
-    historicalWarningChecks ? `${historicalWarningChecks} historical warn` : "",
+    `${checks.length} checks recorded`,
+    historicalFailedChecks ? `${historicalFailedChecks} failed before` : "",
+    historicalWarningChecks ? `${historicalWarningChecks} warned before` : "",
   ].filter(Boolean).join(" · ");
 
   return (
     <div className="page">
       <ForwardHeader />
-      <div className="forward-trust-strip">
-        <span><LockKeyhole size={14} aria-hidden="true" /> Frozen model</span>
-        <i aria-hidden="true" />
-        <span><Clock3 size={14} aria-hidden="true" /> Pre-entry timestamp</span>
-        <i aria-hidden="true" />
-        <span><DatabaseZap size={14} aria-hidden="true" /> Append-only outcome</span>
-      </div>
-
+      <Protocol />
       <ForwardHealthBanner status={status.data} />
 
-      <section className="figures" aria-label="Forward evidence">
-        <MetricCard label="Recorded forecasts" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} awaiting maturity`} />
-        <MetricCard label="Forward rank IC" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} label coverage`} />
-        <MetricCard label="Forward RMSE" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} matured outcomes`} />
-        <MetricCard label="Latest quality status" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
+      <section className="figures" aria-label="Live results">
+        <MetricCard label="Forecasts recorded" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} still waiting for results`} />
+        <MetricCard label="Ranking skill, live" info="rankIc" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} of forecasts have results`} />
+        <MetricCard label="Prediction error, live" info="rmse" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} results in so far`} />
+        <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>
 
       {metrics.forecast_count === 0 && (
         <div className="notice notice--forward">
           <Clock3 size={18} aria-hidden="true" />
-          <div><strong>Registry ready; first qualifying batch pending</strong><span>A forecast is accepted only when it is recorded after the filing arrives and before the next tradable entry. Historical rows are never relabeled as live predictions.</span></div>
+          <div>
+            <strong>No qualifying forecasts yet</strong>
+            <span>A forecast only counts if it was saved after the filing appeared and before the stock could next be traded. Past data is never relabeled as a live forecast.</span>
+          </div>
         </div>
       )}
 
+      <section className="panel forward-forecast-panel">
+        <header>
+          <div>
+            <h2>Recorded forecasts</h2>
+            <p>Scores can't be changed once saved. Each result appears only after its 20 trading days have passed.</p>
+          </div>
+          <span className="count-chip">{forecasts.data!.total} forecasts</span>
+        </header>
+        <ForecastTable rows={forecasts.data!.items} />
+      </section>
+
       <section className="content-grid content-grid--two forward-top-grid">
         <article className="panel">
-          <header><div><span className="panel__kicker">Run ledger</span><h2>Every state transition is preserved</h2></div><GitCommitHorizontal size={20} aria-hidden="true" /></header>
+          <header><div><h2>Recent runs</h2><p>Each scheduled run, including any that failed, is kept.</p></div></header>
           <RunLedger rows={runs.data!} />
         </article>
         <article className="panel">
-          <header><div><span className="panel__kicker">Data contracts</span><h2>Quality gates</h2></div><ShieldCheck size={20} aria-hidden="true" /></header>
+          <header><div><h2>Data checks</h2><p>Automatic checks on each run's inputs and outputs.</p></div></header>
           <QualityList rows={checks} />
         </article>
       </section>
-
-      <section className="panel forward-forecast-panel">
-        <header><div><span className="panel__kicker">Prospective tape</span><h2>Forecasts before outcomes</h2><p>Scores and expert weights are immutable; realized returns appear only after the 20-session horizon matures.</p></div><span className="forward-count">{forecasts.data!.total} rows</span></header>
-        <ForecastTable rows={forecasts.data!.items} />
-      </section>
     </div>
+  );
+}
+
+/** The three rules that make a live forecast trustworthy. */
+function Protocol() {
+  return (
+    <ol className="protocol" aria-label="How live tracking works">
+      <li><span>1</span><div><strong>Freeze the model</strong><small>Its settings are fingerprinted and never changed.</small></div></li>
+      <li><span>2</span><div><strong>Save the forecast first</strong><small>Each score is stored before the stock can be traded.</small></div></li>
+      <li><span>3</span><div><strong>Add the result later</strong><small>The outcome is appended once 20 trading days pass.</small></div></li>
+    </ol>
   );
 }
 
@@ -127,11 +130,11 @@ function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
   const Icon = healthy ? CheckCircle2 : warning ? Activity : TriangleAlert;
   const tone = healthy ? "notice--forward" : "notice--warning";
   const age = status.age_seconds == null
-    ? "no successful run recorded"
-    : `age ${formatAge(status.age_seconds)}`;
+    ? "no successful run yet"
+    : `${formatAge(status.age_seconds)} ago`;
   const running = status.running_run_count === 1
-    ? "1 run currently active"
-    : `${status.running_run_count} runs currently active`;
+    ? "1 run in progress"
+    : `${status.running_run_count} runs in progress`;
 
   return (
     <div className={`notice ${tone} forward-health-banner`}>
@@ -139,7 +142,7 @@ function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
       <div>
         <strong>{status.health_message ?? status.message}</strong>
         <span>
-          Latest success: {dateTime(status.latest_successful_run_at)} · {age} · {running}
+          Last successful run: {dateTime(status.latest_successful_run_at)} ({age}) · {running}
         </span>
       </div>
     </div>
@@ -149,16 +152,17 @@ function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
 function formatAge(seconds: number): string {
   if (seconds < 60) return "less than a minute";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  if (hours < 48) return `${hours} h`;
+  return `${Math.floor(hours / 24)} days`;
 }
 
 function ForwardHeader() {
   return (
-    <PageHeader section="06" kicker="Prospective evaluation" title="Evidence that cannot look ahead.">
-      The v1 research result stays frozen. New filing forecasts are timestamped before entry, stored with content hashes, and evaluated only when their outcomes become observable.
+    <PageHeader title="Live tracking">
+      Since the model was frozen, it has kept scoring new filings as they arrive. This page shows how those
+      forecasts are doing, with no chance to adjust them in hindsight.
     </PageHeader>
   );
 }
@@ -167,32 +171,29 @@ function UnconfiguredForwardLab({ configured }: { configured: boolean }) {
   return (
     <div className="page">
       <ForwardHeader />
+      <Protocol />
       <section className="forward-empty panel">
-        <div className="forward-empty__icon" aria-hidden="true"><Orbit size={30} /></div>
-        <span className="stamp">Append-only</span>
-        <span className="panel__kicker">Infrastructure state</span>
-        <h2>{configured ? "Registry temporarily unavailable" : "Registry connection pending"}</h2>
-        <p>{configured ? "The database is configured, but the API could not read it. Historical research remains available elsewhere in the terminal." : "The application and append-only schema are ready. This deployment has no database URL, so it cannot claim or display prospective observations yet."}</p>
-        <div className="forward-protocol">
-          <div><span>01</span><strong>Freeze</strong><small>Hash-pin model and selection</small></div>
-          <div><span>02</span><strong>Forecast</strong><small>Record before tradable entry</small></div>
-          <div><span>03</span><strong>Settle</strong><small>Append labels after maturity</small></div>
-        </div>
-        <div className="forward-empty__note"><LockKeyhole size={15} aria-hidden="true" /> No synthetic or backfilled rows are presented as forward evidence.</div>
+        <h2>{configured ? "Live results are temporarily unavailable" : "Live results aren't connected here"}</h2>
+        <p>
+          {configured
+            ? "The forecast database is set up, but this site couldn't read it just now. The rest of the research is still available."
+            : "This copy of the site has no connection to the forecast database, so it can't show live results yet."}
+        </p>
+        <div className="forward-empty__note"><LockKeyhole size={15} aria-hidden="true" /> No made-up or back-dated rows are ever shown as live forecasts.</div>
       </section>
     </div>
   );
 }
 
 function RunLedger({ rows }: { rows: Awaited<ReturnType<typeof api.forwardRuns>> }) {
-  if (!rows.length) return <div className="empty-state">No forward runs recorded yet.</div>;
+  if (!rows.length) return <div className="empty-state">No runs recorded yet.</div>;
   return (
     <div className="forward-list">
       {rows.slice(0, 8).map((run) => (
         <div key={run.run_id}>
           <span className={`run-status run-status--${run.status}`}>{run.status}</span>
           <div><strong>{run.run_type}</strong><small>{dateTime(run.started_at)}</small></div>
-          <code>{run.code_revision.slice(0, 8)}</code>
+          <code title="Code version">{run.code_revision.slice(0, 8)}</code>
         </div>
       ))}
     </div>
@@ -200,7 +201,7 @@ function RunLedger({ rows }: { rows: Awaited<ReturnType<typeof api.forwardRuns>>
 }
 
 function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
-  if (!rows.length) return <div className="empty-state">Checks appear with the first run.</div>;
+  if (!rows.length) return <div className="empty-state">Checks appear after the first run.</div>;
   return (
     <div className="quality-list">
       {rows.slice(0, 8).map((check) => (
@@ -215,20 +216,29 @@ function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
 }
 
 function ForecastTable({ rows }: { rows: Awaited<ReturnType<typeof api.forwardForecasts>>["items"] }) {
-  if (!rows.length) return <div className="empty-state">No qualifying pre-entry forecasts have been recorded.</div>;
+  if (!rows.length) return <div className="empty-state">No forecasts recorded yet.</div>;
   return (
     <div className="forward-table-wrap">
       <table className="forward-table">
-        <thead><tr><th scope="col">Event</th><th scope="col">Recorded</th><th scope="col">Entry</th><th scope="col" className="num">Score</th><th scope="col" className="num">Rank</th><th scope="col" className="num">Outcome</th></tr></thead>
+        <thead>
+          <tr>
+            <th scope="col">Company</th>
+            <th scope="col">Saved</th>
+            <th scope="col">Tradable from</th>
+            <th scope="col" className="num">Score</th>
+            <th scope="col" className="num">Rank</th>
+            <th scope="col" className="num">20-day result</th>
+          </tr>
+        </thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.forecast_id}>
               <td><strong>{row.ticker}</strong><span>{row.form} · {row.company_name}</span></td>
-              <td>{dateTime(row.forecast_as_of)}</td>
-              <td>{dateTime(row.entry_at)}</td>
-              <td className="num">{signedDecimal(row.score, 4)}</td>
-              <td className="num">{percent(row.rank, 0)}</td>
-              <td className="num">{row.realized_abnormal_return == null ? <span className="pending-label">Pending</span> : signedPercent(row.realized_abnormal_return)}</td>
+              <td data-label="Saved">{dateTime(row.forecast_as_of)}</td>
+              <td data-label="Tradable from">{dateTime(row.entry_at)}</td>
+              <td className="num" data-label="Score">{signedDecimal(row.score, 4)}</td>
+              <td className="num" data-label="Rank">{standing(row.rank)}</td>
+              <td className="num" data-label="20-day result">{row.realized_abnormal_return == null ? <span className="pending-label">Not yet known</span> : signedPercent(row.realized_abnormal_return)}</td>
             </tr>
           ))}
         </tbody>

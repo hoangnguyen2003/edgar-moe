@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
+import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
 import { decimal, signedDecimal, splitModelName } from "../lib/format";
 import type { ExperimentRecord } from "../lib/types";
@@ -20,43 +20,54 @@ const sorters: Record<SortKey, (a: ExperimentRecord, b: ExperimentRecord) => num
   rmse: (a, b) => compareNumbers(a.validation_rmse, b.validation_rmse),
 };
 
+function ranked(rows: ExperimentRecord[], sort: SortKey) {
+  return [...rows]
+    .sort((a, b) => sorters[sort](a, b) || a.name.localeCompare(b.name))
+    .map((row, index) => ({ row, rank: index + 1 }));
+}
+
 export function ResearchPage() {
   const experiments = useQuery({ queryKey: ["experiments"], queryFn: api.experiments });
   const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
-  if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading experiment registry" /></div>;
+  if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading the model comparison" /></div>;
   if (experiments.error) return <div className="page"><ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);
   const selectedName = selected ? splitModelName(selected.name) : null;
+  const selectedRank = ranked(rows, "rank_ic").find((entry) => entry.row.selected)?.rank;
+  const finalIc = summary.data?.predictive_metrics?.locked_test?.rank_ic;
   return (
     <div className="page">
-      <PageHeader section="02" kicker="Experiment registry" title="Models earn their place.">
-        All candidates use identical chronological splits. Selection uses pre-test folds only; the frozen locked result is reported separately.
+      <PageHeader title="Model comparison">
+        {rows.length} candidate models learned from the same filings and were compared on 2023–2024 validation data.
+        The chosen one was frozen before the final test.
       </PageHeader>
-      <section className="selection" aria-label="Selected model">
-        <article className="panel selection__model">
-          <header>
-            <div>
-              <span className="panel__kicker">Selected model</span>
-              <h2>{selectedName?.family ?? "—"}</h2>
-            </div>
-            <span className="stamp">Frozen</span>
-          </header>
-          {selectedName && selectedName.params.length > 0 && <ParamList params={selectedName.params} />}
-          <p className="panel__note">{selected?.best_epoch != null ? `Best epoch ${selected.best_epoch}. ` : ""}Chosen on pre-test folds; the locked test is reported separately.</p>
-        </article>
-        <div className="figures figures--stack">
-          <MetricCard label="Validation RMSE" value={decimal(selected?.validation_rmse, 5)} detail="Lower is better" />
-          <MetricCard label="Validation rank IC" value={decimal(selected?.validation_rank_ic, 3)} detail="Cross-sectional ordering; higher is better" />
-        </div>
+      {selected && selectedName && (
+        <Takeaway label="Chosen model" title={selectedName.family}>
+          <p>
+            Picked for the best ranking skill in its weaker validation year: the most consistent candidate, not simply
+            the highest average. It ranks #{selectedRank} of {rows.length} on average ranking skill below.
+          </p>
+          {selectedName.params.length > 0 && <ParamList params={selectedName.params} />}
+        </Takeaway>
+      )}
+      <section className="figures figures--three" aria-label="Chosen model results">
+        <MetricCard label="Ranking skill, validation" info="rankIc" value={decimal(selected?.validation_rank_ic, 3)} detail="2023–2024; higher is better" />
+        <MetricCard label="Prediction error, validation" info="rmse" value={decimal(selected?.validation_rmse, 5)} detail="2023–2024; lower is better" />
+        <MetricCard label="Ranking skill, final test" info="lockedTest" value={decimal(finalIc, 3)} detail="2025–2026, scored once after freezing" />
       </section>
       <Leaderboard rows={rows} />
       <article className="panel">
-        <header><div><span className="panel__kicker">Ablation logic</span><h2>What the comparison proves</h2></div></header>
-        <ol className="research-list research-list--columns">
-          <li><span>01</span><div><strong>Linear baseline</strong><p>Tests whether the result is merely a stable additive factor model.</p></div></li>
-          <li><span>02</span><div><strong>Non-linear tabular baseline</strong><p>Measures what flexible trees capture without a modality gate.</p></div></li>
-          <li><span>03</span><div><strong>Regime-gated MoE</strong><p>Must improve rank quality and survive cost-aware portfolio tests—not only prediction loss.</p></div></li>
+        <header>
+          <div>
+            <h2>Why compare against simpler models?</h2>
+            <p>The mixture of experts only earns its complexity if it beats plainer approaches on the same data.</p>
+          </div>
+        </header>
+        <ol className="reason-list">
+          <li><strong>Linear model</strong><p>Checks whether a simple weighted sum of the same inputs does just as well.</p></li>
+          <li><strong>Tree model</strong><p>Checks what a flexible model finds without the specialists and the gate.</p></li>
+          <li><strong>Mixture of experts</strong><p>Has to beat both on ranking skill, and then hold up in the cost-aware backtest.</p></li>
         </ol>
       </article>
       {summary.data?.metadata.data_mode === "synthetic_fixture" && <DemoNotice />}
@@ -67,36 +78,41 @@ export function ResearchPage() {
 function Leaderboard({ rows }: { rows: ExperimentRecord[] }) {
   const [sort, setSort] = useState<SortKey>("rank_ic");
   const [expanded, setExpanded] = useState(false);
-  const entries = [...rows]
-    .sort((a, b) => sorters[sort](a, b) || a.name.localeCompare(b.name))
-    .map((row, index) => ({ row, rank: index + 1 }));
+  const sortLabelId = useId();
+  const entries = ranked(rows, sort);
   const visible = expanded ? entries : entries.slice(0, PREVIEW_ROWS);
   // Keep the frozen selection on screen even when it ranks below the preview.
   const pinned = expanded ? undefined : entries.find((entry) => entry.row.selected && entry.rank > PREVIEW_ROWS);
   const maxIc = Math.max(...rows.map((row) => Math.abs(row.validation_rank_ic ?? 0)), Number.EPSILON);
   const bestRmse = Math.min(...rows.map((row) => row.validation_rmse));
-  const sortLabel = sort === "rank_ic" ? "rank IC, highest first" : "RMSE, lowest first";
+  const sortLabel = sort === "rank_ic" ? "ranking skill, highest first" : "prediction error, lowest first";
   return (
     <article className="panel leaderboard-panel">
       <header>
         <div>
-          <span className="panel__kicker">Baseline comparison</span>
-          <h2>Every candidate on the same folds</h2>
-          <p>{rows.length} candidates · sorted by validation {sortLabel}</p>
+          <h2>All {rows.length} candidates</h2>
+          <p>Validation results for every model tried, sorted by {sortLabel}. The chosen model is highlighted.</p>
+        </div>
+        <div className="control">
+          <span className="control__label" id={sortLabelId}>Sort by</span>
+          <div className="segmented" role="group" aria-labelledby={sortLabelId}>
+            <button type="button" aria-pressed={sort === "rank_ic"} onClick={() => setSort("rank_ic")}>Ranking skill</button>
+            <button type="button" aria-pressed={sort === "rmse"} onClick={() => setSort("rmse")}>Prediction error</button>
+          </div>
         </div>
       </header>
       <div className="table-scroll">
         <table className="leaderboard" role="table">
-          <caption className="sr-only">Validation metrics for {rows.length} candidate models, sorted by {sortLabel}.</caption>
+          <caption className="sr-only">Validation results for {rows.length} candidate models, sorted by {sortLabel}.</caption>
           <thead role="rowgroup">
             <tr role="row">
               <th scope="col" role="columnheader" className="leaderboard__rank">#</th>
-              <th scope="col" role="columnheader">Model</th>
+              <th scope="col" role="columnheader">Model and settings</th>
               <th scope="col" role="columnheader" aria-sort={sort === "rank_ic" ? "descending" : "none"}>
-                <SortButton active={sort === "rank_ic"} onClick={() => setSort("rank_ic")} icon={ArrowDown}>Rank IC</SortButton>
+                Ranking skill (rank IC) <small>higher is better</small>
               </th>
               <th scope="col" role="columnheader" aria-sort={sort === "rmse" ? "ascending" : "none"}>
-                <SortButton active={sort === "rmse"} onClick={() => setSort("rmse")} icon={ArrowUp}>RMSE</SortButton>
+                Error (RMSE) <small>lower is better</small>
               </th>
             </tr>
           </thead>
@@ -113,23 +129,10 @@ function Leaderboard({ rows }: { rows: ExperimentRecord[] }) {
       </div>
       {rows.length > PREVIEW_ROWS && (
         <button type="button" className="text-button" aria-expanded={expanded} onClick={() => setExpanded((value) => !value)}>
-          {expanded ? `Show top ${PREVIEW_ROWS}` : `Show all ${rows.length} candidates`}
+          {expanded ? `Show top ${PREVIEW_ROWS} only` : `Show all ${rows.length} candidates`}
         </button>
       )}
     </article>
-  );
-}
-
-function SortButton({ active, onClick, icon: Icon, children }: {
-  active: boolean;
-  onClick: () => void;
-  icon: typeof ArrowDown;
-  children: string;
-}) {
-  return (
-    <button type="button" className={active ? "sort-button active" : "sort-button"} onClick={onClick}>
-      {children}{active && <Icon size={13} aria-hidden="true" />}
-    </button>
   );
 }
 
@@ -149,11 +152,11 @@ function LeaderboardRow({ row, rank, maxIc, bestRmse }: {
       <td role="cell">
         <div className="leaderboard__model">
           <strong>{family}</strong>
-          {row.selected && <span className="badge badge--selected">Selected</span>}
+          {row.selected && <span className="badge badge--chosen">Chosen</span>}
         </div>
         {params.length > 0 && <ParamList params={params} />}
       </td>
-      <td role="cell" data-label="Rank IC">
+      <td role="cell" data-label="Ranking skill">
         <div className="ic-cell">
           <span className="ic-bar" aria-hidden="true">
             <i style={ic != null && ic < 0 ? { right: "50%", width: `${width}%` } : { left: "50%", width: `${width}%` }} />
@@ -161,18 +164,25 @@ function LeaderboardRow({ row, rank, maxIc, bestRmse }: {
           <span className="num">{signedDecimal(ic, 3)}</span>
         </div>
       </td>
-      <td role="cell" data-label="RMSE">
+      <td role="cell" data-label="Error (RMSE)">
         <span className="num">{decimal(row.validation_rmse, 5)}</span>
-        <small className="leaderboard__delta">{delta === 0 ? "best" : `+${decimal(delta, 5)}`}</small>
+        <small className="leaderboard__delta">{delta === 0 ? "lowest" : `+${decimal(delta, 5)} vs lowest`}</small>
       </td>
     </tr>
   );
 }
 
 function ParamList({ params }: { params: string[] }) {
-  return <ul className="param-list" aria-label="Hyperparameters">{params.map((param) => <li key={param}>{param}</li>)}</ul>;
+  return <ul className="param-list" aria-label="Settings">{params.map((param) => <li key={param}>{param}</li>)}</ul>;
 }
 
 function DemoNotice() {
-  return <div className="notice"><strong>Verification mode</strong><span>These values come from a deterministic synthetic dataset. They validate model selection, API contracts, and visualization—not market alpha.</span></div>;
+  return (
+    <div className="notice">
+      <div>
+        <strong>Synthetic test data</strong>
+        <span>These values come from a generated dataset that checks the software works. They say nothing about real markets.</span>
+      </div>
+    </div>
+  );
 }

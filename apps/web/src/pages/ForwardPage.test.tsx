@@ -37,8 +37,9 @@ describe("Forward Lab", () => {
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Registry connection pending" })).toBeInTheDocument();
-    expect(screen.getByText(/No synthetic or backfilled rows/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Live results aren't connected here" })).toBeInTheDocument();
+    expect(screen.getByText(/No made-up or back-dated rows/)).toBeInTheDocument();
+    expect(screen.queryByText("Forecasts recorded")).not.toBeInTheDocument();
   });
 
   it("renders an empty but operational prospective registry", async () => {
@@ -93,12 +94,13 @@ describe("Forward Lab", () => {
 
     renderPage();
 
-    expect(await screen.findByText("Registry ready; first qualifying batch pending")).toBeInTheDocument();
+    expect(await screen.findByText("No qualifying forecasts yet")).toBeInTheDocument();
     expect(screen.getByText("Forward runner is healthy and within its freshness window.")).toBeInTheDocument();
-    expect(screen.getByText("Latest quality status")).toBeInTheDocument();
+    expect(screen.getByText(/\(2 min ago\)/)).toBeInTheDocument();
+    expect(screen.getByText("Latest data checks")).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
-    expect(screen.getByText(/1 historical warn/)).toBeInTheDocument();
-    expect(screen.getByText("No forward runs recorded yet.")).toBeInTheDocument();
-    expect(screen.getByText("No qualifying pre-entry forecasts have been recorded.")).toBeInTheDocument();
+    expect(screen.getByText(/1 warned before/)).toBeInTheDocument();
+    expect(screen.getByText("No runs recorded yet.")).toBeInTheDocument();
+    expect(screen.getByText("No forecasts recorded yet.")).toBeInTheDocument();
   });
 });

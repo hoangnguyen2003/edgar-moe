@@ -8,21 +8,11 @@ function describe(weights: Weights): string {
   return EXPERTS.map(({ key, label }) => `${label} ${percent(weights[key], 0)}`).join(", ");
 }
 
-export function ExpertLegend() {
-  return (
-    <ul className="expert-legend" aria-label="Expert colors">
-      {EXPERTS.map(({ key, label }) => (
-        <li key={key}><i className={`expert-swatch expert--${key}`} aria-hidden="true" />{label}</li>
-      ))}
-    </ul>
-  );
-}
-
 /** A stacked bar of the gate's split, with the values printed beneath it. */
 export function ExpertMix({ weights }: { weights: Weights }) {
   return (
     <div className="expert-mix">
-      <div className="expert-mix__bar" role="img" aria-label={`Expert allocation: ${describe(weights)}`}>
+      <div className="expert-mix__bar" role="img" aria-label={`Weight given to each specialist: ${describe(weights)}`}>
         {EXPERTS.map(({ key }) => (
           <span key={key} className={`expert--${key}`} style={{ flexGrow: weights[key] }} />
         ))}
