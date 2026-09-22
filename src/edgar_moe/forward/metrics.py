@@ -35,6 +35,16 @@ def forward_metrics(
     *,
     forecast_count: int,
 ) -> ForwardMetrics:
+    """Score every settled forecast as one pooled sample.
+
+    ``rank_ic`` is a single Spearman correlation over all settled pairs rather
+    than the mean of per-run cross-sectional correlations. A run scores the
+    filings accepted since the previous one - one to four in production - which
+    is too few for a cross-section, so averaging per-run values would dress
+    noise in the name of an information coefficient. The cost is that the
+    figure mixes ordering within a batch with variation between periods.
+    """
+
     if len(scores) != len(labels):
         raise ValueError("Scores and labels must have the same length")
     paired = [

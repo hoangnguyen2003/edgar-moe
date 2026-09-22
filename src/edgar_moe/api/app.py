@@ -527,6 +527,12 @@ def forward_performance(
     forecasts they cover. Early in a forward test the sample is small and these
     figures move a great deal, so the counts are part of the answer.
 
+    The rank IC is one Spearman correlation pooled over every settled
+    (score, return) pair, not the average of per-run cross-sectional
+    correlations: a run scores one to four filings, too few for a
+    cross-section. It therefore mixes ordering with variation between periods
+    and is not comparable to the locked study's rank IC.
+
     `rank_ic_low` and `rank_ic_high` bound the rank IC at 95% confidence,
     treating settled forecasts as independent. Forecasts from one run share a
     trading day, so a true interval is wider.
