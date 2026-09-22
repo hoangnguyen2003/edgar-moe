@@ -1,0 +1,82 @@
+name: Measure forward scheduler lateness
+
+on:
+  workflow_dispatch:
+    inputs:
+      lookback_days:
+        description: "Number of recent calendar days to inspect"
+        required: true
+        default: "30"
+        type: string
+      limit:
+        description: "Maximum scheduled runs to request (1-100)"
+        required: true
+        default: "30"
+        type: string
+
+concurrency:
+  group: measure-forward-scheduler-lateness
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  measure:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      REPORT_DIR: reports/scheduler-lateness
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Measure schedule and queue delay
+        id: measure
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          LOOKBACK_DAYS: ${{ inputs.lookback_days }}
+          RUN_LIMIT: ${{ inputs.limit }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p "$REPORT_DIR"
+          python3 scripts/measure_scheduler_lateness.py \
+            --lookback-days "$LOOKBACK_DAYS" \
+            --limit "$RUN_LIMIT" \
+            --output "$REPORT_DIR/summary.json"
+          exit_code=$?
+          set -e
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+          exit "$exit_code"
+
+      - name: Hash retained scheduler-lateness evidence
+        id: hash
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$REPORT_DIR/summary.json"
+          sha256sum "$REPORT_DIR/summary.json" > "$REPORT_DIR/SHA256SUMS"
+
+      - name: Verify retained evidence is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: python3 scripts/validate_redacted_artifacts.py --root "$REPORT_DIR"
+
+      - name: Upload redacted scheduler-lateness evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' && steps.hash.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: forward-scheduler-lateness-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/scheduler-lateness/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless scheduler lateness was observed
+        if: ${{ always() && (steps.measure.outputs.exit_code != '0' || steps.redaction.outcome != 'success' || steps.hash.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "Scheduler lateness measurement did not produce valid evidence; inspect the retained artifact." >&2
+          exit 1

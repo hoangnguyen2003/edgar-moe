@@ -63,6 +63,17 @@ not presented as an exactly-once distributed scheduler.
    `scheduler_origin: unproven_by_github_run_metadata` because GitHub metadata
    cannot prove whether Cloudflare or a human initiated the dispatch.
 
+   To quantify the existing GitHub schedule's lateness, run **Measure forward
+   scheduler lateness** from the Actions tab. This read-only workflow requests
+   recent `schedule` runs for `forward-production.yml`, compares each
+   `created_at` with the expected `17 7 * * 2-6` UTC occurrence, and reports
+   queue delay through `run_started_at`. It retains only bounded timestamps,
+   run IDs, commit hashes, integer delay summaries, and stable validation codes
+   in a hashed redacted artifact. The result is an observation of GitHub's
+   recorded timing, not a start-time SLO or proof that Cloudflare initiated a
+   run. A `blocked` result means the metadata was incomplete or no run fell in
+   the requested lookback window.
+
 4. Only after that observation, open a separate PR that removes the
    `schedule:` trigger from `.github/workflows/forward-production.yml` while
    retaining `workflow_dispatch`. Keep the PR link and the first dispatch run as
