@@ -35,7 +35,8 @@ signal.
   therefore requires a research-design decision.
 - A Cloudflare/Vercel/external scheduler could preserve the current cutoff, but
   it introduces an external service, credentials, and a new operational failure
-  boundary that has not been approved.
+  boundary. ADR 0023 stages a narrow Cloudflare adapter without activating it;
+  deployment and cutover still require explicit operational approval.
 - Ignoring the delay leaves a known timing risk invisible to operators.
 
 ## Consequences

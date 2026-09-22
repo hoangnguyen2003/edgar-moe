@@ -306,7 +306,7 @@ close it alone.
 | Reader role in production | The API should read the registry with a verified SELECT-only role. Until then, the public Live tracking page reports "not connected". | Run [`provision-reader.sql`](../ops/postgres/provision-reader.sql), set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` in Vercel, then run the [reader audit](../.github/workflows/provider-reader-contract-audit.yml) | Maintainer |
 | Provider restore drill | The RPO and RTO are unproven until a restore runs against the provider | Follow the [restore rehearsal](restore-rehearsal.md) into an isolated target, and record the evidence packet | Maintainer |
 | Object-store failure exercise | Partial-write recovery is tested locally, not against the hosted target | Run the provider R2 audit after an injected failure | Maintainer |
-| Scheduler lateness ([#156](https://github.com/hoangnguyen2003/edgar-moe/issues/156)) | Runs finish roughly 40–100 minutes before the open | Choose between an external scheduler and an earlier cron (a research-design change) | Maintainer |
+| Scheduler lateness ([#156](https://github.com/hoangnguyen2003/edgar-moe/issues/156)) | Runs finish roughly 40–100 minutes before the open | Deploy and observe the optional [Cloudflare scheduler adapter](../ops/scheduler/README.md), then cut over in a separate PR; an earlier cron remains a research-design change | Maintainer |
 | Alert delivery | Failures are recorded but not yet pushed to a person | Configure a webhook recipient and exercise the failure cases | Maintainer |
 | Redistribution terms | Derived outputs are public under operator review | Confirm the source terms, then update `data-provenance.json` | Maintainer |
 | Known v1 defects | Mixed-period fundamentals and over-regularized baselines | Disclosed and kept frozen. Later studies use [ADR 0015](adr/0015-xbrl-fact-selection-policy.md) and [ADR 0017](adr/0017-post-v1-selection-protocol.md). | Research |
@@ -323,6 +323,6 @@ Five decisions carry most of the design:
 2. **Freeze v1, and judge changes only prospectively** ([0002](adr/0002-freeze-v1-prospective-evaluation.md)): results cannot be tuned after the fact.
 3. **Verify the snapshot at serving time and at every deploy** ([0004](adr/0004-runtime-snapshot-lock.md)): what visitors see is provably what was reviewed.
 4. **Append-only evidence enforced in the database** ([0016](adr/0016-database-append-only-triggers.md)): integrity does not depend on application discipline.
-5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded.
+5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0023](adr/0023-external-forward-scheduler.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded, with an optional external trigger staged behind an observed cutover.
 
-The [ADR index](adr/README.md) lists all 21 decisions by theme.
+The [ADR index](adr/README.md) lists all 23 decisions by theme.
