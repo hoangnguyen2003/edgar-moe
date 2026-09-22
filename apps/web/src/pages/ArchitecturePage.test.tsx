@@ -59,7 +59,9 @@ describe("Architecture page", () => {
       "href",
       "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0022-copilot-review-profiles.md",
     );
-    expect(within(decisions).getByText(/Seven of the 23 recorded decisions/)).toBeInTheDocument();
+    // scripts/validate_adr_catalog.py owns the exact count; it must match the
+    // records on disk, so asserting it here as well only duplicates that check.
+    expect(within(decisions).getByText(/Seven of the \d+ recorded decisions/)).toBeInTheDocument();
     expect(screen.getByText(/--expect-lock config\/public_snapshot.lock.json/)).toBeInTheDocument();
   });
 
