@@ -329,3 +329,64 @@ jobs:
             uv run edgar-moe forward-status
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+  prune-forward-runtime-caches:
+    name: Prune old forward runtime caches
+    # Cache maintenance must not hide a completed forecast cycle, but it must
+    # still run after a failed cycle when a resumable cache was written.
+    if: ${{ always() && needs.forecast-and-settle.result != 'cancelled' }}
+    needs: forecast-and-settle
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # This job has no checkout, dependencies, or production secrets. Its
+    # narrowly scoped token can list/delete Actions caches only.
+    permissions:
+      actions: write
+    steps:
+      - name: Retain the two newest forward runtime caches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cache_endpoint="/repos/${REPOSITORY}/actions/caches?per_page=100"
+          cache_payload="$(gh api --paginate --slurp "$cache_endpoint")"
+          mapfile -t stale_caches < <(
+            printf '%s' "$cache_payload" | jq -r '
+                [ .[] | .actions_caches[]?
+                  | select(.key | startswith("forward-runtime-")) ]
+                | sort_by(.created_at)
+                | reverse
+                | .[2:]
+                | .[]
+                | [.id, .key, .created_at]
+                | @tsv
+              '
+          )
+
+          if (( ${#stale_caches[@]} == 0 )); then
+            echo "Forward runtime cache set is already bounded (two newest retained)."
+          else
+            for cache in "${stale_caches[@]}"; do
+              IFS=$'\t' read -r cache_id cache_key created_at <<< "$cache"
+              echo "Deleting stale forward runtime cache ${cache_id} (${cache_key}, created ${created_at})."
+              gh api --method DELETE \
+                "/repos/${REPOSITORY}/actions/caches/${cache_id}" \
+                >/dev/null
+            done
+          fi
+
+          remaining_payload="$(gh api --paginate --slurp "$cache_endpoint")"
+          remaining_bytes="$(printf '%s' "$remaining_payload" | jq -r '
+            [ .[] | .actions_caches[]? | (.size_in_bytes // 0) ]
+            | add // 0
+          ')"
+          printf 'Actions cache usage after cleanup: %s bytes\n' "$remaining_bytes"
+          if (( remaining_bytes > 10000000000 )); then
+            echo "::error::Actions cache usage remains above the 10 GB repository quota."
+            exit 1
+          fi
+
+          echo "Deleted ${#stale_caches[@]} stale forward runtime cache(s); two newest retained and repository cache usage is under 10 GB."
