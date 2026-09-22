@@ -1,22 +1,22 @@
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
-interface MetricCardProps {
+/** A key figure, set like a line in a financial summary. */
+export function MetricCard({
+  label,
+  value,
+  detail,
+  adornment,
+}: {
   label: string;
   value: string;
-  detail: string;
-  icon: LucideIcon;
-  tone?: "green" | "amber" | "blue";
-}
-
-export function MetricCard({ label, value, detail, icon: Icon, tone = "green" }: MetricCardProps) {
+  detail?: string;
+  adornment?: ReactNode;
+}) {
   return (
-    <article className={`metric-card metric-card--${tone}`}>
-      <div className="metric-card__top">
-        <span>{label}</span>
-        <Icon size={18} aria-hidden="true" />
-      </div>
-      <strong>{value}</strong>
-      <small>{detail}</small>
+    <article className="figure">
+      <span className="figure__label">{label}</span>
+      <strong className="figure__value">{adornment}{value}</strong>
+      {detail && <small className="figure__detail">{detail}</small>}
     </article>
   );
 }

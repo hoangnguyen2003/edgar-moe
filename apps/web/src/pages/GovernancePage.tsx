@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   CheckCircle2,
   Clock3,
-  Fingerprint,
   GitBranch,
   LockKeyhole,
   ShieldCheck,
@@ -13,6 +12,13 @@ import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
 import { dateTime, humanize } from "../lib/format";
 import type { GovernanceControl, GovernanceResponse } from "../lib/types";
+
+const CONTROL_LABELS: Record<string, string> = {
+  frozen_v1_identity: "Frozen v1 identity",
+  pre_entry_forecasts: "Pre-entry forecasts",
+  append_only_outcomes: "Append-only outcomes",
+  provider_operations: "Provider operations",
+};
 
 export function GovernancePage() {
   const governance = useQuery({ queryKey: ["governance"], queryFn: api.governance });
@@ -31,7 +37,7 @@ export function GovernancePage() {
 
   return (
     <div className="page">
-      <PageHeader kicker="Governance plane" title="Evidence with an explicit boundary.">
+      <PageHeader section="07" kicker="Governance plane" title="Evidence with an explicit boundary.">
         The frozen v1 identity, public-data boundary, and prospective controls are
         presented together so a reader can distinguish repository evidence from
         provider-side observations.
@@ -100,7 +106,7 @@ function FrozenIdentity({ identity }: { identity: GovernanceResponse["frozen_v1"
           <span className="panel__kicker">Frozen v1</span>
           <h2>Content-addressed identity</h2>
         </div>
-        <Fingerprint size={20} aria-hidden="true" />
+        <span className="stamp">Frozen v1</span>
       </header>
       <dl className="governance-facts">
         <div><dt>Snapshot</dt><dd><code>{identity.path}</code></dd></div>
@@ -152,7 +158,7 @@ function ControlRow({ control }: { control: GovernanceControl }) {
   return (
     <div className={`governance-control ${enforced ? "" : "governance-control--pending"}`}>
       {enforced ? <CheckCircle2 size={16} aria-hidden="true" /> : <Clock3 size={16} aria-hidden="true" />}
-      <div><strong>{humanize(control.key)}</strong><span>{control.summary}</span></div>
+      <div><strong>{CONTROL_LABELS[control.key] ?? humanize(control.key)}</strong><span>{control.summary}</span></div>
       <small>{enforced ? "Enforced" : "Operator evidence"}</small>
     </div>
   );

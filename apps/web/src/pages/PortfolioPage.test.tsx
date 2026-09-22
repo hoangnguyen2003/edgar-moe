@@ -45,18 +45,18 @@ describe("Portfolio page", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><PortfolioPage /></QueryClientProvider>);
 
-    expect(await screen.findByText("-0.63", { selector: ".metric-strip strong" })).toBeInTheDocument();
+    expect(await screen.findByText("-0.63", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "10 bps" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Start")).toHaveTextContent("Start 1.00");
 
     fireEvent.click(screen.getByRole("button", { name: "25 bps" }));
 
     expect(screen.getByRole("button", { name: "25 bps" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("-0.63", { selector: ".metric-strip strong" })).toBeInTheDocument();
+    expect(screen.getByText("-0.63", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Portfolio metrics at 10 bps").closest(".scenario")).toHaveAttribute("aria-busy", "true");
 
     release(jsonResponse(curve(25, -0.91)));
-    expect(await screen.findByText("-0.91", { selector: ".metric-strip strong" })).toBeInTheDocument();
+    expect(await screen.findByText("-0.91", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Portfolio metrics at 25 bps").closest(".scenario")).toHaveAttribute("aria-busy", "false");
   });
 });

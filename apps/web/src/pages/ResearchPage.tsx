@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowDown, ArrowUp, CheckCircle2, GitCompareArrows } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
@@ -30,18 +30,25 @@ export function ResearchPage() {
   const selectedName = selected ? splitModelName(selected.name) : null;
   return (
     <div className="page">
-      <PageHeader kicker="Experiment registry" title="Models earn their place.">
+      <PageHeader section="02" kicker="Experiment registry" title="Models earn their place.">
         All candidates use identical chronological splits. Selection uses pre-test folds only; the frozen locked result is reported separately.
       </PageHeader>
-      <section className="content-grid content-grid--three" aria-label="Selected model">
-        <article className="metric-card metric-card--green">
-          <div className="metric-card__top"><span>Selected model</span><CheckCircle2 size={18} aria-hidden="true" /></div>
-          <strong className="metric-card__model">{selectedName?.family ?? "—"}</strong>
+      <section className="selection" aria-label="Selected model">
+        <article className="panel selection__model">
+          <header>
+            <div>
+              <span className="panel__kicker">Selected model</span>
+              <h2>{selectedName?.family ?? "—"}</h2>
+            </div>
+            <span className="stamp">Frozen</span>
+          </header>
           {selectedName && selectedName.params.length > 0 && <ParamList params={selectedName.params} />}
-          <small>{selected?.best_epoch != null ? `Best epoch ${selected.best_epoch}` : "Chosen on pre-test folds"}</small>
+          <p className="panel__note">{selected?.best_epoch != null ? `Best epoch ${selected.best_epoch}. ` : ""}Chosen on pre-test folds; the locked test is reported separately.</p>
         </article>
-        <MetricCard label="Validation RMSE" value={decimal(selected?.validation_rmse, 5)} detail="Lower is better" icon={GitCompareArrows} tone="blue" />
-        <MetricCard label="Validation rank IC" value={decimal(selected?.validation_rank_ic, 3)} detail="Cross-sectional ordering; higher is better" icon={GitCompareArrows} tone="amber" />
+        <div className="figures figures--stack">
+          <MetricCard label="Validation RMSE" value={decimal(selected?.validation_rmse, 5)} detail="Lower is better" />
+          <MetricCard label="Validation rank IC" value={decimal(selected?.validation_rank_ic, 3)} detail="Cross-sectional ordering; higher is better" />
+        </div>
       </section>
       <Leaderboard rows={rows} />
       <article className="panel">
