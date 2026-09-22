@@ -228,6 +228,10 @@ class ForwardPerformanceResponse(BaseModel):
     pending_count: int
     coverage: float = Field(ge=0, le=1)
     rank_ic: float | None
+    #: 95% interval for the rank IC, treating settled forecasts as independent;
+    #: null until enough outcomes have settled to state one.
+    rank_ic_low: float | None = Field(default=None, ge=-1, le=1)
+    rank_ic_high: float | None = Field(default=None, ge=-1, le=1)
     rmse: float | None
     mae: float | None
     directional_accuracy: float | None

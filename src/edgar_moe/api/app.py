@@ -526,6 +526,10 @@ def forward_performance(
     Rank IC, RMSE, MAE, and directional accuracy, with the share of recorded
     forecasts they cover. Early in a forward test the sample is small and these
     figures move a great deal, so the counts are part of the answer.
+
+    `rank_ic_low` and `rank_ic_high` bound the rank IC at 95% confidence,
+    treating settled forecasts as independent. Forecasts from one run share a
+    trading day, so a true interval is wider.
     """
     _cache_live(response)
     if registry is None:
@@ -536,6 +540,8 @@ def forward_performance(
             pending_count=0,
             coverage=0.0,
             rank_ic=None,
+            rank_ic_low=None,
+            rank_ic_high=None,
             rmse=None,
             mae=None,
             directional_accuracy=None,

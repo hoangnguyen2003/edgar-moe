@@ -626,6 +626,8 @@ class ForwardRegistry:
             "pending_count": metrics.pending_count,
             "coverage": metrics.coverage,
             "rank_ic": metrics.rank_ic,
+            "rank_ic_low": metrics.rank_ic_low,
+            "rank_ic_high": metrics.rank_ic_high,
             "rmse": metrics.rmse,
             "mae": metrics.mae,
             "directional_accuracy": metrics.directional_accuracy,

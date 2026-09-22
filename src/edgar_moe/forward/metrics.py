@@ -4,6 +4,14 @@ import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+#: Confidence level of the reported rank-IC interval.
+RANK_IC_CONFIDENCE = 0.95
+#: Two-sided normal quantile for ``RANK_IC_CONFIDENCE``.
+_RANK_IC_Z = 1.959964
+#: Fisher's transform is undefined at the ends; below this many pairs the
+#: Bonett-Wright standard error has no degrees of freedom left either.
+_RANK_IC_MINIMUM_PAIRS = 4
+
 
 @dataclass(frozen=True)
 class ForwardMetrics:
@@ -12,6 +20,10 @@ class ForwardMetrics:
     pending_count: int
     coverage: float
     rank_ic: float | None
+    #: Bounds of the rank IC's confidence interval, or ``None`` when too few
+    #: outcomes have settled to state one.
+    rank_ic_low: float | None
+    rank_ic_high: float | None
     rmse: float | None
     mae: float | None
     directional_accuracy: float | None
@@ -40,23 +52,57 @@ def forward_metrics(
             pending_count=pending_count,
             coverage=coverage,
             rank_ic=None,
+            rank_ic_low=None,
+            rank_ic_high=None,
             rmse=None,
             mae=None,
             directional_accuracy=None,
         )
     score_values, label_values = zip(*paired, strict=True)
     errors = [score - label for score, label in paired]
+    rank_ic = _spearman(score_values, label_values)
+    rank_ic_low, rank_ic_high = rank_ic_interval(rank_ic, matured_count)
     return ForwardMetrics(
         forecast_count=forecast_count,
         matured_count=matured_count,
         pending_count=pending_count,
         coverage=coverage,
-        rank_ic=_spearman(score_values, label_values),
+        rank_ic=rank_ic,
+        rank_ic_low=rank_ic_low,
+        rank_ic_high=rank_ic_high,
         rmse=math.sqrt(sum(error * error for error in errors) / matured_count),
         mae=sum(abs(error) for error in errors) / matured_count,
         directional_accuracy=sum((score >= 0) == (label >= 0) for score, label in paired)
         / matured_count,
     )
+
+
+def rank_ic_interval(
+    rank_ic: float | None,
+    pair_count: int,
+) -> tuple[float | None, float | None]:
+    """Confidence interval for a Spearman rank IC, by Fisher's transform.
+
+    Uses the Bonett-Wright standard error for rank correlation,
+    ``sqrt((1 + rho**2 / 2) / (n - 3))``, transformed back through ``tanh``, so
+    the interval stays inside [-1, 1] and is asymmetric near the ends.
+
+    The interval treats the settled forecasts as independent. Forecasts from
+    one run share a trading day, so their outcomes are cross-correlated and a
+    true interval is wider than this one. It is reported to show how little a
+    handful of outcomes can settle, not to claim significance.
+    """
+
+    if rank_ic is None or pair_count < _RANK_IC_MINIMUM_PAIRS:
+        return None, None
+    if abs(rank_ic) >= 1.0:
+        # Fisher's transform diverges at the ends; a perfect rank correlation
+        # over this sample has no room left to move.
+        return rank_ic, rank_ic
+    standard_error = math.sqrt((1.0 + rank_ic**2 / 2.0) / (pair_count - 3))
+    centre = math.atanh(rank_ic)
+    margin = _RANK_IC_Z * standard_error
+    return math.tanh(centre - margin), math.tanh(centre + margin)
 
 
 def percentile_ranks(values: Sequence[float]) -> list[float]:

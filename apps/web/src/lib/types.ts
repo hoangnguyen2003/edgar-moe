@@ -201,6 +201,8 @@ export interface ForwardPerformanceResponse {
   pending_count: number;
   coverage: number;
   rank_ic: number | null;
+  rank_ic_low: number | null;
+  rank_ic_high: number | null;
   rmse: number | null;
   mae: number | null;
   directional_accuracy: number | null;

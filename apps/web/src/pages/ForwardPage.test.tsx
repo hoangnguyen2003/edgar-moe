@@ -110,7 +110,7 @@ describe("Forward Lab", () => {
       });
       if (url.includes("/performance")) return jsonResponse({
         model_id: "edgar-moe-frozen-v1", forecast_count: 200, matured_count: 120, pending_count: 80,
-        coverage: 0.6, rank_ic: 0.02, rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
+        coverage: 0.6, rank_ic: 0.02, rank_ic_low: -0.16, rank_ic_high: 0.2, rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
       });
       if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 200, offset: 0, limit: 50 });
       return jsonResponse([]);
@@ -120,6 +120,9 @@ describe("Forward Lab", () => {
 
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     expect(screen.queryByText("Too early to read these numbers")).not.toBeInTheDocument();
+    // An interval spanning 0 is the honest reading of 120 settled outcomes.
+    expect(screen.getByText("95% interval -0.16 to 0.20")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is 95% interval?" })).toBeInTheDocument();
   });
 
   it("renders an empty but operational prospective registry", async () => {
@@ -153,6 +156,8 @@ describe("Forward Lab", () => {
         pending_count: 0,
         coverage: 0,
         rank_ic: null,
+        rank_ic_low: null,
+        rank_ic_high: null,
         rmse: null,
         mae: null,
         directional_accuracy: null,
