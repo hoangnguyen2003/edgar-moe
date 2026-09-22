@@ -34,6 +34,30 @@ def test_manual_scheduler_deployment_workflow_passes() -> None:
     assert "scheduler deployment workflow contract passed" in result.stdout
 
 
+def test_scheduler_workflow_rejects_secret_outside_step_environment(tmp_path: Path) -> None:
+    workflow = tmp_path / WORKFLOW.name
+    workflow.write_text(
+        WORKFLOW.read_text(encoding="utf-8").replace(
+            "    environment:\n      name: scheduler\n",
+            "    environment:\n"
+            "      name: scheduler\n"
+            "      leaked: ${{ secrets.CLOUDFLARE_API_TOKEN }}\n",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [sys.executable, str(WORKFLOW_SCRIPT), str(workflow)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "scheduler deployment workflow contract failed" in result.stderr
+
+
 def test_scheduler_config_rejects_secrets_and_schedule_drift(tmp_path: Path) -> None:
     config = tmp_path / "wrangler.toml"
     config.write_text(
