@@ -1,0 +1,72 @@
+name: Observe optional forward scheduler
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "GitHub Actions run ID created by the first scheduler dispatch"
+        required: true
+        type: string
+
+concurrency:
+  group: observe-forward-scheduler
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Verify selected dispatch run
+        id: verify
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_ID: ${{ inputs.run_id }}
+        shell: bash
+        run: |
+          set +e
+          mkdir -p reports/scheduler-observation
+          python3 scripts/verify_scheduler_dispatch.py \
+            --run-id "$RUN_ID" \
+            --output reports/scheduler-observation/dispatch.json
+          exit_code=$?
+          set -e
+          echo "exit_code=$exit_code" >> "$GITHUB_OUTPUT"
+
+      - name: Hash retained observation
+        id: hash
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s reports/scheduler-observation/dispatch.json
+          sha256sum reports/scheduler-observation/dispatch.json \
+            > reports/scheduler-observation/SHA256SUMS
+
+      - name: Verify retained observation is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: python3 scripts/validate_redacted_artifacts.py --root reports/scheduler-observation
+
+      - name: Upload redacted scheduler observation
+        if: ${{ always() && steps.redaction.outcome == 'success' && steps.hash.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: forward-scheduler-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/scheduler-observation/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless observation passed
+        if: ${{ always() && (steps.verify.outputs.exit_code != '0' || steps.redaction.outcome != 'success' || steps.hash.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "Scheduler dispatch observation did not pass; inspect the retained redacted artifact." >&2
+          exit 1

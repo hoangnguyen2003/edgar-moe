@@ -52,6 +52,11 @@ rollback path until the cutover has its own evidence.
 
 ## Verification
 
-The Worker contract tests run in CI with Node 24. The eventual cutover requires
-one observed dispatch, a successful forward run, and review of its recorded
-`pre_open_schedule_margin`; only then can the GitHub schedule be removed.
+The Worker contract tests run in CI with Node 24. The repository also provides
+the manual **Observe optional forward scheduler** workflow. It uses only
+`actions: read` and `contents: read`, validates one selected run's event,
+workflow path, ref, commit, and recency, hashes a redacted report, and records
+that scheduler origin is unproven by GitHub metadata. The eventual cutover
+requires one observed dispatch, a successful forward run, and review of its
+recorded `pre_open_schedule_margin`; only then can the GitHub schedule be
+removed.
