@@ -18,13 +18,20 @@ export function ExpertLegend() {
   );
 }
 
-/** One stacked bar showing how the gate split a forecast across experts. */
+/** A stacked bar of the gate's split, with the values printed beneath it. */
 export function ExpertMix({ weights }: { weights: Weights }) {
   return (
-    <div className="expert-mix" role="img" aria-label={`Expert allocation: ${describe(weights)}`}>
-      {EXPERTS.map(({ key }) => (
-        <span key={key} className={`expert--${key}`} style={{ flexGrow: weights[key] }} />
-      ))}
+    <div className="expert-mix">
+      <div className="expert-mix__bar" role="img" aria-label={`Expert allocation: ${describe(weights)}`}>
+        {EXPERTS.map(({ key }) => (
+          <span key={key} className={`expert--${key}`} style={{ flexGrow: weights[key] }} />
+        ))}
+      </div>
+      <p className="expert-mix__values" aria-hidden="true">
+        {EXPERTS.map(({ key, label }) => (
+          <span key={key}><i className={`expert-swatch expert--${key}`} />{label} {percent(weights[key], 0)}</span>
+        ))}
+      </p>
     </div>
   );
 }

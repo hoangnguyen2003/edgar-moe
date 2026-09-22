@@ -11,21 +11,23 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
-import { chartTheme } from "../lib/chartTheme";
+import { useChartTheme } from "../lib/chartTheme";
 import { decimal, monthYear, percent, shortDate } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
 import type { EquityPoint } from "../lib/types";
 import { REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
 const COSTS = [10, 25, 50];
-const tick = { fill: chartTheme.tick, fontSize: 12, fontFamily: chartTheme.font };
 
 export function PortfolioPage() {
   const [cost, setCost] = useState(10);
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
+  const chartTheme = useChartTheme();
+  const tick = { fill: chartTheme.tick, fontSize: 12, fontFamily: chartTheme.font };
   // Keep the current scenario on screen while another one loads.
   const curve = useQuery({
     queryKey: ["equity", cost],
@@ -45,6 +47,7 @@ export function PortfolioPage() {
   return (
     <div className="page">
       <PageHeader
+        section="03"
         kicker="Cost-aware backtest"
         title="Returns after friction."
         aside={
@@ -66,12 +69,12 @@ export function PortfolioPage() {
         Overlapping 20-session signals are rebalanced under gross, net, beta, industry, and name constraints. Negative outcomes remain visible.
       </PageHeader>
       <div className={updating ? "scenario is-updating" : "scenario"} aria-busy={updating}>
-        <section className="metric-strip" aria-label={`Portfolio metrics at ${data.cost_bps} bps`}>
-          <Metric label="Annual return" value={percent(metrics.annualized_return)} />
-          <Metric label="Volatility" value={percent(metrics.annualized_volatility)} />
-          <Metric label="Sharpe" value={decimal(metrics.sharpe)} />
-          <Metric label="Max drawdown" value={percent(metrics.maximum_drawdown)} />
-          <Metric label="Avg turnover" value={percent(metrics.average_turnover)} />
+        <section className="figures figures--five" aria-label={`Portfolio metrics at ${data.cost_bps} bps`}>
+          <MetricCard label="Annual return" value={percent(metrics.annualized_return)} />
+          <MetricCard label="Volatility" value={percent(metrics.annualized_volatility)} />
+          <MetricCard label="Sharpe" value={decimal(metrics.sharpe)} />
+          <MetricCard label="Max drawdown" value={percent(metrics.maximum_drawdown)} />
+          <MetricCard label="Avg turnover" value={percent(metrics.average_turnover)} />
         </section>
         <article className="panel chart-panel chart-panel--large">
           <header>
@@ -100,12 +103,12 @@ export function PortfolioPage() {
                     type="monotone"
                     dataKey="equity"
                     name="Equity"
-                    stroke={chartTheme.accent}
+                    stroke={chartTheme.series}
                     strokeWidth={2}
-                    fill={chartTheme.accent}
-                    fillOpacity={0.1}
+                    fill={chartTheme.series}
+                    fillOpacity={0.12}
                     dot={false}
-                    activeDot={{ r: 4, fill: chartTheme.accent, stroke: chartTheme.surface, strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: chartTheme.series, stroke: chartTheme.surface, strokeWidth: 2 }}
                     isAnimationActive={!reducedMotion}
                   />
                 </AreaChart>
@@ -181,8 +184,4 @@ function EquityTooltip({ active, payload }: TooltipContentProps) {
       <small>Drawdown {percent(point.drawdown)}</small>
     </div>
   );
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div><span>{label}</span><strong>{value}</strong></div>;
 }

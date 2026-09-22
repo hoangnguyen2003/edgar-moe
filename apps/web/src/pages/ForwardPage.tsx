@@ -64,7 +64,7 @@ export function ForwardPage() {
     : status.data.latest_quality_warnings
       ? `${status.data.latest_quality_warnings} warn`
       : "Passing";
-  const latestQualityIcon = status.data.latest_quality_failures
+  const LatestQualityIcon = status.data.latest_quality_failures
     ? TriangleAlert
     : status.data.latest_quality_warnings
       ? Activity
@@ -88,11 +88,11 @@ export function ForwardPage() {
 
       <ForwardHealthBanner status={status.data} />
 
-      <section className="metric-grid">
-        <MetricCard label="Recorded forecasts" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} awaiting maturity`} icon={Orbit} />
-        <MetricCard label="Forward rank IC" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} label coverage`} icon={ShieldCheck} tone="blue" />
-        <MetricCard label="Forward RMSE" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} matured outcomes`} icon={DatabaseZap} tone="amber" />
-        <MetricCard label="Latest quality status" value={latestQualityLabel} detail={historicalQualityDetail} icon={latestQualityIcon} />
+      <section className="figures" aria-label="Forward evidence">
+        <MetricCard label="Recorded forecasts" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} awaiting maturity`} />
+        <MetricCard label="Forward rank IC" value={decimal(metrics.rank_ic, 3)} detail={`${percent(metrics.coverage)} label coverage`} />
+        <MetricCard label="Forward RMSE" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} matured outcomes`} />
+        <MetricCard label="Latest quality status" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>
 
       {metrics.forecast_count === 0 && (
@@ -157,7 +157,7 @@ function formatAge(seconds: number): string {
 
 function ForwardHeader() {
   return (
-    <PageHeader kicker="Prospective evaluation" title="Evidence that cannot look ahead.">
+    <PageHeader section="06" kicker="Prospective evaluation" title="Evidence that cannot look ahead.">
       The v1 research result stays frozen. New filing forecasts are timestamped before entry, stored with content hashes, and evaluated only when their outcomes become observable.
     </PageHeader>
   );
@@ -169,6 +169,7 @@ function UnconfiguredForwardLab({ configured }: { configured: boolean }) {
       <ForwardHeader />
       <section className="forward-empty panel">
         <div className="forward-empty__icon" aria-hidden="true"><Orbit size={30} /></div>
+        <span className="stamp">Append-only</span>
         <span className="panel__kicker">Infrastructure state</span>
         <h2>{configured ? "Registry temporarily unavailable" : "Registry connection pending"}</h2>
         <p>{configured ? "The database is configured, but the API could not read it. Historical research remains available elsewhere in the terminal." : "The application and append-only schema are ready. This deployment has no database URL, so it cannot claim or display prospective observations yet."}</p>

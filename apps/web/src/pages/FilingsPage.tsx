@@ -69,7 +69,7 @@ export function FilingsPage() {
 
   return (
     <div className="page">
-      <PageHeader kicker="Event intelligence" title="Open the black box.">
+      <PageHeader section="04" kicker="Event intelligence" title="Open the black box.">
         Inspect predictions at the filing level, including modality weights and realized outcomes only after the horizon matures.
       </PageHeader>
       <div className="filter-bar">

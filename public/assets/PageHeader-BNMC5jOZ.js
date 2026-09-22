@@ -1,1 +1,0 @@
-import{j as e}from"./index-ClMjP9UQ.js";function d({kicker:s,title:n,children:a,aside:r}){return e.jsxs("header",{className:r?"page-header page-header--inline":"page-header",children:[e.jsxs("div",{children:[e.jsx("span",{className:"kicker",children:s}),e.jsx("h1",{children:n}),a&&e.jsx("p",{children:a})]}),r]})}export{d as P};

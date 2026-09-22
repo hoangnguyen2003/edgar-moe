@@ -17,13 +17,13 @@ export function MethodologyPage() {
   ];
   return (
     <div className="page">
-      <PageHeader kicker="Reproducibility contract" title="Method before metric.">
+      <PageHeader section="08" kicker="Reproducibility contract" title="Method before metric.">
         The project is designed so a skeptical reviewer can trace every score back to what was known when the decision was made.
       </PageHeader>
       <ol className="method-flow" aria-label="Research pipeline">
         {steps.map(({ icon: Icon, title, text }, index) => (
           <li key={title}>
-            <span>0{index + 1}</span>
+            <span>§ 8.{index + 1}</span>
             <Icon size={22} aria-hidden="true" />
             <h2>{title}</h2>
             <p>{text}</p>
@@ -32,7 +32,7 @@ export function MethodologyPage() {
       </ol>
       <section className="content-grid content-grid--two">
         <article className="panel"><header><div><span className="panel__kicker">Target</span><h2>{data.target}</h2></div></header><dl className="method-facts"><div><dt>Split</dt><dd>{data.split}</dd></div><div><dt>Costs</dt><dd>{data.costs}</dd></div></dl></article>
-        <article className="panel limitations"><header><div><span className="panel__kicker">Known limitations</span><h2>Claims we do not make</h2></div><AlertOctagon size={20} aria-hidden="true" /></header><ul>{data.limitations.map((item) => <li key={item}>{item}</li>)}</ul></article>
+        <article className="panel limitations"><header><div><span className="panel__kicker">Risk factors</span><h2>Claims we do not make</h2></div><AlertOctagon size={20} aria-hidden="true" /></header><ul>{data.limitations.map((item) => <li key={item}>{item}</li>)}</ul></article>
       </section>
     </div>
   );
