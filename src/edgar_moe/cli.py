@@ -1429,6 +1429,242 @@ def research_copilot(
         typer.echo(serialized.decode())
 
 
+@app.command("research-copilot-panel")
+def research_copilot_panel(
+    question: Annotated[
+        str,
+        typer.Argument(help="Evidence-grounded question for the specialist review panel."),
+    ],
+    profiles: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--profile",
+            help=(
+                "Review perspective to run; repeat for multiple profiles. Defaults to quant, "
+                "architect, and operations."
+            ),
+        ),
+    ] = None,
+    snapshot: Annotated[
+        Path,
+        typer.Option("--snapshot", help="Immutable snapshot JSON used by the read-only tools."),
+    ] = Path("data/demo/snapshot.json"),
+    database_url: Annotated[
+        str | None,
+        typer.Option(
+            "--database-url",
+            envvar="EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
+            help="Optional SELECT-only forward-registry URL; local SQLite is also supported.",
+        ),
+    ] = None,
+    diagnostic_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-path",
+            help="Optional private diagnostic; only its redacted summary reaches each profile.",
+        ),
+    ] = None,
+    diagnostic_history_path: Annotated[
+        Path | None,
+        typer.Option(
+            "--diagnostic-history-path",
+            help=(
+                "Optional verified diagnostic history; only safe multi-run summaries reach each "
+                "profile."
+            ),
+        ),
+    ] = None,
+    output_dir: Annotated[
+        Path,
+        typer.Option(
+            "--output-dir",
+            help="Private directory for per-profile answer envelopes and the aggregate panel.",
+        ),
+    ] = Path("/tmp/edgar-moe-copilot-panel"),
+    endpoint: Annotated[
+        str | None,
+        typer.Option("--endpoint", help="Optional OpenAI-compatible chat-completions endpoint."),
+    ] = None,
+    model: Annotated[
+        str | None,
+        typer.Option("--model", help="Optional provider model override."),
+    ] = None,
+    max_tool_calls: Annotated[
+        int | None,
+        typer.Option("--max-tool-calls", min=1, max=8, help="Bound each profile tool-call loop."),
+    ] = None,
+    max_duration_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--max-duration-seconds",
+            min=1,
+            max=900,
+            help="Bound each profile's wall-clock time before another provider call.",
+        ),
+    ] = None,
+    max_context_bytes: Annotated[
+        int | None,
+        typer.Option(
+            "--max-context-bytes",
+            min=16_384,
+            max=2_097_152,
+            help="Bound each profile's UTF-8 context before another provider call.",
+        ),
+    ] = None,
+    max_retries: Annotated[
+        int | None,
+        typer.Option(
+            "--max-retries",
+            min=0,
+            max=3,
+            help="Bound retries for transient provider/network failures.",
+        ),
+    ] = None,
+    retry_backoff_seconds: Annotated[
+        float | None,
+        typer.Option(
+            "--retry-backoff-seconds",
+            min=0,
+            max=5,
+            help="Initial capped exponential retry backoff in seconds.",
+        ),
+    ] = None,
+    plan_only: Annotated[
+        bool,
+        typer.Option(
+            "--plan-only",
+            help="Print the selected profiles and read-only tool contract without contacting an LLM.",
+        ),
+    ] = False,
+) -> None:
+    """Run bounded quant, architecture, and operations perspectives in parallel conceptually.
+
+    Profiles are executed sequentially against one shared read-only toolset so
+    the provider boundary stays easy to audit. Each answer is independently
+    verified and retained privately; the panel aggregate contains no answer
+    text and cannot modify forecasts, labels, registry records, or deployment.
+    """
+    from edgar_moe.copilot import (
+        OpenAICompatibleProvider,
+        ReadOnlyToolset,
+        ResearchCopilot,
+        normalize_copilot_profile,
+        normalize_panel_profiles,
+        run_panel,
+    )
+    from edgar_moe.copilot.policy import CopilotProfile
+    from edgar_moe.forward.database import RegistryDatabase
+    from edgar_moe.forward.registry import ForwardRegistry
+
+    requested_profiles = profiles or ["quant", "architect", "operations"]
+    try:
+        selected_profiles = normalize_panel_profiles(requested_profiles)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), param_hint="--profile") from error
+
+    settings = runtime_settings()
+    repository = _copilot_snapshot_repository(settings, snapshot)
+    registry_database = None
+    registry = None
+    resolved_database_url = _copilot_database_url(settings, database_url)
+    if resolved_database_url:
+        registry_database = RegistryDatabase(resolved_database_url)
+        registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot-panel")
+    try:
+        toolset = ReadOnlyToolset(
+            repository,
+            registry,
+            diagnostic_path=diagnostic_path,
+            diagnostic_history_path=diagnostic_history_path,
+        )
+        if plan_only:
+            report = {
+                "schema_version": 1,
+                "research_only": True,
+                "provider_contacted": False,
+                "profiles": list(selected_profiles),
+                "frozen_identity": repository.frozen_identity(),
+                "tools": [tool.as_provider_schema() for tool in toolset.definitions()],
+                "disclaimer": (
+                    "The panel is read-only and cannot modify forecasts, labels, registry records, "
+                    "or deployment state."
+                ),
+            }
+            typer.echo(
+                orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode()
+            )
+            return
+
+        provider = OpenAICompatibleProvider(
+            endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
+            api_key=settings.edgar_moe_copilot_api_key.get_secret_value(),
+            model=model or settings.edgar_moe_copilot_model,
+            allowed_hosts=settings.edgar_moe_copilot_allowed_hosts,
+            timeout_seconds=settings.edgar_moe_copilot_timeout_seconds,
+            max_tokens=settings.edgar_moe_copilot_max_tokens,
+            max_retries=(
+                settings.edgar_moe_copilot_max_retries if max_retries is None else max_retries
+            ),
+            retry_backoff_seconds=(
+                settings.edgar_moe_copilot_retry_backoff_seconds
+                if retry_backoff_seconds is None
+                else retry_backoff_seconds
+            ),
+        )
+
+        def runner_factory(profile: CopilotProfile) -> ResearchCopilot:
+            # Normalize at the factory boundary as well so a future caller
+            # cannot silently create a runner with an unpinned perspective.
+            normalized_profile = normalize_copilot_profile(profile)
+            return ResearchCopilot(
+                provider=provider,
+                toolset=toolset,
+                max_tool_calls=max_tool_calls or settings.edgar_moe_copilot_max_tool_calls,
+                max_duration_seconds=(
+                    settings.edgar_moe_copilot_max_duration_seconds
+                    if max_duration_seconds is None
+                    else max_duration_seconds
+                ),
+                max_context_bytes=(
+                    settings.edgar_moe_copilot_max_context_bytes
+                    if max_context_bytes is None
+                    else max_context_bytes
+                ),
+                profile=normalized_profile,
+            )
+
+        aggregate = run_panel(question, selected_profiles, runner_factory, output_dir)
+    finally:
+        if registry_database is not None:
+            registry_database.dispose()
+
+    typer.echo(f"Wrote private copilot review panel to {output_dir}")
+    typer.echo(orjson.dumps(aggregate, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
+    if aggregate["status"] != "complete":
+        raise typer.Exit(code=1)
+
+
+@app.command("research-copilot-panel-verify")
+def research_copilot_panel_verify(
+    panel: Annotated[Path, typer.Argument(help="Private content-addressed copilot panel JSON.")],
+) -> None:
+    """Verify a copilot panel aggregate without reading child answer text."""
+    from edgar_moe.copilot.panel import PanelInputError, verify_panel_report
+
+    try:
+        payload = json.loads(panel.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise PanelInputError("copilot panel must be a JSON object")
+        verify_panel_report(payload)
+    except (PanelInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(
+        f"Verified research copilot panel {payload['panel_sha256']} "
+        f"(status={payload['status']}; profiles={len(payload['selected_profiles'])}; "
+        f"successful={len(payload['successful_profiles'])})"
+    )
+
+
 @app.command("research-copilot-verify")
 def research_copilot_verify(
     answer: Annotated[Path, typer.Argument(help="Private research-copilot answer JSON.")],

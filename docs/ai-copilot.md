@@ -173,6 +173,41 @@ promotion or trading decision. The existing tool-call, duration, context,
 citation, and envelope-verification limits apply unchanged. Reports created
 before profile identities were introduced remain verifiable as legacy reports.
 
+### Run a bounded specialist review panel
+
+When one perspective is not enough for an architecture review, the operator can
+run a small panel over the same question and read-only evidence boundary:
+
+```bash
+uv run edgar-moe research-copilot-panel \
+  --profile quant \
+  --profile architect \
+  --profile operations \
+  --output-dir /tmp/edgar-moe-copilot-panel \
+  "Which controls are observed, configured, or still unverified?"
+```
+
+The panel is a bounded coordinator, not an autonomous trading system. It runs
+the selected profiles sequentially, with each profile retaining its own verified
+answer envelope (`quant.json`, `architect.json`, and so on). `panel.json` is a
+content-addressed aggregate that contains only profile outcomes, answer hashes,
+tool/citation counts, agent identities, coarse failure types, and bounded usage
+telemetry. It does not contain answer text, prompts, provider payloads, or
+credentials. A partial panel exits non-zero so an operator cannot mistake one
+successful perspective for a complete review; a mixed frozen identity or tool
+contract is marked `review_required`.
+
+Verify the aggregate without reopening the child answer text:
+
+```bash
+uv run edgar-moe research-copilot-panel-verify \
+  /tmp/edgar-moe-copilot-panel/panel.json
+```
+
+Use `--plan-only` to inspect the selected profiles and exact tool contract
+without contacting a provider. The panel never changes the frozen v1 model,
+prospective forecasts, registry, labels, deployment, or readiness decisions.
+
 ### Inspect a private forward diagnostic
 
 An operator may explicitly provide one downloaded forward-cycle diagnostic to

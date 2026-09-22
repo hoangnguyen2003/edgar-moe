@@ -88,6 +88,27 @@ def test_copilot_plan_only_accepts_a_solution_architecture_profile() -> None:
     assert json.loads(result.stdout)["profile_id"] == "architect"
 
 
+def test_copilot_panel_plan_only_lists_bounded_specialist_profiles() -> None:
+    result = runner.invoke(
+        cli.app,
+        [
+            "research-copilot-panel",
+            "Which controls are still unverified?",
+            "--profile",
+            "quant",
+            "--profile",
+            "architect",
+            "--plan-only",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.stdout)
+    assert report["provider_contacted"] is False
+    assert report["profiles"] == ["quant", "architect"]
+    assert len(report["tools"]) == 7
+
+
 def _copy_locked_repository(root: Path) -> Path:
     (root / "config").mkdir(parents=True)
     (root / "data" / "demo").mkdir(parents=True)
