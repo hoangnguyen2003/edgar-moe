@@ -5,7 +5,7 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
-import { compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
+import { checkReading, compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 /**
@@ -232,7 +232,10 @@ function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
       {rows.slice(0, 8).map((check) => (
         <div key={check.check_id}>
           {check.status === "passed" ? <CheckCircle2 size={15} aria-hidden="true" /> : <TriangleAlert size={15} aria-hidden="true" />}
-          <div><strong>{check.name.replaceAll("_", " ")}</strong><small>{dateTime(check.created_at)}</small></div>
+          <div>
+            <strong>{check.name.replaceAll("_", " ")}</strong>
+            <small>{[checkReading(check.name, check.observed_value, check.threshold), dateTime(check.created_at)].filter(Boolean).join(" · ")}</small>
+          </div>
           <span className={`quality-state quality-state--${check.status}`}>{check.status}</span>
         </div>
       ))}

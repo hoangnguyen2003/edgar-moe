@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   bpsPercent,
+  checkReading,
   compact,
   count,
   decimal,
@@ -74,6 +75,23 @@ describe("format helpers", () => {
     expect(runPosition(12 / 13, 13)).toBe("2nd of 13");
     expect(runPosition(1 / 13, 13)).toBe("13th of 13");
     expect(runPosition(0.5, null)).toBe("—");
+  });
+
+  it("reads a quality check in the unit it was measured in", () => {
+    // The margin is recorded in seconds, which no reader thinks in.
+    expect(checkReading("pre_open_schedule_margin", 2724, 5400)).toBe(
+      "45 min before the open · needs at least 90 min before the open",
+    );
+    expect(checkReading("dataset_freshness_days", 0, 4)).toBe("0.0 days old · needs at most 4.0 days old");
+    expect(checkReading("settlement_match_rate", 1, 1)).toBe("100.0% matched · needs at least 100.0% matched");
+    expect(checkReading("prospective_candidate_count", 0, 1)).toBe("0 candidates · needs at least 1 candidate");
+    expect(checkReading("recent_filing_download_failures", 2, 0)).toBe("2 failures · needs at most 0 failures");
+  });
+
+  it("says only what a quality check recorded when there is no threshold", () => {
+    expect(checkReading("missed_before_entry", 0, null)).toBe("0 missed forecasts");
+    expect(checkReading("a_check_nobody_has_seen", 1.5, 2)).toBe("1.50 · needs at least 2.00");
+    expect(checkReading("point_in_time_availability", null, 0)).toBe("");
   });
 
   it("shows basis points as percentages", () => {

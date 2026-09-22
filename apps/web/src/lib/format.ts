@@ -130,3 +130,44 @@ export function splitModelName(name: string): { family: string; params: string[]
   const family = tokens.filter((token) => !token.includes("=")).join(" ");
   return { family: family || name, params };
 }
+
+/**
+ * How to read one quality check's numbers. Each check records an observed
+ * value and the threshold it must respect, but in its own unit: seconds for
+ * the margin before the open, days for dataset age, a 0-1 rate for settlement
+ * matching, and plain counts elsewhere.
+ */
+const CHECK_READINGS: Record<string, { unit: (value: number) => string; limit: "least" | "most" }> = {
+  pre_open_schedule_margin: {
+    unit: (value) => `${Math.round(value / 60)} min before the open`,
+    limit: "least",
+  },
+  dataset_freshness_days: { unit: (value) => `${decimal(value, 1)} days old`, limit: "most" },
+  settlement_match_rate: { unit: (value) => `${percent(value)} matched`, limit: "least" },
+  recent_filing_download_failures: { unit: (value) => plural(value, "failure"), limit: "most" },
+  missed_before_entry: { unit: (value) => plural(value, "missed forecast"), limit: "most" },
+  prospective_candidate_count: { unit: (value) => plural(value, "candidate"), limit: "least" },
+  point_in_time_availability: { unit: (value) => plural(value, "violation"), limit: "most" },
+};
+
+function plural(value: number, noun: string): string {
+  const count = Math.round(value);
+  return `${count} ${noun}${count === 1 ? "" : "s"}`;
+}
+
+/**
+ * A quality check read in plain language: what was observed, and what it had
+ * to stay above or below. Without this a reader sees only "warning".
+ */
+export function checkReading(
+  name: string,
+  observed: number | null,
+  threshold: number | null,
+): string {
+  if (observed === null) return "";
+  const reading = CHECK_READINGS[name];
+  const unit = reading?.unit ?? ((value: number) => decimal(value, 2));
+  const observedText = unit(observed);
+  if (threshold === null) return observedText;
+  return `${observedText} · needs at ${reading?.limit ?? "least"} ${unit(threshold)}`;
+}
