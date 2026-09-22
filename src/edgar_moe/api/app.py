@@ -90,7 +90,17 @@ forward_registry = (
 app = FastAPI(
     title="EDGAR-MoE Research API",
     version=__version__,
-    description="Snapshot API for point-in-time SEC filing alpha research.",
+    description=(
+        "Read-only access to the frozen v1 study and to the registry that records "
+        "new forecasts before their tradable entry time.\n\n"
+        "- **Study routes** serve the reviewed snapshot bundled with this deployment. "
+        "It cannot change while the deployment lives, so answers are cacheable.\n"
+        "- **Forward routes** read the append-only registry, which changes when a run lands.\n"
+        "- Every route is a `GET`, needs no credentials, and runs in a read-only "
+        "database session.\n\n"
+        "Figures are research output. The study's own cost-aware portfolio was not "
+        "profitable, and nothing here is investment advice."
+    ),
     # FastAPI's built-in docs pages bootstrap with inline script, which the
     # Content-Security-Policy below blocks. Swagger UI is served by the
     # CSP-compatible routes near the end of this module instead.
@@ -216,6 +226,10 @@ def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusR
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["operations"])
 def health(response: Response, repo: RepositoryDependency) -> HealthResponse:
+    """Report whether this deployment can read the snapshot it was built with.
+
+    Never cached: it describes this request, not an earlier one.
+    """
     # A cached health answer would report the state of some earlier moment.
     response.headers["Cache-Control"] = "no-store"
     try:
@@ -232,12 +246,22 @@ def health(response: Response, repo: RepositoryDependency) -> HealthResponse:
 
 @app.get("/api/v1/summary", response_model=SummaryResponse, tags=["research"])
 def summary(response: Response, repo: RepositoryDependency) -> SummaryResponse:
+    """Headline figures from the frozen v1 study, with the snapshot's identity.
+
+    Includes the locked-test rank IC and the cost-aware portfolio result, which
+    was negative. The snapshot cannot change while this deployment lives.
+    """
     _cache(response)
     return SummaryResponse.model_validate(repo.summary())
 
 
 @app.get("/api/v1/experiments", response_model=list[ExperimentRecord], tags=["research"])
 def experiments(response: Response, repo: RepositoryDependency) -> list[ExperimentRecord]:
+    """Every candidate configuration from the selection protocol, including the losers.
+
+    Keeping the rejected candidates visible is what makes the champion's margin
+    readable rather than asserted.
+    """
     _cache(response)
     return [ExperimentRecord.model_validate(item) for item in repo.experiments()]
 
@@ -248,6 +272,11 @@ def equity_curve(
     repo: RepositoryDependency,
     cost_bps: int = Query(default=10),
 ) -> EquityCurveResponse:
+    """The cost-aware portfolio's equity curve at one round-trip cost.
+
+    `cost_bps` accepts 10, 25, or 50 - the three costs the study charges.
+    Any other value is a 422 rather than an interpolated answer.
+    """
     if cost_bps not in {10, 25, 50}:
         raise HTTPException(status_code=422, detail="cost_bps must be one of 10, 25, or 50")
     _cache(response)
@@ -272,6 +301,11 @@ def events(
         description="Case-insensitive substring match on ticker or company name.",
     ),
 ) -> EventPage:
+    """One page of scored filings, newest first.
+
+    Filters are optional and combine. Paging uses an opaque cursor, so a page
+    stays stable while the caller walks it.
+    """
     _cache(response)
     try:
         payload = repo.event_page(
@@ -302,6 +336,11 @@ def event(
     response: Response,
     repo: RepositoryDependency,
 ) -> EventRecord:
+    """One scored filing, by its SEC accession number.
+
+    Carries the per-expert scores, the gate weights that combined them, and the
+    realized outcome once the horizon has passed.
+    """
     payload = repo.event(accession_number)
     if payload is None:
         raise HTTPException(status_code=404, detail="Filing event not found")
@@ -311,18 +350,32 @@ def event(
 
 @app.get("/api/v1/latest-signals", response_model=list[EventRecord], tags=["signals"])
 def latest_signals(response: Response, repo: RepositoryDependency) -> list[EventRecord]:
+    """The last cohort of filings the frozen study scored.
+
+    These are study outputs with known outcomes, not live forecasts. New
+    forecasts recorded before their entry time are under `/api/v1/forward`.
+    """
     _cache(response, seconds=900)
     return [EventRecord.model_validate(item) for item in repo.latest_signals()]
 
 
 @app.get("/api/v1/methodology", response_model=MethodologyResponse, tags=["research"])
 def methodology(response: Response, repo: RepositoryDependency) -> MethodologyResponse:
+    """How the study was run: sources, the point-in-time rule, splits, and costs.
+
+    The same protocol the model card describes, served as data so a reader can
+    check the site against it.
+    """
     _cache(response, seconds=3600)
     return MethodologyResponse.model_validate(repo.methodology())
 
 
 @app.get("/api/v1/freshness", response_model=FreshnessResponse, tags=["operations"])
 def freshness(response: Response, repo: RepositoryDependency) -> FreshnessResponse:
+    """When the bundled snapshot was built, and how old it is now.
+
+    Revalidated on every request, because its answer is about the present.
+    """
     response.headers["Cache-Control"] = "no-cache"
     return FreshnessResponse.model_validate(repo.freshness())
 
@@ -390,6 +443,11 @@ def forward_status(
     response: Response,
     registry: ForwardRegistryDependency,
 ) -> ForwardStatusResponse:
+    """Whether the forward registry is reachable and the runner is on time.
+
+    Reports counts, the latest run, and whether the runner is inside its
+    freshness window. Never cached, so an outage is visible immediately.
+    """
     response.headers["Cache-Control"] = "no-store"
     return _forward_status_response(registry)
 
@@ -404,6 +462,11 @@ def forward_runs(
     registry: ForwardRegistryDependency,
     limit: int = Query(default=25, ge=1, le=100),
 ) -> list[ForwardRunRecord]:
+    """Recent forward runs, newest first, with status and quality-check counts.
+
+    Returns an empty list, not an error, when no registry is configured for
+    this deployment.
+    """
     _cache_live(response)
     if registry is None:
         return []
@@ -427,6 +490,12 @@ def forward_forecasts(
     # Bounded so an oversized value is a 422 rather than a database overflow.
     offset: int = Query(default=0, ge=0, le=1_000_000),
 ) -> ForwardForecastPage:
+    """Recorded forward forecasts, newest first, each bound to its own run.
+
+    A forecast's rank is its position within that run's batch of candidate
+    filings, and `cohort_size` gives that batch's size, so a run that scored a
+    single filing reads as one filing rather than as a top rank.
+    """
     _cache_live(response)
     if registry is None:
         return ForwardForecastPage(items=[], total=0, offset=offset, limit=limit)
@@ -452,6 +521,12 @@ def forward_performance(
     registry: ForwardRegistryDependency,
     model_id: str | None = Query(default=None, min_length=1, max_length=160),
 ) -> ForwardPerformanceResponse:
+    """Scores over the forecasts that have matured.
+
+    Rank IC, RMSE, MAE, and directional accuracy, with the share of recorded
+    forecasts they cover. Early in a forward test the sample is small and these
+    figures move a great deal, so the counts are part of the answer.
+    """
     _cache_live(response)
     if registry is None:
         return ForwardPerformanceResponse(
@@ -481,6 +556,11 @@ def forward_data_quality(
     registry: ForwardRegistryDependency,
     limit: int = Query(default=100, ge=1, le=250),
 ) -> list[ForwardQualityRecord]:
+    """The quality checks each run appended to the registry.
+
+    Includes the point-in-time availability audit and the margin between the
+    run and the market open, with the observed value and threshold for each.
+    """
     _cache_live(response)
     if registry is None:
         return []
