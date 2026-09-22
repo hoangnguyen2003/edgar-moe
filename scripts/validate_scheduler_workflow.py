@@ -163,7 +163,7 @@ def main() -> int:
         for error in errors:
             print(error, file=sys.stderr)
         return 1
-    print(f"scheduler deployment workflow contract passed: {args.workflow}")
+    print("scheduler deployment workflow contract passed")
     return 0
 
 

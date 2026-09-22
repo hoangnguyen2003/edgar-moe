@@ -111,7 +111,7 @@ def main() -> int:
         for error in errors:
             print(error, file=sys.stderr)
         return 1
-    print(f"scheduler configuration contract passed: {args.config}")
+    print("scheduler configuration contract passed")
     return 0
 
 
