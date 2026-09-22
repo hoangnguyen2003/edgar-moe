@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://edgar-moe.vercel.app/</loc><priority>1.0</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/research</loc><priority>0.8</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/portfolio</loc><priority>0.8</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/signals</loc><priority>0.6</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/filings</loc><priority>0.6</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/forward</loc><priority>0.8</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/governance</loc><priority>0.6</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/methodology</loc><priority>0.6</priority></url>
+  <url><loc>https://edgar-moe.vercel.app/architecture</loc><priority>0.8</priority></url>
+</urlset>

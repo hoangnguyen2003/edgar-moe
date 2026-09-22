@@ -59,6 +59,16 @@ The report contains only error codes, counts, the locked snapshot identity, and
 review state. It is not a license grant and does not assert provider-side WAF,
 rate-limit, backup, or account evidence.
 
+## Published images
+
+The bundle is reviewable UTF-8 text apart from two declared images,
+`apple-touch-icon.png` and `social-card.png`. The validator accepts them only as
+PNG pixel data: allowed chunk types only, valid chunk checksums, nothing after
+`IEND`, and at most 200,000 bytes, so no text, EXIF, or colour-profile chunk can
+carry unreviewed content. `favicon.svg` and `sitemap.xml` stay text. The social
+image repeats only figures already published on the site. See
+[ADR 0024](adr/0024-reviewed-public-images.md).
+
 ## Failure behavior
 
 - A failed public-bundle validation stops the Vercel build before a deployment is

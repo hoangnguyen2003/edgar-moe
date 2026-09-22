@@ -1,3 +1,4 @@
 User-agent: *
 Disallow: /api/
 Disallow: /api/docs
+Sitemap: https://edgar-moe.vercel.app/sitemap.xml

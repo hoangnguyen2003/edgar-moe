@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import struct
+import zlib
 from pathlib import Path
 
 import pytest
@@ -146,6 +148,64 @@ def test_security_txt_language_list_cannot_backtrack_exponentially(tmp_path: Pat
     errors = validate_public_bundle(tmp_path)
 
     assert any("valid Preferred-Languages field" in error for error in errors)
+
+
+def png_chunk(kind: bytes, payload: bytes) -> bytes:
+    body = kind + payload
+    return struct.pack(">I", len(payload)) + body + struct.pack(">I", zlib.crc32(body) & 0xFFFFFFFF)
+
+
+def minimal_png(extra: bytes = b"") -> bytes:
+    """A 1x1 greyscale PNG, optionally carrying an extra chunk before IEND."""
+    header = struct.pack(">IIBBBBB", 1, 1, 8, 0, 0, 0, 0)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + png_chunk(b"IHDR", header)
+        + png_chunk(b"IDAT", zlib.compress(b"\x00\x00"))
+        + extra
+        + png_chunk(b"IEND", b"")
+    )
+
+
+def test_public_bundle_accepts_a_declared_pixel_only_image(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    (tmp_path / "social-card.png").write_bytes(minimal_png())
+
+    assert validate_public_bundle(tmp_path) == []
+
+
+def test_public_bundle_rejects_images_that_could_hide_content(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    card = tmp_path / "social-card.png"
+
+    card.write_bytes(minimal_png(png_chunk(b"tEXt", b"Comment\x00private note")))
+    assert any("non-pixel PNG chunk (tEXt)" in error for error in validate_public_bundle(tmp_path))
+
+    card.write_bytes(minimal_png() + b"appended")
+    assert any("trailing bytes after IEND" in error for error in validate_public_bundle(tmp_path))
+
+    corrupt = bytearray(minimal_png())
+    corrupt[-1] ^= 0xFF  # the final IEND checksum byte
+    card.write_bytes(bytes(corrupt))
+    assert any("corrupt PNG chunk" in error for error in validate_public_bundle(tmp_path))
+
+    card.write_bytes(b"\x89PNG\r\n\x1a\n" + b"\x00" * 200_001)
+    assert any("larger than" in error for error in validate_public_bundle(tmp_path))
+
+    # Not valid UTF-8, so it reaches the image check rather than the text review.
+    card.write_bytes(b"GIF89a" + b"\xff\xfe" * 16)
+    assert any("must be a PNG" in error for error in validate_public_bundle(tmp_path))
+
+
+def test_public_bundle_still_rejects_undeclared_binaries(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    (tmp_path / "assets" / "extra.png").write_bytes(minimal_png())
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert any(
+        "non-text publishable file requires review: assets/extra.png" in error for error in errors
+    )
 
 
 def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import re
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 _CREDENTIAL_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
@@ -31,6 +33,15 @@ _SOURCE_MAP_REFERENCE = re.compile(r"sourceMappingURL|[A-Za-z0-9._/-]+\.(?:js|cs
 _ASSET_REFERENCE = re.compile(r"[\"`]((?:/|\./)?(?:assets/)?[A-Za-z0-9._/-]+\.(?:js|css))[\"`]")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EXPECTED_SNAPSHOT_PATH = "data/demo/snapshot.json"
+# Images cannot be reviewed as text, so only these exact files may be binary. Each
+# must be a PNG carrying pixel data alone: no text, EXIF, or colour-profile chunk
+# can smuggle content into the public bundle, and every chunk checksum must match.
+_REVIEWED_IMAGES = frozenset({"apple-touch-icon.png", "social-card.png"})
+_MAX_IMAGE_BYTES = 200_000
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+_ALLOWED_PNG_CHUNKS = frozenset(
+    {"IHDR", "PLTE", "tRNS", "IDAT", "IEND", "sRGB", "gAMA", "cHRM", "pHYs"}
+)
 # security.txt fields: a value must sit on its field's own line ([^\S\n] is any
 # whitespace except a newline, which still allows CRLF endings), and a language
 # tag cannot contain a comma, so the list pattern matches in only one way and
@@ -75,7 +86,10 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            errors.append(f"non-text publishable file requires review: {relative}")
+            if relative in _REVIEWED_IMAGES:
+                _validate_reviewed_image(path, relative, errors)
+            else:
+                errors.append(f"non-text publishable file requires review: {relative}")
             continue
         if _SOURCE_MAP_REFERENCE.search(text):
             errors.append(f"source-map reference found: {relative}")
@@ -93,6 +107,44 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
                 )
 
     return errors
+
+
+def _validate_reviewed_image(path: Path, relative: str, errors: list[str]) -> None:
+    """Accept a declared image only as bounded PNG pixel data with intact checksums."""
+    data = path.read_bytes()
+    if len(data) > _MAX_IMAGE_BYTES:
+        errors.append(f"publishable image is larger than {_MAX_IMAGE_BYTES} bytes: {relative}")
+        return
+    if not data.startswith(_PNG_SIGNATURE):
+        errors.append(f"publishable image must be a PNG: {relative}")
+        return
+    offset = len(_PNG_SIGNATURE)
+    seen_end = False
+    while offset < len(data):
+        if seen_end:
+            errors.append(f"publishable image has trailing bytes after IEND: {relative}")
+            return
+        if offset + 8 > len(data):
+            errors.append(f"publishable image has a truncated PNG chunk: {relative}")
+            return
+        (length,) = struct.unpack(">I", data[offset : offset + 4])
+        kind = data[offset + 4 : offset + 8]
+        end = offset + 12 + length
+        if length > len(data) or end > len(data):
+            errors.append(f"publishable image has a truncated PNG chunk: {relative}")
+            return
+        name = kind.decode("ascii", errors="replace")
+        if name not in _ALLOWED_PNG_CHUNKS:
+            errors.append(f"publishable image carries a non-pixel PNG chunk ({name}): {relative}")
+            return
+        (stored_crc,) = struct.unpack(">I", data[end - 4 : end])
+        if zlib.crc32(data[offset + 4 : end - 4]) & 0xFFFFFFFF != stored_crc:
+            errors.append(f"publishable image has a corrupt PNG chunk ({name}): {relative}")
+            return
+        seen_end = name == "IEND"
+        offset = end
+    if not seen_end:
+        errors.append(f"publishable image is missing its PNG end marker: {relative}")
 
 
 def _validate_disclosure_metadata(root: Path, errors: list[str]) -> None:
