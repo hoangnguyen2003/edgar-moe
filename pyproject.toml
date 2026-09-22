@@ -43,7 +43,7 @@ research = [
 ]
 dev = [
   "mypy>=1.17,<3",
-  "pytest>=8.4,<9",
+  "pytest>=8.4,<10",
   "pytest-asyncio>=1,<2",
   "pytest-cov>=6,<8",
   "respx>=0.22,<1",
