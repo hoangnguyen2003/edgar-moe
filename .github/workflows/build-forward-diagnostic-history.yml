@@ -1,0 +1,157 @@
+name: Build forward diagnostic history
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_ids:
+        description: "Comma-separated successful forward run IDs (3-8)"
+        required: true
+        type: string
+      artifact_names:
+        description: "Comma-separated forward-diagnostic artifact names in the same order"
+        required: true
+        type: string
+      minimum_reports:
+        description: "Reports required before the history can be ready"
+        required: true
+        default: "3"
+        type: string
+
+concurrency:
+  group: build-forward-diagnostic-history
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  history:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REPORT_DIR: reports/forward-diagnostic-history
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install the verification runtime
+        run: uv sync --locked --extra dev
+
+      - name: Validate artifact selection
+        env:
+          RUN_IDS: ${{ inputs.run_ids }}
+          ARTIFACT_NAMES: ${{ inputs.artifact_names }}
+          MINIMUM_REPORTS: ${{ inputs.minimum_reports }}
+        run: |
+          uv run python scripts/validate_forward_diagnostic_history_inputs.py \
+            --run-ids "$RUN_IDS" \
+            --artifact-names "$ARTIFACT_NAMES" \
+            --minimum-reports "$MINIMUM_REPORTS"
+
+      - name: Download selected diagnostics and build redacted history
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RUN_IDS: ${{ inputs.run_ids }}
+          ARTIFACT_NAMES: ${{ inputs.artifact_names }}
+          MINIMUM_REPORTS: ${{ inputs.minimum_reports }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$REPORT_DIR"
+          raw_dir="$(mktemp -d /tmp/edgar-moe-forward-diagnostics.XXXXXX)"
+          IFS=',' read -r -a run_ids <<< "$RUN_IDS"
+          IFS=',' read -r -a artifact_names <<< "$ARTIFACT_NAMES"
+          report_args=()
+
+          for index in "${!run_ids[@]}"; do
+            run_id="${run_ids[$index]}"
+            artifact_name="${artifact_names[$index]}"
+            if ! metadata="$(gh run view "$run_id" --repo "$GITHUB_REPOSITORY" \
+              --json workflowName,event,status,conclusion,headBranch 2>/dev/null)"; then
+              echo "selected run metadata could not be read" >&2
+              exit 1
+            fi
+            if ! jq -e --arg workflow "Prospective forward cycle" '
+              .workflowName == $workflow and
+              (.event == "schedule" or .event == "workflow_dispatch") and
+              .status == "completed" and
+              .conclusion == "success" and
+              .headBranch == "main"
+            ' <<< "$metadata" >/dev/null; then
+              echo "selected run is not a successful main forward cycle" >&2
+              exit 1
+            fi
+
+            target="$raw_dir/$index"
+            mkdir -p "$target"
+            if ! gh run download "$run_id" --repo "$GITHUB_REPOSITORY" \
+              --name "$artifact_name" --dir "$target" >/dev/null 2>&1; then
+              echo "selected diagnostic artifact could not be downloaded" >&2
+              exit 1
+            fi
+            mapfile -t reports < <(find "$target" -type f -name 'diagnostic-*.json' -print)
+            if (( ${#reports[@]} != 1 )); then
+              echo "each selected artifact must contain exactly one diagnostic JSON" >&2
+              exit 1
+            fi
+            report_args+=(--report "${reports[0]}")
+          done
+
+          uv run edgar-moe forward-diagnostic-history \
+            "${report_args[@]}" \
+            --minimum-reports "$MINIMUM_REPORTS" \
+            --output "$REPORT_DIR/history.json"
+
+      - name: Hash retained diagnostic history
+        id: hash
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s "$REPORT_DIR/history.json"
+          sha256sum "$REPORT_DIR/history.json" > "$REPORT_DIR/SHA256SUMS"
+
+      - name: Verify retained diagnostic history
+        id: verify
+        if: ${{ always() }}
+        run: uv run edgar-moe forward-diagnostic-history-verify "$REPORT_DIR/history.json"
+
+      - name: Verify retained history is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$REPORT_DIR"
+
+      - name: Publish diagnostic-history status
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if test -s "$REPORT_DIR/history.json"; then
+            jq -r '"History status: \(.status); observations: \(.report_count); hash: \(.history_sha256)"' \
+              "$REPORT_DIR/history.json" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Diagnostic history was not produced." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload redacted diagnostic history
+        if: ${{ always() && steps.verify.outcome == 'success' && steps.redaction.outcome == 'success' && steps.hash.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: forward-diagnostic-history-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/forward-diagnostic-history/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail unless diagnostic history is valid
+        if: ${{ always() && (steps.build.outcome != 'success' || steps.verify.outcome != 'success' || steps.redaction.outcome != 'success' || steps.hash.outcome != 'success') }}
+        shell: bash
+        run: |
+          echo "Diagnostic history did not produce valid redacted evidence." >&2
+          exit 1

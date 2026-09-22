@@ -181,6 +181,7 @@ Evidence is never erased to make a retry look clean.
 | Forward runner | GitHub-hosted Ubuntu 24.04 | Cron `17 7 * * 2-6` UTC, or manual | Writer DB, R2, and sources, each scoped per step ([ADR 0018](adr/0018-workflow-supply-chain.md)) | Private |
 | Optional scheduler observer | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with a run ID | GitHub `actions: read` and `contents: read` only | Read-only evidence |
 | Optional scheduler-lateness measurement | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with a bounded lookback | GitHub `actions: read` and `contents: read` only | Read-only evidence |
+| Optional diagnostic-history collector | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with paired forward run IDs and artifact names | GitHub `actions: read` and `contents: read` only | Redacted research evidence |
 | Registry | Managed Postgres (Neon) | — | Writer (runner) and reader (API and auditor) | Evidence store |
 | Evidence mirror | Cloudflare R2 | — | Runner write; auditor read-only | Evidence store |
 | CI | GitHub Actions | Every PR and push | `contents: read` | Gate |

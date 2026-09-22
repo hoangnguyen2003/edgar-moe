@@ -546,6 +546,23 @@ exists; a non-ready diagnostic status produces `review_required`. Verification
 never reopens the private source files. This history is not the official
 20-session evaluation, a performance promotion gate, or a retraining trigger.
 
+### Build a history from retained GitHub artifacts
+
+The manual **Build forward diagnostic history** Actions workflow makes this
+collection repeatable without putting private diagnostics in the repository. In
+the Actions tab, provide comma-separated run IDs and the matching
+`forward-diagnostic-YYYY-MM-DD` artifact names, in the same order. Each run is
+checked before download: it must be a successful `Prospective forward cycle`
+run on `main`, triggered by `schedule` or `workflow_dispatch`. The selection is
+bounded to eight artifacts and requires at least three by default.
+
+The workflow uses only `actions: read` and `contents: read`, downloads the
+source artifacts into the ephemeral runner, and uploads only the redacted,
+content-addressed history plus `SHA256SUMS`. Raw diagnostic JSON is never
+uploaded by this workflow. A valid `review_required` history is useful evidence
+but is not a readiness decision; the history must still be independently
+reviewed before it can influence research decisions.
+
 ## Monitoring and recovery
 
 The independent Go [evidence auditor](evidence-auditor.md) verifies registry

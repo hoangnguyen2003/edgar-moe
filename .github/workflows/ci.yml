@@ -47,6 +47,7 @@ jobs:
           uv run python scripts/validate_scheduler_workflow.py
           uv run python scripts/validate_scheduler_observation_workflow.py
           uv run python scripts/validate_scheduler_lateness_workflow.py
+          uv run python scripts/validate_forward_diagnostic_history_workflow.py
           uv run python scripts/validate_forward_schedule_boundary.py
       - name: Validate architecture decision catalog
         run: uv run python scripts/validate_adr_catalog.py
@@ -54,6 +55,7 @@ jobs:
         run: |
           uv run python scripts/verify_scheduler_dispatch.py --help
           uv run python scripts/measure_scheduler_lateness.py --help
+          uv run python scripts/validate_forward_diagnostic_history_inputs.py --help
       - name: Check forward alert receipt verifier is runnable
         run: uv run python scripts/verify_forward_alert_receipt.py --help
       - name: Check forward evidence manifest commands are runnable
