@@ -30,6 +30,11 @@ Add an optional Cloudflare Workers Cron adapter that dispatches the existing
 The source cutoff, `forecast_as_of < entry_at` invariant, frozen v1 artifact, and
 prospective evaluation policy remain unchanged.
 
+Until cutover evidence exists, CI enforces the rollback boundary: the existing
+`07:17 UTC` GitHub schedule, manual dispatch, CPU-only device input, and
+concurrency group must remain together. Removing or drifting that trigger is a
+deliberate cutover change, not an incidental workflow edit.
+
 ## Alternatives considered
 
 - Keep GitHub schedule only: no new credential boundary, but the known latency
