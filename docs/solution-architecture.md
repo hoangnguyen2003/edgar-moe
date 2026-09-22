@@ -228,6 +228,10 @@ Evidence is never erased to make a retry look clean.
   - Historical pages depend only on the packaged snapshot.
   - A registry outage makes forward data report unavailable (503s on data
     routes), without affecting the rest of the site.
+  - An error while rendering a page is caught in the page area: the reader
+    keeps the navigation and is told to reload or pick another page, instead
+    of being left with a blank document. A page asset that a new deployment
+    replaced is named as such, because reloading fixes it.
 - **Observability:**
   - `/api/v1/governance` and `/api/v1/forward/status` expose the frozen identity
     and the runner's health.
