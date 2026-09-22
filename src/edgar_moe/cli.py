@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import csv
 import json
+import re
 import subprocess
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -1897,6 +1898,23 @@ def serve(
     uvicorn.run("edgar_moe.api.app:app", host=host, port=port, reload=False)
 
 
+_EMAIL_DOMAIN = re.compile(r"@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
+# RFC 2606 reserves these for documentation; the shipped placeholders use them.
+_PLACEHOLDER_DOMAINS = ("example.com", "example.org", "example.net")
+
+
+def _is_placeholder_user_agent(user_agent: str) -> bool:
+    """Return whether an SEC User-Agent is blank or still carries a placeholder contact."""
+    if not user_agent.strip():
+        return True
+    domains = (domain.lower() for domain in _EMAIL_DOMAIN.findall(user_agent))
+    return any(
+        domain == reserved or domain.endswith(f".{reserved}")
+        for domain in domains
+        for reserved in _PLACEHOLDER_DOMAINS
+    )
+
+
 def _require_source_configuration(settings: RuntimeSettings, *, needs_fred: bool) -> None:
     missing: list[str] = []
     if not settings.alpaca_api_key:
@@ -1905,7 +1923,7 @@ def _require_source_configuration(settings: RuntimeSettings, *, needs_fred: bool
         missing.append("ALPACA_API_SECRET")
     if needs_fred and not settings.fred_api_key:
         missing.append("FRED_API_KEY")
-    if not settings.sec_user_agent or "example.com" in settings.sec_user_agent.lower():
+    if _is_placeholder_user_agent(settings.sec_user_agent or ""):
         missing.append("SEC_USER_AGENT with your real contact email")
     if missing:
         raise typer.BadParameter(
