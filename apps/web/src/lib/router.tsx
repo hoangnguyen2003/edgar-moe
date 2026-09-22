@@ -1,5 +1,6 @@
 import { type AnchorHTMLAttributes, type MouseEvent, type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type NavigationOptions, RouterContext, useRouter } from "./router-context";
+import { prefersReducedMotion } from "./useMediaQuery";
 
 function currentPathname() {
   const path = window.location.pathname.replace(/\/+$/, "");
@@ -19,7 +20,7 @@ export function RouterProvider({ children }: { children: ReactNode }) {
     if (to === currentPathname()) return;
     window.history[options.replace ? "replaceState" : "pushState"]({}, "", to);
     setPathname(currentPathname());
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? "auto" : "smooth" });
   }, []);
 
   const value = useMemo(() => ({ pathname, navigate }), [navigate, pathname]);

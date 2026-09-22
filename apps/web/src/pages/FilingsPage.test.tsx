@@ -88,6 +88,6 @@ describe("Filing explorer", () => {
 
     expect(await screen.findByText(/horizon Aug 27, 2026/)).toBeInTheDocument();
     expect(screen.getByText(/Accepted Jul 30, 2026, 09:00 PM UTC/)).toBeInTheDocument();
-    expect(screen.getByText("median dollar volume 60d")).toBeInTheDocument();
+    expect(screen.getByText("Median dollar volume 60d")).toBeInTheDocument();
   });
 });
