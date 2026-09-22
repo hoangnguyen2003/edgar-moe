@@ -53,6 +53,16 @@ not presented as an exactly-once distributed scheduler.
    `workflow_dispatch` run starts at the intended UTC time. Check the resulting
    `pre_open_schedule_margin` quality check; it is the application-side source
    of truth for whether the run reached the entry window.
+
+   To make the GitHub-side observation repeatable, copy the run ID from the
+   first dispatch and run **Observe optional forward scheduler** from the
+   Actions tab. The workflow reads one run with an `actions: read` token and
+   retains a hashed, redacted report containing only the event, workflow path,
+   `main` ref, commit, timestamps, status, and validation reason codes. A
+   passing report proves the run shape and recency; it deliberately records
+   `scheduler_origin: unproven_by_github_run_metadata` because GitHub metadata
+   cannot prove whether Cloudflare or a human initiated the dispatch.
+
 4. Only after that observation, open a separate PR that removes the
    `schedule:` trigger from `.github/workflows/forward-production.yml` while
    retaining `workflow_dispatch`. Keep the PR link and the first dispatch run as
@@ -74,8 +84,9 @@ merging this adapter cannot stop production cycles.
 
 The deployment workflow is deliberately manual and does not remove or disable
 the GitHub schedule. A successful deployment is not a cutover or evidence that
-the Worker has dispatched a cycle; retain the first observed dispatch before
-opening a cutover PR.
+the Worker has dispatched a cycle. The observation workflow is likewise
+read-only evidence, not origin proof; retain its report and the application
+margin before opening a cutover PR.
 
 ## Verification
 
@@ -88,4 +99,6 @@ node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs
 These tests cover dispatch payloads, active-run suppression, configuration
 validation, token non-disclosure, the absent public trigger, and fail-closed
 GitHub errors. They do not claim that a Cloudflare account, GitHub token, or
-production cutover has been configured.
+production cutover has been configured. The separate observation workflow
+verifies one selected GitHub run and explicitly leaves scheduler provenance
+unproven.
