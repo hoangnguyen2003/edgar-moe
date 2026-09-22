@@ -64,6 +64,10 @@ export const GLOSSARY = {
     term: "Long, short, neutral",
     definition: "Long: the top 10% of scores, which a long-short portfolio would buy. Short: the bottom 10%, which it would bet against. Neutral: everything in between, with no position.",
   },
+  runRank: {
+    term: "Rank in run",
+    definition: "Where a forecast's score placed among the filings scored in the same run. Many runs score only one or a few filings, so this is not a market-wide percentile.",
+  },
   percentile: {
     term: "Percentile rank",
     definition: "Where a filing's score falls among scored filings. \"Top 1%\" means it scored higher than 99% of them.",
@@ -86,7 +90,7 @@ export type GlossaryKey = keyof typeof GLOSSARY;
 
 /** The order terms appear in on How it works. */
 export const GLOSSARY_ORDER: GlossaryKey[] = [
-  "experts", "gate", "xbrl", "target", "direction", "percentile",
+  "experts", "gate", "xbrl", "target", "direction", "percentile", "runRank",
   "rankIc", "rmse", "validation", "lockedTest", "embargo", "frozen",
   "sharpe", "volatility", "drawdown", "turnover", "tradingCost", "forward", "fingerprint",
 ];

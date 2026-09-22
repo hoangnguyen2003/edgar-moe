@@ -33,7 +33,7 @@ function jsonResponse(payload: unknown) {
   return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } }));
 }
 
-describe("Latest signals", () => {
+describe("Study signals", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   it("summarizes the cohort, groups it by direction, and links each filing to its details", async () => {
@@ -46,6 +46,7 @@ describe("Latest signals", () => {
     render(<QueryClientProvider client={client}><RouterProvider><SignalsPage /></RouterProvider></QueryClientProvider>);
 
     expect(await screen.findByText("3 filings scored: 1 long, 1 neutral, 1 short.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Live tracking" })).toHaveAttribute("href", "/forward");
     const long = screen.getByRole("region", { name: /Long/ });
     expect(within(long).getByText("MU")).toBeInTheDocument();
     expect(within(long).getByText("Top 1%")).toBeInTheDocument();

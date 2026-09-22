@@ -3,7 +3,7 @@ export const navigation = [
   { to: "/", label: "Overview", description: "What the project is and what it found" },
   { to: "/research", label: "Models", description: "How the candidate models compare, and which one was frozen" },
   { to: "/portfolio", label: "Backtest", description: "Would trading on the scores have made money after costs?" },
-  { to: "/signals", label: "Signals", description: "The latest filings the model rates highest and lowest" },
+  { to: "/signals", label: "Signals", description: "The study's final filings, rated highest to lowest" },
   { to: "/filings", label: "Filings", description: "Search any scored filing and see what drove its score" },
   { to: "/forward", label: "Live tracking", description: "How the frozen model does on filings it has never seen" },
   { to: "/governance", label: "Audit", description: "How to check the results weren't changed afterwards" },

@@ -464,6 +464,7 @@ main { flex: 1; min-width: 0; }
 .forward-table th { padding: 10px 12px; border-bottom: 1px solid var(--ink); color: var(--ink-2); font: 600 14px var(--sans); text-align: left; }
 .forward-table td { padding: 14px 12px; border-bottom: 1px solid var(--rule); color: var(--ink-2); font: 500 14px var(--sans); }
 .forward-table td.num { font-family: var(--mono); }
+.th-with-tip { display: inline-flex; align-items: center; gap: 4px; }
 .forward-table td:first-child strong, .forward-table td:first-child span { display: block; }
 .forward-table td:first-child strong { color: var(--ink); font: 600 15px var(--mono); }
 .forward-table td:first-child span { max-width: 240px; margin-top: 2px; overflow: hidden; color: var(--ink-2); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }

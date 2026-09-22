@@ -1,10 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
+import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
-import { compact, dateTime, decimal, percent, signedDecimal, signedPercent, standing } from "../lib/format";
+import { compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 export function ForwardPage() {
@@ -92,7 +93,10 @@ export function ForwardPage() {
         <header>
           <div>
             <h2>Recorded forecasts</h2>
-            <p>Scores can't be changed once saved. Each result appears only after its 20 trading days have passed.</p>
+            <p>
+              Scores can't be changed once saved. Each result appears only after its 20 trading days have passed.
+              "Rank in run" compares a forecast only with the other filings scored in the same run.
+            </p>
           </div>
           <span className="count-chip">{forecasts.data!.total} forecasts</span>
         </header>
@@ -226,7 +230,7 @@ function ForecastTable({ rows }: { rows: Awaited<ReturnType<typeof api.forwardFo
             <th scope="col">Saved</th>
             <th scope="col">Tradable from</th>
             <th scope="col" className="num">Score</th>
-            <th scope="col" className="num">Rank</th>
+            <th scope="col" className="num"><span className="th-with-tip">Rank in run <InfoTip term="runRank" /></span></th>
             <th scope="col" className="num">20-day result</th>
           </tr>
         </thead>
@@ -237,7 +241,7 @@ function ForecastTable({ rows }: { rows: Awaited<ReturnType<typeof api.forwardFo
               <td data-label="Saved">{dateTime(row.forecast_as_of)}</td>
               <td data-label="Tradable from">{dateTime(row.entry_at)}</td>
               <td className="num" data-label="Score">{signedDecimal(row.score, 4)}</td>
-              <td className="num" data-label="Rank">{standing(row.rank)}</td>
+              <td className="num" data-label="Rank in run">{runPosition(row.rank, row.cohort_size)}</td>
               <td className="num" data-label="20-day result">{row.realized_abnormal_return == null ? <span className="pending-label">Not yet known</span> : signedPercent(row.realized_abnormal_return)}</td>
             </tr>
           ))}

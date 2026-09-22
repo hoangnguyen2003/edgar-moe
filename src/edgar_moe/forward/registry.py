@@ -555,6 +555,22 @@ class ForwardRegistry:
                 .offset(offset)
                 .limit(limit)
             ).all()
+            # A forecast's rank is its percentile among the forecasts recorded in the same
+            # run, which often holds only one or two filings. Report each run's full size,
+            # regardless of page or filters, so a rank is never read as market-wide.
+            run_ids = sorted({forecast.run_id for forecast, _ in rows})
+            cohort_sizes: dict[str, int] = (
+                {
+                    run_id: int(size)
+                    for run_id, size in session.execute(
+                        select(ForecastRecord.run_id, func.count(ForecastRecord.forecast_id))
+                        .where(ForecastRecord.run_id.in_(run_ids))
+                        .group_by(ForecastRecord.run_id)
+                    ).all()
+                }
+                if run_ids
+                else {}
+            )
             items = [
                 {
                     "forecast_id": forecast.forecast_id,
@@ -573,6 +589,7 @@ class ForwardRegistry:
                     "forecast_as_of": _iso(forecast.forecast_as_of),
                     "score": forecast.score,
                     "rank": forecast.rank,
+                    "cohort_size": cohort_sizes.get(forecast.run_id, 1),
                     "fundamental_score": forecast.fundamental_score,
                     "expert_weights": forecast.expert_weights,
                     "realized_abnormal_return": (

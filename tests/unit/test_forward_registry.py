@@ -181,6 +181,12 @@ def test_label_settlement_and_forward_performance(tmp_path: Path) -> None:
     )
     registry_service.complete_run(forecast_run, result_counts={"forecasts": 2})
     forecast_page = registry_service.list_forecasts(limit=10)
+    # Ranks are percentiles within a run, so every row reports its run's full size,
+    # even when a filter or page shows only part of the run.
+    assert [item["cohort_size"] for item in forecast_page["items"]] == [2, 2]
+    one_ticker = registry_service.list_forecasts(ticker="event-001", limit=10)
+    assert [item["cohort_size"] for item in one_ticker["items"]] == [2]
+    assert registry_service.list_forecasts(limit=1)["items"][0]["cohort_size"] == 2
 
     settlement_run = registry_service.start_run(
         RunRegistration(

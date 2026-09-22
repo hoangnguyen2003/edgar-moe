@@ -21,12 +21,13 @@ export function SignalsPage() {
   const signals = useQuery({ queryKey: ["latest-signals"], queryFn: api.latestSignals });
   const freshness = useQuery({ queryKey: ["freshness"], queryFn: api.freshness });
   const header = (
-    <PageHeader title="Latest signals">
-      The newest filings scored by the frozen model, grouped by what a long-short portfolio would do with them.
-      Each card's "Why this score" link opens the details behind it.
+    <PageHeader title="Study signals">
+      The final filings scored in the published study, grouped by what a long-short portfolio would do with them.
+      Each card's "Why this score" link opens the details behind it. Forecasts recorded since the study ended are
+      on <Link to="/forward">Live tracking</Link>.
     </PageHeader>
   );
-  if (signals.isLoading) return <div className="page">{header}<LoadingState label="Loading the latest filings" /></div>;
+  if (signals.isLoading) return <div className="page">{header}<LoadingState label="Loading the study's final filings" /></div>;
   if (signals.error) return <div className="page">{header}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
   const items = signals.data!;
   const counts = DIRECTIONS.map(({ direction, title }) => `${items.filter((item) => item.direction === direction).length} ${title.toLowerCase()}`);
