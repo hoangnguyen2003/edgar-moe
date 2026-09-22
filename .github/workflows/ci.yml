@@ -325,6 +325,7 @@ jobs:
       - run: python scripts/validate_deployment_contract.py
       - run: python scripts/verify_public_snapshot_lock.py
       - run: python scripts/validate_public_bundle.py
+      - run: python scripts/check_web_budget.py
       - run: python scripts/public_release_readiness.py --allow-review-required
       - run: python -m json.tool vercel.json >/dev/null
       - run: git diff --exit-code -- public
