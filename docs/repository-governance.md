@@ -2,8 +2,7 @@
 
 The intended lightweight workflow is **branch → pull request → CI →
 self-review → GitHub merge → branch deletion**. Local merges are not the normal
-path. This keeps the project private and avoids paying for controls that are
-disproportionate to a personal repository.
+path. Controls stay proportionate to a single-maintainer repository.
 
 This document records the settings and expectations that must be enabled in
 GitHub; repository administrative settings are external state and are not
@@ -14,8 +13,27 @@ represented by files alone.
 If the project later gains collaborators or a stronger audit requirement, the
 repository’s Settings → Branches → Branch protection rules (or Rulesets) can
 protect `main` with required pull requests, reviews, conversation resolution,
-up-to-date branches, and the applicable CI checks. This is an optional future
-control, not a prerequisite for the current personal-project workflow.
+up-to-date branches, and the applicable CI checks. Branch protection costs
+nothing for a public repository; it remains an optional future control, not a
+prerequisite for the current single-maintainer workflow.
+
+## Public repository settings
+
+The repository has been public since 2026-09-22, so standard GitHub-hosted
+Actions runners no longer draw on the account's private-repository minutes
+(#152). These settings are enabled in GitHub:
+
+- Private vulnerability reporting, the channel `SECURITY.md` points reporters to.
+- Secret scanning with push protection.
+- Approval before workflows run for pull requests from any outside
+  contributor. Fork pull requests never receive repository secrets, and the
+  credentialed workflows run only on `schedule` or `workflow_dispatch`.
+
+Everything in the repository is public: source history, commit metadata,
+issues, pull requests, and Actions logs and artifacts. Evidence artifacts are
+designed to be redacted (provider evidence uploads are gated on a redaction
+scan); never put credentials, connection URLs, or raw provider payloads in any
+of them.
 
 ## Pull requests
 
@@ -60,8 +78,8 @@ that provider-side operations are healthy.
 
 ## Current personal-project mode
 
-Branch protection is intentionally not enabled: the repository is personal,
-private, and cost-sensitive. The practical controls are an open PR, green CI,
-the branch-policy check, a short self-review using the template, and a deliberate
-commitment not to push directly to `main`. If collaborators or regulated
-evidence are introduced later, revisit paid protection or an organization plan.
+Branch protection is not enabled because the repository has a single
+maintainer. The practical controls are an open PR, green CI, the branch-policy
+check, a short self-review using the template, and a deliberate commitment not
+to push directly to `main`. If collaborators or regulated evidence are
+introduced later, enable a ruleset for `main`.
