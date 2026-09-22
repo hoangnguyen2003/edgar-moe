@@ -258,6 +258,16 @@ the filing, embedding, and Hugging Face caches under a unique run-attempt key. A
 timed-out attempt still fails visibly, but the next attempt restores its completed
 work instead of starting from zero.
 
+After the cycle job finishes, a separate cache-maintenance job uses a token with
+only `actions: write` and no production secrets. It lists the `forward-runtime-*`
+cache family, retains the two newest entries, and deletes older entries through the
+GitHub cache API, then checks that total Actions cache usage is below the 10 GB
+repository quota. This keeps resumability while preventing one roughly 1.4 GB
+entry per run from consuming the repository cache quota. If the maintenance job
+cannot list or delete caches, or the quota remains exceeded, it fails visibly for
+operator follow-up; it never touches registry rows, evidence objects, or the frozen
+model.
+
 If refresh, inference, or settlement fails, the workflow writes a redacted
 `forward-failure-context.json` containing the commit, cutoff, attempt, and step
 outcome, uploads it with any diagnostic already produced, and adds a failure

@@ -33,3 +33,20 @@ def test_forward_workflow_cross_validates_frozen_bundle_before_copying_it() -> N
     copy = text.index("install -m 0644 ops/frozen/frozen-model.pt")
 
     assert validation < copy
+
+
+def test_forward_workflow_prunes_old_runtime_caches_with_a_separate_scope() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    cleanup = text.index("prune-forward-runtime-caches:")
+    cleanup_text = text[cleanup:]
+
+    assert "needs: forecast-and-settle" in cleanup_text
+    assert "needs.forecast-and-settle.result != 'cancelled'" in cleanup_text
+    assert "actions: write" in cleanup_text
+    assert "GH_TOKEN: ${{ github.token }}" in cleanup_text
+    assert 'startswith("forward-runtime-")' in cleanup_text
+    assert ".[2:]" in cleanup_text
+    assert "gh api --method DELETE" in cleanup_text
+    assert "remaining_bytes > 10000000000" in cleanup_text
+    assert "${{ secrets." not in cleanup_text
