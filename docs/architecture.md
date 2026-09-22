@@ -10,6 +10,7 @@
 6. The locked test is evaluated after the model family, features, costs, and constraints are frozen.
 7. Historical endpoints read a derived snapshot; prospective endpoints read the registry. Neither needs raw licensed market data or training dependencies.
 8. The one-time evaluator requires the exact walk-forward selection hash and refuses locked-artifact overwrites.
+9. A dependency upgrade cannot silently change frozen-v1 inference: the private compatibility audit records the runtime and reproduced scores, and the comparison gate fails closed before a frozen-inference upgrade is accepted ([ADR 0021](adr/0021-frozen-runtime-compatibility-gate.md)).
 
 ## Storage layers
 
@@ -102,7 +103,7 @@ flowchart LR
 | `api/index.py`, `src/edgar_moe/api/app.py` | Snapshot, governance, and registry queries | No training or mutation endpoints; governance fields are value-safe and provider-neutral |
 | Postgres | Forecasts, labels, identities, runs, quality checks | Prospective record of truth; SQLite is the local/test alternative |
 | `scripts/run_forward_cycle.py` | Refresh, build, forecast, settle, diagnose | Batch execution, not a web request |
-| `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins |
+| `ops/frozen/`, `config/forward.yaml` | Reviewed inference artifact and identities | Hash-pinned model; code review governs changes to the pins; private runtime-compatibility evidence is required for dependency upgrades ([ADR 0021](adr/0021-frozen-runtime-compatibility-gate.md)) |
 | Local artifacts + R2 mirror | Content-addressed evidence bytes | Mirrored identity checks; bucket access/retention still require account verification |
 | Actions caches | Reusable filings, embeddings, model downloads | Performance optimization, not a backup; a separate least-privilege maintenance job retains only the two newest forward-runtime entries |
 | Optional alert webhook | Receives redacted failed-run and health classifications | Secret is runner-only; delivery is best-effort and never contains database/R2 credentials |

@@ -25,6 +25,33 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 > studies use corrected fundamentals ([ADR 0015](docs/adr/0015-xbrl-fact-selection-policy.md))
 > and a revised selection protocol ([ADR 0017](docs/adr/0017-post-v1-selection-protocol.md)).
 
+### Frozen-runtime compatibility
+
+The checkpoint hash alone cannot prove that a dependency upgrade preserves
+inference numerics. Before changing PyTorch, Transformers, or the numerical
+stack used by frozen v1, reproduce the locked test in both environments and
+compare the private reports and score archives:
+
+```bash
+uv run python scripts/audit_frozen_normalization.py \
+  --selection data/artifacts/walk-forward/<dataset-id>/walk-forward-selection.json \
+  --output /tmp/frozen-baseline.json \
+  --scores-output /tmp/frozen-baseline.npz
+
+uv run python scripts/compare_frozen_runtime_reports.py \
+  --baseline /tmp/frozen-baseline.json \
+  --candidate /tmp/frozen-candidate.json \
+  --baseline-scores /tmp/frozen-baseline.npz \
+  --candidate-scores /tmp/frozen-candidate.npz
+```
+
+Run the audit separately in the candidate environment, then attach only the
+redacted decision and hashes to the dependency-upgrade review. The reports and
+score archives can contain private study-derived evidence and must not be
+committed or uploaded to public CI. A passing comparison is necessary evidence
+for review, not permission to change the immutable v1 model or select a new
+model.
+
 ## What makes this a quant project
 
 - Every feature has an `available_at` timestamp and fails the build if it exceeds the filing cutoff.

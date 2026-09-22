@@ -77,12 +77,17 @@ class FinBertEmbedder:
             raise ValueError("chunk_tokens, max_chunks, and inference_batch_size must be positive")
         try:
             import torch
+            import transformers
             from transformers import AutoModelForSequenceClassification, AutoTokenizer
         except ImportError as error:  # pragma: no cover - optional dependency path
             raise RuntimeError(
                 "Install research dependencies with `uv sync --extra research`"
             ) from error
         self.torch = torch
+        self.runtime_versions = {
+            "torch": str(getattr(torch, "__version__", "unknown")),
+            "transformers": str(getattr(transformers, "__version__", "unknown")),
+        }
         self.model_name = model_name
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)  # type: ignore[no-untyped-call]
         self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
@@ -100,7 +105,10 @@ class FinBertEmbedder:
     @property
     def cache_identity(self) -> str:
         return (
-            f"finbert:model={self.model_name}:revision={self.model_revision}:"
+            "finbert-v2:"
+            f"torch={self.runtime_versions['torch']}:"
+            f"transformers={self.runtime_versions['transformers']}:"
+            f"model={self.model_name}:revision={self.model_revision}:"
             f"chunk_tokens={self.chunk_tokens}:pooling=weighted-cls:"
             f"max_chunks={self.max_chunks}:sampling=uniform-v1:"
             "sentiment=negative-neutral-positive"
