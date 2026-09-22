@@ -34,12 +34,15 @@ function renderPage(response: () => Promise<Response>) {
 describe("Architecture page", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("explains the system in four ordered lanes with the key decisions", () => {
+  it("explains the system in five ordered lanes with the key decisions", () => {
     renderPage(() => new Promise<Response>(() => {}));
 
     const lanes = screen.getByRole("region", { name: "How the system fits together" });
     const titles = within(lanes).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(["Research study", "Public site", "Live tracking", "Delivery and checks"]);
+    expect(titles).toEqual(["Research study", "Public site", "Live tracking", "Evidence copilot", "Delivery and checks"]);
+    const copilot = screen.getByRole("region", { name: "Evidence copilot" });
+    expect(within(copilot).getByText(/read-only evidence tools/i)).toBeInTheDocument();
+    expect(within(copilot).getByText(/Human review/i)).toBeInTheDocument();
     const delivery = screen.getByRole("region", { name: "Delivery and checks" });
     expect(within(delivery).getAllByRole("listitem").map((item) => item.querySelector("strong")?.textContent)).toEqual([
       "Pull request",
@@ -51,6 +54,10 @@ describe("Architecture page", () => {
     expect(within(decisions).getByRole("link", { name: /Make the database itself refuse edits/ })).toHaveAttribute(
       "href",
       "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0016-database-append-only-triggers.md",
+    );
+    expect(within(decisions).getByRole("link", { name: /Keep AI review profiles bounded and read-only/ })).toHaveAttribute(
+      "href",
+      "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0022-copilot-review-profiles.md",
     );
     expect(screen.getByText(/--expect-lock config\/public_snapshot.lock.json/)).toBeInTheDocument();
   });

@@ -52,6 +52,18 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
     ],
   },
   {
+    id: "copilot",
+    title: "Evidence copilot",
+    zone: "Private, operator-run",
+    summary: "Explains the research record without entering the forecasting, registry, or public-serving path.",
+    steps: [
+      { title: "Operator asks a question", detail: "A local CLI sends a bounded question to an explicitly configured OpenAI-compatible provider" },
+      { title: "Read-only evidence tools", detail: "The agent can inspect the frozen snapshot, governance state, derived filing events, and opt-in redacted diagnostics" },
+      { title: "Citations and identity", detail: "Tool-payload hashes, frozen identity, policy/tool-contract digests, and bounded usage are retained" },
+      { title: "Human review", detail: "Offline evaluation and review history are required before generated prose is relied on" },
+    ],
+  },
+  {
     id: "delivery",
     title: "Delivery and checks",
     zone: "Verification",
@@ -68,6 +80,7 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
 const ZONES = [
   { zone: "Public", runs: "Browser, web app, and API", can: "Read the snapshot and registry", holds: "No secrets; at most a read-only database address" },
   { zone: "Private", runs: "Scheduled runner and research pipeline", can: "Add forecasts, results, and evidence", holds: "Database writer, R2, and data-source keys, each scoped to the step that needs it" },
+  { zone: "AI copilot", runs: "Operator CLI and an LLM provider", can: "Explain cited evidence and compare controls", holds: "A local provider key; no write credentials and no public endpoint" },
   { zone: "Verification", runs: "CI, CodeQL, post-deploy check, evidence auditor", can: "Check and report", holds: "No secrets, or read-only access" },
 ];
 
@@ -77,6 +90,7 @@ const DECISIONS = [
   { adr: "0004-runtime-snapshot-lock", title: "Check the results file's fingerprint before serving it", why: "The API refuses to serve a snapshot that differs from its lock." },
   { adr: "0016-database-append-only-triggers", title: "Make the database itself refuse edits", why: "Integrity does not depend on the application behaving well." },
   { adr: "0020-pre-open-schedule-margin", title: "Record how close each run gets to the market open", why: "A late scheduler becomes visible instead of silently risky." },
+  { adr: "0022-copilot-review-profiles", title: "Keep AI review profiles bounded and read-only", why: "The copilot can help with quant and architecture reviews without gaining model or deployment authority." },
   { adr: "0018-workflow-supply-chain", title: "Pin every workflow action and scope every secret", why: "A compromised action or step sees as little as possible." },
 ];
 
@@ -177,7 +191,7 @@ export function ArchitecturePage() {
         <header>
           <div>
             <h2 id="decisions-title">Key design decisions</h2>
-            <p>Six of the 21 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
+            <p>Seven of the 21 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
           </div>
           <a className="button button--secondary button--small" href={`${REPOSITORY}/blob/main/docs/adr/README.md`}>
             All decisions <ArrowUpRight size={14} aria-hidden="true" />
