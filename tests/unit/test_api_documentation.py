@@ -64,6 +64,15 @@ def test_the_forecast_route_explains_what_a_rank_means(schema: dict[str, Any]) -
     assert "single filing" in description
 
 
+def test_the_performance_route_states_how_the_rank_ic_is_computed(schema: dict[str, Any]) -> None:
+    # Pooling across runs is a choice with consequences; an undocumented IC
+    # invites comparison with the locked study's, which is not comparable.
+    description = schema["paths"]["/api/v1/forward/performance"]["get"]["description"]
+
+    assert "pooled" in description
+    assert "not comparable" in description
+
+
 def test_documented_query_limits_match_the_code(schema: dict[str, Any]) -> None:
     events = schema["paths"]["/api/v1/events"]["get"]
     limit = next(item for item in events["parameters"] if item["name"] == "limit")

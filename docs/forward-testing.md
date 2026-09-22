@@ -476,6 +476,30 @@ uv run edgar-moe forward-settle \
 
 The command matches by immutable `event_id`, verifies maturity, appends at most one label per forecast, records unmatched due forecasts as a quality warning, and recomputes read-time metrics from forecast/label joins.
 
+## How the live rank IC is computed
+
+The forward rank IC is a **single Spearman correlation over every settled
+(score, realized return) pair**, pooled across runs. It is not the average of
+per-run cross-sectional correlations, which is the usual definition of an
+information coefficient.
+
+The reason is the batch size. A run scores the filings accepted since the
+previous run, which in production has meant one to four filings; a
+cross-sectional correlation over a single filing does not exist, and over two
+it takes only the values -1 and 1. Averaging such figures would report noise
+with a respectable-looking name.
+
+The cost of pooling is that the figure mixes cross-sectional ordering with
+variation between periods, so it is not comparable to the locked study's rank
+IC, which was computed over a far larger cross-section. Both limits are why the
+page reports an interval and withholds a reading below 100 settled outcomes:
+
+- `rank_ic_interval()` in [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py)
+  bounds the figure at 95% confidence, treating settled forecasts as
+  independent, which same-day filings are not.
+- Live tracking states how many outcomes the figure rests on, and calls it a
+  running log rather than evidence until the sample is large enough to read.
+
 ## Short-horizon diagnostic
 
 The official forward target remains the 20-session beta-adjusted abnormal return.
