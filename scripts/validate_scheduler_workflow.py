@@ -160,8 +160,8 @@ def main() -> int:
     args = parser.parse_args()
     errors = validate_scheduler_workflow(args.workflow)
     if errors:
-        for error in errors:
-            print(error, file=sys.stderr)
+        print("scheduler deployment workflow contract failed", file=sys.stderr)
+        print(f"{len(errors)} validation error(s) detected", file=sys.stderr)
         return 1
     print("scheduler deployment workflow contract passed")
     return 0

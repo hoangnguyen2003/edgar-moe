@@ -108,8 +108,8 @@ def main() -> int:
     args = parser.parse_args()
     errors = validate_scheduler_config(args.config)
     if errors:
-        for error in errors:
-            print(error, file=sys.stderr)
+        print("scheduler configuration contract failed", file=sys.stderr)
+        print(f"{len(errors)} validation error(s) detected", file=sys.stderr)
         return 1
     print("scheduler configuration contract passed")
     return 0

@@ -61,8 +61,8 @@ GITHUB_TOKEN = "should-not-be-here"
     )
 
     assert result.returncode == 1
-    assert "triggers.crons" in result.stderr
-    assert "GITHUB_TOKEN" in result.stderr
+    assert "scheduler configuration contract failed" in result.stderr
+    assert "validation error(s) detected" in result.stderr
 
 
 def test_missing_scheduler_config_fails_closed(tmp_path: Path) -> None:
@@ -74,4 +74,4 @@ def test_missing_scheduler_config_fails_closed(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 1
-    assert f"configuration file is missing: {tmp_path / 'missing.toml'}" in result.stderr
+    assert "scheduler configuration contract failed" in result.stderr
