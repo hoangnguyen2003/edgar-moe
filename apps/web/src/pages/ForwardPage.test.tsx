@@ -92,6 +92,34 @@ describe("Forward Lab", () => {
     expect(kroger).not.toHaveTextContent("Top 1%");
     expect(screen.getByText("DELL").closest("tr")).toHaveTextContent("2nd of 4");
     expect(screen.getByRole("button", { name: "What is Rank in run?" })).toBeInTheDocument();
+    // Two settled results are nowhere near enough to read the live metrics.
+    expect(screen.getByText("Too early to read these numbers")).toBeInTheDocument();
+    expect(screen.getByText(/0 of 2 forecasts have a result so far/)).toBeInTheDocument();
+  });
+
+  it("drops the early-sample caution once enough outcomes have settled", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
+        matured_count: 120, pending_count: 80, latest_successful_run_at: "2026-12-01T12:10:00Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-12-01T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 200, matured_count: 120, pending_count: 80,
+        coverage: 0.6, rank_ic: 0.02, rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
+      });
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 200, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
+    expect(screen.queryByText("Too early to read these numbers")).not.toBeInTheDocument();
   });
 
   it("renders an empty but operational prospective registry", async () => {
