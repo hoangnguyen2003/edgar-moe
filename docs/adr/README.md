@@ -29,6 +29,7 @@ decisions in the overall design.
 | [0019](0019-forward-cache-lifecycle.md) | Keep immutable per-attempt runtime caches, and prune all but the two newest in a separate job with no checkout, dependencies, or production secrets. | 2026-09-22 |
 | [0020](0020-pre-open-schedule-margin.md) | Record each forecast run's margin before the NYSE open as an immutable quality check, and warn below 90 minutes, without changing the cutoff or the model. | 2026-09-22 |
 | [0023](0023-external-forward-scheduler.md) | Stage a dormant Cloudflare Cron adapter for the existing forward workflow; require a separate observed cutover before removing the GitHub schedule. | 2026-09-22 |
+| [0024](0024-reviewed-public-images.md) | Allow only two declared PNG images in the public bundle, each pixel-data only, checksum-verified and size-bounded; everything else must stay reviewable text. | 2026-09-23 |
 
 ## AI research copilot boundary
 
