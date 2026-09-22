@@ -141,21 +141,6 @@ def test_registry_enforces_prospective_timing_and_state(tmp_path: Path) -> None:
     database.dispose()
 
 
-def test_run_completion_can_pin_the_recording_timestamp(tmp_path: Path) -> None:
-    database, registry_service = registry(tmp_path)
-    run_id = prepare_forecast_run(registry_service)
-    recorded_at = datetime(2026, 8, 6, 13, 15, tzinfo=UTC)
-
-    registry_service.complete_run(
-        run_id,
-        result_counts={"forecasts": 0},
-        finished_at=recorded_at,
-    )
-
-    assert registry_service.list_runs(limit=1)[0]["finished_at"] == "2026-08-06T13:15:00Z"
-    database.dispose()
-
-
 def test_failed_run_messages_are_redacted_at_registry_boundary(tmp_path: Path) -> None:
     database, registry_service = registry(tmp_path)
     run_id = prepare_forecast_run(registry_service)

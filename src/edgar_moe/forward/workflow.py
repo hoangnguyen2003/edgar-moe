@@ -148,11 +148,7 @@ class ForwardWorkflow:
                 "forecasts_idempotent": forecast_counts["idempotent_skips"],
                 "quality_checks_inserted": quality_counts["inserted"],
             }
-            self.registry.complete_run(
-                run.run_id,
-                result_counts=counts,
-                finished_at=recording_at,
-            )
+            self.registry.complete_run(run.run_id, result_counts=counts)
             return WorkflowResult(
                 run_id=run.run_id,
                 status="succeeded",
