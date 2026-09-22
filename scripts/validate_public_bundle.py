@@ -31,10 +31,18 @@ _SOURCE_MAP_REFERENCE = re.compile(r"sourceMappingURL|[A-Za-z0-9._/-]+\.(?:js|cs
 _ASSET_REFERENCE = re.compile(r"[\"`]((?:/|\./)?(?:assets/)?[A-Za-z0-9._/-]+\.(?:js|css))[\"`]")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _EXPECTED_SNAPSHOT_PATH = "data/demo/snapshot.json"
-_SECURITY_CONTACT = re.compile(r"(?m)^Contact:\s*\S+\s*$")
-_SECURITY_POLICY = re.compile(r"(?m)^Policy:\s*\S+\s*$")
-_SECURITY_LANGUAGES = re.compile(r"(?m)^Preferred-Languages:\s*\S+(?:\s*,\s*\S+)*\s*$")
-_SECURITY_EXPIRES = re.compile(r"(?m)^Expires:\s*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\s*$")
+# security.txt fields: a value must sit on its field's own line ([^\S\n] is any
+# whitespace except a newline, which still allows CRLF endings), and a language
+# tag cannot contain a comma, so the list pattern matches in only one way and
+# cannot backtrack exponentially.
+_SECURITY_CONTACT = re.compile(r"(?m)^Contact:[^\S\n]*\S+[^\S\n]*$")
+_SECURITY_POLICY = re.compile(r"(?m)^Policy:[^\S\n]*\S+[^\S\n]*$")
+_SECURITY_LANGUAGES = re.compile(
+    r"(?m)^Preferred-Languages:[^\S\n]*[^\s,]+(?:[^\S\n]*,[^\S\n]*[^\s,]+)*[^\S\n]*$"
+)
+_SECURITY_EXPIRES = re.compile(
+    r"(?m)^Expires:[^\S\n]*\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z[^\S\n]*$"
+)
 _ISO_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$")
 _HTTPS_URL = re.compile(r"^https://\S+$")
 

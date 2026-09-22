@@ -1,3 +1,4 @@
+import importlib.util
 import json
 import re
 from hashlib import sha256
@@ -8,6 +9,14 @@ from fastapi.testclient import TestClient
 
 from edgar_moe.api.app import SpaStaticFiles, app, get_forward_registry, get_repository
 from edgar_moe.api.repository import SnapshotRepository
+
+# The deployment smoke check's HTML parser, so the docs page is held to the same
+# external-scripts-only rule that production is probed with.
+_SMOKE_PATH = Path(__file__).parents[2] / "scripts" / "smoke_deployment.py"
+_SMOKE_SPEC = importlib.util.spec_from_file_location("smoke_deployment", _SMOKE_PATH)
+assert _SMOKE_SPEC is not None and _SMOKE_SPEC.loader is not None
+_SMOKE = importlib.util.module_from_spec(_SMOKE_SPEC)
+_SMOKE_SPEC.loader.exec_module(_SMOKE)
 
 
 def fixture_snapshot() -> dict:
@@ -147,15 +156,15 @@ def test_api_docs_render_under_the_content_security_policy() -> None:
         script_sources = _csp_directive(docs.headers["content-security-policy"], "script-src")
         assert "'unsafe-inline'" not in script_sources
 
-        scripts = re.findall(r"<script\b([^>]*)>(.*?)</script>", docs.text, re.S)
+        scripts = _SMOKE._script_elements(docs.text)
         assert len(scripts) == 2
         for attributes, body in scripts:
             # Browsers block inline script under this CSP, which blanked the page.
             assert not body.strip()
-            source = re.search(r'src="([^"]+)"', attributes)
-            assert source is not None
-            assert source.group(1).startswith("/") or any(
-                source.group(1).startswith(allowed) for allowed in script_sources
+            source = attributes.get("src")
+            assert source
+            assert source.startswith("/") or any(
+                source.startswith(allowed) for allowed in script_sources
             )
         cdn_tags = re.findall(r"<(?:script|link)\b[^>]*https://cdn\.jsdelivr\.net[^>]*>", docs.text)
         assert len(cdn_tags) == 2

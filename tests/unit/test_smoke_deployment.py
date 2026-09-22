@@ -230,6 +230,25 @@ def test_smoke_rejects_api_docs_that_the_csp_would_blank(
     assert "_body" not in docs
 
 
+@pytest.mark.parametrize(
+    ("body", "external"),
+    [
+        ('<script src="/app.js"></script>', True),
+        ('<SCRIPT SRC="/app.js"></SCRIPT>', True),
+        ("<script src='/a.js'></script ><script type=module src=/b.js></script>", True),
+        ('<script src="/app.js">alert(1)</script>', False),
+        ("<SCRIPT>alert(1)</SCRIPT>", False),
+        # A regular expression looking for "</script>" missed this inline script.
+        ('<script src="/a.js"></script><script>alert(1)</script >', False),
+        ("<script>alert(1)", False),
+        ('<script src="">alert(1)</script>', False),
+        ("<p>No scripts at all</p>", False),
+    ],
+)
+def test_script_check_tokenizes_tags_like_a_browser(body: str, external: bool) -> None:
+    assert _MODULE._scripts_are_external(body) is external
+
+
 def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     responses["https://terminal.example/api/v1/health"] = FakeResponse(

@@ -122,6 +122,32 @@ def test_public_bundle_rejects_incomplete_security_txt(tmp_path: Path) -> None:
     assert any("valid Expires field" in error for error in errors)
 
 
+def test_security_txt_fields_accept_crlf_but_not_a_value_on_the_next_line(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    security = tmp_path / ".well-known" / "security.txt"
+    text = security.read_text(encoding="utf-8")
+    security.write_bytes(text.replace("\n", "\r\n").encode("utf-8"))
+    assert validate_public_bundle(tmp_path) == []
+
+    security.write_text(text.replace("Policy: https", "Policy:\nhttps"), encoding="utf-8")
+    assert any("valid Policy field" in error for error in validate_public_bundle(tmp_path))
+
+
+def test_security_txt_language_list_cannot_backtrack_exponentially(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    security = tmp_path / ".well-known" / "security.txt"
+    text = security.read_text(encoding="utf-8")
+    # The previous pattern took exponential time on this line; now it is rejected at once.
+    security.write_text(
+        text.replace("Preferred-Languages: en, vi", "Preferred-Languages:" + "!," * 5000),
+        encoding="utf-8",
+    )
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert any("valid Preferred-Languages field" in error for error in errors)
+
+
 def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:
     write_bundle(tmp_path)
     manifest = json.loads((tmp_path / "data-provenance.json").read_text(encoding="utf-8"))

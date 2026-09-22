@@ -7,6 +7,7 @@ import json
 import re
 import sys
 from datetime import UTC, datetime
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -35,7 +36,54 @@ _REQUIRED_SECURITY_HEADERS = {
 }
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
-_SCRIPT_TAG = re.compile(r"<script\b([^>]*)>(.*?)</script>", re.IGNORECASE | re.DOTALL)
+
+
+class _ScriptCollector(HTMLParser):
+    """Collect each script element's attributes and inline text.
+
+    An HTML parser, unlike a regular expression, tokenizes tags the way a
+    browser does: any letter case, end tags such as ``</script >``, and
+    attributes in any order or quoting style.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.scripts: list[tuple[dict[str, str | None], str]] = []
+        self._attributes: dict[str, str | None] | None = None
+        self._text: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script":
+            self._attributes = dict(attrs)
+            self._text = []
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script":
+            self.scripts.append((dict(attrs), ""))
+
+    def handle_data(self, data: str) -> None:
+        if self._attributes is not None:
+            self._text.append(data)
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._attributes is not None:
+            self.scripts.append((self._attributes, "".join(self._text)))
+            self._attributes = None
+
+    def close(self) -> None:
+        super().close()
+        # A browser runs an unterminated script's text too, so keep it as inline content.
+        if self._attributes is not None:
+            self.scripts.append((self._attributes, "".join(self._text)))
+            self._attributes = None
+
+
+def _script_elements(body: str) -> list[tuple[dict[str, str | None], str]]:
+    """Return every script element in ``body`` as (attributes, inline text)."""
+    collector = _ScriptCollector()
+    collector.feed(body)
+    collector.close()
+    return collector.scripts
 
 
 class _CrossOriginRedirectError(ValueError):
@@ -301,9 +349,9 @@ def _check_endpoint(
 
 def _scripts_are_external(body: str) -> bool:
     """Return whether a page loads only external scripts, as its CSP requires."""
-    scripts = _SCRIPT_TAG.findall(body)
+    scripts = _script_elements(body)
     return bool(scripts) and all(
-        "src=" in attributes.lower() and not content.strip() for attributes, content in scripts
+        bool(attributes.get("src")) and not content.strip() for attributes, content in scripts
     )
 
 
