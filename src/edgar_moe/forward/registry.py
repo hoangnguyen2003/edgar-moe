@@ -142,12 +142,18 @@ class ForwardRegistry:
             )
             return record
 
-    def complete_run(self, run_id: str, *, result_counts: dict[str, int]) -> RunRecord:
+    def complete_run(
+        self,
+        run_id: str,
+        *,
+        result_counts: dict[str, int],
+        finished_at: datetime | None = None,
+    ) -> RunRecord:
         with self.database.session() as session:
             run = _require_running_run(session, run_id)
             run.status = "succeeded"
             run.result_counts = dict(result_counts)
-            run.finished_at = utc_now()
+            run.finished_at = _as_utc(finished_at or utc_now())
             _audit(
                 session,
                 actor=self.actor,

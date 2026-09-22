@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -25,6 +25,9 @@ from edgar_moe.forward.inference import ForecastBatch, ForecastQualityError, Fro
 from edgar_moe.forward.models import utc_now
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.utils.hashing import sha256_file
+from edgar_moe.utils.time import target_nyse_open
+
+MINIMUM_PRE_OPEN_MARGIN = timedelta(minutes=90)
 
 
 class Predictor(Protocol):
@@ -111,6 +114,7 @@ class ForwardWorkflow:
                 threshold=4.0,
                 details={"dataset_as_of": dataset.as_of.isoformat()},
             )
+            recording_at = _aware_utc(self.clock())
             all_checks = [
                 *batch.checks,
                 freshness_check,
@@ -119,6 +123,7 @@ class ForwardWorkflow:
                     forecast_as_of=forecast_as_of,
                     previous_forecast_as_of=previous_forecast_as_of,
                 ),
+                _pre_open_schedule_margin_check(recording_at),
             ]
             quality_counts = self.registry.add_quality_checks(run.run_id, all_checks)
             forecast_counts = self.registry.append_forecasts(run.run_id, batch.forecasts)
@@ -143,7 +148,11 @@ class ForwardWorkflow:
                 "forecasts_idempotent": forecast_counts["idempotent_skips"],
                 "quality_checks_inserted": quality_counts["inserted"],
             }
-            self.registry.complete_run(run.run_id, result_counts=counts)
+            self.registry.complete_run(
+                run.run_id,
+                result_counts=counts,
+                finished_at=recording_at,
+            )
             return WorkflowResult(
                 run_id=run.run_id,
                 status="succeeded",
@@ -418,6 +427,39 @@ def _source_coverage_checks(
             )
         )
     return checks
+
+
+def _pre_open_schedule_margin_check(observed_at: datetime) -> QualityCheckDraft:
+    """Record whether the forecast was committed with a safe pre-open margin."""
+    threshold_seconds = MINIMUM_PRE_OPEN_MARGIN.total_seconds()
+    try:
+        target_open = target_nyse_open(observed_at)
+    except (RuntimeError, ValueError):
+        return QualityCheckDraft(
+            name="pre_open_schedule_margin",
+            status="warning",
+            observed_value=None,
+            threshold=threshold_seconds,
+            details={
+                "rule": "forecast recording should precede the target NYSE entry open by at least 90 minutes",
+                "observed_at": observed_at.isoformat(),
+                "calendar_status": "unavailable",
+            },
+        )
+    margin_seconds = max((target_open - observed_at).total_seconds(), 0.0)
+    return QualityCheckDraft(
+        name="pre_open_schedule_margin",
+        status="passed" if margin_seconds >= threshold_seconds else "warning",
+        observed_value=margin_seconds,
+        threshold=threshold_seconds,
+        details={
+            "rule": "forecast recording should precede the target NYSE entry open by at least 90 minutes",
+            "observed_at": observed_at.isoformat(),
+            "target_regular_open": target_open.isoformat(),
+            "schedule_phase": "before_open" if target_open > observed_at else "entry_already_open",
+            "calendar_status": "available",
+        },
+    )
 
 
 def _json_bytes(payload: dict[str, Any]) -> bytes:
