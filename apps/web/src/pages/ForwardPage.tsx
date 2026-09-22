@@ -8,6 +8,13 @@ import { api } from "../lib/api";
 import { compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
+/**
+ * Below this many settled outcomes the live figures are reported as a running
+ * log rather than a result. It is a readability threshold, not a statistical
+ * test: the frozen study's own locked test used 1,794 events.
+ */
+const EARLY_RESULT_COUNT = 100;
+
 export function ForwardPage() {
   const status = useQuery({ queryKey: ["forward-status"], queryFn: api.forwardStatus });
   const enabled = Boolean(status.data?.available);
@@ -78,6 +85,20 @@ export function ForwardPage() {
         <MetricCard label="Prediction error, live" info="rmse" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} results in so far`} />
         <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>
+
+      {metrics.forecast_count > 0 && metrics.matured_count < EARLY_RESULT_COUNT && (
+        <div className="notice">
+          <Clock3 size={18} aria-hidden="true" />
+          <div>
+            <strong>Too early to read these numbers</strong>
+            <span>
+              {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a
+              result so far. Treat the live figures as a running log, not evidence: the frozen
+              study's own test used 1,794 filings.
+            </span>
+          </div>
+        </div>
+      )}
 
       {metrics.forecast_count === 0 && (
         <div className="notice notice--forward">
