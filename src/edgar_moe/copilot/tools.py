@@ -9,10 +9,6 @@ from pathlib import Path
 from sqlalchemy.exc import SQLAlchemyError
 
 from edgar_moe.api.repository import SnapshotRepository
-from edgar_moe.forward.diagnostic_history import (
-    DiagnosticHistoryError,
-    read_forward_diagnostic_history,
-)
 from edgar_moe.forward.registry import ForwardRegistry
 
 from .contracts import Citation, ToolDefinition, ToolResult, content_hash
@@ -253,6 +249,11 @@ class ReadOnlyToolset:
         if name == "get_forward_diagnostic_history":
             if self.diagnostic_history_path is None:
                 raise ToolInputError("forward diagnostic history is not configured")
+            from edgar_moe.forward.diagnostic_history import (
+                DiagnosticHistoryError,
+                read_forward_diagnostic_history,
+            )
+
             try:
                 payload = read_forward_diagnostic_history(self.diagnostic_history_path)
             except DiagnosticHistoryError:
