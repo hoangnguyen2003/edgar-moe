@@ -53,11 +53,11 @@ Every change follows this sequence:
 7. Delete the remote head branch after merge. Start the next task from the
    updated `main`.
 
-For this personal project, the repository can remain private and unprotected
-to avoid paid-plan requirements. The pull request, CI checks, template, and
+The repository is public, and `main` is not branch-protected because the
+project has a single maintainer. The pull request, CI checks, template, and
 branch policy still provide a useful lightweight review record. See
-`docs/repository-governance.md` for the intentionally minimal governance
-model.
+`docs/repository-governance.md` for the governance model and the repository
+settings that are enabled.
 
 ## Review expectations
 
