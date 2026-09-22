@@ -41,8 +41,11 @@ jobs:
             github.event.deployment_status.target_url }}
         run: |
           mkdir -p reports/deployment-smoke
+          # The checkout is the deployed commit (or main for a manual recheck), so
+          # its reviewed lock is the identity production must serve.
           uv run python scripts/smoke_deployment.py \
             "$DEPLOYMENT_URL" \
+            --expect-lock config/public_snapshot.lock.json \
             --output reports/deployment-smoke/smoke.json
       - name: Upload smoke evidence
         if: ${{ always() }}
