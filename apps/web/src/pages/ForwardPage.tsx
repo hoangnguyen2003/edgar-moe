@@ -11,9 +11,10 @@ import {
   TriangleAlert,
 } from "lucide-react";
 import { MetricCard } from "../components/MetricCard";
+import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
-import { compact, dateTime, decimal, percent } from "../lib/format";
+import { compact, dateTime, decimal, percent, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 export function ForwardPage() {
@@ -40,7 +41,7 @@ export function ForwardPage() {
     return <div className="page"><LoadingState label="Checking forward registry" /></div>;
   }
   if (status.error) {
-    return <div className="page"><ErrorState error={status.error} /></div>;
+    return <div className="page"><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
   }
   if (!status.data?.available) {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
@@ -49,7 +50,10 @@ export function ForwardPage() {
     return <div className="page"><LoadingState label="Loading prospective evidence" /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
-  if (error) return <div className="page"><ErrorState error={error} /></div>;
+  if (error) {
+    const retry = () => void Promise.all([performance.refetch(), runs.refetch(), forecasts.refetch(), quality.refetch()]);
+    return <div className="page"><ErrorState error={error} onRetry={retry} /></div>;
+  }
 
   const metrics = performance.data!;
   const checks = quality.data!;
@@ -73,13 +77,13 @@ export function ForwardPage() {
 
   return (
     <div className="page">
-      <PageHeader />
+      <ForwardHeader />
       <div className="forward-trust-strip">
-        <span><LockKeyhole size={14} /> Frozen model</span>
-        <i />
-        <span><Clock3 size={14} /> Pre-entry timestamp</span>
-        <i />
-        <span><DatabaseZap size={14} /> Append-only outcome</span>
+        <span><LockKeyhole size={14} aria-hidden="true" /> Frozen model</span>
+        <i aria-hidden="true" />
+        <span><Clock3 size={14} aria-hidden="true" /> Pre-entry timestamp</span>
+        <i aria-hidden="true" />
+        <span><DatabaseZap size={14} aria-hidden="true" /> Append-only outcome</span>
       </div>
 
       <ForwardHealthBanner status={status.data} />
@@ -93,18 +97,18 @@ export function ForwardPage() {
 
       {metrics.forecast_count === 0 && (
         <div className="notice notice--forward">
-          <Clock3 size={18} />
+          <Clock3 size={18} aria-hidden="true" />
           <div><strong>Registry ready; first qualifying batch pending</strong><span>A forecast is accepted only when it is recorded after the filing arrives and before the next tradable entry. Historical rows are never relabeled as live predictions.</span></div>
         </div>
       )}
 
       <section className="content-grid content-grid--two forward-top-grid">
         <article className="panel">
-          <header><div><span className="panel__kicker">Run ledger</span><h2>Every state transition is preserved</h2></div><GitCommitHorizontal size={20} /></header>
+          <header><div><span className="panel__kicker">Run ledger</span><h2>Every state transition is preserved</h2></div><GitCommitHorizontal size={20} aria-hidden="true" /></header>
           <RunLedger rows={runs.data!} />
         </article>
         <article className="panel">
-          <header><div><span className="panel__kicker">Data contracts</span><h2>Quality gates</h2></div><ShieldCheck size={20} /></header>
+          <header><div><span className="panel__kicker">Data contracts</span><h2>Quality gates</h2></div><ShieldCheck size={20} aria-hidden="true" /></header>
           <QualityList rows={checks} />
         </article>
       </section>
@@ -131,7 +135,7 @@ function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
 
   return (
     <div className={`notice ${tone} forward-health-banner`}>
-      <Icon size={18} />
+      <Icon size={18} aria-hidden="true" />
       <div>
         <strong>{status.health_message ?? status.message}</strong>
         <span>
@@ -151,22 +155,20 @@ function formatAge(seconds: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-function PageHeader() {
+function ForwardHeader() {
   return (
-    <header className="page-header">
-      <span>Prospective evaluation</span>
-      <h1>Evidence that cannot look ahead.</h1>
-      <p>The v1 research result stays frozen. New filing forecasts are timestamped before entry, stored with content hashes, and evaluated only when their outcomes become observable.</p>
-    </header>
+    <PageHeader kicker="Prospective evaluation" title="Evidence that cannot look ahead.">
+      The v1 research result stays frozen. New filing forecasts are timestamped before entry, stored with content hashes, and evaluated only when their outcomes become observable.
+    </PageHeader>
   );
 }
 
 function UnconfiguredForwardLab({ configured }: { configured: boolean }) {
   return (
     <div className="page">
-      <PageHeader />
+      <ForwardHeader />
       <section className="forward-empty panel">
-        <div className="forward-empty__icon"><Orbit size={30} /></div>
+        <div className="forward-empty__icon" aria-hidden="true"><Orbit size={30} /></div>
         <span className="panel__kicker">Infrastructure state</span>
         <h2>{configured ? "Registry temporarily unavailable" : "Registry connection pending"}</h2>
         <p>{configured ? "The database is configured, but the API could not read it. Historical research remains available elsewhere in the terminal." : "The application and append-only schema are ready. This deployment has no database URL, so it cannot claim or display prospective observations yet."}</p>
@@ -175,7 +177,7 @@ function UnconfiguredForwardLab({ configured }: { configured: boolean }) {
           <div><span>02</span><strong>Forecast</strong><small>Record before tradable entry</small></div>
           <div><span>03</span><strong>Settle</strong><small>Append labels after maturity</small></div>
         </div>
-        <div className="forward-empty__note"><LockKeyhole size={15} /> No synthetic or backfilled rows are presented as forward evidence.</div>
+        <div className="forward-empty__note"><LockKeyhole size={15} aria-hidden="true" /> No synthetic or backfilled rows are presented as forward evidence.</div>
       </section>
     </div>
   );
@@ -202,7 +204,7 @@ function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
     <div className="quality-list">
       {rows.slice(0, 8).map((check) => (
         <div key={check.check_id}>
-          {check.status === "passed" ? <CheckCircle2 size={15} /> : <TriangleAlert size={15} />}
+          {check.status === "passed" ? <CheckCircle2 size={15} aria-hidden="true" /> : <TriangleAlert size={15} aria-hidden="true" />}
           <div><strong>{check.name.replaceAll("_", " ")}</strong><small>{dateTime(check.created_at)}</small></div>
           <span className={`quality-state quality-state--${check.status}`}>{check.status}</span>
         </div>
@@ -216,16 +218,16 @@ function ForecastTable({ rows }: { rows: Awaited<ReturnType<typeof api.forwardFo
   return (
     <div className="forward-table-wrap">
       <table className="forward-table">
-        <thead><tr><th>Event</th><th>Recorded</th><th>Entry</th><th>Score</th><th>Rank</th><th>Outcome</th></tr></thead>
+        <thead><tr><th scope="col">Event</th><th scope="col">Recorded</th><th scope="col">Entry</th><th scope="col" className="num">Score</th><th scope="col" className="num">Rank</th><th scope="col" className="num">Outcome</th></tr></thead>
         <tbody>
           {rows.map((row) => (
             <tr key={row.forecast_id}>
               <td><strong>{row.ticker}</strong><span>{row.form} · {row.company_name}</span></td>
               <td>{dateTime(row.forecast_as_of)}</td>
               <td>{dateTime(row.entry_at)}</td>
-              <td className={row.score >= 0 ? "positive" : "negative"}>{decimal(row.score, 4)}</td>
-              <td>{percent(row.rank, 0)}</td>
-              <td>{row.realized_abnormal_return == null ? <span className="pending-label">Pending</span> : percent(row.realized_abnormal_return)}</td>
+              <td className="num">{signedDecimal(row.score, 4)}</td>
+              <td className="num">{percent(row.rank, 0)}</td>
+              <td className="num">{row.realized_abnormal_return == null ? <span className="pending-label">Pending</span> : signedPercent(row.realized_abnormal_return)}</td>
             </tr>
           ))}
         </tbody>
