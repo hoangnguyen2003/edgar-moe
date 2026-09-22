@@ -1,0 +1,57 @@
+name: Deploy optional forward scheduler
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Choose DEPLOY only after reviewing the config and Cloudflare target"
+        required: true
+        default: "NO"
+        type: choice
+        options:
+          - "NO"
+          - "DEPLOY"
+
+concurrency:
+  group: deploy-forward-scheduler
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6.1.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Validate scheduler configuration
+        run: python3 scripts/validate_scheduler_config.py
+      - name: Test scheduler boundary
+        run: node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs
+
+  deploy:
+    if: ${{ inputs.deploy == 'DEPLOY' }}
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: scheduler
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Deploy Worker from the reviewed example config
+        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3.15.0
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ops/scheduler
+          wranglerVersion: "4.136.2"
+          command: deploy --config wrangler.toml.example
+          quiet: true
