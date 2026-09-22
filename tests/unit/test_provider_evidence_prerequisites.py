@@ -83,3 +83,33 @@ def test_restore_identity_conflicts_block_preflight_without_disclosing_urls() ->
     ]
     assert report["status"] == "blocked"
     assert environment["EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL"] not in json.dumps(report)
+
+
+def test_reader_and_auditor_identity_reuse_blocks_the_affected_groups() -> None:
+    environment = _configured_environment()
+    environment["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"] = environment[
+        "EDGAR_MOE_REGISTRY_DATABASE_URL"
+    ]
+    environment["EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL"] = environment[
+        "EDGAR_MOE_REGISTRY_DATABASE_URL"
+    ]
+    environment["EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID"] = environment["EDGAR_MOE_R2_ACCESS_KEY_ID"]
+    environment["EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY"] = environment[
+        "EDGAR_MOE_R2_SECRET_ACCESS_KEY"
+    ]
+
+    report = _MODULE.check_prerequisites(environment)
+
+    reader = next(group for group in report["groups"] if group["group_id"] == "reader_contract")
+    assert reader["violations"] == ["reader_writer_database_identity_conflict"]
+    for group_id in ("r2_read_audit", "partial_write_reconciliation"):
+        group = next(group for group in report["groups"] if group["group_id"] == group_id)
+        assert group["violations"] == [
+            "auditor_writer_database_identity_conflict",
+            "auditor_writer_r2_access_key_identity_conflict",
+            "auditor_writer_r2_secret_key_identity_conflict",
+        ]
+    assert report["status"] == "blocked"
+    serialized = json.dumps(report)
+    assert environment["EDGAR_MOE_REGISTRY_DATABASE_URL"] not in serialized
+    assert environment["EDGAR_MOE_R2_SECRET_ACCESS_KEY"] not in serialized

@@ -112,13 +112,18 @@ uv run python scripts/check_provider_evidence_prerequisites.py \
 
 The command checks the four workflow secret groups (reader contract, R2 read
 audit, isolated restore, and partial-write reconciliation). It reports missing
-secret names and restore identity conflicts only; it never prints secret values,
-URLs, or hashes of secret values. A `ready_to_run` result means the names are
-configured and the restore URLs are not identical. It does **not** prove
-provider grants, network reachability, backup behavior, or target isolation;
-the corresponding manual workflow and its retained redacted artifact remain
-the evidence boundary. A blocked result is expected until the missing
-provider-side secrets are configured.
+secret names and stable identity-conflict codes only; it never prints secret
+values, URLs, or hashes of secret values. The preflight rejects reuse of a
+reader or auditor database URL as the writer URL, and rejects reuse of writer R2
+access-key or secret-key credentials by the auditor. The R2 endpoint and bucket
+may remain shared because they identify a service location, not a credential
+identity. A `ready_to_run` result means the names are configured, the restore
+URLs are not identical, and the configured reader/auditor identities are
+separate from the writer. It does **not** prove provider grants, network
+reachability, backup behavior, or target isolation; the corresponding manual
+workflow and its retained redacted artifact remain the evidence boundary. A
+blocked result is expected until the missing provider-side secrets are
+configured.
 
 ## Required operator evidence
 

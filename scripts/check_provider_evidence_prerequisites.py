@@ -46,6 +46,53 @@ GROUPS: dict[str, tuple[str, ...]] = {
     "partial_write_reconciliation": (*WRITER_SECRETS, *AUDITOR_SECRETS[:1], *AUDITOR_SECRETS[3:]),
 }
 
+# Endpoint and bucket names are intentionally shared by the writer and the
+# auditor. Database URLs and access keys are identities, however, so reusing
+# one silently widens the blast radius of a serving or audit credential.
+IDENTITY_CONFLICTS: dict[str, tuple[tuple[str, str, str], ...]] = {
+    "reader_contract": (
+        (
+            "EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
+            "EDGAR_MOE_REGISTRY_DATABASE_URL",
+            "reader_writer_database_identity_conflict",
+        ),
+    ),
+    "r2_read_audit": (
+        (
+            "EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL",
+            "EDGAR_MOE_REGISTRY_DATABASE_URL",
+            "auditor_writer_database_identity_conflict",
+        ),
+        (
+            "EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID",
+            "EDGAR_MOE_R2_ACCESS_KEY_ID",
+            "auditor_writer_r2_access_key_identity_conflict",
+        ),
+        (
+            "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY",
+            "EDGAR_MOE_R2_SECRET_ACCESS_KEY",
+            "auditor_writer_r2_secret_key_identity_conflict",
+        ),
+    ),
+    "partial_write_reconciliation": (
+        (
+            "EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL",
+            "EDGAR_MOE_REGISTRY_DATABASE_URL",
+            "auditor_writer_database_identity_conflict",
+        ),
+        (
+            "EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID",
+            "EDGAR_MOE_R2_ACCESS_KEY_ID",
+            "auditor_writer_r2_access_key_identity_conflict",
+        ),
+        (
+            "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY",
+            "EDGAR_MOE_R2_SECRET_ACCESS_KEY",
+            "auditor_writer_r2_secret_key_identity_conflict",
+        ),
+    ),
+}
+
 
 def check_prerequisites(environment: Mapping[str, str]) -> dict[str, Any]:
     """Return a non-sensitive readiness report for the provider workflows."""
@@ -54,6 +101,8 @@ def check_prerequisites(environment: Mapping[str, str]) -> dict[str, Any]:
     for group_id, secret_names in GROUPS.items():
         missing = [name for name in secret_names if not environment.get(name, "").strip()]
         violations: list[str] = []
+        for left_name, right_name, code in IDENTITY_CONFLICTS.get(group_id, ()):
+            _append_identity_conflict(violations, environment, left_name, right_name, code)
         if group_id == "restore_rehearsal":
             _append_identity_conflict(
                 violations,
