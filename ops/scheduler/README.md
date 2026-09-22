@@ -34,6 +34,21 @@ not presented as an exactly-once distributed scheduler.
    npx wrangler deploy --config ops/scheduler/wrangler.toml
    ```
 
+   The committed configuration contract can be checked without Cloudflare
+   credentials:
+
+   ```bash
+   uv run python scripts/validate_scheduler_config.py
+   ```
+
+   For a repeatable account-side deployment, use the manually triggered
+   **Deploy optional forward scheduler** GitHub Actions workflow. It runs the
+   same configuration and Worker contract checks first, requires an explicit
+   `DEPLOY` confirmation, and reads only `CLOUDFLARE_API_TOKEN` and
+   `CLOUDFLARE_ACCOUNT_ID` from the `scheduler` environment. The workflow does
+   not receive `GITHUB_TOKEN`; set the Worker's `GITHUB_TOKEN` secret directly
+   with `wrangler secret put` as shown above.
+
 3. Use the Worker logs and GitHub Actions to confirm a single
    `workflow_dispatch` run starts at the intended UTC time. Check the resulting
    `pre_open_schedule_margin` quality check; it is the application-side source
@@ -56,6 +71,11 @@ merging this adapter cannot stop production cycles.
 - Roll back by disabling the Worker Cron trigger or reverting the separate
   cutover PR. Restoring the GitHub schedule is a repository change and should be
   reviewed like any other privileged workflow change.
+
+The deployment workflow is deliberately manual and does not remove or disable
+the GitHub schedule. A successful deployment is not a cutover or evidence that
+the Worker has dispatched a cycle; retain the first observed dispatch before
+opening a cutover PR.
 
 ## Verification
 
