@@ -258,21 +258,25 @@ class MirroredArtifactStore:
 
 
 def artifact_store_from_settings(settings: RuntimeSettings) -> ArtifactStore:
+    # The configuration is judged before anything is built, so a misconfigured
+    # pair is reported as such instead of as whichever store failed first.
     backend = settings.edgar_moe_artifact_backend.strip().lower()
-    if backend == "local":
-        primary: ArtifactStore = LocalArtifactStore(settings.edgar_moe_artifact_dir)
-    elif backend == "r2":
-        primary = _r2_store(settings)
-    else:
+    if backend not in {"local", "r2"}:
         raise ValueError(f"Unsupported artifact backend: {backend}")
-
     mirror_backend = settings.edgar_moe_artifact_mirror_backend.strip().lower()
-    if mirror_backend in {"", "none"}:
-        return primary
-    if mirror_backend != "r2":
+    if mirror_backend not in {"", "none", "r2"}:
         raise ValueError(f"Unsupported artifact mirror backend: {mirror_backend}")
-    if backend == "r2":
+    mirrored = mirror_backend == "r2"
+    if mirrored and backend == "r2":
         raise ValueError("Primary and mirror artifact backends must be different")
+
+    primary: ArtifactStore = (
+        LocalArtifactStore(settings.edgar_moe_artifact_dir)
+        if backend == "local"
+        else _r2_store(settings)
+    )
+    if not mirrored:
+        return primary
     return MirroredArtifactStore(primary, _r2_store(settings))
 
 
