@@ -9,6 +9,7 @@ import {
   humanize,
   monthYear,
   percent,
+  runPosition,
   shortDate,
   signedDecimal,
   signedPercent,
@@ -60,6 +61,19 @@ describe("format helpers", () => {
     expect(standing(0.13)).toBe("Bottom 13%");
     expect(standing(0.001)).toBe("Bottom 1%");
     expect(standing(null)).toBe("—");
+  });
+
+  it("places a forecast within its run instead of claiming a market-wide percentile", () => {
+    expect(runPosition(1, 1)).toBe("Only filing");
+    expect(runPosition(1, 4)).toBe("1st of 4");
+    expect(runPosition(0.75, 4)).toBe("2nd of 4");
+    expect(runPosition(0.5, 4)).toBe("3rd of 4");
+    expect(runPosition(0.25, 4)).toBe("4th of 4");
+    expect(runPosition(1 / 16, 16)).toBe("16th of 16");
+    expect(runPosition(0.6875, 16)).toBe("6th of 16");
+    expect(runPosition(12 / 13, 13)).toBe("2nd of 13");
+    expect(runPosition(1 / 13, 13)).toBe("13th of 13");
+    expect(runPosition(0.5, null)).toBe("—");
   });
 
   it("shows basis points as percentages", () => {

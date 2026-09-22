@@ -179,6 +179,8 @@ export interface ForwardForecastRecord {
   forecast_as_of: string;
   score: number;
   rank: number;
+  /** Forecasts recorded in the same run; `rank` is a percentile within this cohort. */
+  cohort_size: number;
   fundamental_score: number | null;
   expert_weights: Record<string, number>;
   realized_abnormal_return: number | null;

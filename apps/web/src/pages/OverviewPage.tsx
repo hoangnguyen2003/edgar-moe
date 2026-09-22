@@ -28,9 +28,9 @@ function verdict(rankIc: number | null | undefined, annualReturn: number | null 
 
 function gateCaption(weights: Record<ExpertKey, number> | null, cohort: number): string {
   const intro = "Three specialists score every filing, and a gate decides how much to trust each one.";
-  if (!weights) return `${intro} The weights appear when the latest filings load.`;
+  if (!weights) return `${intro} The weights appear when the study's final filings load.`;
   const leading = EXPERTS.reduce((best, expert) => (weights[expert.key] > weights[best.key] ? expert : best));
-  return `${intro} Across the latest ${cohort} filings, it leaned most on ${leading.name.toLowerCase()} (${percent(weights[leading.key], 0)}).`;
+  return `${intro} Across the study's final ${cohort} filings, it leaned most on ${leading.name.toLowerCase()} (${percent(weights[leading.key], 0)}).`;
 }
 
 export function OverviewPage() {

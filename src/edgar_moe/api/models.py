@@ -206,6 +206,8 @@ class ForwardForecastRecord(BaseModel):
     forecast_as_of: datetime
     score: float
     rank: float = Field(ge=0, le=1)
+    # Forecasts recorded in the same run; ``rank`` is a percentile within this cohort.
+    cohort_size: int = Field(ge=1)
     fundamental_score: float | None
     expert_weights: dict[str, float]
     realized_abnormal_return: float | None

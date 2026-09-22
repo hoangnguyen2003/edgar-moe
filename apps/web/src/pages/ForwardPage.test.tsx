@@ -42,6 +42,58 @@ describe("Forward Lab", () => {
     expect(screen.queryByText("Forecasts recorded")).not.toBeInTheDocument();
   });
 
+  it("shows each forecast's place within its own run", async () => {
+    const forecast = (ticker: string, rank: number, cohortSize: number) => ({
+      forecast_id: `f-${ticker}`,
+      run_id: `run-${cohortSize}`,
+      model_id: "edgar-moe-frozen-v1",
+      event_id: `e-${ticker}`,
+      accession_number: "0000000000-26-000001",
+      ticker,
+      company_name: `${ticker} Inc`,
+      form: "10-Q",
+      accepted_at: "2026-09-18T21:00:00Z",
+      entry_at: "2026-09-21T13:30:00Z",
+      entry_date: "2026-09-21",
+      horizon_at: "2026-10-19T20:00:00Z",
+      forecast_as_of: "2026-09-19T12:06:26Z",
+      score: -0.0009,
+      rank,
+      cohort_size: cohortSize,
+      fundamental_score: null,
+      expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 },
+      realized_abnormal_return: null,
+      label_recorded_at: null,
+    });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 2, forecast_count: 2,
+        matured_count: 0, pending_count: 2, latest_successful_run_at: "2026-09-19T12:10:00Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 2, matured_count: 0, pending_count: 2,
+        coverage: 0, rank_ic: null, rmse: null, mae: null, directional_accuracy: null,
+      });
+      if (url.includes("/forecasts")) return jsonResponse({
+        items: [forecast("KR", 1, 1), forecast("DELL", 0.75, 4)], total: 2, offset: 0, limit: 50,
+      });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    const kroger = (await screen.findByText("KR")).closest("tr")!;
+    expect(kroger).toHaveTextContent("Only filing");
+    expect(kroger).not.toHaveTextContent("Top 1%");
+    expect(screen.getByText("DELL").closest("tr")).toHaveTextContent("2nd of 4");
+    expect(screen.getByRole("button", { name: "What is Rank in run?" })).toBeInTheDocument();
+  });
+
   it("renders an empty but operational prospective registry", async () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);

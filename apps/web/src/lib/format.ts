@@ -59,6 +59,24 @@ export function standing(rank: number | null | undefined): string {
     : `Bottom ${Math.max(1, Math.round(rank * 100))}%`;
 }
 
+function ordinal(value: number): string {
+  const teen = value % 100 >= 11 && value % 100 <= 13;
+  const suffix = teen ? "th" : ({ 1: "st", 2: "nd", 3: "rd" } as Record<number, string>)[value % 10] ?? "th";
+  return `${value}${suffix}`;
+}
+
+/**
+ * A forecast's place among the filings scored in the same run, e.g. "1st of 4".
+ * Runs often score only one or two filings, so a bare percentile would overstate it.
+ */
+export function runPosition(rank: number | null | undefined, cohortSize: number | null | undefined): string {
+  if (rank == null || !Number.isFinite(rank) || cohortSize == null || !Number.isFinite(cohortSize)) return "—";
+  const size = Math.max(1, Math.round(cohortSize));
+  if (size === 1) return "Only filing";
+  const fromTop = size - Math.round(rank * size) + 1;
+  return `${ordinal(Math.min(Math.max(fromTop, 1), size))} of ${size}`;
+}
+
 /** Basis points as a percentage, e.g. 10 -> "0.10%". */
 export function bpsPercent(bps: number): string {
   return `${(bps / 100).toFixed(2)}%`;

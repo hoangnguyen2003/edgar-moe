@@ -101,6 +101,7 @@ def test_forward_api_contracts(tmp_path: Path) -> None:
             page = client.get("/api/v1/forward/forecasts?ticker=test").json()
             assert page["total"] == 1
             assert page["items"][0]["entry_at"].endswith("Z")
+            assert page["items"][0]["cohort_size"] == 1
             # An unbounded offset used to overflow SQLite and return HTTP 500.
             assert client.get(f"/api/v1/forward/forecasts?offset={10**30}").status_code == 422
             beyond = client.get("/api/v1/forward/forecasts?offset=1000000").json()
