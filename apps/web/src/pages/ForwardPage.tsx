@@ -3,7 +3,7 @@ import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "luci
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
-import { ErrorState, LoadingState } from "../components/QueryState";
+import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
 import { compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
@@ -29,7 +29,7 @@ export function ForwardPage() {
   });
 
   if (status.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} /></div>;
   }
   if (status.error) {
     return <div className="page"><ForwardHeader /><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
@@ -38,7 +38,7 @@ export function ForwardPage() {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
   if (error) {

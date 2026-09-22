@@ -1,6 +1,28 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import { ErrorState } from "./QueryState";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ErrorState, LoadingState, SLOW_LOAD_HINT_MS } from "./QueryState";
+
+describe("LoadingState", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("explains a slow load only after the delay, inside the status message", () => {
+    vi.useFakeTimers();
+    render(<LoadingState label="Loading live forecasts" slowHint="The database is waking up." />);
+    expect(screen.getByRole("status")).toHaveTextContent("Loading live forecasts");
+    expect(screen.queryByText("The database is waking up.")).not.toBeInTheDocument();
+
+    act(() => vi.advanceTimersByTime(SLOW_LOAD_HINT_MS));
+
+    expect(screen.getByRole("status")).toHaveTextContent("The database is waking up.");
+  });
+
+  it("never shows a hint when none is given", () => {
+    vi.useFakeTimers();
+    render(<LoadingState label="Loading" />);
+    act(() => vi.advanceTimersByTime(SLOW_LOAD_HINT_MS * 2));
+    expect(screen.getByRole("status")).toHaveTextContent(/^Loading$/);
+  });
+});
 
 describe("ErrorState", () => {
   it("offers a retry when the caller can refetch", () => {

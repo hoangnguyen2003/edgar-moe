@@ -241,6 +241,14 @@ Evidence is never erased to make a retry look clean.
   - a candidate RPO of 24 hours and RTO of 4 hours, to be demonstrated by drills.
 
   See the [proposed objectives](architecture-roadmap.md#proposed-service-objectives--not-measured-commitments).
+- **Cold starts:** the Vercel function and the Neon compute both scale to zero,
+  and they share a region (`sin1` and `ap-southeast-1`).
+  - Steady-state registry reads take about 0.2 s.
+  - The first request after an idle period waits while both resume; one
+    `governance` request took 22.7 s on 2026-09-22.
+  - Keeping the database warm would spend free compute allowance, so the pages
+    that read the registry show a delayed "the database pauses when idle" hint
+    instead.
 - **Capacity:** `edgar-moe capacity-baseline` records latency, storage, and
   runtime, and marks provider quotas as unobserved rather than guessing.
 
