@@ -146,6 +146,33 @@ The model is an explanation and evidence-navigation assistant. It does not
 replace statistical evaluation, the frozen model identity checks, a human
 review, or investment/legal/compliance advice.
 
+### Review profiles
+
+The same read-only agent can be run with a bounded review perspective. The
+profile changes only the instructions and is recorded in the content-addressed
+`agent_identity`; it never adds tools or write authority:
+
+- `research` (default): concise evidence navigation;
+- `quant`: point-in-time availability, leakage, label maturity, costs, and
+  uncertainty;
+- `architect`: system boundaries, source-of-truth choices, trust boundaries,
+  SLOs, failure modes, and cost/reliability trade-offs; or
+- `operations`: scheduler, deployment, database/artifact, alert, and recovery
+  evidence.
+
+For example, the architecture profile is useful when preparing a design review:
+
+```bash
+uv run edgar-moe research-copilot \
+  --profile architect \
+  "Which controls are observed, configured, or still unverified?"
+```
+
+Profiles are not separate autonomous actors and do not constitute a model
+promotion or trading decision. The existing tool-call, duration, context,
+citation, and envelope-verification limits apply unchanged. Reports created
+before profile identities were introduced remain verifiable as legacy reports.
+
 ### Inspect a private forward diagnostic
 
 An operator may explicitly provide one downloaded forward-cycle diagnostic to

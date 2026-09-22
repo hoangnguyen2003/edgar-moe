@@ -67,8 +67,25 @@ def test_copilot_plan_only_describes_the_tools_without_contacting_a_provider() -
     report = json.loads(result.stdout)
     assert report["provider_contacted"] is False
     assert len(report["tools"]) == 7
+    assert report["profile_id"] == "research"
     snapshot_digest = hashlib.sha256(Path("data/demo/snapshot.json").read_bytes()).hexdigest()
     assert report["frozen_identity"]["sha256"] == snapshot_digest
+
+
+def test_copilot_plan_only_accepts_a_solution_architecture_profile() -> None:
+    result = runner.invoke(
+        cli.app,
+        [
+            "research-copilot",
+            "Which controls are still unverified?",
+            "--profile",
+            "architect",
+            "--plan-only",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["profile_id"] == "architect"
 
 
 def _copy_locked_repository(root: Path) -> Path:

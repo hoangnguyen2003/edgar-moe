@@ -4,10 +4,18 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
+from typing import Literal
 
 from .contracts import CopilotAgentIdentity, ToolDefinition, content_hash
 
 COPILOT_POLICY_ID = "research-copilot-v1"
+CopilotProfile = Literal["research", "quant", "architect", "operations"]
+COPILOT_PROFILES: tuple[CopilotProfile, ...] = (
+    "research",
+    "quant",
+    "architect",
+    "operations",
+)
 
 COPILOT_SYSTEM_PROMPT = """You are the EDGAR-MoE Research Copilot.
 
@@ -25,24 +33,77 @@ include a reminder that it is research-only when the question asks for a
 decision or recommendation.
 """
 
+_PROFILE_INSTRUCTIONS: dict[CopilotProfile, str] = {
+    "research": "",
+    "quant": """
+Perspective for this run: quant research reviewer. Emphasize point-in-time
+availability, leakage controls, label maturity, cost assumptions, uncertainty,
+and the distinction between historical locked results and prospective evidence.
+Never turn a metric into a trading recommendation or imply that pending labels
+are performance evidence.
+""",
+    "architect": """
+Perspective for this run: solution-architecture reviewer. Explain the system
+boundaries, source-of-truth choices, trust boundaries, failure modes, SLOs,
+operational dependencies, and cost/reliability trade-offs visible in the cited
+evidence. Separate observed controls from configured-but-unverified controls and
+from open design decisions. Do not propose a write, deployment change, model
+promotion, or credential action as if it had already happened.
+""",
+    "operations": """
+Perspective for this run: production-operations reviewer. Focus on scheduler
+timeliness, deployment health, database and artifact boundaries, alertability,
+recovery evidence, and actionable runbook gaps. Classify each statement as
+observed, configured, pending, or unverified, and keep every conclusion tied to
+the returned evidence. Never modify production state or treat an alert as a
+model-change authorization.
+""",
+}
+
 _LEGACY_AGENT_IDENTITY_KEYS = frozenset(
     {"max_tool_calls", "policy_id", "policy_sha256", "tool_contract_sha256"}
 )
 _CURRENT_AGENT_IDENTITY_KEYS = _LEGACY_AGENT_IDENTITY_KEYS | {
     "max_context_bytes",
     "max_duration_seconds",
+    "profile_id",
 }
 _MAX_AGENT_DURATION_SECONDS = 900.0
 _MIN_AGENT_CONTEXT_BYTES = 16 * 1024
 _MAX_AGENT_CONTEXT_BYTES = 2 * 1024 * 1024
 
 
-def copilot_policy_sha256() -> str:
-    """Return the stable digest of the policy text used for new agent runs."""
+def normalize_copilot_profile(value: str) -> CopilotProfile:
+    """Validate the bounded perspective names exposed to operators."""
+    profile = value.strip().lower()
+    if profile not in COPILOT_PROFILES:
+        choices = ", ".join(COPILOT_PROFILES)
+        raise ValueError(f"copilot profile must be one of: {choices}")
+    return profile
+
+
+def build_system_prompt(profile: str = "research") -> str:
+    """Return the base safety policy plus one bounded review perspective."""
+    normalized = normalize_copilot_profile(profile)
+    return COPILOT_SYSTEM_PROMPT + _PROFILE_INSTRUCTIONS[normalized]
+
+
+def copilot_policy_sha256(profile: str | None = None) -> str:
+    """Return the policy digest for a legacy or profile-aware agent run."""
+    if profile is None or normalize_copilot_profile(profile) == "research":
+        # Keep the original digest stable so existing reports remain verifiable.
+        return content_hash(
+            {
+                "policy_id": COPILOT_POLICY_ID,
+                "system_prompt": COPILOT_SYSTEM_PROMPT,
+            }
+        )
+    normalized = normalize_copilot_profile(profile)
     return content_hash(
         {
             "policy_id": COPILOT_POLICY_ID,
-            "system_prompt": COPILOT_SYSTEM_PROMPT,
+            "profile_id": normalized,
+            "system_prompt": build_system_prompt(normalized),
         }
     )
 
@@ -52,15 +113,18 @@ def build_agent_identity(
     max_tool_calls: int,
     max_duration_seconds: float | None = None,
     max_context_bytes: int | None = None,
+    profile_id: str = "research",
 ) -> CopilotAgentIdentity:
     """Build the non-secret identity of one bounded agent configuration."""
+    normalized_profile = normalize_copilot_profile(profile_id)
     return CopilotAgentIdentity(
         policy_id=COPILOT_POLICY_ID,
-        policy_sha256=copilot_policy_sha256(),
+        policy_sha256=copilot_policy_sha256(normalized_profile),
         tool_contract_sha256=content_hash([tool.as_provider_schema() for tool in tool_definitions]),
         max_tool_calls=max_tool_calls,
         max_duration_seconds=max_duration_seconds,
         max_context_bytes=max_context_bytes,
+        profile_id=normalized_profile,
     )
 
 
@@ -82,7 +146,18 @@ def validate_agent_identity(value: object) -> dict[str, object]:
     policy_sha256 = value["policy_sha256"]
     if not _is_digest(policy_sha256):
         raise ValueError("agent_identity policy_sha256 must be a lowercase SHA-256 digest")
-    if policy_sha256 != copilot_policy_sha256():
+    profile_id = value.get("profile_id")
+    if profile_id is not None:
+        try:
+            profile_id = normalize_copilot_profile(profile_id)
+        except (AttributeError, ValueError) as error:
+            raise ValueError("agent_identity profile_id is invalid") from error
+        expected_policy_sha256 = copilot_policy_sha256(profile_id)
+    else:
+        # Reports emitted before profile-aware identities used the base policy
+        # digest and remain valid without a profile_id field.
+        expected_policy_sha256 = copilot_policy_sha256()
+    if policy_sha256 != expected_policy_sha256:
         raise ValueError("agent_identity policy_sha256 does not match the current policy")
     if not _is_digest(value["tool_contract_sha256"]):
         raise ValueError("agent_identity tool_contract_sha256 must be a lowercase SHA-256 digest")
@@ -120,6 +195,8 @@ def validate_agent_identity(value: object) -> dict[str, object]:
     for optional_key in ("max_duration_seconds", "max_context_bytes"):
         if optional_key in value:
             normalized[optional_key] = value[optional_key]
+    if profile_id is not None:
+        normalized["profile_id"] = profile_id
     return normalized
 
 

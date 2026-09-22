@@ -25,7 +25,7 @@ from .contracts import (
     ToolTrace,
     content_hash,
 )
-from .policy import COPILOT_SYSTEM_PROMPT, build_agent_identity
+from .policy import build_agent_identity, build_system_prompt, normalize_copilot_profile
 from .tools import ReadOnlyToolset, ToolInputError
 from .verification import verify_copilot_answer_report
 
@@ -250,6 +250,7 @@ class ResearchCopilot:
         max_tool_calls: int = 4,
         max_duration_seconds: float = _DEFAULT_MAX_DURATION_SECONDS,
         max_context_bytes: int = _DEFAULT_MAX_CONTEXT_BYTES,
+        profile: str = "research",
     ) -> None:
         if not 1 <= max_tool_calls <= 8:
             raise ValueError("max_tool_calls must be between 1 and 8")
@@ -276,6 +277,7 @@ class ResearchCopilot:
         self.max_tool_calls = max_tool_calls
         self.max_duration_seconds = max_duration_seconds
         self.max_context_bytes = max_context_bytes
+        self.profile = normalize_copilot_profile(profile)
 
     def ask(self, question: str) -> CopilotAnswer:
         normalized_question = question.strip()
@@ -285,7 +287,7 @@ class ResearchCopilot:
             )
 
         messages: list[dict[str, object]] = [
-            {"role": "system", "content": COPILOT_SYSTEM_PROMPT},
+            {"role": "system", "content": build_system_prompt(self.profile)},
             {"role": "user", "content": normalized_question},
         ]
         run_started = monotonic()
@@ -302,6 +304,7 @@ class ResearchCopilot:
             self.max_tool_calls,
             self.max_duration_seconds,
             self.max_context_bytes,
+            self.profile,
         )
         allowed_tool_names = {tool.name for tool in tool_definitions}
 
