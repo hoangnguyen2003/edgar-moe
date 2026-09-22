@@ -46,6 +46,7 @@ jobs:
           uv run python scripts/validate_scheduler_config.py
           uv run python scripts/validate_scheduler_workflow.py
           uv run python scripts/validate_scheduler_observation_workflow.py
+          uv run python scripts/validate_forward_schedule_boundary.py
       - name: Check scheduler observation verifier is runnable
         run: uv run python scripts/verify_scheduler_dispatch.py --help
       - name: Check forward alert receipt verifier is runnable

@@ -71,6 +71,12 @@ not presented as an exactly-once distributed scheduler.
 The current branch deliberately does not remove the GitHub schedule, so simply
 merging this adapter cannot stop production cycles.
 
+CI also validates the forward workflow's rollback boundary: the `07:17 UTC`
+schedule, manual dispatch, CPU-only input, and concurrency group must remain
+present together. A deliberate Cloudflare cutover must change that contract in
+the same reviewed PR as the schedule removal; an incidental workflow edit is
+rejected before merge.
+
 ## Failure and rollback behavior
 
 - Missing or malformed configuration fails before any GitHub request.
