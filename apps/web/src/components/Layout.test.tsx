@@ -74,7 +74,11 @@ describe("Layout", () => {
     const next = screen.getByRole("navigation", { name: "Next page" });
     expect(within(next).getByRole("link")).toHaveAttribute("href", "/signals");
 
-    fireEvent.click(within(screen.getByRole("navigation", { name: "Main" })).getByRole("link", { name: /How it works/ }));
+    const main = screen.getByRole("navigation", { name: "Main" });
+    fireEvent.click(within(main).getByRole("link", { name: /How it works/ }));
+    expect(within(screen.getByRole("navigation", { name: "Next page" })).getByRole("link")).toHaveAttribute("href", "/architecture");
+
+    fireEvent.click(within(main).getByRole("link", { name: /Architecture/ }));
     expect(within(screen.getByRole("navigation", { name: "Next page" })).getByRole("link")).toHaveTextContent("Back to the start");
   });
 

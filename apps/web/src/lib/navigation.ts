@@ -8,6 +8,7 @@ export const navigation = [
   { to: "/forward", label: "Live tracking", description: "How the frozen model does on filings it has never seen" },
   { to: "/governance", label: "Audit", description: "How to check the results weren't changed afterwards" },
   { to: "/methodology", label: "How it works", description: "The data, the model, and key terms in plain English" },
+  { to: "/architecture", label: "Architecture", description: "How the system is built, deployed, and kept honest" },
 ];
 
 export type NavigationEntry = (typeof navigation)[number];

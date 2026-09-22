@@ -21,7 +21,7 @@ export const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
 /** Matches the stylesheet's single-column breakpoint. */
 export const COMPACT_LAYOUT = "(max-width: 760px)";
 /** Below this width the page links move behind the Menu button. */
-export const MENU_LAYOUT = "(max-width: 1080px)";
+export const MENU_LAYOUT = "(max-width: 1180px)";
 
 export function prefersReducedMotion(): boolean {
   return matches(REDUCED_MOTION);

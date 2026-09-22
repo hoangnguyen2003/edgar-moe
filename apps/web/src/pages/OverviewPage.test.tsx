@@ -38,7 +38,7 @@ describe("Overview", () => {
     expect(await screen.findByText(/it leaned most on financial statements \(85%\)/)).toBeInTheDocument();
 
     const explore = screen.getByRole("navigation", { name: "Explore the project" });
-    expect(within(explore).getAllByRole("link")).toHaveLength(7);
+    expect(within(explore).getAllByRole("link")).toHaveLength(8);
     expect(within(explore).getByRole("link", { name: /Backtest/ })).toHaveAttribute("href", "/portfolio");
   });
 });
