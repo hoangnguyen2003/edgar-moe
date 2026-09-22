@@ -4,6 +4,7 @@ import pytest
 
 from edgar_moe.features.tabular import build_fundamental_ratios, cross_sectional_winsorize
 from edgar_moe.features.text import (
+    FinBertEmbedder,
     HashingTextEmbedder,
     _canonical_sentiment_indices,
     _uniform_chunk_sample,
@@ -58,6 +59,21 @@ def test_hashing_text_features_are_deterministic_and_comparable() -> None:
 
 def test_finbert_labels_are_reordered_to_project_convention() -> None:
     assert _canonical_sentiment_indices({0: "positive", 1: "negative", 2: "neutral"}) == (1, 2, 0)
+
+
+def test_finbert_cache_identity_pins_runtime_versions() -> None:
+    embedder = object.__new__(FinBertEmbedder)
+    embedder.runtime_versions = {"torch": "2.13.0", "transformers": "4.57.6"}
+    embedder.model_name = "ProsusAI/finbert"
+    embedder.model_revision = "revision-123"
+    embedder.chunk_tokens = 510
+    embedder.max_chunks = 12
+
+    identity = embedder.cache_identity
+
+    assert identity.startswith("finbert-v2:torch=2.13.0:transformers=4.57.6:")
+    assert "model=ProsusAI/finbert" in identity
+    assert "revision=revision-123" in identity
 
 
 def test_finbert_uniformly_samples_long_filings() -> None:
