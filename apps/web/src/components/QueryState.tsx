@@ -46,7 +46,7 @@ export function ErrorState({
         <strong>Research API unavailable</strong>
         <p>{error.message}</p>
         {onRetry && (
-          <button type="button" className="button button--ghost button--small" onClick={onRetry}>
+          <button type="button" className="button button--secondary button--small" onClick={onRetry}>
             <RotateCw size={14} aria-hidden="true" /> Try again
           </button>
         )}

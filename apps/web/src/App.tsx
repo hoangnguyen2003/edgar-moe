@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
+import { PageErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { LoadingState } from "./components/QueryState";
 import { useRouter } from "./lib/router-context";
@@ -35,9 +36,11 @@ export default function App() {
 
   return (
     <Layout>
-      <Suspense fallback={<div className="page"><LoadingState /></div>}>
-        {Page ? <Page /> : null}
-      </Suspense>
+      <PageErrorBoundary resetKey={pathname}>
+        <Suspense fallback={<div className="page"><LoadingState /></div>}>
+          {Page ? <Page /> : null}
+        </Suspense>
+      </PageErrorBoundary>
     </Layout>
   );
 }
