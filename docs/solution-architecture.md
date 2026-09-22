@@ -91,6 +91,7 @@ Each scenario gives a stimulus, the required response, and the current evidence.
 | Security | A credential is committed or bundled. The bundle validator and secret scanning block or flag it. | Enforced in CI; push protection is enabled |
 | Timeliness | A scheduled run starts late. Its margin before the open is recorded, with a warning below 90 minutes. | Enforced ([ADR 0020](adr/0020-pre-open-schedule-margin.md)); manual read-only observers verify a selected dispatch and summarize historical scheduled-time, creation-time, and start-time delays. Punctuality and scheduler origin are not guaranteed by GitHub metadata. |
 | Recoverability | The registry is lost. It can be restored into an isolated target and reconciled with R2 evidence. | Rehearsed locally and in CI. **Pending:** a provider-side drill; the candidate RPO (24 h) and RTO (4 h) are unverified. |
+| Performance | A change adds weight to the site. The first visit still downloads under 130 KB of compressed HTML, JavaScript, and CSS, and CI fails when it would not. | Enforced ([`check_web_budget.py`](../scripts/check_web_budget.py), budget in [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json)); measured at 97 KB on 2026-09-23 |
 | Cost | A copilot tool loop or provider outage runs long. Wall-clock and context budgets stop it before the next provider call. | Enforced ([ADR 0008](adr/0008-copilot-run-execution-budget.md), [ADR 0009](adr/0009-copilot-context-budget.md)) |
 
 ## 3. Architecture views
@@ -294,6 +295,7 @@ how it is verified. CI runs the linked tests on every pull request.
 | R9 | Without the registry, historical reads still work and forward status says so | [`api/app.py`](../src/edgar_moe/api/app.py) | [`test_api.py`](../tests/integration/test_api.py) |
 | R10 | Late runs are visible before the open | [`forward/workflow.py`](../src/edgar_moe/forward/workflow.py) ([ADR 0020](adr/0020-pre-open-schedule-margin.md)) | [`test_forward_workflow.py`](../tests/integration/test_forward_workflow.py) |
 | R11 | Copilot citations are bound to real tool output | [`copilot/agent.py`](../src/edgar_moe/copilot/agent.py), [`copilot/verification.py`](../src/edgar_moe/copilot/verification.py) | [`test_copilot_agent.py`](../tests/unit/test_copilot_agent.py), [`test_copilot_verification.py`](../tests/unit/test_copilot_verification.py) |
+| R12 | The first visit stays inside the page-weight budget | [`check_web_budget.py`](../scripts/check_web_budget.py), [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json) | [`test_web_budget.py`](../tests/unit/test_web_budget.py), and the bundle job in CI |
 
 **Verify the live system yourself.** From a clone, with no credentials, run:
 

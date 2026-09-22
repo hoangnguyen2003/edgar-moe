@@ -1,0 +1,21 @@
+{
+  "checked_by": "scripts/check_web_budget.py",
+  "units": "gzip kilobytes, compression level 6",
+  "budgets": {
+    "first_load_kb": 130,
+    "route_chunk_kb": 130,
+    "total_kb": 300
+  },
+  "measured": {
+    "on": "2026-09-23",
+    "commit": "716a877",
+    "first_load_kb": 97.1,
+    "route_chunk_kb": 102.7,
+    "total_kb": 217.7,
+    "notes": [
+      "first load is index.html plus the entry module, the API module, and the stylesheet",
+      "the heaviest route chunk is the portfolio page, which carries the chart library",
+      "budgets allow roughly a third more than the measurement, so a deliberate feature fits and an accidental dependency does not"
+    ]
+  }
+}
