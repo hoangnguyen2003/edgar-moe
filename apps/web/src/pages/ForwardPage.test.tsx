@@ -180,6 +180,8 @@ describe("Forward Lab", () => {
     expect(screen.getByText("Latest data checks")).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
     expect(screen.getByText(/1 warned before/)).toBeInTheDocument();
+    // The check reads as a number against its threshold, not just "warning".
+    expect(screen.getByText(/0 candidates · needs at least 1 candidate/)).toBeInTheDocument();
     expect(screen.getByText("No runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("No forecasts recorded yet.")).toBeInTheDocument();
   });
