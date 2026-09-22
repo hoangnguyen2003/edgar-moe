@@ -46,6 +46,7 @@ describe("Portfolio page", () => {
     render(<QueryClientProvider client={client}><PortfolioPage /></QueryClientProvider>);
 
     expect(await screen.findByText("-0.63", { selector: ".figure__value" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "Trading cost" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "0.10%" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Start")).toHaveTextContent("Start $1.00");
     expect(screen.getByText("At 0.10% trading cost, the portfolio lost 3.3% a year.")).toBeInTheDocument();

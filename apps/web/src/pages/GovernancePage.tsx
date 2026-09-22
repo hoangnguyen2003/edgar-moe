@@ -99,7 +99,7 @@ function FrozenIdentity({ identity }: { identity: GovernanceResponse["frozen_v1"
     <article className="panel governance-identity-panel">
       <header>
         <div>
-          <h2>Frozen model fingerprints <InfoTip term="fingerprint" /></h2>
+          <div className="panel__title"><h2>Frozen model fingerprints</h2><InfoTip term="fingerprint" /></div>
           <p>If a single byte of the published data or the model's selection changed, these codes would change too.</p>
         </div>
         <span className="badge badge--frozen">Frozen v1</span>

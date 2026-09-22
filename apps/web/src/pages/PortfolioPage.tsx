@@ -59,7 +59,7 @@ export function PortfolioPage() {
   });
   const costControl = (
     <div className="control">
-      <span className="control__label" id={costLabelId}>Trading cost <InfoTip term="tradingCost" /></span>
+      <span className="control__label"><span id={costLabelId}>Trading cost</span><InfoTip term="tradingCost" /></span>
       <div className="segmented" role="group" aria-labelledby={costLabelId}>
         {COSTS.map((value) => (
           <button type="button" key={value} aria-pressed={cost === value} onClick={() => setCost(value)}>

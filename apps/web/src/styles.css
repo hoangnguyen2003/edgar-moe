@@ -173,7 +173,8 @@ main { flex: 1; min-width: 0; }
 .panel > header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px 24px; margin-bottom: 20px; }
 .panel > header > div:first-child { min-width: min(100%, 320px); flex: 1; }
 .panel > figcaption { margin-bottom: 18px; }
-.panel h2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; font: 500 25px/1.2 var(--serif); letter-spacing: -.01em; }
+.panel h2 { margin: 0; font: 500 25px/1.2 var(--serif); letter-spacing: -.01em; }
+.panel__title { display: flex; align-items: center; gap: 6px; }
 .panel header p, .panel figcaption p { max-width: 66ch; margin: 8px 0 0; color: var(--ink-2); font-size: 15px; line-height: 1.6; }
 .panel__note { display: flex; align-items: flex-start; gap: 7px; margin: 20px 0 0; padding-top: 14px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 14px; line-height: 1.6; }
 .panel__note svg { flex: 0 0 auto; margin-top: 4px; }
