@@ -1,7 +1,7 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. All 21 records are accepted. When a decision changes,
+the decision is verified. All 23 records are accepted. When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
 decisions in the overall design.
@@ -18,6 +18,7 @@ decisions in the overall design.
 | [0016](0016-database-append-only-triggers.md) | Enforce the append-only registry with database triggers on SQLite and Postgres: evidence tables reject every update and delete. | 2026-09-21 |
 | [0017](0017-post-v1-selection-protocol.md) | For studies after v1, early-stop on a purged chronological holdout instead of the scored validation fold, and use scale-invariant baselines. | 2026-09-21 |
 | [0021](0021-frozen-runtime-compatibility-gate.md) | Bind embedding caches to exact PyTorch and Transformers versions, and require a reproduction comparison of the locked test before any frozen-inference dependency upgrade. | 2026-09-22 |
+| [0022](0022-copilot-review-profiles.md) | Keep research, quant, architecture, and operations copilot perspectives bounded by one content-addressed read-only agent identity. | 2026-09-22 |
 
 ## Operations and delivery
 
@@ -27,6 +28,7 @@ decisions in the overall design.
 | [0018](0018-workflow-supply-chain.md) | Pin every workflow action to a full commit SHA, and pass each secret only to the steps that need it. | 2026-09-21 |
 | [0019](0019-forward-cache-lifecycle.md) | Keep immutable per-attempt runtime caches, and prune all but the two newest in a separate job with no checkout, dependencies, or production secrets. | 2026-09-22 |
 | [0020](0020-pre-open-schedule-margin.md) | Record each forecast run's margin before the NYSE open as an immutable quality check, and warn below 90 minutes, without changing the cutoff or the model. | 2026-09-22 |
+| [0023](0023-external-forward-scheduler.md) | Stage a dormant Cloudflare Cron adapter for the existing forward workflow; require a separate observed cutover before removing the GitHub schedule. | 2026-09-22 |
 
 ## AI research copilot boundary
 
