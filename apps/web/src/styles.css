@@ -252,6 +252,7 @@ main { flex: 1; min-width: 0; }
 
 /* ---------- Loading, errors, notices ---------- */
 .query-state { display: flex; align-items: flex-start; justify-content: center; gap: 12px; max-width: 520px; min-height: 110px; margin: 72px auto; color: var(--ink-2); font: 500 15px var(--sans); }
+.query-state__hint { display: block; max-width: 44ch; margin-top: 6px; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
 .query-state--error { justify-content: flex-start; padding: 22px; background: var(--sheet); border: 1px solid var(--rule); border-top: 3px solid var(--critical); color: var(--critical); }
 .query-state--error strong { display: block; color: var(--ink); font: 500 21px var(--serif); }
 .query-state--error p { margin: 6px 0 14px; color: var(--ink-2); font-size: 15px; }

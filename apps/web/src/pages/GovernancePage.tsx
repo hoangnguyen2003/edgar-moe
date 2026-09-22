@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
-import { ErrorState, LoadingState } from "../components/QueryState";
+import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
 import { dateTime, humanize, shortDate } from "../lib/format";
@@ -25,7 +25,7 @@ export function GovernancePage() {
   );
 
   if (governance.isLoading) {
-    return <div className="page">{header}<LoadingState label="Loading the audit trail" /></div>;
+    return <div className="page">{header}<LoadingState label="Loading the audit trail" slowHint={IDLE_DATABASE_HINT} /></div>;
   }
   if (governance.error) {
     return <div className="page">{header}<ErrorState error={governance.error} onRetry={() => void governance.refetch()} /></div>;
