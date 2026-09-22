@@ -155,8 +155,41 @@ def get_forward_registry() -> ForwardRegistry | None:
 ForwardRegistryDependency = Annotated[ForwardRegistry | None, Depends(get_forward_registry)]
 
 
-def _cache(response: Response, seconds: int = 300) -> None:
-    response.headers["Cache-Control"] = f"public, max-age={seconds}, stale-while-revalidate=600"
+# Vercel's edge caches a function response only when it carries ``s-maxage``.
+# Without one, every visitor invokes the function, and the first visitor after
+# an idle period waits for the function and the database to resume. A new
+# deployment starts with an empty edge cache, so a snapshot response can never
+# outlive the snapshot it came from, however long its edge lifetime.
+_EDGE_SNAPSHOT_SECONDS = 86_400
+_EDGE_SNAPSHOT_STALE_SECONDS = 604_800
+_EDGE_LIVE_SECONDS = 60
+_EDGE_LIVE_STALE_SECONDS = 300
+
+
+def _cache(
+    response: Response,
+    seconds: int = 300,
+    *,
+    edge_seconds: int = _EDGE_SNAPSHOT_SECONDS,
+    stale_seconds: int = _EDGE_SNAPSHOT_STALE_SECONDS,
+) -> None:
+    """Cache a reviewed-snapshot read: briefly in the browser, long at the edge."""
+
+    response.headers["Cache-Control"] = (
+        f"public, max-age={seconds}, s-maxage={edge_seconds}, "
+        f"stale-while-revalidate={stale_seconds}"
+    )
+
+
+def _cache_live(response: Response, seconds: int = 60) -> None:
+    """Cache a registry read, which changes when a forward run lands."""
+
+    _cache(
+        response,
+        seconds,
+        edge_seconds=_EDGE_LIVE_SECONDS,
+        stale_seconds=_EDGE_LIVE_STALE_SECONDS,
+    )
 
 
 def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusResponse:
@@ -182,7 +215,9 @@ def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusR
 
 
 @app.get("/api/v1/health", response_model=HealthResponse, tags=["operations"])
-def health(repo: RepositoryDependency) -> HealthResponse:
+def health(response: Response, repo: RepositoryDependency) -> HealthResponse:
+    # A cached health answer would report the state of some earlier moment.
+    response.headers["Cache-Control"] = "no-store"
     try:
         snapshot = repo.load()
     except (SnapshotNotFoundError, ValueError):
@@ -369,7 +404,7 @@ def forward_runs(
     registry: ForwardRegistryDependency,
     limit: int = Query(default=25, ge=1, le=100),
 ) -> list[ForwardRunRecord]:
-    _cache(response, seconds=60)
+    _cache_live(response)
     if registry is None:
         return []
     try:
@@ -392,7 +427,7 @@ def forward_forecasts(
     # Bounded so an oversized value is a 422 rather than a database overflow.
     offset: int = Query(default=0, ge=0, le=1_000_000),
 ) -> ForwardForecastPage:
-    _cache(response, seconds=60)
+    _cache_live(response)
     if registry is None:
         return ForwardForecastPage(items=[], total=0, offset=offset, limit=limit)
     try:
@@ -417,7 +452,7 @@ def forward_performance(
     registry: ForwardRegistryDependency,
     model_id: str | None = Query(default=None, min_length=1, max_length=160),
 ) -> ForwardPerformanceResponse:
-    _cache(response, seconds=60)
+    _cache_live(response)
     if registry is None:
         return ForwardPerformanceResponse(
             model_id=model_id,
@@ -446,7 +481,7 @@ def forward_data_quality(
     registry: ForwardRegistryDependency,
     limit: int = Query(default=100, ge=1, le=250),
 ) -> list[ForwardQualityRecord]:
-    _cache(response, seconds=60)
+    _cache_live(response)
     if registry is None:
         return []
     try:

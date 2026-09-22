@@ -254,6 +254,11 @@ Evidence is never erased to make a retry look clean.
   - Keeping the database warm would spend free compute allowance, so the pages
     that read the registry show a delayed "the database pauses when idle" hint
     instead.
+  - Snapshot reads carry `s-maxage`, so the edge answers them without waking
+    the function: after a deployment the first visitor pays the resume, and
+    the readers behind them do not. Registry reads keep a 60-second edge
+    lifetime, and health, freshness, and forward status are never cached.
+    Asserted in [`test_cache_policy.py`](../tests/unit/test_cache_policy.py).
 - **Capacity:** `edgar-moe capacity-baseline` records latency, storage, and
   runtime, and marks provider quotas as unobserved rather than guessing.
 
@@ -269,7 +274,8 @@ Evidence is never erased to make a retry look clean.
 
 The design targets zero recurring spend:
 - GitHub Actions uses free standard runners for this public repository.
-- Serving is static assets plus one small read-only Python function.
+- Serving is static assets plus one small read-only Python function, and the
+  edge answers repeat snapshot reads, so most visits invoke nothing.
 - The registry and evidence mirror hold small row and JSON volumes, sized for free allowances. Provider usage has not been measured yet.
 - Market data uses the free IEX feed.
 
