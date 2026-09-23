@@ -91,7 +91,7 @@ export function PortfolioPage() {
       {header}
       <div className={updating ? "scenario is-updating" : "scenario"} aria-busy={updating}>
         {headline && (
-          <Takeaway title={headline}>
+          <Takeaway variant="quiet" title={headline}>
             At its worst it fell {metrics.maximum_drawdown == null ? "—" : percent(Math.abs(metrics.maximum_drawdown))} from
             a peak, and returns swung {percent(metrics.annualized_volatility)} a year. Short positions also paid a 2% yearly
             borrowing fee.

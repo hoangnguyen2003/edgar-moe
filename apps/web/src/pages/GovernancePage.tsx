@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
+import { LockKeyhole } from "lucide-react";
+import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { CopyValue } from "../components/CopyValue";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
-import { dateTime, humanize, shortDate } from "../lib/format";
+import { humanize, shortDate } from "../lib/format";
 import type { GovernanceControl, GovernanceResponse } from "../lib/types";
 
 const CONTROL_LABELS: Record<string, string> = {
@@ -33,15 +34,12 @@ export function GovernancePage() {
   }
 
   const data = governance.data!;
-  const forwardHealthy = data.forward_status.health_status === "ok";
-  const ForwardIcon = forwardHealthy ? CheckCircle2 : TriangleAlert;
-  const forwardTone = forwardHealthy ? "notice--forward" : "notice--warning";
   const enforced = data.controls.filter((control) => control.status === "enforced").length;
 
   return (
     <div className="page">
       {header}
-      <Takeaway title={`${enforced} of ${data.controls.length} safeguards are enforced in code.`}>
+      <Takeaway variant="quiet" title={`${enforced} of ${data.controls.length} safeguards are enforced in code.`}>
         The rest depend on the people running the service and are marked as needing their evidence.
       </Takeaway>
 
@@ -69,18 +67,16 @@ export function GovernancePage() {
             <p>Counts from the forecast database behind the Live tracking page.</p>
           </div>
         </header>
-        <div className={`notice ${forwardTone}`}>
-          <ForwardIcon size={18} aria-hidden="true" />
-          <div>
-            <strong>{data.forward_status.health_message ?? data.forward_status.message}</strong>
-            <span>
-              {data.forward_status.available ? "Connected" : "Not connected"}
-              {data.forward_status.latest_successful_run_at
-                ? ` · last successful run ${dateTime(data.forward_status.latest_successful_run_at)}`
-                : " · no successful run yet"}
-            </span>
-          </div>
-        </div>
+        {data.forward_status.available ? (
+          <>
+            <RunnerStatus status={data.forward_status} />
+            {data.forward_status.health_status !== "ok" && <RunnerHealthBanner status={data.forward_status} />}
+          </>
+        ) : (
+          <p className="caveat">
+            <strong>Not connected.</strong> {data.forward_status.health_message ?? data.forward_status.message}
+          </p>
+        )}
         <div className="governance-lane">
           <LaneMetric label="Models" value={String(data.forward_status.model_count)} />
           <LaneMetric label="Runs" value={String(data.forward_status.run_count)} />
@@ -154,7 +150,6 @@ function PublicBoundary({ data }: { data: GovernanceResponse }) {
 function BoundaryRow({ label, value, safe }: { label: string; value: string; safe: boolean }) {
   return (
     <div className="governance-boundary-row">
-      {safe ? <CheckCircle2 size={16} aria-hidden="true" /> : <Clock3 size={16} aria-hidden="true" />}
       <span>{label}</span>
       <strong className={safe ? "positive" : "pending-label"}>{value}</strong>
     </div>
@@ -165,7 +160,6 @@ function ControlRow({ control }: { control: GovernanceControl }) {
   const enforced = control.status === "enforced";
   return (
     <div className={`governance-control ${enforced ? "" : "governance-control--pending"}`}>
-      {enforced ? <CheckCircle2 size={16} aria-hidden="true" /> : <Clock3 size={16} aria-hidden="true" />}
       <div><strong>{CONTROL_LABELS[control.key] ?? humanize(control.key)}</strong><span>{control.summary}</span></div>
       <small>{enforced ? "Enforced" : "Needs operator evidence"}</small>
     </div>

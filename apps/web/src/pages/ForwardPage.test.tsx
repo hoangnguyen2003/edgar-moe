@@ -318,4 +318,33 @@ describe("Forward Lab", () => {
     // The table shows a page; the count beside it describes the whole registry.
     expect(screen.getByText(/Showing the 0 most recent of 400 recorded/)).toBeInTheDocument();
   });
+
+  it("states an unhealthy runner once, in the banner, and names the state in the header", async () => {
+    const message = "The latest scheduled run failed; forecasts are paused.";
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 0,
+        matured_count: 0, pending_count: 0, latest_successful_run_at: "2026-09-19T12:10:00Z",
+        health_status: "warning", health_message: message,
+        latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "failed", latest_failed_run_at: "2026-09-19T12:10:00Z",
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 0, matured_count: 0, pending_count: 0,
+        coverage: 0, rank_ic: null, rank_ic_low: null, rank_ic_high: null, rmse: null, mae: null, directional_accuracy: null,
+      });
+      if (url.includes("/data-quality")) return jsonResponse([]);
+      if (url.includes("/runs")) return jsonResponse([]);
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 0, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Needs attention")).toBeInTheDocument();
+    // Repeating the same sentence twice is noise exactly when the reader needs signal.
+    expect(screen.getAllByText(message)).toHaveLength(1);
+  });
 });

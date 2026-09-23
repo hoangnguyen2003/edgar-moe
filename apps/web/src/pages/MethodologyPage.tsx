@@ -39,7 +39,7 @@ export function MethodologyPage() {
       <ol className="steps" aria-label="From filing to score">
         {STEPS.map(({ title, text }, index) => (
           <li key={title}>
-            <span className="steps__number" aria-hidden="true">{index + 1}</span>
+            <span className="steps__number" aria-hidden="true">{String(index + 1).padStart(2, "0")}</span>
             <h2>{title}</h2>
             <p>{text}</p>
           </li>

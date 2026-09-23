@@ -1,10 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ShieldAlert } from "lucide-react";
-import { ExpertMix } from "../components/Experts";
+import { ArrowRight } from "lucide-react";
+import { ExpertLegend, ExpertMix } from "../components/Experts";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { SignalBadge } from "../components/SignalBadge";
 import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
 import { filedDate, shortDate, signedDecimal, standing } from "../lib/format";
@@ -23,7 +22,7 @@ export function SignalsPage() {
   const header = (
     <PageHeader title="Study signals">
       The final filings scored in the published study, grouped by what a long-short portfolio would do with them.
-      Each card's "Why this score" link opens the details behind it. Forecasts recorded since the study ended are
+      Each row's "Why this score" link opens the details behind it. Forecasts recorded since the study ended are
       on <Link to="/forward">Live tracking</Link>.
     </PageHeader>
   );
@@ -35,28 +34,41 @@ export function SignalsPage() {
   return (
     <div className="page">
       {header}
-      <Takeaway title={`${items.length} filings scored: ${counts.join(", ")}.`}>
+      <Takeaway variant="quiet" title={`${items.length} filings scored: ${counts.join(", ")}.`}>
         {updated ? `Updated ${shortDate(updated.slice(0, 10))}. ` : ""}Long and short are the top and bottom 10% of scores.
       </Takeaway>
-      <div className="notice notice--warning">
-        <ShieldAlert size={20} aria-hidden="true" />
-        <div>
-          <strong>Research output, not investment advice</strong>
-          <span>Signals can be wrong, out of date, or impossible to trade. This site never places orders.</span>
-        </div>
+      <p className="caveat">
+        <strong>Research output, not investment advice.</strong> Signals can be wrong, out of date, or impossible to
+        trade. This site never places orders.
+      </p>
+      <div className="blotter__key">
+        <span className="blotter__key-label">What the model relied on</span>
+        <ExpertLegend />
       </div>
       {DIRECTIONS.map(({ direction, title, note }) => {
         const group = items.filter((signal) => signal.direction === direction);
         if (!group.length) return null;
         return (
-          <section className="signal-group" key={direction} aria-labelledby={`signals-${direction}`}>
-            <header className="signal-group__head">
+          <section className={`blotter blotter--${direction}`} key={direction} aria-labelledby={`signals-${direction}`}>
+            <header className="blotter__head">
               <h2 id={`signals-${direction}`}>{title} <span>{group.length}</span></h2>
               <p>{note}</p>
             </header>
-            <ul className="signal-grid">
-              {group.map((signal) => <SignalCard key={signal.event_id} signal={signal} />)}
-            </ul>
+            <table className="blotter__table">
+              <thead>
+                <tr>
+                  <th scope="col">Filing</th>
+                  <th scope="col">Filed</th>
+                  <th scope="col" className="num">Score</th>
+                  <th scope="col" className="num"><span className="th-with-tip">Rank <InfoTip term="percentile" /></span></th>
+                  <th scope="col">Relied on</th>
+                  <th scope="col"><span className="sr-only">Details</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.map((signal) => <SignalRow key={signal.event_id} signal={signal} />)}
+              </tbody>
+            </table>
           </section>
         );
       })}
@@ -64,24 +76,20 @@ export function SignalsPage() {
   );
 }
 
-function SignalCard({ signal }: { signal: EventRecord }) {
+function SignalRow({ signal }: { signal: EventRecord }) {
   const details = `/filings?${new URLSearchParams({ q: signal.ticker, event: signal.event_id })}`;
   return (
-    <li className="signal-card">
-      <header>
-        <div><strong>{signal.ticker}</strong><span>{signal.company_name}</span></div>
-        <SignalBadge direction={signal.direction} />
-      </header>
-      <dl className="signal-card__score">
-        <div><dt>Score</dt><dd>{signedDecimal(signal.score, 4)}</dd></div>
-        <div><dt>Rank <InfoTip term="percentile" /></dt><dd>{standing(signal.rank)}</dd></div>
-      </dl>
-      <p className="signal-card__meta">{signal.form} filed {filedDate(signal.accepted_at)}</p>
-      <p className="signal-card__mix-label">What the model relied on</p>
-      <ExpertMix weights={signal.expert_weights} />
-      <Link className="signal-card__link" to={details}>
-        Why this score <ArrowRight size={16} aria-hidden="true" /><span className="sr-only"> for {signal.ticker}</span>
-      </Link>
-    </li>
+    <tr>
+      <td className="blotter__filing"><strong>{signal.ticker}</strong><span>{signal.company_name}</span></td>
+      <td data-label="Filed">{signal.form} filed {filedDate(signal.accepted_at)}</td>
+      <td className="num" data-label="Score">{signedDecimal(signal.score, 4)}</td>
+      <td className="num" data-label="Rank">{standing(signal.rank)}</td>
+      <td data-label="Relied on"><ExpertMix weights={signal.expert_weights} compact /></td>
+      <td className="blotter__link">
+        <Link to={details}>
+          Why this score <ArrowRight size={14} aria-hidden="true" /><span className="sr-only"> for {signal.ticker}</span>
+        </Link>
+      </td>
+    </tr>
   );
 }

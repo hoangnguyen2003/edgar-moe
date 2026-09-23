@@ -171,3 +171,13 @@ export function checkReading(
   if (threshold === null) return observedText;
   return `${observedText} · needs at ${reading?.limit ?? "least"} ${unit(threshold)}`;
 }
+
+/** Elapsed time the way a status line says it: "13 h", "2 days". */
+export function formatAge(seconds: number): string {
+  if (seconds < 60) return "less than a minute";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) return `${hours} h`;
+  return `${Math.floor(hours / 24)} days`;
+}

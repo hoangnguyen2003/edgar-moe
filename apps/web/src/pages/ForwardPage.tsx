@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { useId, useState } from "react";
+import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
@@ -106,9 +107,10 @@ export function ForwardPage() {
 
   return (
     <div className="page">
-      <ForwardHeader />
+      <ForwardHeader status={status.data} />
+      {/* Quiet when healthy: the header says so. Loud when not: it needs action. */}
+      {status.data.health_status !== "ok" && <RunnerHealthBanner status={status.data} />}
       <Protocol />
-      <ForwardHealthBanner status={status.data} />
 
       <section className="figures" aria-label="Live results">
         <MetricCard label="Forecasts recorded" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} still waiting for results`} />
@@ -118,30 +120,24 @@ export function ForwardPage() {
       </section>
 
       {metrics.forecast_count > 0 && metrics.matured_count < EARLY_RESULT_COUNT && (
-        <div className="notice">
-          <Clock3 size={18} aria-hidden="true" />
-          <div>
-            <strong>Too early to read these numbers</strong>
-            <span>
-              {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a
-              result so far. Treat the live figures as a running log, not evidence: the frozen
-              study's own test used 1,794 filings.
-            </span>
-          </div>
-        </div>
+        <p className="figures__note">
+          <strong>Too early to read these numbers</strong>
+          <span>
+            {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a
+            result so far. Treat the live figures as a running log, not evidence: the frozen
+            study's own test used 1,794 filings.
+          </span>
+        </p>
       )}
 
       {metrics.rank_ic_interval_status === "insufficient_months" && (
-        <div className="notice">
-          <Clock3 size={18} aria-hidden="true" />
-          <div>
-            <strong>More calendar history is needed</strong>
-            <span>
-              Settled filings cover {metrics.rank_ic_calendar_months ?? 0} distinct calendar months; the time-clustered
-              interval waits for 12. The point estimate is a running log, not evidence of a reliable edge.
-            </span>
-          </div>
-        </div>
+        <p className="figures__note">
+          <strong>More calendar history is needed</strong>
+          <span>
+            Settled filings cover {metrics.rank_ic_calendar_months ?? 0} distinct calendar months; the time-clustered
+            interval waits for 12. The point estimate is a running log, not evidence of a reliable edge.
+          </span>
+        </p>
       )}
 
       {metrics.forecast_count === 0 && (
@@ -204,50 +200,16 @@ export function ForwardPage() {
 function Protocol() {
   return (
     <ol className="protocol" aria-label="How live tracking works">
-      <li><span>1</span><div><strong>Freeze the model</strong><small>Its settings are fingerprinted and never changed.</small></div></li>
-      <li><span>2</span><div><strong>Save the forecast first</strong><small>Each score is stored before the stock can be traded.</small></div></li>
-      <li><span>3</span><div><strong>Add the result later</strong><small>The outcome is appended once 20 trading days pass.</small></div></li>
+      <li><span aria-hidden="true">01</span><div><strong>Freeze the model</strong><small>Its settings are fingerprinted and never changed.</small></div></li>
+      <li><span aria-hidden="true">02</span><div><strong>Save the forecast first</strong><small>Each score is stored before the stock can be traded.</small></div></li>
+      <li><span aria-hidden="true">03</span><div><strong>Add the result later</strong><small>The outcome is appended once 20 trading days pass.</small></div></li>
     </ol>
   );
 }
 
-function ForwardHealthBanner({ status }: { status: ForwardStatusResponse }) {
-  const healthy = status.health_status === "ok";
-  const warning = status.health_status === "warning";
-  const Icon = healthy ? CheckCircle2 : warning ? Activity : TriangleAlert;
-  const tone = healthy ? "notice--forward" : "notice--warning";
-  const age = status.age_seconds == null
-    ? "no successful run yet"
-    : `${formatAge(status.age_seconds)} ago`;
-  const running = status.running_run_count === 1
-    ? "1 run in progress"
-    : `${status.running_run_count} runs in progress`;
-
+function ForwardHeader({ status }: { status?: ForwardStatusResponse }) {
   return (
-    <div className={`notice ${tone} forward-health-banner`}>
-      <Icon size={18} aria-hidden="true" />
-      <div>
-        <strong>{status.health_message ?? status.message}</strong>
-        <span>
-          Last successful run: {dateTime(status.latest_successful_run_at)} ({age}) · {running}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function formatAge(seconds: number): string {
-  if (seconds < 60) return "less than a minute";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours} h`;
-  return `${Math.floor(hours / 24)} days`;
-}
-
-function ForwardHeader() {
-  return (
-    <PageHeader title="Live tracking">
+    <PageHeader title="Live tracking" aside={status ? <RunnerStatus status={status} /> : undefined}>
       Since the model was frozen, it has kept scoring new filings as they arrive. This page shows how those
       forecasts are doing, with no chance to adjust them in hindsight.
     </PageHeader>
