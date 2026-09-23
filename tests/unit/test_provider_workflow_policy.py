@@ -46,7 +46,28 @@ def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:
     result = _run_validator(tmp_path)
 
     assert result.returncode != 0
-    assert "reader database secret must not be job-scoped" in result.stdout
+    assert "reader audit secret must not be job-scoped" in result.stdout
+
+
+def test_provider_reader_secret_alias_cannot_be_job_scoped(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{secrets['EDGAR_MOE_REGISTRY_READ_DATABASE_URL']}}\n      AUDIT_DIR:",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not be job-scoped" in result.stdout
 
 
 def test_provider_reader_job_rename_cannot_bypass_secret_scope(tmp_path: Path) -> None:
@@ -87,7 +108,30 @@ def test_provider_reader_secret_cannot_enter_unrelated_step(tmp_path: Path) -> N
     result = _run_validator(tmp_path)
 
     assert result.returncode != 0
-    assert "reader secret must not enter Install dependencies" in result.stdout
+    assert "reader audit secret must not enter Install dependencies" in result.stdout
+
+
+def test_provider_reader_secret_alias_cannot_enter_unrelated_step(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          DATABASE_ALIAS: ${{secrets['EDGAR_MOE_REGISTRY_READ_DATABASE_URL']}}\n"
+            "        run: uv sync --locked --extra dev",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not enter Install dependencies" in result.stdout
 
 
 def test_provider_reader_verifier_must_receive_secret(tmp_path: Path) -> None:

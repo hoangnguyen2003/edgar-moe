@@ -169,23 +169,24 @@ def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     secret_name = "EDGAR_MOE_REGISTRY_READ_DATABASE_URL"
     secret_expression = "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}"
+
+    def has_secret(env: Any) -> bool:
+        return isinstance(env, dict) and (
+            secret_name in env
+            or any(_SECRET_EXPRESSION.search(str(value)) for value in env.values())
+        )
+
     workflow_env = workflow.get("env")
-    if isinstance(workflow_env, dict) and (
-        secret_name in workflow_env
-        or any(secret_expression in str(value) for value in workflow_env.values())
-    ):
-        errors.append(f"{name}: reader database secret must not be workflow-scoped")
+    if has_secret(workflow_env):
+        errors.append(f"{name}: reader audit secret must not be workflow-scoped")
     jobs = workflow.get("jobs")
     job = jobs.get("reader-contract") if isinstance(jobs, dict) else None
     if not isinstance(job, dict):
         errors.append(f"{name}: reader audit job must be named reader-contract")
     else:
         job_env = job.get("env")
-        if isinstance(job_env, dict) and (
-            secret_name in job_env
-            or any(secret_expression in str(value) for value in job_env.values())
-        ):
-            errors.append(f"{name}: reader database secret must not be job-scoped")
+        if has_secret(job_env):
+            errors.append(f"{name}: reader audit secret must not be job-scoped")
         required_steps = {
             "Require the deployed reader secret",
             "Run the effective reader-role verifier",
@@ -203,15 +204,17 @@ def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
                     observed_steps.add(step_name)
                     if secret_value != secret_expression:
                         errors.append(f"{name}: {step_name} must receive the reader secret")
-                elif secret_value is not None:
+                elif has_secret(step_env):
                     errors.append(
-                        f"{name}: reader secret must not enter {step_name or 'unnamed step'}"
+                        f"{name}: reader audit secret must not enter {step_name or 'unnamed step'}"
                     )
                 if isinstance(step_env, dict) and any(
-                    key != secret_name and secret_expression in str(value)
+                    key != secret_name and _SECRET_EXPRESSION.search(str(value))
                     for key, value in step_env.items()
                 ):
-                    errors.append(f"{name}: reader secret must use its dedicated step variable")
+                    errors.append(
+                        f"{name}: reader audit secret must use its dedicated step variable"
+                    )
         for missing_step in sorted(required_steps - observed_steps):
             errors.append(f"{name}: missing reader secret consumer {missing_step}")
     for required in (
