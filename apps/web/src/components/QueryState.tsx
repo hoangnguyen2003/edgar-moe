@@ -69,21 +69,28 @@ function SkeletonBlock({ part }: { part: SkeletonPart }) {
   );
 }
 
+/**
+ * A failed load, said plainly: what happened, what to do, and the technical
+ * detail for anyone who needs it. "API" is not a word most readers use.
+ */
 export function ErrorState({
   error,
   onRetry,
+  title = "This page couldn't load its data",
   children,
 }: {
   error: Error;
   onRetry?: () => void;
+  title?: string;
   children?: ReactNode;
 }) {
   return (
     <div className="query-state query-state--error" role="alert">
       <AlertTriangle size={20} aria-hidden="true" />
       <div>
-        <strong>Research API unavailable</strong>
-        <p>{error.message}</p>
+        <strong>{title}</strong>
+        <p>{onRetry ? "It may be a brief outage. Try again, or come back in a minute." : "It may be a brief outage; come back in a minute."}</p>
+        <p className="query-state__detail">{error.message}</p>
         {onRetry && (
           <button type="button" className="button button--secondary button--small" onClick={onRetry}>
             <RotateCw size={14} aria-hidden="true" /> Try again

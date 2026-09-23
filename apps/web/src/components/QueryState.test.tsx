@@ -38,4 +38,26 @@ describe("ErrorState", () => {
     render(<ErrorState error={new Error("offline")} />);
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
+
+  it("reports a failure in plain words, with the detail kept for whoever needs it", () => {
+    const retry = vi.fn();
+    render(<ErrorState error={new Error("HTTP 503 from /api/v1/summary")} onRetry={retry} />);
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("This page couldn't load its data");
+    expect(alert).toHaveTextContent("Try again, or come back in a minute.");
+    expect(alert).toHaveTextContent("HTTP 503 from /api/v1/summary");
+    expect(alert).not.toHaveTextContent("API unavailable");
+
+    screen.getByRole("button", { name: /Try again/ }).click();
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("sketches the page and keeps the outline away from assistive technology", () => {
+    const { container } = render(<LoadingState label="Loading live forecasts" skeleton={["figures", "rows"]} />);
+
+    expect(screen.getByRole("status")).toHaveTextContent("Loading live forecasts");
+    expect(container.querySelector(".skeleton-figures")?.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(container.querySelectorAll(".skeleton-bar--row")).toHaveLength(6);
+  });
 });
