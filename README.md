@@ -17,6 +17,11 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 > 10 bps round-trip cost, annualized return was -3.28% and Sharpe was -0.63 (95%
 > block-bootstrap interval [-2.31, 0.94]). The weak positive ordering did not
 > survive implementation costs. See the [locked report](reports/authenticated_research_report.md).
+> A [dated companion analysis](reports/locked_rank_ic_interval_2026-09-23.md)
+> estimates a 95% two-calendar-month block-bootstrap interval of **[-0.0114,
+> 0.0702]** for the locked rank IC, which includes zero. The corresponding
+> selected-development interval is [0.0173, 0.1181] and is not adjusted for
+> the 33-candidate model search.
 >
 > **Known v1 defects:** the frozen fundamental features mix quarterly with
 > year-to-date income and can reuse years-old revenue, and the Elastic Net
