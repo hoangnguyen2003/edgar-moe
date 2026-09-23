@@ -667,8 +667,11 @@ main { flex: 1; min-width: 0; }
 /* ---------- Tablet ---------- */
 @media (max-width: 1080px) {
   .hero, .content-grid--two, .forward-top-grid { grid-template-columns: minmax(0, 1fr); }
-  .lane__steps { flex-wrap: wrap; }
-  .lane__steps li { flex: 1 1 30%; }
+  /* Five steps across would crush them, and a wrapped row would start with
+     an arrow from nowhere, so lanes list their steps downwards. */
+  .lane__steps { flex-direction: column; gap: var(--s3); }
+  .lane__steps li { flex-direction: column; flex: none; }
+  .lane__steps li + li::before { content: "↓" / ""; margin: 0; padding: 4px 0; }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .explorer { grid-template-columns: 320px minmax(0, 1fr); }
 }
@@ -698,8 +701,6 @@ main { flex: 1; min-width: 0; }
 /* ---------- Phone ---------- */
 @media (max-width: 760px) {
   .lane { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
-  .lane__steps { flex-direction: column; gap: var(--s3); }
-  .lane__steps li + li::before { content: none; }
   .step { padding-top: var(--s2); border-top-width: 1px; }
   /* Blotter rows stack: ticker and score lead, detail follows. */
   .blotter__table thead { display: none; }
@@ -735,6 +736,7 @@ main { flex: 1; min-width: 0; }
   .figures .figure:nth-child(n+3) { border-top: 1px solid var(--rule); }
   /* An odd last figure takes the whole row rather than leaving a hole. */
   .figures .figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .reason-list { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
   .decision-list a { grid-template-columns: minmax(0, 1fr) 16px; }
   .decision-list small { grid-row: 1; padding-top: 0; }
   .decision-list strong { grid-column: 1; grid-row: 2; }
@@ -744,10 +746,7 @@ main { flex: 1; min-width: 0; }
   .figure__value { font-size: 30px; }
   .gate__label, .gate__share { display: none; }
   .gate__legend { display: flex; }
-  .lane { padding: 16px 16px 18px; }
-  .lane__steps { flex-direction: column; flex-wrap: nowrap; }
-  .lane__steps li { flex-direction: column; flex: none; }
-  .lane__steps li + li::before { content: "↓" / ""; padding: 4px 0; }
+  .lane { padding: var(--s4) 0 var(--s5); }
   /* Trust zones become one card per zone, labelled like the other phone tables. */
   .zone-table thead { display: none; }
   .zone-table tr { display: block; padding: 12px 0; border-bottom: 1px solid var(--rule); }
