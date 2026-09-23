@@ -33,7 +33,8 @@ export function Layout({ children }: { children: ReactNode }) {
     }
     setOpen(false);
     mainRef.current?.focus({ preventScroll: true });
-    setAnnouncement(`${navigation.find((item) => item.to === pathname)?.label ?? "Page"} page`);
+    const entry = navigation.find((item) => item.to === pathname);
+    setAnnouncement(entry ? `${entry.label} page` : "Page not found");
   }, [pathname]);
 
   useEffect(() => {

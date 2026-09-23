@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect } from "react";
 import { PageErrorBoundary } from "./components/ErrorBoundary";
 import { Layout } from "./components/Layout";
 import { LoadingState } from "./components/QueryState";
+import { canonicalPath } from "./lib/navigation";
 import { useRouter } from "./lib/router-context";
+import { NotFoundPage } from "./pages/NotFoundPage";
 import { OverviewPage } from "./pages/OverviewPage";
 
 const ResearchPage = lazy(() => import("./pages/ResearchPage").then((module) => ({ default: module.ResearchPage })));
@@ -28,17 +30,19 @@ const routes = {
 
 export default function App() {
   const { pathname, navigate } = useRouter();
-  const Page = routes[pathname as keyof typeof routes];
+  const Page = Object.hasOwn(routes, pathname) ? routes[pathname as keyof typeof routes] : undefined;
+  // A page's visible name or a miscased path leads to the page it means.
+  const canonical = Page ? null : canonicalPath(pathname);
 
   useEffect(() => {
-    if (!Page) navigate("/", { replace: true });
-  }, [Page, navigate]);
+    if (canonical) navigate(canonical, { replace: true });
+  }, [canonical, navigate]);
 
   return (
     <Layout>
       <PageErrorBoundary resetKey={pathname}>
         <Suspense fallback={<div className="page"><LoadingState label="Loading the page" skeleton={["rows"]} /></div>}>
-          {Page ? <Page /> : null}
+          {Page ? <Page /> : canonical ? null : <NotFoundPage pathname={pathname} />}
         </Suspense>
       </PageErrorBoundary>
     </Layout>

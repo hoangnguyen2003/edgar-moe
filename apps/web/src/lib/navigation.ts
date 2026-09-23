@@ -24,6 +24,48 @@ export function nextPage(pathname: string): { entry: NavigationEntry; wraps: boo
 const SITE_TITLE = "EDGAR-MoE Research Terminal";
 
 export function pageTitle(pathname: string): string {
-  const entry = navigation.find((item) => item.to === pathname);
-  return !entry || entry.to === "/" ? SITE_TITLE : `${entry.label} · EDGAR-MoE`;
+  const entry = navigation.find((item) => item.to === (canonicalPath(pathname) ?? pathname));
+  if (!entry) return "Page not found · EDGAR-MoE";
+  return entry.to === "/" ? SITE_TITLE : `${entry.label} · EDGAR-MoE`;
+}
+
+/** A page's visible name as a path: "How it works" → "/how-it-works". */
+function slug(label: string): string {
+  return `/${label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")}`;
+}
+
+/**
+ * The page a path unambiguously means: a real path in any casing, or a page's
+ * visible name ("/backtest" for the Backtest page, which lives at /portfolio).
+ */
+export function canonicalPath(pathname: string): string | null {
+  const path = pathname.toLowerCase();
+  return navigation.find((item) => item.to === path || slug(item.label) === path)?.to ?? null;
+}
+
+/** Edits (insertions, deletions, substitutions) that turn one string into the other. */
+function editDistance(a: string, b: string): number {
+  const row = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = row[0];
+    row[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const above = row[j];
+      row[j] = Math.min(above + 1, row[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diagonal = above;
+    }
+  }
+  return row[b.length];
+}
+
+/** The page a mistyped path was probably meant to reach: one within two edits of its path or name. */
+export function suggestPage(pathname: string): NavigationEntry | null {
+  const path = pathname.toLowerCase();
+  let best: { entry: NavigationEntry; edits: number } | null = null;
+  for (const entry of navigation) {
+    const targets = entry.to === "/" ? [slug(entry.label)] : [entry.to, slug(entry.label)];
+    const edits = Math.min(...targets.map((target) => editDistance(path, target)));
+    if (!best || edits < best.edits) best = { entry, edits };
+  }
+  return best && best.edits <= 2 ? best.entry : null;
 }

@@ -251,6 +251,8 @@ main { flex: 1; min-width: 0; }
 .explore span { color: var(--ink-2); font-size: var(--t-small); line-height: 1.5; }
 .explore a > svg { position: absolute; top: var(--s4); right: var(--s3); color: var(--ink-3); transition: transform .15s ease; }
 .explore a:hover > svg { color: var(--ink); transform: translateX(3px); }
+.not-found__path { font: 500 .9em var(--mono); overflow-wrap: anywhere; }
+.not-found__actions { margin: 0 0 var(--s7); }
 
 /* The gate diagram. */
 .gate__svg { display: block; width: 100%; height: auto; overflow: visible; }
