@@ -25,6 +25,8 @@ identity. It does not permit prospective observations to replace that identity.
 
 The application prevents ORM updates and deletes for evidence tables and stores canonical payload hashes in an audit trail. Migration `20260921_0002` also enforces the contract in the database: evidence rows reject `UPDATE`, `DELETE`, and `TRUNCATE` from any client, and a run may record its outcome only once, while it is `running` ([ADR 0016](adr/0016-database-append-only-triggers.md)). Database owners can still drop triggers with DDL, so durable evidence should also be exported to a versioned, access-restricted R2 bucket with retention policies.
 
+CI applies the migrations to a fresh, disposable PostgreSQL database and attempts direct SQL updates, deletes, and truncations against every protected table. Those checks prove the migration-installed PostgreSQL triggers reject writes at the database boundary; the SQLite tests separately cover the local development schema. The integration test refuses non-loopback URLs, any database name other than `edgar_moe_immutability_test`, and databases that already contain registry rows.
+
 ## Local setup
 
 ```bash

@@ -46,3 +46,22 @@ def test_forward_production_secrets_reach_only_first_party_run_steps() -> None:
     # The writer credential is still delivered to the steps that need it.
     text = path.read_text(encoding="utf-8")
     assert text.count("${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}") == 4
+
+
+def test_postgres_ci_exercises_migrated_append_only_triggers() -> None:
+    workflow = yaml.safe_load(Path(".github/workflows/ci.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["postgres-reader-role"]["steps"]
+    by_name = {step.get("name"): step for step in steps if isinstance(step, dict)}
+
+    create_database = by_name["Create a fresh database for PostgreSQL immutability tests"]
+    migrate_database = by_name["Apply registry migrations to the immutability-test database"]
+    run_trigger_test = by_name["Verify migrated PostgreSQL append-only triggers reject direct SQL"]
+
+    database_name = "edgar_moe_immutability_test"
+    assert database_name in str(create_database["run"])
+    assert database_name in str(migrate_database["env"]["EDGAR_MOE_REGISTRY_DATABASE_URL"])
+    assert database_name in str(run_trigger_test["env"]["EDGAR_MOE_TEST_POSTGRES_URL"])
+    assert "alembic upgrade head" in str(migrate_database["run"])
+    assert "test_postgres_migrated_append_only_triggers_reject_direct_sql_mutations" in str(
+        run_trigger_test["run"]
+    )
