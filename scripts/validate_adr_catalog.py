@@ -1,6 +1,7 @@
 """Validate that architecture decision counts stay synchronized.
 
-The ADR index is referenced by the README and the public architecture page.
+The ADR index is referenced by the README, the public architecture page, the
+solution architecture document, and the CV entry.
 This check keeps those portfolio-facing summaries aligned with the numbered
 records on disk instead of relying on a manual count.
 """
@@ -17,6 +18,7 @@ ADR_INDEX = ADR_DIR / "README.md"
 README = Path("README.md")
 ARCHITECTURE_PAGE = Path("apps/web/src/pages/ArchitecturePage.tsx")
 SOLUTION_ARCHITECTURE = Path("docs/solution-architecture.md")
+CV_ENTRY = Path("docs/cv-entry.md")
 
 _ADR_NAME = re.compile(r"^(?P<number>[0-9]{4})-[a-z0-9][a-z0-9-]*\.md$")
 _ADR_HEADING = re.compile(r"^#\s+ADR\s+(?P<number>[0-9]{4})\b")
@@ -26,6 +28,7 @@ _PAGE_COUNT = re.compile(r"\bof\s+the\s+(?P<count>[0-9]+)\s+recorded decisions\b
 _SOLUTION_COUNT = re.compile(
     r"\bDecision log:\s*\*{0,2}\s*\[(?P<count>[0-9]+)\s+architecture decision records\]"
 )
+_CV_COUNT = re.compile(r"\bsolution architecture with (?P<count>[0-9]+) ADRs\b")
 
 
 def validate_adr_catalog(
@@ -35,6 +38,7 @@ def validate_adr_catalog(
     readme_path: Path = README,
     architecture_path: Path = ARCHITECTURE_PAGE,
     solution_architecture_path: Path = SOLUTION_ARCHITECTURE,
+    cv_entry_path: Path = CV_ENTRY,
 ) -> list[str]:
     """Return violations of the ADR count and numbering contract."""
 
@@ -71,6 +75,7 @@ def validate_adr_catalog(
         (readme_path, _README_COUNT, "README"),
         (architecture_path, _PAGE_COUNT, "architecture page"),
         (solution_architecture_path, _SOLUTION_COUNT, "solution architecture"),
+        (cv_entry_path, _CV_COUNT, "CV entry"),
     ):
         text = _read(path, label, errors)
         if text is None:
