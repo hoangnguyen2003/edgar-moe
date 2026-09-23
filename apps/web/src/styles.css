@@ -640,12 +640,15 @@ main { flex: 1; min-width: 0; }
 .command__failed { color: var(--critical); font-size: 13px; }
 .verify a, .decision-list a { color: var(--ink); }
 .decisions { margin-top: 16px; }
-.decision-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.decision-list a { display: flex; flex-direction: column; gap: 6px; height: 100%; padding: 16px 18px; background: var(--paper); border: 1px solid var(--rule); text-decoration: none; transition: border-color .15s ease; }
-.decision-list a:hover { border-color: var(--ink); }
-.decision-list strong { font: 600 16px/1.35 var(--sans); }
-.decision-list span { color: var(--ink-2); font-size: 14px; line-height: 1.5; }
-.decision-list small { margin-top: auto; padding-top: 6px; color: var(--ink-2); font: 500 13px var(--mono); }
+/* An index, not a card grid: each decision is one ruled row of number, title and reason. */
+.decision-list { border-top: 1px solid var(--ink); }
+.decision-list a { display: grid; grid-template-columns: 88px minmax(0, 1fr) 16px; gap: 2px var(--s4); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); text-decoration: none; transition: background .15s ease, padding-left .15s ease; }
+.decision-list a:hover { background: var(--paper-2); padding-left: var(--s2); }
+.decision-list small { grid-column: 1; grid-row: 1 / span 2; padding-top: 4px; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); }
+.decision-list strong { grid-column: 2; grid-row: 1; font: 600 16px/1.35 var(--sans); }
+.decision-list span { grid-column: 2; grid-row: 2; color: var(--ink-2); font-size: 14px; line-height: 1.5; }
+.decision-list a > svg { grid-column: 3; grid-row: 1; margin-top: 3px; color: var(--ink-3); transition: transform .15s ease; }
+.decision-list a:hover > svg { color: var(--ink); transform: translate(2px, -2px); }
 
 /* ---------- Narrower than the full page list: links move behind the Menu button ---------- */
 @media (max-width: 1180px) {
@@ -732,6 +735,11 @@ main { flex: 1; min-width: 0; }
   .figures .figure:nth-child(n+3) { border-top: 1px solid var(--rule); }
   /* An odd last figure takes the whole row rather than leaving a hole. */
   .figures .figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
+  .decision-list a { grid-template-columns: minmax(0, 1fr) 16px; }
+  .decision-list small { grid-row: 1; padding-top: 0; }
+  .decision-list strong { grid-column: 1; grid-row: 2; }
+  .decision-list span { grid-column: 1; grid-row: 3; }
+  .decision-list a > svg { grid-column: 2; }
   .figure { padding: 14px 16px 12px 0; }
   .figure__value { font-size: 30px; }
   .gate__label, .gate__share { display: none; }
