@@ -5,12 +5,51 @@ from __future__ import annotations
 import argparse
 import json
 import math
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from edgar_moe.forward.diagnostics import _first_event_forecasts
 from edgar_moe.forward.metrics import forward_metrics
+from edgar_moe.forward.uncertainty import clustered_rank_ic_interval
+
+
+def _descriptive_metrics(
+    scores: list[float], labels: list[float], *, forecast_count: int
+) -> dict[str, Any]:
+    """Keep descriptive metrics without the helper's independent-pair interval."""
+    result = asdict(forward_metrics(scores, labels, forecast_count=forecast_count))
+    result["rank_ic_low"] = None
+    result["rank_ic_high"] = None
+    return result
+
+
+def _official_metrics(rows: Sequence[Mapping[str, Any]], *, forecast_count: int) -> dict[str, Any]:
+    scores = [float(row["score"]) for row in rows]
+    labels = [float(row["realized_abnormal_return"]) for row in rows]
+    accepted_at: list[datetime] = []
+    for row in rows:
+        try:
+            timestamp = datetime.fromisoformat(str(row.get("accepted_at", "")))
+        except ValueError as exc:
+            raise ValueError("Aware accepted_at is required for settled forecasts") from exc
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError("Aware accepted_at is required for settled forecasts")
+        accepted_at.append(timestamp)
+    result = _descriptive_metrics(scores, labels, forecast_count=forecast_count)
+    interval = clustered_rank_ic_interval(scores, labels, accepted_at)
+    result.update(
+        rank_ic_low=interval.low,
+        rank_ic_high=interval.high,
+        rank_ic_interval_method="calendar_month_moving_block",
+        rank_ic_interval_status=interval.status,
+        rank_ic_calendar_months=interval.calendar_months,
+        rank_ic_block_months=interval.block_months,
+        rank_ic_bootstrap_samples=interval.resamples,
+    )
+    return result
 
 
 def audit_official(page: dict[str, Any]) -> dict[str, Any]:
@@ -36,9 +75,7 @@ def audit_official(page: dict[str, Any]) -> dict[str, Any]:
     anchor = [float(r["fundamental_score"]) for r in paired]
     if not all(math.isfinite(v) for v in anchor):
         raise ValueError("Non-finite component scores")
-    paired_labels = [float(r["realized_abnormal_return"]) for r in paired]
-    paired_scores = [float(r["score"]) for r in paired]
-    model = forward_metrics(scores, labels, forecast_count=len(selected))
+    model = _official_metrics(matured, forecast_count=len(selected))
     zero = forward_metrics([0.0] * len(labels), labels, forecast_count=len(selected))
     return {
         "evaluation": "read_only_audit_of_recorded_official_labels",
@@ -48,7 +85,7 @@ def audit_official(page: dict[str, Any]) -> dict[str, Any]:
         "unique_event_count": len(selected),
         "repeated_forecast_count": len(rows) - len(selected),
         "selected_forecast_ids": [r["forecast_id"] for r in selected],
-        "model": asdict(model),
+        "model": model,
         "zero_return_baseline": {"rmse": zero.rmse, "mae": zero.mae},
         "negative_predictions": sum(v < 0 for v in scores),
         "negative_outcomes": sum(v < 0 for v in labels),
@@ -59,16 +96,17 @@ def audit_official(page: dict[str, Any]) -> dict[str, Any]:
         "component_comparison": {
             "paired_count": len(paired),
             "missing_component_count": len(matured) - len(paired),
-            "model": asdict(
-                forward_metrics(paired_scores, paired_labels, forecast_count=len(paired))
-            ),
-            "fundamental_anchor": asdict(
-                forward_metrics(anchor, paired_labels, forecast_count=len(paired))
+            "model": _official_metrics(paired, forecast_count=len(paired)),
+            "fundamental_anchor": _official_metrics(
+                [{**row, "score": row["fundamental_score"]} for row in paired],
+                forecast_count=len(paired),
             ),
         },
         "limitations": (
             "Exploratory audit, not a replacement for published registry metrics. "
             "Unlabeled events may be pending or awaiting settlement. "
+            "Clustered rank-IC intervals require at least 100 settled events in 12 "
+            "acceptance months; unavailable bounds are not evidence of no effect. "
             "No model refitting or independent significance claim."
         ),
     }
@@ -92,7 +130,6 @@ def audit_diagnostic(report: dict[str, Any]) -> dict[str, Any]:
     count = len(rows)
     if count != unique.get("matured_count"):
         raise ValueError("Observation count disagrees with matured_count")
-    model = forward_metrics(scores, labels, forecast_count=count)
     zero = forward_metrics([0.0] * count, labels, forecast_count=count)
     sensitivity = [
         forward_metrics(
@@ -114,7 +151,11 @@ def audit_diagnostic(report: dict[str, Any]) -> dict[str, Any]:
         "negative_outcomes": sum(value < 0 for value in labels),
         "positive_outcomes": sum(value > 0 for value in labels),
         "zero_outcomes": sum(value == 0 for value in labels),
-        "model": asdict(model),
+        "model": {
+            **_descriptive_metrics(scores, labels, forecast_count=count),
+            "rank_ic_interval_method": "not_estimated",
+            "rank_ic_interval_status": "short_horizon_diagnostic",
+        },
         "zero_return_baseline": {"rmse": zero.rmse, "mae": zero.mae},
         # Match the production metric's non-negative versus negative convention.
         "always_nonnegative_accuracy": sum(value >= 0 for value in labels) / count
@@ -125,7 +166,8 @@ def audit_diagnostic(report: dict[str, Any]) -> dict[str, Any]:
         "leave_one_out_rank_ic_max": max(finite_ic, default=None),
         "limitations": (
             "Exploratory short-horizon audit, not official model validation. "
-            "Leave-one-out range is not a confidence interval. "
+            "No rank-IC confidence interval is estimated; leave-one-out range is "
+            "not a confidence interval. "
             "Observations may share market exposures and overlapping horizons."
         ),
     }

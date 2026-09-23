@@ -566,8 +566,14 @@ page withholds a statistical reading below 100 settled outcomes:
   market-regime changes, issuer dependence beyond these time blocks, or a
   guarantee that future performance will match the observed period.
 - The older `rank_ic_interval()` in [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py)
-  remains an explicitly independence-assuming diagnostic helper; the public
-  registry no longer publishes its bounds.
+  remains an explicitly independence-assuming diagnostic helper; neither the
+  public registry nor the read-only offline audits publish its bounds. The
+  official-outcome audit uses the same calendar-block method on its
+  earliest-per-event sample and requires an aware acceptance timestamp for
+  every settled forecast. Its interval need not equal the registry interval,
+  which retains repeated forecasts. The short-horizon diagnostic reports no
+  confidence bounds, even when it has enough pairs for the older helper to
+  calculate an independence-assuming interval.
 - Live tracking states how many outcomes the figure rests on, and calls it a
   running log rather than evidence until the sample is large enough to read.
   The browser displays bounds only when the API names the reviewed
