@@ -59,6 +59,32 @@ The report contains only error codes, counts, the locked snapshot identity, and
 review state. It is not a license grant and does not assert provider-side WAF,
 rate-limit, backup, or account evidence.
 
+## What each source contributes to the bundle
+
+The redistribution review is a decision about specific content, so here is the
+content. Verify it with `pytest tests/unit/test_public_data_surface.py`, which
+fails if any of this changes.
+
+| Source | In the public bundle | Not in the public bundle |
+| --- | --- | --- |
+| SEC EDGAR | Accession numbers, company names, tickers, form types, acceptance timestamps, SIC industry codes, and a `https://www.sec.gov/...` link per filing | Filing text or HTML, and XBRL fact values. The longest string in the snapshot is a 233-character status message this project wrote |
+| Alpaca (IEX feed) | One `realized_abnormal_return` per filing, and three portfolio series of 395 daily points holding an indexed equity level, drawdown, and turnover | Quotes, bars, prices, volumes, or any per-session market record |
+| FRED / ALFRED | Nothing. Regime features are model inputs; no series value or observation reaches the bundle | Every FRED series and observation |
+
+Everything published from a vendor feed is a figure this project computed:
+model scores, ranks, expert weights, attributions, one realized outcome per
+filing, and aggregates of them. The bundle links to filings rather than copying
+them.
+
+That is the factual half of the review. The remaining half is a judgement about
+each provider's terms, which belongs to the operator and is not made here or by
+CI. To record it, set each source's `redistribution_status` to `approved` in
+`apps/web/public/data-provenance.json`, then set the `review` block's
+`redistribution_status` to `approved`, `legal_approval` to `true`, and
+`last_reviewed_at` to the UTC time of the review. Until then
+`public_release_readiness.py` reports `review_required`, which is why CI runs it
+with `--allow-review-required`.
+
 ## Published images
 
 The bundle is reviewable UTF-8 text apart from two declared images,
