@@ -487,6 +487,40 @@ uv run edgar-moe forward-settle \
 
 The command matches by immutable `event_id`, verifies maturity, appends at most one label per forecast, records unmatched due forecasts as a quality warning, and recomputes read-time metrics from forecast/label joins.
 
+## What this test can and cannot show
+
+The forward test records about 14 forecasts a week: one to four filings per run,
+five runs a week. Treating settled forecasts as independent - which is generous,
+since filings scored on the same day share a trading day - a 95% interval
+excludes zero only when `1.96 / sqrt(n)` drops below the true rank IC:
+
+| True rank IC | Settled forecasts needed | Time at the current rate |
+| --- | --- | --- |
+| 0.03, the locked test's figure | about 4,300 | about 6 years |
+| 0.05 | about 1,500 | about 2 years |
+| 0.10 | about 400 | about 6 months |
+
+So the live test cannot confirm an edge the size of the one the study measured,
+and will not be able to for years. It would detect a large edge within months,
+and it would detect a badly broken model quickly, because a model that has
+stopped working produces a clearly negative reading rather than a small one.
+
+That is not a reason to stop running it. What it demonstrates, from the first
+run, is the part that is usually asserted rather than shown:
+
+- every forecast is recorded before its entry time, and the database rejects any
+  attempt to change it afterwards;
+- outcomes are appended only once the horizon has matured, and the settlement
+  match rate is recorded;
+- the model, dataset, and selection identity behind each forecast are pinned to
+  the frozen artifacts;
+- the pipeline's own quality checks are published with the numbers behind them.
+
+Those are claims about process integrity, and a small sample proves them as well
+as a large one. The statistical claim is the one that needs years, which is why
+Live tracking reports an interval, says how many outcomes it rests on, and calls
+itself a running log rather than evidence.
+
 ## How the live rank IC is computed
 
 The forward rank IC is a **single Spearman correlation over every settled
