@@ -1,8 +1,5 @@
 import { Check, Copy } from "lucide-react";
-import { useEffect, useState } from "react";
-
-/** How long the confirmation stays up before the button offers the copy again. */
-const CONFIRMATION_MS = 2_000;
+import { useCopyToClipboard } from "../lib/useCopyToClipboard";
 
 /**
  * A command block with a copy button. The command is meant to be run, and on a
@@ -13,27 +10,7 @@ const CONFIRMATION_MS = 2_000;
  * insecure context rather than present and broken.
  */
 export function CopyCommand({ command, label }: { command: string; label: string }) {
-  const [copied, setCopied] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const supported = typeof navigator !== "undefined" && Boolean(navigator.clipboard?.writeText);
-
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), CONFIRMATION_MS);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(command);
-      setFailed(false);
-      setCopied(true);
-    } catch {
-      // Never leave the reader thinking a command was copied when it was not.
-      setCopied(false);
-      setFailed(true);
-    }
-  };
+  const { supported, copied, failed, copy } = useCopyToClipboard(command);
 
   return (
     <div className="command">

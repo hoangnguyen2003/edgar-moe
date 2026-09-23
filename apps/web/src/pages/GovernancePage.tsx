@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
+import { CopyValue } from "../components/CopyValue";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
@@ -108,9 +109,21 @@ function FrozenIdentity({ identity }: { identity: GovernanceResponse["frozen_v1"
         <div><dt>Data through</dt><dd>{shortDate(identity.as_of)}</dd></div>
         <div><dt>Data type</dt><dd>{humanize(identity.data_mode)}</dd></div>
         <div><dt>Snapshot file</dt><dd><code>{identity.path}</code></dd></div>
-        <div><dt>Snapshot fingerprint</dt><dd><code>{identity.sha256}</code></dd></div>
-        <div><dt>Model-selection fingerprint</dt><dd><code>{identity.selection_hash}</code></dd></div>
-        <div><dt>Final-test fingerprint</dt><dd><code>{identity.locked_test_hash}</code></dd></div>
+        <div>
+          <dt>Snapshot fingerprint</dt>
+          <dd><code>{identity.sha256}</code></dd>
+          <CopyValue value={identity.sha256} label="the snapshot fingerprint" />
+        </div>
+        <div>
+          <dt>Model-selection fingerprint</dt>
+          <dd><code>{identity.selection_hash}</code></dd>
+          <CopyValue value={identity.selection_hash} label="the model-selection fingerprint" />
+        </div>
+        <div>
+          <dt>Final-test fingerprint</dt>
+          <dd><code>{identity.locked_test_hash}</code></dd>
+          <CopyValue value={identity.locked_test_hash} label="the final-test fingerprint" />
+        </div>
       </dl>
       <p className="panel__note"><LockKeyhole size={14} aria-hidden="true" /> Changing any of these would publish a new version, not edit this one.</p>
     </article>
