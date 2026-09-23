@@ -90,9 +90,9 @@ const DECISIONS = [
   { adr: "0002-freeze-v1-prospective-evaluation", title: "Freeze the model before the final test", why: "Any later change becomes a new version, judged only on new data." },
   { adr: "0004-runtime-snapshot-lock", title: "Check the results file's fingerprint before serving it", why: "The API refuses to serve a snapshot that differs from its lock." },
   { adr: "0016-database-append-only-triggers", title: "Make the database itself refuse edits", why: "Integrity does not depend on the application behaving well." },
+  { adr: "0018-workflow-supply-chain", title: "Pin every workflow action and scope every secret", why: "A compromised action or step sees as little as possible." },
   { adr: "0020-pre-open-schedule-margin", title: "Record how close each run gets to the market open", why: "A late scheduler becomes visible instead of silently risky." },
   { adr: "0022-copilot-review-profiles", title: "Keep AI review profiles bounded and read-only", why: "The copilot can help with quant and architecture reviews without gaining model or deployment authority." },
-  { adr: "0018-workflow-supply-chain", title: "Pin every workflow action and scope every secret", why: "A compromised action or step sees as little as possible." },
 ];
 
 export function ArchitecturePage() {
@@ -202,9 +202,10 @@ export function ArchitecturePage() {
           {DECISIONS.map((decision) => (
             <li key={decision.adr}>
               <a href={`${REPOSITORY}/blob/main/docs/adr/${decision.adr}.md`}>
+                <small>ADR {decision.adr.slice(0, 4)}</small>
                 <strong>{decision.title}</strong>
                 <span>{decision.why}</span>
-                <small>ADR {decision.adr.slice(0, 4)}</small>
+                <ArrowUpRight size={16} aria-hidden="true" />
               </a>
             </li>
           ))}

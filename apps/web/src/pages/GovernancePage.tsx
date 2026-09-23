@@ -3,6 +3,7 @@ import { LockKeyhole } from "lucide-react";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { CopyValue } from "../components/CopyValue";
 import { InfoTip } from "../components/InfoTip";
+import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
@@ -77,12 +78,12 @@ export function GovernancePage() {
             <strong>Not connected.</strong> {data.forward_status.health_message ?? data.forward_status.message}
           </p>
         )}
-        <div className="governance-lane">
-          <LaneMetric label="Models" value={String(data.forward_status.model_count)} />
-          <LaneMetric label="Runs" value={String(data.forward_status.run_count)} />
-          <LaneMetric label="Forecasts" value={String(data.forward_status.forecast_count)} />
-          <LaneMetric label="Waiting for results" value={String(data.forward_status.pending_count)} />
-        </div>
+        <section className="figures" aria-label="Forecast database counts">
+          <MetricCard label="Models" value={String(data.forward_status.model_count)} />
+          <MetricCard label="Runs" value={String(data.forward_status.run_count)} />
+          <MetricCard label="Forecasts" value={String(data.forward_status.forecast_count)} />
+          <MetricCard label="Waiting for results" value={String(data.forward_status.pending_count)} />
+        </section>
         <p className="panel__note">
           If the database is disconnected, this page says so. Past results are never swapped in as live forecasts.
         </p>
@@ -164,8 +165,4 @@ function ControlRow({ control }: { control: GovernanceControl }) {
       <small>{enforced ? "Enforced" : "Needs operator evidence"}</small>
     </div>
   );
-}
-
-function LaneMetric({ label, value }: { label: string; value: string }) {
-  return <div><span>{label}</span><strong>{value}</strong></div>;
 }

@@ -1,9 +1,25 @@
 import { Info } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { GLOSSARY, type GlossaryKey } from "../lib/glossary";
 
-/** Width the bubble may take; it opens leftwards when there is no room to the right. */
+/** Width the bubble may take. It opens from the icon and slides left only as far as it must to stay on screen. */
 const BUBBLE_WIDTH = 300;
+const SCREEN_MARGIN = 16;
+
+/**
+ * A label followed by its definition button. The last word and the button
+ * wrap together, so a narrow column never strands the icon on its own line.
+ */
+export function InfoLabel({ text, term }: { text: string; term?: GlossaryKey }) {
+  if (!term) return <>{text}</>;
+  const cut = text.lastIndexOf(" ") + 1;
+  return (
+    <>
+      {text.slice(0, cut)}
+      <span className="infotip-anchor">{text.slice(cut)}<InfoTip term={term} /></span>
+    </>
+  );
+}
 
 /**
  * A definition behind an info button. It opens on click or tap (never hover
@@ -13,10 +29,10 @@ const BUBBLE_WIDTH = 300;
 export function InfoTip({ term }: { term: GlossaryKey }) {
   const { term: name, definition } = GLOSSARY[term];
   const [open, setOpen] = useState(false);
-  const [alignEnd, setAlignEnd] = useState(false);
   const id = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const regionRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -36,11 +52,23 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
     };
   }, [open]);
 
-  const toggle = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect) setAlignEnd(rect.left + BUBBLE_WIDTH > window.innerWidth - 16);
-    setOpen((value) => !value);
-  };
+  // Place the bubble once it is open, from where the icon is at that moment,
+  // and again if the window changes size while it is showing.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const root = rootRef.current?.getBoundingClientRect();
+      if (!root || !regionRef.current) return;
+      const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 2 * SCREEN_MARGIN);
+      const left = Math.max(SCREEN_MARGIN, Math.min(root.left - 10, window.innerWidth - SCREEN_MARGIN - width));
+      regionRef.current.style.left = `${left - root.left}px`;
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
+  const toggle = () => setOpen((value) => !value);
 
   return (
     <span className="infotip" ref={rootRef}>
@@ -55,7 +83,7 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
       >
         <Info size={15} aria-hidden="true" />
       </button>
-      <span id={id} role="status" className={alignEnd ? "infotip__region infotip__region--end" : "infotip__region"}>
+      <span id={id} ref={regionRef} role="status" className="infotip__region">
         {open && <span className="infotip__bubble"><strong>{name}</strong>{definition}</span>}
       </span>
     </span>

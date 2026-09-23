@@ -174,6 +174,16 @@ describe("Accessibility", () => {
     15_000,
   );
 
+  it("not-found page has no detectable violations", async () => {
+    window.history.replaceState({}, "", "/portfolo");
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><RouterProvider><App /></RouterProvider></QueryClientProvider>);
+
+    await screen.findByRole("heading", { level: 1, name: "Page not found" });
+
+    expect(await violations(document.body)).toEqual([]);
+  });
+
   it("reports real violations, so a clean result is meaningful", async () => {
     const { container } = render(<main><h1>Probe</h1><button type="button" /><img src="probe.png" /></main>);
 

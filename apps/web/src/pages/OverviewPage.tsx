@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { GateDiagram } from "../components/GateDiagram";
 import { MetricCard } from "../components/MetricCard";
+import { PageDirectory } from "../components/PageDirectory";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import rankIcInterval from "../data/locked-rank-ic-interval.json";
@@ -133,17 +134,7 @@ export function OverviewPage() {
 
       <nav className="explore" aria-labelledby="explore-title">
         <h2 id="explore-title">Explore the project</h2>
-        <ul>
-          {navigation.slice(1).map(({ to, label, description }) => (
-            <li key={to}>
-              <Link to={to}>
-                <strong>{label}</strong>
-                <span>{description}</span>
-                <ArrowRight size={18} aria-hidden="true" />
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <PageDirectory entries={navigation.slice(1)} />
       </nav>
     </Page>
   );
