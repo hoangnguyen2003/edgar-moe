@@ -167,6 +167,51 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
 def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
     text = _workflow_text(workflow)
     errors: list[str] = []
+    secret_name = "EDGAR_MOE_REGISTRY_READ_DATABASE_URL"
+    secret_expression = "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}"
+    workflow_env = workflow.get("env")
+    if isinstance(workflow_env, dict) and (
+        secret_name in workflow_env
+        or any(secret_expression in str(value) for value in workflow_env.values())
+    ):
+        errors.append(f"{name}: reader database secret must not be workflow-scoped")
+    jobs = workflow.get("jobs")
+    job = jobs.get("reader-contract") if isinstance(jobs, dict) else None
+    if isinstance(job, dict):
+        job_env = job.get("env")
+        if isinstance(job_env, dict) and (
+            secret_name in job_env
+            or any(secret_expression in str(value) for value in job_env.values())
+        ):
+            errors.append(f"{name}: reader database secret must not be job-scoped")
+        required_steps = {
+            "Require the deployed reader secret",
+            "Run the effective reader-role verifier",
+        }
+        observed_steps: set[str] = set()
+        steps = job.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                step_name = str(step.get("name", ""))
+                step_env = step.get("env")
+                secret_value = step_env.get(secret_name) if isinstance(step_env, dict) else None
+                if step_name in required_steps:
+                    observed_steps.add(step_name)
+                    if secret_value != secret_expression:
+                        errors.append(f"{name}: {step_name} must receive the reader secret")
+                elif secret_value is not None:
+                    errors.append(
+                        f"{name}: reader secret must not enter {step_name or 'unnamed step'}"
+                    )
+                if isinstance(step_env, dict) and any(
+                    key != secret_name and secret_expression in str(value)
+                    for key, value in step_env.items()
+                ):
+                    errors.append(f"{name}: reader secret must use its dedicated step variable")
+        for missing_step in sorted(required_steps - observed_steps):
+            errors.append(f"{name}: missing reader secret consumer {missing_step}")
     for required in (
         "EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
         "scripts/verify_postgres_reader.py",

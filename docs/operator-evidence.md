@@ -100,6 +100,13 @@ repair paths in the read-only R2 audit. The isolated restore workflow must retai
 its explicit confirmation and source/target safety checks. These are repository
 controls, not evidence that the provider workflows have been run.
 
+The reader-audit database URL is step-scoped to its prerequisite check and
+effective-privilege verifier. Checkout, dependency installation, hashing,
+redaction, and artifact upload do not receive that credential. A missing Actions
+secret produces a redacted `not_run` artifact and cannot be treated as a passed
+hosted-role audit; a URL configured only in Vercel does not configure GitHub
+Actions.
+
 ## Preflight the provider workflows
 
 Before starting a hosted audit, run the value-redacting preflight locally or
