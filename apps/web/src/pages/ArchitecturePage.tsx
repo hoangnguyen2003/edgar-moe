@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight } from "lucide-react";
+import { CopyCommand } from "../components/CopyCommand";
 import { PageHeader } from "../components/PageHeader";
 import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
@@ -171,7 +172,7 @@ export function ArchitecturePage() {
             <li>
               <strong>Run the post-deploy check</strong>
               <span>From a clone of the repository:</span>
-              <pre><code>{VERIFY_COMMAND}</code></pre>
+              <CopyCommand command={VERIFY_COMMAND} label="command" />
             </li>
             <li>
               <strong>Read the design</strong>
