@@ -241,6 +241,12 @@ Evidence is never erased to make a retry look clean.
   - Redacted run artifacts are kept for 30 days.
   - An optional redacted webhook sends alerts.
   - Smoke reports carry correlation IDs.
+  - A request identifier is returned only on responses a shared cache may not
+    store. A cached read is served to everyone, so an identifier on it would
+    belong to whoever filled the cache; it is left off rather than published
+    misleadingly. Asserted on both sides in
+    [`test_cache_policy.py`](../tests/unit/test_cache_policy.py) and
+    [`test_smoke_deployment.py`](../tests/unit/test_smoke_deployment.py).
 - **Service objectives:** these are proposed, not yet measured:
   - zero forecasts accepted after entry (an invariant);
   - a 96-hour freshness warning;
