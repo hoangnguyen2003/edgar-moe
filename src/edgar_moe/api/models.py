@@ -120,6 +120,7 @@ class HealthResponse(BaseModel):
     snapshot_loaded: bool
     data_mode: str | None
     as_of: date | None
+    commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
 
 
 class FrozenSnapshotIdentity(BaseModel):

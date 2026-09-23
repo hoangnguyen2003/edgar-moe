@@ -4,6 +4,7 @@ import re
 from hashlib import sha256
 from pathlib import Path
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -90,7 +91,8 @@ def fixture_snapshot() -> dict:
     }
 
 
-def test_api_contracts(tmp_path: Path) -> None:
+def test_api_contracts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "a" * 40)
     path = tmp_path / "snapshot.json"
     path.write_text(json.dumps(fixture_snapshot()), encoding="utf-8")
     repo = SnapshotRepository(path)
@@ -99,7 +101,10 @@ def test_api_contracts(tmp_path: Path) -> None:
     with TestClient(app) as client:
         health = client.get("/api/v1/health", headers={"X-Request-ID": "smoke-probe-123"})
         assert health.json()["status"] == "ok"
+        assert health.json()["commit_sha"] == "a" * 40
         assert health.headers["x-request-id"] == "smoke-probe-123"
+        monkeypatch.setenv("VERCEL_GIT_COMMIT_SHA", "not-a-git-sha?token=secret")
+        assert client.get("/api/v1/health").json()["commit_sha"] is None
         assert client.get("/api/v1/summary").status_code == 200
         events = client.get("/api/v1/events?direction=long").json()
         assert events["total"] == 1

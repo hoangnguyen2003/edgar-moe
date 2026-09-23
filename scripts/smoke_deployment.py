@@ -37,6 +37,7 @@ _REQUIRED_SECURITY_HEADERS = {
 }
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 # The frozen identity a deployment publishes twice (governance API and provenance
 # manifest) and the repository pins in config/public_snapshot.lock.json.
 _IDENTITY_FIELDS = ("path", "data_mode", "as_of", "sha256", "selection_hash", "locked_test_hash")
@@ -143,6 +144,7 @@ def run_smoke(
     allow_http: bool = False,
     allow_degraded: bool = False,
     expected_identity: dict[str, str] | None = None,
+    expected_commit_sha: str | None = None,
 ) -> dict[str, Any]:
     """Check the public deployment boundary without sending credentials or mutations.
 
@@ -150,6 +152,8 @@ def run_smoke(
     frozen identity must also equal the reviewed lock field by field, so a
     well-formed but unreviewed snapshot cannot pass.
     """
+    if expected_commit_sha is not None and _COMMIT_SHA.fullmatch(expected_commit_sha) is None:
+        raise ValueError("expected commit must be a lowercase 40-character Git SHA")
     base = normalize_base_url(base_url, allow_http=allow_http)
     base_parts = urlsplit(base)
     origin = (base_parts.scheme.lower(), base_parts.netloc.lower())
@@ -226,6 +230,17 @@ def run_smoke(
                         check.update(status="failed", error="health_status_invalid")
                     elif health_status == "degraded" and not allow_degraded:
                         check.update(status="failed", error="health_status_degraded")
+                    elif expected_commit_sha is not None:
+                        served_commit = payload.get("commit_sha")
+                        if (
+                            not isinstance(served_commit, str)
+                            or _COMMIT_SHA.fullmatch(served_commit) is None
+                        ):
+                            check.update(status="failed", error="served_commit_unavailable")
+                        elif served_commit != expected_commit_sha:
+                            check.update(status="failed", error="served_commit_mismatch")
+                        else:
+                            check["commit_verified"] = True
         elif check["name"] == "governance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -344,6 +359,8 @@ def run_smoke(
     if expected_identity is not None:
         # Public digests only: the snapshot identity is published on the site itself.
         report["expected_snapshot_sha256"] = expected_identity["sha256"]
+    if expected_commit_sha is not None:
+        report["expected_commit_sha"] = expected_commit_sha
     return report
 
 
@@ -690,6 +707,10 @@ def _parse_args() -> argparse.Namespace:
             "(for example, config/public_snapshot.lock.json)"
         ),
     )
+    parser.add_argument(
+        "--expect-commit",
+        help="require /api/v1/health to identify the exact deployed 40-character Git SHA",
+    )
     return parser.parse_args()
 
 
@@ -707,6 +728,7 @@ def main() -> int:
             allow_http=args.allow_http,
             allow_degraded=args.allow_degraded,
             expected_identity=expected_identity,
+            expected_commit_sha=args.expect_commit,
         )
     except ValueError as error:
         print(f"Deployment smoke check rejected: {error}", file=sys.stderr)
