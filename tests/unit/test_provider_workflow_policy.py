@@ -322,6 +322,28 @@ def test_r2_audit_rejects_job_scoped_credentials(tmp_path: Path) -> None:
     assert "R2 audit credentials must not be job-scoped" in result.stdout
 
 
+def test_r2_audit_rejects_case_variant_secret_name_at_job_scope(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    text = workflow.read_text(encoding="utf-8")
+    workflow.write_text(
+        text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      ALIAS: ${{ secrets.edgar_moe_r2_auditor_secret_access_key }}\n"
+            "      AUDIT_DIR:",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "R2 audit credentials must not be job-scoped" in result.stdout
+
+
 def test_r2_audit_rejects_credentials_in_dependency_setup(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
@@ -335,6 +357,32 @@ def test_r2_audit_rejects_credentials_in_dependency_setup(tmp_path: Path) -> Non
             "        env:\n"
             "          AUDITOR_R2_SECRET_ACCESS_KEY: "
             "${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}\n"
+            "        run: uv sync --locked --extra dev",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "R2 audit credentials must not enter Install dependencies" in result.stdout
+
+
+def test_r2_audit_rejects_case_variant_secret_name_in_dependency_setup(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    text = workflow.read_text(encoding="utf-8")
+    workflow.write_text(
+        text.replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          EXTRA: ${{secrets['edgar_moe_r2_auditor_secret_access_key']}}\n"
             "        run: uv sync --locked --extra dev",
             1,
         ),

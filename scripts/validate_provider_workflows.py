@@ -272,7 +272,8 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
     )
 
     def references_secret(value: Any) -> bool:
-        return any(secret_name in str(value) for secret_name in secret_names)
+        normalized_value = str(value).casefold()
+        return any(secret_name.casefold() in normalized_value for secret_name in secret_names)
 
     def exposes_credentials(value: Any) -> bool:
         return isinstance(value, dict) and any(
