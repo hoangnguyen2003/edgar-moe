@@ -24,11 +24,18 @@ def _write_catalog(root: Path, *, count: int) -> tuple[Path, Path, Path, Path, P
         f"- **Decision log:** [{count} architecture decision records](adr/README.md)\n",
         encoding="utf-8",
     )
-    return adr_dir, index, readme, architecture, solution_architecture
+    cv_entry = root / "cv-entry.md"
+    cv_entry.write_text(
+        f"Documented the design as a solution architecture with {count} ADRs.\n",
+        encoding="utf-8",
+    )
+    return adr_dir, index, readme, architecture, solution_architecture, cv_entry
 
 
 def test_adr_catalog_matches_all_references(tmp_path: Path) -> None:
-    adr_dir, index, readme, architecture, solution_architecture = _write_catalog(tmp_path, count=2)
+    adr_dir, index, readme, architecture, solution_architecture, cv_entry = _write_catalog(
+        tmp_path, count=2
+    )
 
     assert (
         validate_adr_catalog(
@@ -37,13 +44,16 @@ def test_adr_catalog_matches_all_references(tmp_path: Path) -> None:
             readme_path=readme,
             architecture_path=architecture,
             solution_architecture_path=solution_architecture,
+            cv_entry_path=cv_entry,
         )
         == []
     )
 
 
 def test_adr_catalog_reports_stale_reference_counts(tmp_path: Path) -> None:
-    adr_dir, index, readme, architecture, solution_architecture = _write_catalog(tmp_path, count=2)
+    adr_dir, index, readme, architecture, solution_architecture, cv_entry = _write_catalog(
+        tmp_path, count=2
+    )
     index.write_text("All 1 records are accepted.\n", encoding="utf-8")
     readme.write_text("The ADR index: 1 decisions grouped by theme\n", encoding="utf-8")
     architecture.write_text("Seven of the 1 recorded decisions.\n", encoding="utf-8")
@@ -58,6 +68,7 @@ def test_adr_catalog_reports_stale_reference_counts(tmp_path: Path) -> None:
         readme_path=readme,
         architecture_path=architecture,
         solution_architecture_path=solution_architecture,
+        cv_entry_path=cv_entry,
     )
 
     assert "ADR index declares 1 ADRs; expected 2" in errors
@@ -69,7 +80,7 @@ def test_adr_catalog_reports_stale_reference_counts(tmp_path: Path) -> None:
 def test_a_record_headed_with_another_number_is_reported(tmp_path: Path) -> None:
     # Two records claiming one number is how a citation ends up pointing at the
     # wrong decision; it happened when concurrent work renumbered a file.
-    adr_dir, index, readme, architecture, solution = _write_catalog(tmp_path, count=3)
+    adr_dir, index, readme, architecture, solution, cv_entry = _write_catalog(tmp_path, count=3)
     (adr_dir / "0003-decision.md").write_text("# ADR 0002: Decision\n", encoding="utf-8")
 
     errors = validate_adr_catalog(
@@ -78,13 +89,14 @@ def test_a_record_headed_with_another_number_is_reported(tmp_path: Path) -> None
         readme_path=readme,
         architecture_path=architecture,
         solution_architecture_path=solution,
+        cv_entry_path=cv_entry,
     )
 
     assert errors == ["ADR 0003-decision.md is headed ADR 0002"]
 
 
 def test_a_record_without_an_adr_heading_is_reported(tmp_path: Path) -> None:
-    adr_dir, index, readme, architecture, solution = _write_catalog(tmp_path, count=2)
+    adr_dir, index, readme, architecture, solution, cv_entry = _write_catalog(tmp_path, count=2)
     (adr_dir / "0002-decision.md").write_text("# Decision\n", encoding="utf-8")
 
     errors = validate_adr_catalog(
@@ -93,6 +105,27 @@ def test_a_record_without_an_adr_heading_is_reported(tmp_path: Path) -> None:
         readme_path=readme,
         architecture_path=architecture,
         solution_architecture_path=solution,
+        cv_entry_path=cv_entry,
     )
 
     assert errors == ["ADR must open with a '# ADR NNNN:' heading: 0002-decision.md"]
+
+
+def test_a_stale_count_in_the_cv_entry_is_reported(tmp_path: Path) -> None:
+    # The CV entry is read by people outside the repository, where a wrong
+    # number is least likely to be noticed and least easy to excuse.
+    adr_dir, index, readme, architecture, solution, cv_entry = _write_catalog(tmp_path, count=4)
+    cv_entry.write_text(
+        "Documented the design as a solution architecture with 21 ADRs.\n", encoding="utf-8"
+    )
+
+    errors = validate_adr_catalog(
+        adr_dir=adr_dir,
+        index_path=index,
+        readme_path=readme,
+        architecture_path=architecture,
+        solution_architecture_path=solution,
+        cv_entry_path=cv_entry,
+    )
+
+    assert errors == ["CV entry declares 21 ADRs; expected 4"]
