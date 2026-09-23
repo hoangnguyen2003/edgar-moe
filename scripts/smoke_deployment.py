@@ -321,6 +321,17 @@ def _verify_identity(
         check["identity_verified"] = True
 
 
+def _shared_cacheable(cache_control: str) -> bool:
+    """Whether a shared cache may store this response and serve it to others."""
+
+    names = {
+        item.strip().lower().split("=", 1)[0] for item in cache_control.split(",") if item.strip()
+    }
+    if names & {"no-store", "no-cache", "private"}:
+        return False
+    return bool(names & {"public", "s-maxage", "max-age"})
+
+
 def _check_endpoint(
     base: str,
     origin: tuple[str, str],
@@ -375,12 +386,20 @@ def _check_endpoint(
                 check["missing_headers"] = missing_headers
                 return check
             if path.startswith("/api/"):
-                if response_headers.get("x-request-id") != request_id:
+                if _shared_cacheable(response_headers.get("cache-control", "")):
+                    # A shared cache serves one stored response to everyone, so
+                    # an identifier on it would belong to whoever filled the
+                    # cache. Its absence is the contract, not its echo.
+                    if response_headers.get("x-request-id"):
+                        check["error"] = "request_id_on_shared_cacheable_response"
+                        return check
+                elif response_headers.get("x-request-id") != request_id:
                     check["error"] = "request_id_not_echoed"
                     return check
-                # This is generated locally by this probe; never retain an
-                # arbitrary response header value in the redacted artifact.
-                check["request_id"] = request_id
+                else:
+                    # This is generated locally by this probe; never retain an
+                    # arbitrary response header value in the redacted artifact.
+                    check["request_id"] = request_id
             decoded = body.decode("utf-8")
             if name in {"health", "provenance", "governance"}:
                 try:
