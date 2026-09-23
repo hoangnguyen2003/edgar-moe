@@ -40,6 +40,15 @@ from .evaluation import (
     evaluate_reports,
     load_evaluation_corpus,
 )
+from .panel import (
+    PanelFailure,
+    PanelInputError,
+    PanelRunner,
+    normalize_panel_profiles,
+    run_panel,
+    verify_panel_report,
+    write_panel_report,
+)
 from .policy import (
     COPILOT_PROFILES,
     CopilotProfile,
@@ -107,6 +116,13 @@ __all__ = [
     "verify_copilot_review_history",
     "write_copilot_review_history",
     "verify_copilot_answer_report",
+    "PanelFailure",
+    "PanelInputError",
+    "PanelRunner",
+    "normalize_panel_profiles",
+    "run_panel",
+    "verify_panel_report",
+    "write_panel_report",
     "CopilotReadinessError",
     "build_copilot_readiness",
     "verify_copilot_readiness",
