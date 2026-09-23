@@ -7,7 +7,7 @@ depends on provider configuration or operator action.
 
 - **Status date:** 2026-09-23.
 - **Live system:** [edgar-moe.vercel.app](https://edgar-moe.vercel.app), its [API reference](https://edgar-moe.vercel.app/api/docs), and a plain-language [architecture page](https://edgar-moe.vercel.app/architecture) for visitors.
-- **Decision log:** [26 architecture decision records](adr/README.md).
+- **Decision log:** [27 architecture decision records](adr/README.md).
 - **Detailed views:** [architecture and data flow](architecture.md), [forward-testing operations](forward-testing.md), [improvement plan](architecture-roadmap.md).
 
 ## 1. Context and goals
@@ -313,7 +313,7 @@ how it is verified. CI runs the linked tests on every pull request.
 | R10 | Late runs are visible before the open | [`forward/workflow.py`](../src/edgar_moe/forward/workflow.py) ([ADR 0020](adr/0020-pre-open-schedule-margin.md)) | [`test_forward_workflow.py`](../tests/integration/test_forward_workflow.py) |
 | R11 | Copilot citations are bound to real tool output | [`copilot/agent.py`](../src/edgar_moe/copilot/agent.py), [`copilot/verification.py`](../src/edgar_moe/copilot/verification.py) | [`test_copilot_agent.py`](../tests/unit/test_copilot_agent.py), [`test_copilot_verification.py`](../tests/unit/test_copilot_verification.py) |
 | R12 | The first visit stays inside the page-weight budget | [`check_web_budget.py`](../scripts/check_web_budget.py), [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json) | [`test_web_budget.py`](../tests/unit/test_web_budget.py), and the bundle job in CI |
-| R13 | A live figure is published with its uncertainty | [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py), [`ForwardPage.tsx`](../apps/web/src/pages/ForwardPage.tsx) | [`test_forward_registry.py`](../tests/unit/test_forward_registry.py), [`ForwardPage.test.tsx`](../apps/web/src/pages/ForwardPage.test.tsx) |
+| R13 | The live point estimate retains its pooled definition; a time-clustered interval appears only after sufficient calendar history, otherwise a reason is explicit | [`forward/uncertainty.py`](../src/edgar_moe/forward/uncertainty.py), [`ForwardPage.tsx`](../apps/web/src/pages/ForwardPage.tsx), [ADR 0027](adr/0027-clustered-forward-rank-ic-uncertainty.md) | [`test_forward_uncertainty.py`](../tests/unit/test_forward_uncertainty.py), [`test_forward_api.py`](../tests/integration/test_forward_api.py), [`ForwardPage.test.tsx`](../apps/web/src/pages/ForwardPage.test.tsx) |
 
 **Verify the live system yourself.** From a clone, with no credentials, run:
 
@@ -356,4 +356,4 @@ Five decisions carry most of the design:
 4. **Append-only evidence enforced in the database** ([0016](adr/0016-database-append-only-triggers.md)): integrity does not depend on application discipline.
 5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0023](adr/0023-external-forward-scheduler.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded, with an optional external trigger staged behind an observed cutover.
 
-The [ADR index](adr/README.md) lists all 25 decisions by theme.
+The [ADR index](adr/README.md) lists all 27 decisions by theme.

@@ -218,6 +218,10 @@ def test_label_settlement_and_forward_performance(tmp_path: Path) -> None:
     assert performance["matured_count"] == 2
     assert performance["coverage"] == 1.0
     assert performance["rank_ic"] == pytest.approx(1.0)
+    assert performance["rank_ic_low"] is None and performance["rank_ic_high"] is None
+    assert performance["rank_ic_interval_method"] == "calendar_month_moving_block"
+    assert performance["rank_ic_interval_status"] == "insufficient_pairs"
+    assert performance["rank_ic_calendar_months"] == 1
     assert performance["directional_accuracy"] == 1.0
     assert registry_service.status()["pending_count"] == 0
     assert registry_service.list_quality_checks()[0]["status"] == "passed"

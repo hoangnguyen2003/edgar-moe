@@ -231,10 +231,26 @@ class ForwardPerformanceResponse(BaseModel):
     pending_count: int
     coverage: float = Field(ge=0, le=1)
     rank_ic: float | None
-    #: 95% interval for the rank IC, treating settled forecasts as independent;
-    #: null until enough outcomes have settled to state one.
+    #: Conditional 95% calendar-month moving-block interval. Null until enough
+    #: settled outcomes and distinct months exist, or when the computation is
+    #: undefined or outside its reviewed capacity envelope.
     rank_ic_low: float | None = Field(default=None, ge=-1, le=1)
     rank_ic_high: float | None = Field(default=None, ge=-1, le=1)
+    rank_ic_interval_method: Literal["calendar_month_moving_block"] | None = None
+    rank_ic_interval_status: (
+        Literal[
+            "ready",
+            "insufficient_pairs",
+            "insufficient_months",
+            "undefined_rank_ic",
+            "degenerate_resamples",
+            "capacity_review_required",
+        ]
+        | None
+    ) = None
+    rank_ic_calendar_months: int = Field(default=0, ge=0)
+    rank_ic_block_months: int | None = Field(default=None, ge=1)
+    rank_ic_bootstrap_samples: int | None = Field(default=None, ge=1)
     rmse: float | None
     mae: float | None
     directional_accuracy: float | None

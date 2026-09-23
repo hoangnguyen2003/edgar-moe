@@ -111,6 +111,8 @@ describe("Forward Lab", () => {
       if (url.includes("/performance")) return jsonResponse({
         model_id: "edgar-moe-frozen-v1", forecast_count: 200, matured_count: 120, pending_count: 80,
         coverage: 0.6, rank_ic: 0.02, rank_ic_low: -0.16, rank_ic_high: 0.2, rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
+        rank_ic_interval_method: "calendar_month_moving_block", rank_ic_interval_status: "ready",
+        rank_ic_calendar_months: 12, rank_ic_block_months: 2, rank_ic_bootstrap_samples: 1000,
       });
       if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 200, offset: 0, limit: 50 });
       return jsonResponse([]);
@@ -120,9 +122,38 @@ describe("Forward Lab", () => {
 
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     expect(screen.queryByText("Too early to read these numbers")).not.toBeInTheDocument();
-    // An interval spanning 0 is the honest reading of 120 settled outcomes.
-    expect(screen.getByText("95% interval -0.16 to 0.20")).toBeInTheDocument();
+    // The UI labels the time-clustered interval rather than implying independent events.
+    expect(screen.getByText("95% time-clustered interval -0.16 to 0.20")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is 95% interval?" })).toBeInTheDocument();
+  });
+
+  it("states when many settled filings still cover too few calendar months", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
+        matured_count: 120, pending_count: 80, latest_successful_run_at: "2026-12-01T12:10:00Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-12-01T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 200, matured_count: 120, pending_count: 80,
+        coverage: 0.6, rank_ic: 0.02, rank_ic_low: null, rank_ic_high: null,
+        rank_ic_interval_method: "calendar_month_moving_block", rank_ic_interval_status: "insufficient_months",
+        rank_ic_calendar_months: 4, rank_ic_block_months: 2, rank_ic_bootstrap_samples: 1000,
+        rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
+      });
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 200, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("More calendar history is needed")).toBeInTheDocument();
+    expect(screen.getByText("4 of 12 filing months settled; interval pending")).toBeInTheDocument();
+    expect(screen.queryByText(/95% time-clustered interval/)).not.toBeInTheDocument();
   });
 
   it("renders an empty but operational prospective registry", async () => {

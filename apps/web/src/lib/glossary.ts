@@ -10,7 +10,7 @@ export const GLOSSARY = {
   },
   confidenceInterval: {
     term: "95% interval",
-    definition: "The range the measurement could plausibly take given how few results it is based on. A range that straddles 0 means the figure cannot yet be told apart from luck. It assumes each filing's outcome is independent; filings scored on the same day are not, so the real range is wider.",
+    definition: "An approximate range for the live ranking score, calculated by resampling two-month calendar blocks of settled filings. Filings in the same period move together. A range that straddles 0 does not establish ranking skill; even a range above 0 cannot correct for market-regime changes or model selection.",
   },
   rmse: {
     term: "RMSE",

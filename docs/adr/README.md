@@ -1,7 +1,7 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. All 26 records are accepted. When a decision changes,
+the decision is verified. All 27 records are accepted. When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
 decisions in the overall design.
@@ -20,6 +20,7 @@ decisions in the overall design.
 | [0021](0021-frozen-runtime-compatibility-gate.md) | Bind embedding caches to exact PyTorch and Transformers versions, and require a reproduction comparison of the locked test before any frozen-inference dependency upgrade. | 2026-09-22 |
 | [0022](0022-copilot-review-profiles.md) | Keep research, quant, architecture, and operations copilot perspectives bounded by one content-addressed read-only agent identity. | 2026-09-22 |
 | [0025](0025-copilot-review-panels.md) | Coordinate a bounded multi-profile copilot panel while retaining only private child envelopes and a hashed structural aggregate. | 2026-09-23 |
+| [0027](0027-clustered-forward-rank-ic-uncertainty.md) | Withhold live ranking intervals until time clusters accrue, then use a bounded calendar moving-block bootstrap without changing the pooled point estimate. | 2026-09-23 |
 
 ## Operations and delivery
 

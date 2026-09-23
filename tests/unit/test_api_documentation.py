@@ -71,6 +71,8 @@ def test_the_performance_route_states_how_the_rank_ic_is_computed(schema: dict[s
 
     assert "pooled" in description
     assert "not comparable" in description
+    assert "two-calendar-month moving blocks" in description
+    assert "null until" in description
 
 
 def test_documented_query_limits_match_the_code(schema: dict[str, Any]) -> None:

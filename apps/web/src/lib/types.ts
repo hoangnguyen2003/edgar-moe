@@ -203,6 +203,11 @@ export interface ForwardPerformanceResponse {
   rank_ic: number | null;
   rank_ic_low: number | null;
   rank_ic_high: number | null;
+  rank_ic_interval_method?: "calendar_month_moving_block" | null;
+  rank_ic_interval_status?: "ready" | "insufficient_pairs" | "insufficient_months" | "undefined_rank_ic" | "degenerate_resamples" | "capacity_review_required" | null;
+  rank_ic_calendar_months?: number;
+  rank_ic_block_months?: number | null;
+  rank_ic_bootstrap_samples?: number | null;
   rmse: number | null;
   mae: number | null;
   directional_accuracy: number | null;

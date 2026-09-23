@@ -68,13 +68,24 @@ export function ForwardPage() {
             ? row.realized_abnormal_return !== null
             : row.realized_abnormal_return === null,
         );
-  // An interval that straddles 0 says more than the point estimate does, so it
-  // replaces the coverage line whenever enough outcomes have settled to state one.
-  const hasInterval = metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
-  const rankIcDetail = hasInterval
-    ? `95% interval ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
-    : `${percent(metrics.coverage)} of forecasts have results`;
-  const rankIcInfo = hasInterval ? "confidenceInterval" : "rankIc";
+  const hasClusteredInterval = metrics.rank_ic_interval_status === "ready"
+    && metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
+  const hasLegacyInterval = metrics.rank_ic_interval_status == null
+    && metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
+  const rankIcDetail = hasClusteredInterval
+    ? `95% time-clustered interval ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
+    : hasLegacyInterval
+      ? `95% independent-event approximation ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
+      : metrics.rank_ic_interval_status === "insufficient_months"
+        ? `${metrics.rank_ic_calendar_months ?? 0} of 12 filing months settled; interval pending`
+        : metrics.rank_ic_interval_status === "insufficient_pairs"
+          ? `${compact(metrics.matured_count)} of 100 results settled; interval pending`
+          : metrics.rank_ic_interval_status === "capacity_review_required"
+            ? "Interval paused for capacity review"
+            : metrics.rank_ic_interval_status === "undefined_rank_ic" || metrics.rank_ic_interval_status === "degenerate_resamples"
+              ? "No stable time-clustered interval yet"
+              : `${percent(metrics.coverage)} of forecasts have results`;
+  const rankIcInfo = hasClusteredInterval ? "confidenceInterval" : "rankIc";
   const historicalFailedChecks = checks.filter((check) => check.status === "failed").length;
   const historicalWarningChecks = checks.filter((check) => check.status === "warning").length;
   const latestQualityLabel = status.data.latest_quality_failures
@@ -115,6 +126,19 @@ export function ForwardPage() {
               {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a
               result so far. Treat the live figures as a running log, not evidence: the frozen
               study's own test used 1,794 filings.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {metrics.rank_ic_interval_status === "insufficient_months" && (
+        <div className="notice">
+          <Clock3 size={18} aria-hidden="true" />
+          <div>
+            <strong>More calendar history is needed</strong>
+            <span>
+              Settled filings cover {metrics.rank_ic_calendar_months ?? 0} distinct calendar months; the time-clustered
+              interval waits for 12. The point estimate is a running log, not evidence of a reliable edge.
             </span>
           </div>
         </div>
