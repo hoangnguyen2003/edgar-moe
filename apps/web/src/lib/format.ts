@@ -1,15 +1,30 @@
+/** U+2212, the typographic minus: as wide as "+", and read aloud as "minus". */
+export const MINUS = "\u2212";
+
+/**
+ * Fixed-point text with a true minus sign. The hyphen that `toFixed` produces
+ * is narrower and lower than "+", so signed columns look ragged, and screen
+ * readers often announce it as "dash" or skip it. A value that rounds to zero
+ * is written unsigned, never as "-0.00".
+ */
+export function fixed(value: number, digits: number): string {
+  const text = value.toFixed(digits);
+  if (Number(text) === 0) return (0).toFixed(digits);
+  return text.startsWith("-") ? `${MINUS}${text.slice(1)}` : text;
+}
+
 export function percent(value: number | null | undefined, digits = 1): string {
-  return value == null || !Number.isFinite(value) ? "—" : `${(value * 100).toFixed(digits)}%`;
+  return value == null || !Number.isFinite(value) ? "—" : `${fixed(value * 100, digits)}%`;
 }
 
 export function decimal(value: number | null | undefined, digits = 2): string {
-  return value == null || !Number.isFinite(value) ? "—" : value.toFixed(digits);
+  return value == null || !Number.isFinite(value) ? "—" : fixed(value, digits);
 }
 
 /** Fixed-point text with an explicit sign, so polarity never depends on color. */
 function signed(value: number, digits: number, suffix = ""): string {
-  const text = value.toFixed(digits);
-  if (Number(text) === 0) return `${(0).toFixed(digits)}${suffix}`;
+  const text = fixed(value, digits);
+  if (Number(value.toFixed(digits)) === 0) return `${text}${suffix}`;
   return `${value > 0 ? "+" : ""}${text}${suffix}`;
 }
 

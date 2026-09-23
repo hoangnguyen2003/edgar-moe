@@ -37,7 +37,7 @@ describe("Overview", () => {
     expect(answer).toHaveTextContent("Not convincingly, and not profitably.");
     expect(answer).toHaveTextContent("rank IC point estimate was 0.032, but its 95% interval includes zero");
     expect(answer).toHaveTextContent("lost 3.3% a year after trading costs");
-    expect(await screen.findByText(/95% two-month calendar-block interval -0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
+    expect(await screen.findByText(/95% two-month calendar-block interval −0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read the dated method and caveats" })).toHaveAttribute(
       "href", "https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md",
     );

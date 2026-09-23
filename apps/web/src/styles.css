@@ -629,6 +629,23 @@ main { flex: 1; min-width: 0; }
 }
 
 /* ---------- Phone ---------- */
+/* ---------- Tablet: re-proportion wide tables instead of letting them spill ---------- */
+@media (min-width: 761px) and (max-width: 1080px) {
+  /* The forecast table fits the width; dates wrap rather than hiding columns
+     behind a sideways scroll. */
+  .forward-table { min-width: 0; }
+  .forward-table td[data-label="Saved"], .forward-table td[data-label="Tradable from"] { white-space: normal; }
+  .forward-table td:first-child span { max-width: 150px; }
+  /* The blotter's link needs more than 13% at this width. */
+  .blotter__table th:nth-child(1) { width: 27%; }
+  .blotter__table th:nth-child(2) { width: 17%; }
+  .blotter__table th:nth-child(3) { width: 11%; }
+  .blotter__table th:nth-child(4) { width: 12%; }
+  .blotter__table th:nth-child(5) { width: 13%; }
+  .blotter__table th:nth-child(6) { width: 20%; }
+  .expert-mix__bar--compact { width: 100%; max-width: 132px; }
+}
+
 @media (max-width: 760px) {
   .lane { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
   .lane__steps { flex-direction: column; gap: var(--s3); }

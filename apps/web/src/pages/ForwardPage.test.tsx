@@ -123,7 +123,7 @@ describe("Forward Lab", () => {
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     expect(screen.queryByText("Too early to read these numbers")).not.toBeInTheDocument();
     // The UI labels the time-clustered interval rather than implying independent events.
-    expect(screen.getByText("95% time-clustered interval -0.16 to 0.20")).toBeInTheDocument();
+    expect(screen.getByText("95% time-clustered interval −0.16 to 0.20")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is 95% interval?" })).toBeInTheDocument();
   });
 
