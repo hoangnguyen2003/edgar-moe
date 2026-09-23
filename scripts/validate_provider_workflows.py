@@ -18,7 +18,7 @@ PROVIDER_WORKFLOWS = (
 
 # Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
 _PINNED_ACTION = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
-_SECRET_EXPRESSION = "${{ secrets."
+_SECRET_EXPRESSION = re.compile(r"\$\{\{[^}]*\bsecrets\b[^}]*\}\}", re.DOTALL)
 
 
 def validate_provider_workflows(
@@ -155,7 +155,7 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
                 visit(child, (*path, str(index)))
         elif (
             isinstance(value, str)
-            and _SECRET_EXPRESSION in value
+            and _SECRET_EXPRESSION.search(value)
             and ("env" not in path or "with" in path or "run" in path)
         ):
             errors.append(f"{name}: secret expressions may only appear in job/step env mappings")
