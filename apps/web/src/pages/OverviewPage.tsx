@@ -4,6 +4,7 @@ import { GateDiagram } from "../components/GateDiagram";
 import { MetricCard } from "../components/MetricCard";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
+import rankIcInterval from "../data/locked-rank-ic-interval.json";
 import { api } from "../lib/api";
 import { averageWeights, EXPERTS, type ExpertKey } from "../lib/experts";
 import { count, decimal, percent, shortDate } from "../lib/format";
@@ -43,7 +44,17 @@ export function OverviewPage() {
   const portfolio = data.portfolio_scenarios.find((item) => item.cost_bps === 10) ?? {};
   const demo = data.metadata.data_mode === "synthetic_fixture";
   const weights = averageWeights(signals.data);
-  const answer = verdict(test.rank_ic, portfolio.annualized_return);
+  const hasFrozenInterval = data.metadata.data_mode === "authenticated_locked_test"
+    && data.metadata.selection_hash === rankIcInterval.selection_hash
+    && data.metadata.locked_test_hash === rankIcInterval.locked_test_hash
+    && test.rank_ic != null
+    && Math.abs(test.rank_ic - rankIcInterval.rank_ic) < 1e-12;
+  const answer = hasFrozenInterval && portfolio.annualized_return != null && portfolio.annualized_return < 0
+    ? {
+        title: "Not convincingly, and not profitably.",
+        detail: `On 2025–2026 filings, the rank IC point estimate was ${decimal(test.rank_ic, 3)}, but its 95% interval includes zero. A portfolio trading on those scores lost ${percent(-portfolio.annualized_return)} a year after trading costs.`,
+      }
+    : verdict(test.rank_ic, portfolio.annualized_return);
   return (
     <Page>
       <section className="hero">
@@ -75,10 +86,16 @@ export function OverviewPage() {
 
       <section className="figures" aria-label="Headline results">
         <MetricCard label="Filings analyzed" value={count(data.summary.events)} detail={`From ${count(data.summary.issuers)} companies`} />
-        <MetricCard label="Ranking skill" info="rankIc" value={decimal(test.rank_ic, 3)} detail="Rank IC on the final test; 0 is random" />
+        <MetricCard label="Ranking skill" info="rankIc" value={decimal(test.rank_ic, 3)} detail={hasFrozenInterval
+          ? `95% two-month calendar-block interval ${decimal(rankIcInterval.ci_low, 3)} to ${decimal(rankIcInterval.ci_high, 3)}; includes zero`
+          : "Rank IC on the final test; 0 is random"} />
         <MetricCard label="Sharpe ratio" info="sharpe" value={decimal(portfolio.sharpe)} detail="After 0.10% trading costs; below 0 lost money" />
         <MetricCard label="Worst drop" info="drawdown" value={percent(portfolio.maximum_drawdown)} detail="Largest fall from a peak in the backtest" />
       </section>
+      {hasFrozenInterval && <p className="panel__note">
+        The ranking interval groups filings by calendar month and does not adjust for model selection.
+        {" "}<a href="https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md">Read the dated method and caveats</a>.
+      </p>}
 
       <section className="panel fair-test">
         <header>
