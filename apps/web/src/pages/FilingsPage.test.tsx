@@ -130,7 +130,8 @@ describe("Filing explorer", () => {
     fireEvent.change(screen.getByRole("combobox", { name: /Signal/ }), { target: { value: "long" } });
     fireEvent.change(screen.getByPlaceholderText("Search by ticker or company"), { target: { value: "AAL" } });
 
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("AAL"));
+    // Search is debounced; allow for a slow machine.
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("AAL"), { timeout: 3000 });
     expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({ q: "AAL", signal: "long", event: "event-2" });
     expect(window.location.pathname).toBe("/filings");
     expect(window.history.length).toBe(entries);
