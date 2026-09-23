@@ -6,6 +6,21 @@ import { GLOSSARY, type GlossaryKey } from "../lib/glossary";
 const BUBBLE_WIDTH = 300;
 
 /**
+ * A label followed by its definition button. The last word and the button
+ * wrap together, so a narrow column never strands the icon on its own line.
+ */
+export function InfoLabel({ text, term }: { text: string; term?: GlossaryKey }) {
+  if (!term) return <>{text}</>;
+  const cut = text.lastIndexOf(" ") + 1;
+  return (
+    <>
+      {text.slice(0, cut)}
+      <span className="infotip-anchor">{text.slice(cut)}<InfoTip term={term} /></span>
+    </>
+  );
+}
+
+/**
  * A definition behind an info button. It opens on click or tap (never hover
  * alone), closes with Escape or an outside press, and its text is announced
  * when it appears.

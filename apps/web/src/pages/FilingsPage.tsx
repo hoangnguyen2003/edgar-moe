@@ -2,7 +2,7 @@ import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowUp, ExternalLink, Search, X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ExpertBars } from "../components/Experts";
-import { InfoTip } from "../components/InfoTip";
+import { InfoLabel } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { SignalBadge } from "../components/SignalBadge";
@@ -205,9 +205,9 @@ function EventDetail({ event, ref, onBack }: { event: EventRecord; ref: React.Re
       </header>
       <dl className="event-score">
         <div><dt>Model score</dt><dd>{signedDecimal(event.score, 4)}</dd></div>
-        <div><dt>Rank <InfoTip term="percentile" /></dt><dd>{standing(event.rank)}</dd></div>
+        <div><dt><InfoLabel text="Rank" term="percentile" /></dt><dd>{standing(event.rank)}</dd></div>
         <div>
-          <dt>20-day result <InfoTip term="target" /></dt>
+          <dt><InfoLabel text="20-day result" term="target" /></dt>
           <dd>{event.realized_abnormal_return == null ? <span className="pending-label">Not yet known</span> : signedPercent(event.realized_abnormal_return)}</dd>
         </div>
       </dl>

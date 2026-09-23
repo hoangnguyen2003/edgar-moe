@@ -170,6 +170,8 @@ main { flex: 1; min-width: 0; }
 
 /* Definitions open on click or tap, never on hover alone. */
 .infotip { position: relative; display: inline-flex; vertical-align: middle; }
+.infotip-anchor { white-space: nowrap; }
+.infotip-anchor .infotip { margin-left: 6px; }
 .infotip__button { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -6px -4px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink-3); }
 .infotip__button:hover, .infotip__button[aria-expanded="true"] { color: var(--ink); background: var(--paper-2); }
 .infotip__region { position: absolute; top: calc(100% + 8px); left: -10px; z-index: 30; }
@@ -209,6 +211,12 @@ main { flex: 1; min-width: 0; }
 .panel__note { display: block; margin: var(--s5) 0 0; padding-top: var(--s3); border-top: 1px solid var(--rule); color: var(--ink-2); font-size: var(--t-small); line-height: 1.6; }
 /* An icon and its text sit side by side; plain text with a link must stay one line of prose. */
 .panel__note:has(> svg) { display: flex; align-items: flex-start; gap: 7px; }
+/* Under a list or figure strip that already ends in a rule, a note sits
+   closer and doesn't draw a second one. */
+:is(.figures, .attribution-list, .governance-facts, .governance-boundary-list, .verify__steps) + .panel__note { margin-top: var(--s3); padding-top: 0; border-top: 0; }
+.figures:has(+ .panel__note) { margin-bottom: 0; }
+/* A note between sections keeps the page's rhythm below it. */
+.page > .panel__note { margin-bottom: var(--s5); }
 .panel__note svg { flex: 0 0 auto; margin-top: 4px; }
 .content-grid { display: grid; gap: 16px; margin: 16px 0; }
 .content-grid--two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -217,9 +225,11 @@ main { flex: 1; min-width: 0; }
 .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
 .figures--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .figures--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.figure { min-width: 0; padding: var(--s3) var(--s4) var(--s4); border-left: 1px solid var(--rule); }
+/* Each figure spans its row's label, value and detail tracks, so values line
+   up across a row however the labels above them wrap. */
+.figure { display: grid; grid-row: span 3; grid-template-rows: subgrid; min-width: 0; padding: var(--s3) var(--s4) var(--s4); border-left: 1px solid var(--rule); }
 .figure:first-child { border-left: 0; padding-left: 0; }
-.figure__label { display: flex; align-items: center; gap: 6px; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.figure__label { color: var(--ink-3); font: var(--eyebrow); line-height: 16px; letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
 .figure__value { display: flex; align-items: baseline; gap: var(--s2); margin: var(--s2) 0 var(--s1); color: var(--ink); font: 600 clamp(24px, 2.3vw, 31px)/1.05 var(--sans); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
 .figure__value svg { flex: 0 0 auto; color: var(--ink-2); }
 .figure__detail { display: block; color: var(--ink-2); font-size: var(--t-small); line-height: 1.45; }
@@ -332,6 +342,7 @@ main { flex: 1; min-width: 0; }
 .chart-caption { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); color: var(--ink-2); font-size: 14px; }
 .chart-caption strong { color: var(--ink); font: 600 14px var(--mono); }
 .chart-caption small { color: var(--ink-3); font-size: 13px; }
+.chart-annotation { font: 500 12px var(--sans); }
 .chart-tooltip { display: grid; gap: 2px; padding: 9px 12px; background: var(--sheet); border: 1px solid var(--ink); box-shadow: var(--shadow); font: 500 13px var(--sans); }
 .chart-tooltip strong { color: var(--ink); font: 600 18px var(--sans); }
 .chart-tooltip span { color: var(--ink-2); }
@@ -424,10 +435,10 @@ main { flex: 1; min-width: 0; }
 .event-detail h2 { font-size: var(--t-title); letter-spacing: -.02em; }
 .event-detail__back { margin: 0 0 14px; }
 .event-score { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
-.event-score > div { min-width: 0; padding: 14px 16px 14px 0; }
+.event-score > div { display: grid; grid-row: span 2; grid-template-rows: subgrid; min-width: 0; padding: 14px 16px 14px 0; }
 .event-score > div + div { padding-left: 16px; border-left: 1px solid var(--rule); }
-.event-score dt { display: flex; align-items: center; gap: 6px; color: var(--ink-2); font: 600 14px var(--sans); }
-.event-score dd { margin: 8px 0 0; font: 600 24px var(--sans); letter-spacing: -.02em; }
+.event-score dt { color: var(--ink-3); font: var(--eyebrow); line-height: 16px; letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.event-score dd { margin: var(--s2) 0 0; font: 600 24px/1.1 var(--sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
 .event-detail h3 { margin: var(--s5) 0 var(--s3); font: 500 19px var(--serif); }
 .detail-hint { margin: -6px 0 10px; color: var(--ink-2); font-size: 14px; }
 .expert-bars > div { display: grid; grid-template-columns: 130px minmax(0, 1fr) 48px; align-items: center; gap: 12px; margin: 10px 0; }
@@ -583,6 +594,7 @@ main { flex: 1; min-width: 0; }
 .governance-boundary-row strong { font: 700 13px var(--sans); }
 .governance-controls-panel, .governance-forward-panel { margin-top: 16px; }
 .governance-forward-panel .notice { margin-top: 0; }
+.governance-forward-panel .figures { margin-top: var(--s4); }
 .governance-controls { border-top: 1px solid var(--ink); }
 .governance-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
 .governance-control strong, .governance-control span { display: block; }
@@ -590,12 +602,6 @@ main { flex: 1; min-width: 0; }
 .governance-control span { margin-top: 2px; color: var(--ink-2); font-size: var(--t-small); line-height: 1.55; }
 .governance-control small { padding: 2px 7px; border: 1px solid var(--good); border-radius: 2px; color: var(--good); font: 600 var(--t-micro)/1.3 var(--sans); white-space: nowrap; }
 .governance-control--pending small { border-color: var(--warning); color: var(--warning); }
-.governance-lane { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
-.governance-lane > div { min-height: 80px; padding: 15px 16px 15px 0; }
-.governance-lane > div + div { padding-left: 16px; border-left: 1px solid var(--rule); }
-.governance-lane span, .governance-lane strong { display: block; }
-.governance-lane span { color: var(--ink-2); font: 600 14px var(--sans); }
-.governance-lane strong { margin-top: 8px; font: 600 28px var(--sans); }
 
 /* ---------- Architecture ---------- */
 /* Swimlanes: each lane is labelled on the left and flows to the right. The
@@ -656,16 +662,17 @@ main { flex: 1; min-width: 0; }
   .hero, .content-grid--two, .forward-top-grid { grid-template-columns: minmax(0, 1fr); }
   .lane__steps { flex-wrap: wrap; }
   .lane__steps li { flex: 1 1 30%; }
-  .figures--five { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .figures--five .figure:nth-child(4) { border-left: 0; padding-left: 0; }
-  .figures--five .figure:nth-child(n+4) { border-top: 1px solid var(--rule); }
   .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .explorer { grid-template-columns: 320px minmax(0, 1fr); }
 }
 
-/* ---------- Phone ---------- */
 /* ---------- Tablet: re-proportion wide tables instead of letting them spill ---------- */
 @media (min-width: 761px) and (max-width: 1080px) {
+  /* Five figures split three over two, so no cell is left empty. */
+  .figures--five { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .figures--five .figure { grid-column: span 2; }
+  .figures--five .figure:nth-child(n+4) { grid-column: span 3; border-top: 1px solid var(--rule); }
+  .figures--five .figure:nth-child(4) { border-left: 0; padding-left: 0; }
   /* The forecast table fits the width; dates wrap rather than hiding columns
      behind a sideways scroll. */
   .forward-table { min-width: 0; }
@@ -681,6 +688,7 @@ main { flex: 1; min-width: 0; }
   .expert-mix__bar--compact { width: 100%; max-width: 132px; }
 }
 
+/* ---------- Phone ---------- */
 @media (max-width: 760px) {
   .lane { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
   .lane__steps { flex-direction: column; gap: var(--s3); }
@@ -718,6 +726,8 @@ main { flex: 1; min-width: 0; }
   .figures .figure:nth-child(odd) { border-left: 0; padding-left: 0; }
   .figures .figure:nth-child(even) { border-left: 1px solid var(--rule); padding-left: 16px; }
   .figures .figure:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  /* An odd last figure takes the whole row rather than leaving a hole. */
+  .figures .figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .figure { padding: 14px 16px 12px 0; }
   .figure__value { font-size: 30px; }
   .gate__label, .gate__share { display: none; }
@@ -743,7 +753,6 @@ main { flex: 1; min-width: 0; }
   .result-count { flex: 1; min-height: 50px; }
   .event-score > div { padding: 12px 8px 12px 0; }
   .event-score > div + div { padding-left: 8px; }
-  .event-score dt { font-size: 13px; }
   .event-score dd { font-size: 18px; }
   .expert-bars > div { grid-template-columns: 112px minmax(0, 1fr) 44px; }
   .attribution-list li { grid-template-columns: minmax(0, 1fr) 88px; }
@@ -752,9 +761,6 @@ main { flex: 1; min-width: 0; }
   .governance-facts dd { text-align: left; }
   .governance-control { grid-template-columns: minmax(0, 1fr); }
   .governance-control small { grid-column: 1; justify-self: start; }
-  .governance-lane { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .governance-lane > div:nth-child(3) { padding-left: 0; border-left: 0; }
-  .governance-lane > div:nth-child(n+3) { border-top: 1px solid var(--rule); }
   .chart-panel--large .chart-wrap { height: 300px; }
   .next-page { padding-bottom: 40px; }
   .next-page a { padding: 16px 18px; }

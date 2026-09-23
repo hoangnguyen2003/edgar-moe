@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { GlossaryKey } from "../lib/glossary";
-import { InfoTip } from "./InfoTip";
+import { InfoLabel } from "./InfoTip";
 
 /** A key figure with a plain-language reading beneath it and, optionally, a definition. */
 export function MetricCard({
@@ -18,7 +18,7 @@ export function MetricCard({
 }) {
   return (
     <article className="figure">
-      <span className="figure__label">{label}{info && <InfoTip term={info} />}</span>
+      <span className="figure__label"><InfoLabel text={label} term={info} /></span>
       <strong className="figure__value">{adornment}{value}</strong>
       {detail && <small className="figure__detail">{detail}</small>}
     </article>

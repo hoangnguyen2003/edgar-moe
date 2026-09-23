@@ -127,7 +127,7 @@ export function PortfolioPage() {
                     stroke={chartTheme.reference}
                     strokeOpacity={0.7}
                     strokeDasharray="5 4"
-                    label={{ value: "Break-even", position: "insideBottomLeft", fill: chartTheme.tick, fontSize: 12 }}
+                    label={<BreakEvenLabel above={!stats || stats.end.equity < 1} fill={chartTheme.tick} halo={chartTheme.paper} />}
                   />
                   <Tooltip cursor={{ stroke: chartTheme.reference, strokeWidth: 1 }} content={EquityTooltip} isAnimationActive={false} />
                   <Area
@@ -139,7 +139,7 @@ export function PortfolioPage() {
                     fill={chartTheme.series}
                     fillOpacity={0.12}
                     dot={false}
-                    activeDot={{ r: 4, fill: chartTheme.series, stroke: chartTheme.surface, strokeWidth: 2 }}
+                    activeDot={{ r: 4, fill: chartTheme.series, stroke: chartTheme.paper, strokeWidth: 2 }}
                     isAnimationActive={!reducedMotion}
                   />
                 </AreaChart>
@@ -213,6 +213,32 @@ function equityStats(points: EquityPoint[]) {
     if (point.equity < low.equity) low = point;
   }
   return { start: points[0], end: points[points.length - 1], high, low };
+}
+
+type LineBox = { x?: number; y?: number; width?: number };
+
+/**
+ * Names the $1.00 line at its right end. Every curve starts on the line, so a
+ * label on the left sits on the data; by the end the curve has moved away, and
+ * the label takes the side it left clear. The halo keeps it legible regardless.
+ */
+export function BreakEvenLabel({ viewBox, above, fill, halo }: { viewBox?: LineBox; above: boolean; fill: string; halo: string }) {
+  if (viewBox?.x == null || viewBox.y == null || viewBox.width == null) return null;
+  return (
+    <text
+      className="chart-annotation"
+      x={viewBox.x + viewBox.width - 4}
+      y={viewBox.y + (above ? -7 : 16)}
+      textAnchor="end"
+      fill={fill}
+      stroke={halo}
+      strokeWidth={4}
+      strokeLinejoin="round"
+      paintOrder="stroke"
+    >
+      Break-even
+    </text>
+  );
 }
 
 function EquityTooltip({ active, payload }: TooltipContentProps) {
