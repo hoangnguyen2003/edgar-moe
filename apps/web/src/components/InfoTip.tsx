@@ -2,8 +2,9 @@ import { Info } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { GLOSSARY, type GlossaryKey } from "../lib/glossary";
 
-/** Width the bubble may take; it opens leftwards when there is no room to the right. */
+/** Width the bubble may take. It opens from the icon and slides left only as far as it must to stay on screen. */
 const BUBBLE_WIDTH = 300;
+const SCREEN_MARGIN = 16;
 
 /**
  * A label followed by its definition button. The last word and the button
@@ -28,7 +29,7 @@ export function InfoLabel({ text, term }: { text: string; term?: GlossaryKey }) 
 export function InfoTip({ term }: { term: GlossaryKey }) {
   const { term: name, definition } = GLOSSARY[term];
   const [open, setOpen] = useState(false);
-  const [alignEnd, setAlignEnd] = useState(false);
+  const [offset, setOffset] = useState(-10);
   const id = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -52,8 +53,12 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
   }, [open]);
 
   const toggle = () => {
-    const rect = buttonRef.current?.getBoundingClientRect();
-    if (rect) setAlignEnd(rect.left + BUBBLE_WIDTH > window.innerWidth - 16);
+    const root = rootRef.current?.getBoundingClientRect();
+    if (root) {
+      const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 2 * SCREEN_MARGIN);
+      const left = Math.max(SCREEN_MARGIN, Math.min(root.left - 10, window.innerWidth - SCREEN_MARGIN - width));
+      setOffset(left - root.left);
+    }
     setOpen((value) => !value);
   };
 
@@ -70,7 +75,7 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
       >
         <Info size={15} aria-hidden="true" />
       </button>
-      <span id={id} role="status" className={alignEnd ? "infotip__region infotip__region--end" : "infotip__region"}>
+      <span id={id} role="status" className="infotip__region" style={{ left: offset }}>
         {open && <span className="infotip__bubble"><strong>{name}</strong>{definition}</span>}
       </span>
     </span>

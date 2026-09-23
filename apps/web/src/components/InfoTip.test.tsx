@@ -1,8 +1,21 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { InfoLabel, InfoTip } from "./InfoTip";
 
+/** Place the icon at a given distance from the left edge of the screen. */
+function placeIcon(left: number) {
+  const root = document.querySelector(".infotip") as HTMLElement;
+  vi.spyOn(root, "getBoundingClientRect").mockReturnValue({
+    left, right: left + 20, top: 300, bottom: 316, x: left, y: 300, width: 20, height: 16, toJSON: () => ({}),
+  } as DOMRect);
+}
+
 describe("InfoTip", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
   it("shows a definition on click and closes with Escape, returning focus", () => {
     render(<p>Sharpe ratio <InfoTip term="sharpe" /></p>);
     const button = screen.getByRole("button", { name: "What is Sharpe ratio?" });
@@ -41,5 +54,19 @@ describe("InfoTip", () => {
     const { container } = render(<span><InfoLabel text="Models" /></span>);
     expect(container.firstChild).toHaveTextContent(/^Models$/);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("opens from its icon, and slides left only as far as it must to stay on screen", () => {
+    vi.stubGlobal("innerWidth", 1280);
+    render(<p>Ranking skill <InfoTip term="rankIc" /></p>);
+    placeIcon(262);
+    fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
+    expect(screen.getByRole("status")).toHaveStyle({ left: "-10px" });
+    fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
+
+    // Mid-screen on a phone, a 300px bubble fits neither side of the icon; it spans 74-374 instead.
+    vi.stubGlobal("innerWidth", 390);
+    fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
+    expect(screen.getByRole("status")).toHaveStyle({ left: "-188px" });
   });
 });

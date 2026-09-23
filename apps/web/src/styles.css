@@ -175,7 +175,6 @@ main { flex: 1; min-width: 0; }
 .infotip__button { display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -6px -4px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--ink-3); }
 .infotip__button:hover, .infotip__button[aria-expanded="true"] { color: var(--ink); background: var(--paper-2); }
 .infotip__region { position: absolute; top: calc(100% + 8px); left: -10px; z-index: 30; }
-.infotip__region--end { left: auto; right: -10px; }
 .infotip__bubble { display: block; width: max-content; max-width: min(300px, calc(100vw - 32px)); padding: 12px 14px; background: var(--ink); color: var(--paper); box-shadow: 0 6px 16px -8px rgba(0, 0, 0, .45); font: 400 14px/1.5 var(--sans); letter-spacing: 0; text-align: left; text-transform: none; white-space: normal; }
 .infotip__bubble strong { display: block; margin-bottom: 3px; font-weight: 700; }
 
