@@ -135,6 +135,24 @@ def complete_responses() -> dict[str, FakeResponse]:
             ),
             "application/json",
         ),
+        f"{base}/api/v1/forward/performance": FakeResponse(
+            f"{base}/api/v1/forward/performance",
+            json.dumps(
+                {
+                    "forecast_count": 24,
+                    "matured_count": 24,
+                    "pending_count": 0,
+                    "rank_ic_low": None,
+                    "rank_ic_high": None,
+                    "rank_ic_interval_method": "calendar_month_moving_block",
+                    "rank_ic_interval_status": "insufficient_pairs",
+                    "rank_ic_calendar_months": 2,
+                    "rank_ic_block_months": 2,
+                    "rank_ic_bootstrap_samples": 1000,
+                }
+            ),
+            "application/json",
+        ),
         f"{base}/api/v1/health": FakeResponse(
             f"{base}/api/v1/health",
             json.dumps({"status": "ok", "snapshot_loaded": True}),
@@ -198,12 +216,102 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
     api_checks = [check for check in report["checks"] if check["path"].startswith("/api/")]
-    assert len(api_checks) == 3
+    assert len(api_checks) == 4
     for check in api_checks:
         request_id = check["request_id"]
         assert isinstance(request_id, str)
         assert len(request_id) == 32
         assert all(character in "0123456789abcdef" for character in request_id)
+
+
+@pytest.mark.parametrize(
+    ("change", "expected_error"),
+    [
+        ({"rank_ic_interval_method": None}, "forward_interval_method_invalid"),
+        ({"rank_ic_low": -0.5, "rank_ic_high": 0.2}, "forward_interval_bounds_not_withheld"),
+        ({"rank_ic_interval_status": "ready"}, "forward_interval_history_insufficient"),
+        ({"rank_ic_block_months": 1}, "forward_interval_design_invalid"),
+    ],
+)
+def test_smoke_rejects_misleading_forward_interval(
+    monkeypatch: pytest.MonkeyPatch, change: dict[str, object], expected_error: str
+) -> None:
+    responses = complete_responses()
+    url = "https://terminal.example/api/v1/forward/performance"
+    payload = json.loads(responses[url]._body)
+    payload.update(change)
+    responses[url] = FakeResponse(url, json.dumps(payload), "application/json")
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    check = next(check for check in report["checks"] if check["name"] == "forward_performance")
+    assert check["error"] == expected_error
+    assert "_json" not in check
+
+
+def test_smoke_rejects_pre_clustered_api_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    responses = complete_responses()
+    url = "https://terminal.example/api/v1/forward/performance"
+    responses[url] = FakeResponse(
+        url,
+        json.dumps(
+            {
+                "forecast_count": 24,
+                "matured_count": 24,
+                "pending_count": 0,
+                "rank_ic_low": -0.5,
+                "rank_ic_high": 0.2,
+            }
+        ),
+        "application/json",
+    )
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    check = next(check for check in report["checks"] if check["name"] == "forward_performance")
+    assert check["error"] == "forward_interval_metadata_missing"
+
+
+def test_unconfigured_registry_has_no_interval() -> None:
+    assert (
+        _MODULE._forward_interval_contract_error(
+            {
+                "forecast_count": 0,
+                "matured_count": 0,
+                "pending_count": 0,
+                "rank_ic_low": None,
+                "rank_ic_high": None,
+                "rank_ic_interval_method": None,
+                "rank_ic_interval_status": None,
+                "rank_ic_calendar_months": 0,
+                "rank_ic_block_months": None,
+                "rank_ic_bootstrap_samples": None,
+            }
+        )
+        is None
+    )
+
+
+def test_sufficient_history_allows_bounded_clustered_interval() -> None:
+    payload = {
+        "forecast_count": 140,
+        "matured_count": 120,
+        "pending_count": 20,
+        "rank_ic_low": -0.3,
+        "rank_ic_high": 0.2,
+        "rank_ic_interval_method": "calendar_month_moving_block",
+        "rank_ic_interval_status": "ready",
+        "rank_ic_calendar_months": 12,
+        "rank_ic_block_months": 2,
+        "rank_ic_bootstrap_samples": 1000,
+    }
+
+    assert _MODULE._forward_interval_contract_error(payload) is None
+    payload["rank_ic_low"] = float("nan")
+    assert _MODULE._forward_interval_contract_error(payload) == "forward_interval_bounds_invalid"
 
 
 def test_smoke_requires_api_request_id_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:

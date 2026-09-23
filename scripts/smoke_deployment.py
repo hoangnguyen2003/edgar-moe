@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from datetime import UTC, datetime
@@ -169,6 +170,14 @@ def run_smoke(
             "application/json",
             timeout,
         ),
+        _check_endpoint(
+            base,
+            origin,
+            "/api/v1/forward/performance",
+            "forward_performance",
+            "application/json",
+            timeout,
+        ),
         _check_endpoint(base, origin, "/api/v1/health", "health", "application/json", timeout),
     ]
 
@@ -253,6 +262,12 @@ def run_smoke(
                     check.update(status="failed", error="governance_forward_status_invalid")
                 elif expected_identity is not None:
                     _verify_identity(check, frozen, expected_identity, "governance")
+        elif check["name"] == "forward_performance":
+            payload = check.pop("_json", None)
+            if check["status"] == "passed":
+                error = _forward_interval_contract_error(payload)
+                if error is not None:
+                    check.update(status="failed", error=error)
         elif check["name"] == "provenance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -282,6 +297,83 @@ def run_smoke(
         # Public digests only: the snapshot identity is published on the site itself.
         report["expected_snapshot_sha256"] = expected_identity["sha256"]
     return report
+
+
+def _forward_interval_contract_error(payload: Any) -> str | None:
+    """Reject stale or statistically misleading forward-performance responses."""
+    if not isinstance(payload, dict):
+        return "forward_performance_response_not_object"
+    required = {
+        "forecast_count",
+        "matured_count",
+        "pending_count",
+        "rank_ic_low",
+        "rank_ic_high",
+        "rank_ic_interval_method",
+        "rank_ic_interval_status",
+        "rank_ic_calendar_months",
+        "rank_ic_block_months",
+        "rank_ic_bootstrap_samples",
+    }
+    if not required.issubset(payload):
+        return "forward_interval_metadata_missing"
+    counts = [payload[field] for field in ("forecast_count", "matured_count", "pending_count")]
+    if any(type(value) is not int or value < 0 for value in counts):
+        return "forward_performance_counts_invalid"
+    forecast_count, matured_count, pending_count = counts
+    if forecast_count != matured_count + pending_count:
+        return "forward_performance_counts_invalid"
+    method = payload["rank_ic_interval_method"]
+    status = payload["rank_ic_interval_status"]
+    low = payload["rank_ic_low"]
+    high = payload["rank_ic_high"]
+    months = payload["rank_ic_calendar_months"]
+    if method is None:
+        if (
+            forecast_count
+            or status is not None
+            or low is not None
+            or high is not None
+            or months != 0
+            or payload["rank_ic_block_months"] is not None
+            or payload["rank_ic_bootstrap_samples"] is not None
+        ):
+            return "forward_interval_method_invalid"
+        return None
+    if method != "calendar_month_moving_block":
+        return "forward_interval_method_invalid"
+    if type(months) is not int or months < 0:
+        return "forward_interval_calendar_months_invalid"
+    if payload["rank_ic_block_months"] != 2 or payload["rank_ic_bootstrap_samples"] != 1000:
+        return "forward_interval_design_invalid"
+    if status == "ready":
+        if matured_count < 100 or months < 12:
+            return "forward_interval_history_insufficient"
+        if any(type(bound) not in (int, float) for bound in (low, high)):
+            return "forward_interval_bounds_invalid"
+        if not (-1 <= low <= high <= 1):
+            return "forward_interval_bounds_invalid"
+        if not math.isfinite(low) or not math.isfinite(high):
+            return "forward_interval_bounds_invalid"
+    elif status in {
+        "insufficient_pairs",
+        "insufficient_months",
+        "undefined_rank_ic",
+        "degenerate_resamples",
+        "capacity_review_required",
+    }:
+        if low is not None or high is not None:
+            return "forward_interval_bounds_not_withheld"
+        if matured_count < 100 and status != "insufficient_pairs":
+            return "forward_interval_history_status_invalid"
+        if matured_count >= 100 and (
+            (months < 12 and status != "insufficient_months")
+            or (months >= 12 and status in {"insufficient_pairs", "insufficient_months"})
+        ):
+            return "forward_interval_history_status_invalid"
+    else:
+        return "forward_interval_status_invalid"
+    return None
 
 
 def load_expected_identity(path: Path) -> dict[str, str]:
@@ -401,7 +493,7 @@ def _check_endpoint(
                     # arbitrary response header value in the redacted artifact.
                     check["request_id"] = request_id
             decoded = body.decode("utf-8")
-            if name in {"health", "provenance", "governance"}:
+            if name in {"health", "provenance", "governance", "forward_performance"}:
                 try:
                     check["_json"] = json.loads(decoded)
                 except json.JSONDecodeError:
