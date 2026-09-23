@@ -28,6 +28,159 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      EDGAR_MOE_REGISTRY_READ_DATABASE_URL: "
+            "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}\n      AUDIT_DIR:",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not be job-scoped" in result.stdout
+
+
+def test_provider_reader_secret_alias_cannot_be_job_scoped(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{secrets['EDGAR_MOE_REGISTRY_READ_DATABASE_URL']}}\n      AUDIT_DIR:",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not be job-scoped" in result.stdout
+
+
+def test_provider_reader_case_variant_secret_context_cannot_be_job_scoped(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{ SECRETS['edgar_moe_registry_read_database_url'] }}\n      AUDIT_DIR:",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not be job-scoped" in result.stdout
+
+
+def test_provider_reader_job_rename_cannot_bypass_secret_scope(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace("  reader-contract:\n", "  renamed-reader-audit:\n", 1),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit job must be named reader-contract" in result.stdout
+
+
+def test_provider_reader_secret_cannot_enter_unrelated_step(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: "
+            "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}\n"
+            "        run: uv sync --locked --extra dev",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not enter Install dependencies" in result.stdout
+
+
+def test_provider_reader_secret_alias_cannot_enter_unrelated_step(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          DATABASE_ALIAS: ${{secrets['EDGAR_MOE_REGISTRY_READ_DATABASE_URL']}}\n"
+            "        run: uv sync --locked --extra dev",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not enter Install dependencies" in result.stdout
+
+
+def test_provider_reader_verifier_must_receive_secret(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    verifier = "      - name: Run the effective reader-role verifier"
+    before, after = reader_text.split(verifier, 1)
+    after = after.replace(
+        "        env:\n"
+        "          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: "
+        "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}\n",
+        "",
+        1,
+    )
+    reader.write_text(before + verifier + after, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "Run the effective reader-role verifier must receive the reader secret" in result.stdout
+
+
 def test_provider_workflow_policy_rejects_secret_in_step_with_mapping(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
@@ -43,6 +196,60 @@ def test_provider_workflow_policy_rejects_secret_in_step_with_mapping(tmp_path: 
         reader_text.replace(
             checkout,
             checkout + "\n        with:\n          token: ${{ secrets.UNSAFE_TOKEN }}",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "secret expressions may only appear" in result.stdout
+
+
+def test_provider_workflow_policy_rejects_alternate_secret_expression_syntax(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    checkout = next(
+        line
+        for line in reader_text.splitlines()
+        if line.startswith("      - uses: actions/checkout@")
+    )
+    reader.write_text(
+        reader_text.replace(
+            checkout,
+            checkout + "\n        with:\n          token: ${{secrets['UNSAFE_TOKEN']}}",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "secret expressions may only appear" in result.stdout
+
+
+def test_provider_workflow_policy_rejects_case_variant_secret_context(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    checkout = next(
+        line
+        for line in reader_text.splitlines()
+        if line.startswith("      - uses: actions/checkout@")
+    )
+    reader.write_text(
+        reader_text.replace(
+            checkout,
+            checkout + "\n        with:\n          token: ${{ SeCrEtS.UNSAFE_TOKEN }}",
         ),
         encoding="utf-8",
     )

@@ -18,7 +18,7 @@ PROVIDER_WORKFLOWS = (
 
 # Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
 _PINNED_ACTION = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
-_SECRET_EXPRESSION = "${{ secrets."
+_SECRET_EXPRESSION = re.compile(r"\$\{\{[^}]*\bsecrets\b[^}]*\}\}", re.IGNORECASE | re.DOTALL)
 
 
 def validate_provider_workflows(
@@ -155,7 +155,7 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
                 visit(child, (*path, str(index)))
         elif (
             isinstance(value, str)
-            and _SECRET_EXPRESSION in value
+            and _SECRET_EXPRESSION.search(value)
             and ("env" not in path or "with" in path or "run" in path)
         ):
             errors.append(f"{name}: secret expressions may only appear in job/step env mappings")
@@ -167,6 +167,56 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
 def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
     text = _workflow_text(workflow)
     errors: list[str] = []
+    secret_name = "EDGAR_MOE_REGISTRY_READ_DATABASE_URL"
+    secret_expression = "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}"
+
+    def has_secret(env: Any) -> bool:
+        return isinstance(env, dict) and (
+            secret_name in env
+            or any(_SECRET_EXPRESSION.search(str(value)) for value in env.values())
+        )
+
+    workflow_env = workflow.get("env")
+    if has_secret(workflow_env):
+        errors.append(f"{name}: reader audit secret must not be workflow-scoped")
+    jobs = workflow.get("jobs")
+    job = jobs.get("reader-contract") if isinstance(jobs, dict) else None
+    if not isinstance(job, dict):
+        errors.append(f"{name}: reader audit job must be named reader-contract")
+    else:
+        job_env = job.get("env")
+        if has_secret(job_env):
+            errors.append(f"{name}: reader audit secret must not be job-scoped")
+        required_steps = {
+            "Require the deployed reader secret",
+            "Run the effective reader-role verifier",
+        }
+        observed_steps: set[str] = set()
+        steps = job.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                step_name = str(step.get("name", ""))
+                step_env = step.get("env")
+                secret_value = step_env.get(secret_name) if isinstance(step_env, dict) else None
+                if step_name in required_steps:
+                    observed_steps.add(step_name)
+                    if secret_value != secret_expression:
+                        errors.append(f"{name}: {step_name} must receive the reader secret")
+                elif has_secret(step_env):
+                    errors.append(
+                        f"{name}: reader audit secret must not enter {step_name or 'unnamed step'}"
+                    )
+                if isinstance(step_env, dict) and any(
+                    key != secret_name and _SECRET_EXPRESSION.search(str(value))
+                    for key, value in step_env.items()
+                ):
+                    errors.append(
+                        f"{name}: reader audit secret must use its dedicated step variable"
+                    )
+        for missing_step in sorted(required_steps - observed_steps):
+            errors.append(f"{name}: missing reader secret consumer {missing_step}")
     for required in (
         "EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
         "scripts/verify_postgres_reader.py",
