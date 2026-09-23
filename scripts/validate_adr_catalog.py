@@ -19,6 +19,7 @@ ARCHITECTURE_PAGE = Path("apps/web/src/pages/ArchitecturePage.tsx")
 SOLUTION_ARCHITECTURE = Path("docs/solution-architecture.md")
 
 _ADR_NAME = re.compile(r"^(?P<number>[0-9]{4})-[a-z0-9][a-z0-9-]*\.md$")
+_ADR_HEADING = re.compile(r"^#\s+ADR\s+(?P<number>[0-9]{4})\b")
 _INDEX_COUNT = re.compile(r"\bAll\s+(?P<count>[0-9]+)\s+records\b")
 _README_COUNT = re.compile(r"\bADR index\b[^\n]*?:\s*(?P<count>[0-9]+)\s+decisions\b")
 _PAGE_COUNT = re.compile(r"\bof\s+the\s+(?P<count>[0-9]+)\s+recorded decisions\b")
@@ -50,6 +51,13 @@ def validate_adr_catalog(
             errors.append(f"ADR filename is invalid: {record.name}")
             continue
         numbers.append(int(match.group("number")))
+        # A record that names a different number than its filename is filed
+        # under one identity and cited under another.
+        heading = _ADR_HEADING.match(record.read_text(encoding="utf-8").lstrip())
+        if heading is None:
+            errors.append(f"ADR must open with a '# ADR NNNN:' heading: {record.name}")
+        elif heading.group("number") != match.group("number"):
+            errors.append(f"ADR {record.name} is headed ADR {heading.group('number')}")
     expected_numbers = list(range(1, len(records) + 1))
     if numbers != expected_numbers:
         errors.append(

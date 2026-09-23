@@ -10,7 +10,9 @@ def _write_catalog(root: Path, *, count: int) -> tuple[Path, Path, Path, Path, P
     adr_dir = root / "adr"
     adr_dir.mkdir()
     for number in range(1, count + 1):
-        (adr_dir / f"{number:04d}-decision.md").write_text("# Decision\n", encoding="utf-8")
+        (adr_dir / f"{number:04d}-decision.md").write_text(
+            f"# ADR {number:04d}: Decision\n", encoding="utf-8"
+        )
     index = adr_dir / "README.md"
     index.write_text(f"All {count} records are accepted.\n", encoding="utf-8")
     readme = root / "README.md"
@@ -62,3 +64,35 @@ def test_adr_catalog_reports_stale_reference_counts(tmp_path: Path) -> None:
     assert "README declares 1 ADRs; expected 2" in errors
     assert "architecture page declares 1 ADRs; expected 2" in errors
     assert "solution architecture declares 1 ADRs; expected 2" in errors
+
+
+def test_a_record_headed_with_another_number_is_reported(tmp_path: Path) -> None:
+    # Two records claiming one number is how a citation ends up pointing at the
+    # wrong decision; it happened when concurrent work renumbered a file.
+    adr_dir, index, readme, architecture, solution = _write_catalog(tmp_path, count=3)
+    (adr_dir / "0003-decision.md").write_text("# ADR 0002: Decision\n", encoding="utf-8")
+
+    errors = validate_adr_catalog(
+        adr_dir=adr_dir,
+        index_path=index,
+        readme_path=readme,
+        architecture_path=architecture,
+        solution_architecture_path=solution,
+    )
+
+    assert errors == ["ADR 0003-decision.md is headed ADR 0002"]
+
+
+def test_a_record_without_an_adr_heading_is_reported(tmp_path: Path) -> None:
+    adr_dir, index, readme, architecture, solution = _write_catalog(tmp_path, count=2)
+    (adr_dir / "0002-decision.md").write_text("# Decision\n", encoding="utf-8")
+
+    errors = validate_adr_catalog(
+        adr_dir=adr_dir,
+        index_path=index,
+        readme_path=readme,
+        architecture_path=architecture,
+        solution_architecture_path=solution,
+    )
+
+    assert errors == ["ADR must open with a '# ADR NNNN:' heading: 0002-decision.md"]

@@ -1,4 +1,4 @@
-# ADR 0024: Coordinate bounded multi-profile copilot review panels
+# ADR 0025: Coordinate bounded multi-profile copilot review panels
 
 Status: Accepted
 
