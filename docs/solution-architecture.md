@@ -7,7 +7,7 @@ depends on provider configuration or operator action.
 
 - **Status date:** 2026-09-23.
 - **Live system:** [edgar-moe.vercel.app](https://edgar-moe.vercel.app), its [API reference](https://edgar-moe.vercel.app/api/docs), and a plain-language [architecture page](https://edgar-moe.vercel.app/architecture) for visitors.
-- **Decision log:** [25 architecture decision records](adr/README.md).
+- **Decision log:** [26 architecture decision records](adr/README.md).
 - **Detailed views:** [architecture and data flow](architecture.md), [forward-testing operations](forward-testing.md), [improvement plan](architecture-roadmap.md).
 
 ## 1. Context and goals

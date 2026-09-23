@@ -1,7 +1,7 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. All 25 records are accepted. When a decision changes,
+the decision is verified. All 26 records are accepted. When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
 decisions in the overall design.
@@ -31,6 +31,7 @@ decisions in the overall design.
 | [0020](0020-pre-open-schedule-margin.md) | Record each forecast run's margin before the NYSE open as an immutable quality check, and warn below 90 minutes, without changing the cutoff or the model. | 2026-09-22 |
 | [0023](0023-external-forward-scheduler.md) | Stage a dormant Cloudflare Cron adapter for the existing forward workflow; require a separate observed cutover before removing the GitHub schedule. | 2026-09-22 |
 | [0024](0024-reviewed-public-images.md) | Allow only two declared PNG images in the public bundle, each pixel-data only, checksum-verified and size-bounded; everything else must stay reviewable text. | 2026-09-23 |
+| [0026](0026-edge-cached-reads.md) | Answer reviewed snapshot reads from the edge (`s-maxage`), keep registry reads at 60 s, and keep operational reads and per-caller identifiers out of anything a shared cache may store. | 2026-09-23 |
 
 ## AI research copilot boundary
 
