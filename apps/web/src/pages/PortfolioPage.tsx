@@ -75,7 +75,7 @@ export function PortfolioPage() {
       final test, after trading and borrowing costs. Pick a trading cost to compare.
     </PageHeader>
   );
-  if (curve.isPending) return <div className="page">{header}<LoadingState label="Repricing the backtest" /></div>;
+  if (curve.isPending) return <div className="page">{header}<LoadingState label="Repricing the backtest" skeleton={["figures", "chart"]} /></div>;
   if (curve.isError) return <div className="page">{header}<ErrorState error={curve.error} onRetry={() => void curve.refetch()} /></div>;
   const data = curve.data;
   const { metrics } = data;

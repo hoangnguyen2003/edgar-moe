@@ -52,7 +52,7 @@ export function FilingsPage() {
       Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards.
     </PageHeader>
   );
-  if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" /></div>;
+  if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" skeleton={["rows"]} /></div>;
   if (events.error) return <div className="page">{header}<ErrorState error={events.error} onRetry={() => void events.refetch()} /></div>;
   const pages = events.data!.pages;
   const items = pages.flatMap((page) => page.items);

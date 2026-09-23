@@ -8,10 +8,20 @@ export const SLOW_LOAD_HINT_MS = 4_000;
 export const IDLE_DATABASE_HINT =
   "The live database pauses when it has been idle, so the first visit can take several seconds.";
 
-export function LoadingState({ label = "Loading research snapshot", slowHint }: {
+/** Shapes a loading page can sketch while its data arrives. */
+export type SkeletonPart = "figures" | "rows" | "chart";
+
+/**
+ * A page that is still loading shows the outline of what is coming, so a slow
+ * first visit reads as "arriving" rather than "empty", and nothing jumps when
+ * the data lands. The status line carries the meaning; the outline is hidden
+ * from assistive technology, and its pulse stops for readers who reduce motion.
+ */
+export function LoadingState({ label = "Loading research snapshot", slowHint, skeleton }: {
   label?: string;
   /** Shown if loading takes longer than {@link SLOW_LOAD_HINT_MS}. */
   slowHint?: string;
+  skeleton?: SkeletonPart[];
 }) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -19,13 +29,42 @@ export function LoadingState({ label = "Loading research snapshot", slowHint }: 
     const timer = window.setTimeout(() => setSlow(true), SLOW_LOAD_HINT_MS);
     return () => window.clearTimeout(timer);
   }, [slowHint]);
-  return (
-    <div className="query-state" role="status">
-      <LoaderCircle className="spin" size={20} aria-hidden="true" />
+  const status = (
+    <>
+      <LoaderCircle className="spin" size={skeleton ? 16 : 20} aria-hidden="true" />
       <span>
         {label}
         {slow && slowHint && <small className="query-state__hint">{slowHint}</small>}
       </span>
+    </>
+  );
+  if (!skeleton?.length) {
+    return <div className="query-state" role="status">{status}</div>;
+  }
+  return (
+    <div className="query-state query-state--skeleton" role="status">
+      <p className="query-state__line">{status}</p>
+      <div aria-hidden="true">
+        {skeleton.map((part, index) => <SkeletonBlock key={`${part}-${index}`} part={part} />)}
+      </div>
+    </div>
+  );
+}
+
+function SkeletonBlock({ part }: { part: SkeletonPart }) {
+  if (part === "figures") {
+    return (
+      <div className="skeleton-figures">
+        {[0, 1, 2, 3].map((index) => (
+          <div key={index}><i className="skeleton-bar skeleton-bar--label" /><i className="skeleton-bar skeleton-bar--value" /><i className="skeleton-bar skeleton-bar--detail" /></div>
+        ))}
+      </div>
+    );
+  }
+  if (part === "chart") return <div className="skeleton-chart"><i className="skeleton-bar skeleton-bar--chart" /></div>;
+  return (
+    <div className="skeleton-rows">
+      {[0, 1, 2, 3, 4, 5].map((index) => <i key={index} className="skeleton-bar skeleton-bar--row" />)}
     </div>
   );
 }

@@ -109,7 +109,14 @@ button, input, select { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
-h1, h2, h3 { font-family: var(--serif); font-weight: 500; }
+h1, h2, h3 { font-family: var(--serif); font-weight: 500; text-wrap: balance; }
+/* Headings break into even lines; prose avoids a lone last word. */
+p, li, dd, .page-header__lede, .takeaway__detail { text-wrap: pretty; }
+.takeaway__title, .next-page strong { text-wrap: balance; }
+/* Links are underlined, never by colour alone, with an offset that clears descenders. */
+a { text-decoration-thickness: from-font; text-underline-offset: .18em; }
+/* Numbers line up wherever they are compared. */
+table, .figure__value, .num { font-variant-numeric: tabular-nums; }
 ::selection { background: var(--highlight); color: var(--on-highlight); }
 :focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; border-radius: 2px; }
 main:focus { outline: none; }
@@ -279,6 +286,26 @@ main { flex: 1; min-width: 0; }
 .query-state--error strong { display: block; color: var(--ink); font: 500 21px var(--serif); }
 .query-state--error p { margin: 6px 0 14px; color: var(--ink-2); font-size: 15px; }
 .spin { animation: spin 1s linear infinite; }
+/* Skeleton loading: the page's outline, drawn in the paper tone, pulsing gently. */
+.query-state--skeleton { display: block; max-width: none; min-height: 0; margin: 0; }
+.query-state__line { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s4); color: var(--ink-2); font: 500 var(--t-small) var(--sans); }
+.query-state__line .query-state__hint { margin-top: 0; margin-left: var(--s2); display: inline; }
+.skeleton-bar { display: block; background: var(--paper-2); border-radius: 2px; animation: skeleton-pulse 1.6s ease-in-out infinite alternate; }
+.skeleton-figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.skeleton-figures > div { display: grid; gap: var(--s2); padding: var(--s3) var(--s4) var(--s4); border-left: 1px solid var(--rule); }
+.skeleton-figures > div:first-child { padding-left: 0; border-left: 0; }
+.skeleton-bar--label { width: 55%; height: 9px; }
+.skeleton-bar--value { width: 45%; height: 26px; }
+.skeleton-bar--detail { width: 75%; height: 10px; }
+.skeleton-rows { border-top: 1px solid var(--ink); }
+.skeleton-bar--row { height: 18px; margin: 15px 0; }
+.skeleton-rows .skeleton-bar--row:nth-child(3n + 2) { width: 88%; }
+.skeleton-rows .skeleton-bar--row:nth-child(3n) { width: 94%; }
+.skeleton-chart { margin-bottom: var(--s5); padding-top: var(--s5); border-top: 1px solid var(--ink); }
+.skeleton-bar--chart { height: clamp(200px, 32vw, 360px); }
+@keyframes skeleton-pulse { from { opacity: 1; } to { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .skeleton-bar { animation: none; } }
+@media (max-width: 760px) { .skeleton-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); } .skeleton-figures > div:nth-child(3) { padding-left: 0; border-left: 0; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .notice { display: flex; align-items: center; gap: 14px; margin: 16px 0; padding: 14px 18px; background: var(--sheet); border: 1px solid var(--rule); border-left: 4px solid var(--stamp); }
 .notice > svg { flex: 0 0 auto; color: var(--stamp); }
