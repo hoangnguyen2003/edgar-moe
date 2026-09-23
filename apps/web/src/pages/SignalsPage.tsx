@@ -26,7 +26,7 @@ export function SignalsPage() {
       on <Link to="/forward">Live tracking</Link>.
     </PageHeader>
   );
-  if (signals.isLoading) return <div className="page">{header}<LoadingState label="Loading the study's final filings" /></div>;
+  if (signals.isLoading) return <div className="page">{header}<LoadingState label="Loading the study's final filings" skeleton={["rows"]} /></div>;
   if (signals.error) return <div className="page">{header}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
   const items = signals.data!;
   const counts = DIRECTIONS.map(({ direction, title }) => `${items.filter((item) => item.direction === direction).length} ${title.toLowerCase()}`);

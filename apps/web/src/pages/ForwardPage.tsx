@@ -40,7 +40,7 @@ export function ForwardPage() {
   });
 
   if (status.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
   }
   if (status.error) {
     return <div className="page"><ForwardHeader /><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
@@ -49,7 +49,7 @@ export function ForwardPage() {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} /></div>;
+    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
   if (error) {

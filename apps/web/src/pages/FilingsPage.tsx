@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
 import { ArrowUp, ExternalLink, Search, X } from "lucide-react";
-import { type KeyboardEvent, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ExpertBars } from "../components/Experts";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
@@ -34,6 +34,21 @@ export function FilingsPage() {
   const [query, setQuery] = useState(linked.query);
   const [direction, setDirection] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(linked.eventId);
+  const searchRef = useRef<HTMLInputElement>(null);
+  // "/" jumps to search, as on most tools a reader already uses; it never
+  // fires while they are typing somewhere else.
+  useEffect(() => {
+    const focusSearch = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, [contenteditable='true']")) return;
+      event.preventDefault();
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    };
+    document.addEventListener("keydown", focusSearch);
+    return () => document.removeEventListener("keydown", focusSearch);
+  }, []);
   const compact = useMediaQuery(COMPACT_LAYOUT);
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
   const listRef = useRef<HTMLUListElement>(null);
@@ -52,7 +67,7 @@ export function FilingsPage() {
       Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards.
     </PageHeader>
   );
-  if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" /></div>;
+  if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" skeleton={["rows"]} /></div>;
   if (events.error) return <div className="page">{header}<ErrorState error={events.error} onRetry={() => void events.refetch()} /></div>;
   const pages = events.data!.pages;
   const items = pages.flatMap((page) => page.items);
@@ -94,17 +109,27 @@ export function FilingsPage() {
           <Search size={18} aria-hidden="true" />
           <span className="sr-only">Search by ticker or company</span>
           <input
+            ref={searchRef}
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              // Escape clears first, then leaves the field.
+              if (event.key !== "Escape") return;
+              if (query) setQuery("");
+              else event.currentTarget.blur();
+            }}
             placeholder="Search by ticker or company"
             autoComplete="off"
             spellCheck={false}
+            aria-keyshortcuts="/"
           />
-          {query && (
-            <button type="button" className="icon-button" aria-label="Clear search" onClick={() => setQuery("")}>
+          {query ? (
+            <button type="button" className="icon-button" aria-label="Clear search" onClick={() => { setQuery(""); searchRef.current?.focus(); }}>
               <X size={16} aria-hidden="true" />
             </button>
+          ) : (
+            <kbd className="search-field__key" aria-hidden="true">/</kbd>
           )}
         </label>
         <label className="select-field">

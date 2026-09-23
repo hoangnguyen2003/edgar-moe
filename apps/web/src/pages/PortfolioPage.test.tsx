@@ -45,7 +45,7 @@ describe("Portfolio page", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><PortfolioPage /></QueryClientProvider>);
 
-    expect(await screen.findByText("-0.63", { selector: ".figure__value" })).toBeInTheDocument();
+    expect(await screen.findByText("−0.63", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByRole("group", { name: "Trading cost" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "0.10%" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("Start")).toHaveTextContent("Start $1.00");
@@ -55,11 +55,11 @@ describe("Portfolio page", () => {
     fireEvent.click(screen.getByRole("button", { name: "0.25%" }));
 
     expect(screen.getByRole("button", { name: "0.25%" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("-0.63", { selector: ".figure__value" })).toBeInTheDocument();
+    expect(screen.getByText("−0.63", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Backtest results at 0.10% trading cost").closest(".scenario")).toHaveAttribute("aria-busy", "true");
 
     release(jsonResponse(curve(25, -0.91)));
-    expect(await screen.findByText("-0.91", { selector: ".figure__value" })).toBeInTheDocument();
+    expect(await screen.findByText("−0.91", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Backtest results at 0.25% trading cost").closest(".scenario")).toHaveAttribute("aria-busy", "false");
   });
 });

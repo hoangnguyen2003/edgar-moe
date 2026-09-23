@@ -18,7 +18,7 @@ import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import { api } from "../lib/api";
 import { useChartTheme } from "../lib/chartTheme";
-import { bpsPercent, decimal, monthYear, percent, shortDate } from "../lib/format";
+import { bpsPercent, decimal, fixed, monthYear, percent, shortDate } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
 import type { EquityCurveResponse, EquityPoint } from "../lib/types";
 import { REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
@@ -26,7 +26,7 @@ import { REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 const COSTS = [10, 25, 50];
 
 function dollars(value: number | null | undefined): string {
-  return value == null || !Number.isFinite(value) ? "—" : `$${value.toFixed(2)}`;
+  return value == null || !Number.isFinite(value) ? "—" : `$${fixed(value, 2)}`;
 }
 
 /** What the scenario means, in one sentence, for the summary box. */
@@ -75,7 +75,7 @@ export function PortfolioPage() {
       final test, after trading and borrowing costs. Pick a trading cost to compare.
     </PageHeader>
   );
-  if (curve.isPending) return <div className="page">{header}<LoadingState label="Repricing the backtest" /></div>;
+  if (curve.isPending) return <div className="page">{header}<LoadingState label="Repricing the backtest" skeleton={["figures", "chart"]} /></div>;
   if (curve.isError) return <div className="page">{header}<ErrorState error={curve.error} onRetry={() => void curve.refetch()} /></div>;
   const data = curve.data;
   const { metrics } = data;
@@ -120,7 +120,7 @@ export function PortfolioPage() {
                 <AreaChart data={data.points} margin={{ left: 0, right: 28, top: 12, bottom: 0 }} title="Growth of one dollar" desc={summary}>
                   <CartesianGrid stroke={chartTheme.grid} vertical={false} />
                   <XAxis dataKey="date" minTickGap={48} tickFormatter={monthYear} tick={tick} tickLine={false} axisLine={{ stroke: chartTheme.axisLine }} />
-                  <YAxis domain={["auto", "auto"]} tickFormatter={(value: number) => `$${value.toFixed(2)}`} tick={tick} tickLine={false} axisLine={false} width={54} />
+                  <YAxis domain={["auto", "auto"]} tickFormatter={(value: number) => `$${fixed(value, 2)}`} tick={tick} tickLine={false} axisLine={false} width={54} />
                   <ReferenceLine
                     y={1}
                     ifOverflow="extendDomain"

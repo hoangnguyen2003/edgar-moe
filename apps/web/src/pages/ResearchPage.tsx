@@ -29,7 +29,7 @@ function ranked(rows: ExperimentRecord[], sort: SortKey) {
 export function ResearchPage() {
   const experiments = useQuery({ queryKey: ["experiments"], queryFn: api.experiments });
   const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
-  if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading the model comparison" /></div>;
+  if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading the model comparison" skeleton={["figures", "rows"]} /></div>;
   if (experiments.error) return <div className="page"><ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);

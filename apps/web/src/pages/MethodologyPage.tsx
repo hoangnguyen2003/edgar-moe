@@ -30,7 +30,7 @@ export function MethodologyPage() {
       How a filing becomes a score, how the score was tested, and what the results can't tell you.
     </PageHeader>
   );
-  if (methodology.isLoading) return <div className="page">{header}<LoadingState label="Loading the method" /></div>;
+  if (methodology.isLoading) return <div className="page">{header}<LoadingState label="Loading the method" skeleton={["rows"]} /></div>;
   if (methodology.error) return <div className="page">{header}<ErrorState error={methodology.error} onRetry={() => void methodology.refetch()} /></div>;
   const data = methodology.data!;
   return (

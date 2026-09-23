@@ -37,7 +37,7 @@ export default function App() {
   return (
     <Layout>
       <PageErrorBoundary resetKey={pathname}>
-        <Suspense fallback={<div className="page"><LoadingState /></div>}>
+        <Suspense fallback={<div className="page"><LoadingState label="Loading the page" skeleton={["rows"]} /></div>}>
           {Page ? <Page /> : null}
         </Suspense>
       </PageErrorBoundary>

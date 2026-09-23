@@ -27,7 +27,7 @@ export function GovernancePage() {
   );
 
   if (governance.isLoading) {
-    return <div className="page">{header}<LoadingState label="Loading the audit trail" slowHint={IDLE_DATABASE_HINT} /></div>;
+    return <div className="page">{header}<LoadingState label="Loading the audit trail" slowHint={IDLE_DATABASE_HINT} skeleton={["rows"]} /></div>;
   }
   if (governance.error) {
     return <div className="page">{header}<ErrorState error={governance.error} onRetry={() => void governance.refetch()} /></div>;

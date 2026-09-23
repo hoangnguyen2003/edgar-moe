@@ -101,9 +101,9 @@ describe("format helpers", () => {
 
   it("states polarity in the text, not only in color", () => {
     expect(signedDecimal(0.0038, 4)).toBe("+0.0038");
-    expect(signedDecimal(-0.0049, 4)).toBe("-0.0049");
+    expect(signedDecimal(-0.0049, 4)).toBe("−0.0049");
     expect(signedPercent(0.0412)).toBe("+4.1%");
-    expect(signedPercent(-0.041)).toBe("-4.1%");
+    expect(signedPercent(-0.041)).toBe("−4.1%");
     expect(signedDecimal(null)).toBe("—");
   });
 
@@ -131,5 +131,14 @@ describe("format helpers", () => {
     expect(featureLabel("gross_moe_signal")).toBe("Gross MoE signal");
     expect(featureLabel("median_dollar_volume_60d")).toBe("Median dollar volume 60d");
     expect(humanize("authenticated_locked_test")).toBe("Authenticated locked test");
+  });
+
+  it("writes negatives with a true minus sign and never as negative zero", () => {
+    // U+2212 is as wide as "+" and is read aloud as "minus"; a hyphen is not.
+    expect(decimal(-0.179, 3)).toBe("\u22120.179");
+    expect(percent(-0.121)).toBe("\u221212.1%");
+    expect(decimal(-0.0001, 2)).toBe("0.00");
+    expect(signedDecimal(-0.00001, 3)).toBe("0.000");
+    expect(decimal(0.179, 3)).toBe("0.179");
   });
 });

@@ -112,4 +112,36 @@ describe("Filing explorer", () => {
     const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
     expect(requested.every((url) => url.searchParams.get("q") === "AAL")).toBe(true);
   });
+
+  it("jumps to search on slash, but never while the reader is typing elsewhere", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => page([event("AAPL", "Apple Inc", 1)], 1, null)));
+    renderPage();
+    const search = await screen.findByRole("searchbox", { name: "Search by ticker or company" });
+    expect(search).toHaveAttribute("aria-keyshortcuts", "/");
+
+    fireEvent.keyDown(document.body, { key: "/" });
+    expect(search).toHaveFocus();
+
+    // In another field "/" is a character, not a command.
+    const signal = screen.getByRole("combobox");
+    signal.focus();
+    const typed = fireEvent.keyDown(signal, { key: "/" });
+    expect(typed).toBe(true);
+    expect(signal).toHaveFocus();
+  });
+
+  it("clears the search on Escape, then leaves the field on a second press", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => page([event("AAPL", "Apple Inc", 1)], 1, null)));
+    renderPage();
+    const search = await screen.findByRole("searchbox", { name: "Search by ticker or company" });
+
+    search.focus();
+    fireEvent.change(search, { target: { value: "APP" } });
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(search).toHaveValue("");
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(search).not.toHaveFocus();
+  });
 });

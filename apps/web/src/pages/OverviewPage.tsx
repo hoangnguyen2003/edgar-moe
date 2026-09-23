@@ -37,7 +37,7 @@ function gateCaption(weights: Record<ExpertKey, number> | null, cohort: number):
 export function OverviewPage() {
   const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
   const signals = useQuery({ queryKey: ["latest-signals"], queryFn: api.latestSignals });
-  if (summary.isLoading) return <Page><LoadingState /></Page>;
+  if (summary.isLoading) return <Page><LoadingState skeleton={["figures", "rows"]} /></Page>;
   if (summary.error) return <Page><ErrorState error={summary.error} onRetry={() => void summary.refetch()} /></Page>;
   const data = summary.data!;
   const test = data.predictive_metrics.locked_test;
