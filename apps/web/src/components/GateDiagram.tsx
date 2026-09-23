@@ -39,9 +39,12 @@ function layoutStreams(shares: Record<ExpertKey, number>) {
  */
 export function GateDiagram({ weights }: { weights: Record<ExpertKey, number> | null }) {
   const streams = layoutStreams(weights ?? { text: 1 / 3, fundamental: 1 / 3, market: 1 / 3 });
-  // Phones hide the side labels (the legend below carries them), so crop their space.
+  // Phones hide the side labels (the legend below carries them), so crop the
+  // space they needed: their column, and the height beyond the streams and gate.
   const compact = useMediaQuery(COMPACT_LAYOUT);
-  const viewBox = compact ? `${START_X - 6} 0 ${ARROW_TIP + 12 - START_X} ${HEIGHT}` : `0 0 ${WIDTH} ${HEIGHT}`;
+  const top = Math.min(...streams.map((stream) => stream.startY - stream.thickness / 2), GATE_Y - BUNDLE / 2 - 44) - 8;
+  const bottom = Math.max(...streams.map((stream) => stream.startY + stream.thickness / 2), GATE_Y + BUNDLE / 2 + 14) + 8;
+  const viewBox = compact ? `${START_X - 6} ${top} ${ARROW_TIP + 12 - START_X} ${bottom - top}` : `0 0 ${WIDTH} ${HEIGHT}`;
   const summary = streams.map((stream) => `${stream.label} ${percent(stream.share, 0)}`).join(", ");
   return (
     <div className="gate">
