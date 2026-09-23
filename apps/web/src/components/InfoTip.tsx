@@ -1,5 +1,5 @@
 import { Info } from "lucide-react";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { GLOSSARY, type GlossaryKey } from "../lib/glossary";
 
 /** Width the bubble may take. It opens from the icon and slides left only as far as it must to stay on screen. */
@@ -29,10 +29,10 @@ export function InfoLabel({ text, term }: { text: string; term?: GlossaryKey }) 
 export function InfoTip({ term }: { term: GlossaryKey }) {
   const { term: name, definition } = GLOSSARY[term];
   const [open, setOpen] = useState(false);
-  const [offset, setOffset] = useState(-10);
   const id = useId();
   const rootRef = useRef<HTMLSpanElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const regionRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -52,15 +52,23 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
     };
   }, [open]);
 
-  const toggle = () => {
-    const root = rootRef.current?.getBoundingClientRect();
-    if (root) {
+  // Place the bubble once it is open, from where the icon is at that moment,
+  // and again if the window changes size while it is showing.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const root = rootRef.current?.getBoundingClientRect();
+      if (!root || !regionRef.current) return;
       const width = Math.min(BUBBLE_WIDTH, window.innerWidth - 2 * SCREEN_MARGIN);
       const left = Math.max(SCREEN_MARGIN, Math.min(root.left - 10, window.innerWidth - SCREEN_MARGIN - width));
-      setOffset(left - root.left);
-    }
-    setOpen((value) => !value);
-  };
+      regionRef.current.style.left = `${left - root.left}px`;
+    };
+    place();
+    window.addEventListener("resize", place);
+    return () => window.removeEventListener("resize", place);
+  }, [open]);
+
+  const toggle = () => setOpen((value) => !value);
 
   return (
     <span className="infotip" ref={rootRef}>
@@ -75,7 +83,7 @@ export function InfoTip({ term }: { term: GlossaryKey }) {
       >
         <Info size={15} aria-hidden="true" />
       </button>
-      <span id={id} role="status" className="infotip__region" style={{ left: offset }}>
+      <span id={id} ref={regionRef} role="status" className="infotip__region">
         {open && <span className="infotip__bubble"><strong>{name}</strong>{definition}</span>}
       </span>
     </span>

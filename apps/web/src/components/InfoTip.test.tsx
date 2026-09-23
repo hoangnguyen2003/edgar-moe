@@ -62,11 +62,11 @@ describe("InfoTip", () => {
     placeIcon(262);
     fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
     expect(screen.getByRole("status")).toHaveStyle({ left: "-10px" });
-    fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
 
-    // Mid-screen on a phone, a 300px bubble fits neither side of the icon; it spans 74-374 instead.
+    // Narrowed to a phone while open: a 300px bubble now fits neither side of
+    // the icon, so it moves to span 74-374 instead.
     vi.stubGlobal("innerWidth", 390);
-    fireEvent.click(screen.getByRole("button", { name: "What is Rank IC?" }));
+    fireEvent(window, new Event("resize"));
     expect(screen.getByRole("status")).toHaveStyle({ left: "-188px" });
   });
 });
