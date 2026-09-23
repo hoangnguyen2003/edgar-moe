@@ -158,3 +158,58 @@ def test_alert_receipt_hash_rejects_tampering() -> None:
     receipt["kind"] = "quality_warning"
     with pytest.raises(ValueError, match="does not match"):
         verify_alert_receipt(receipt)
+
+
+_HEALTHY = {
+    "available": True,
+    "latest_run_status": "succeeded",
+    "age_seconds": 10,
+    "stale_after_seconds": 100,
+    "health_status": "ok",
+}
+
+
+@pytest.mark.parametrize(
+    ("names", "expected"),
+    [
+        # Most runs score nothing because no filing was accepted that day.
+        (["prospective_candidate_count"], None),
+        (["pre_open_schedule_margin"], "quality_warning"),
+        # A new problem alongside the expected one still has to be seen.
+        (["prospective_candidate_count", "pre_open_schedule_margin"], "quality_warning"),
+        (["a_check_nobody_has_seen"], "quality_warning"),
+        ([], "quality_warning"),
+    ],
+)
+def test_an_expected_warning_does_not_page(names: list[str], expected: str | None) -> None:
+    status = {**_HEALTHY, "latest_quality_warnings": max(len(names), 1)}
+    if names:
+        status["latest_quality_warning_names"] = names
+
+    assert classify_forward_status(status) == expected
+
+
+def test_a_failure_still_pages_even_among_expected_warnings() -> None:
+    status = {
+        **_HEALTHY,
+        "latest_quality_warnings": 1,
+        "latest_quality_warning_names": ["prospective_candidate_count"],
+        "latest_quality_failures": 1,
+    }
+
+    assert classify_forward_status(status) == "quality_failure"
+
+
+def test_an_alert_names_the_checks_that_warned() -> None:
+    payload = build_status_alert(
+        {
+            **_HEALTHY,
+            "health_status": "warning",
+            "latest_quality_warnings": 2,
+            "latest_quality_warning_names": ["pre_open_schedule_margin", "../../etc/passwd"],
+        }
+    )
+
+    assert payload is not None
+    # The names reach a recipient, so anything that is not a check name is dropped.
+    assert payload["details"]["latest_quality_warning_names"] == ["pre_open_schedule_margin"]

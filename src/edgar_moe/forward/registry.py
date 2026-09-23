@@ -432,17 +432,22 @@ class ForwardRegistry:
                 .order_by(RunRecord.finished_at.desc())
                 .limit(1)
             )
-            latest_quality_statuses = (
-                session.scalars(
-                    select(DataQualityRecord.status).where(
+            latest_quality_rows = (
+                session.execute(
+                    select(DataQualityRecord.status, DataQualityRecord.name).where(
                         DataQualityRecord.run_id == latest_run.run_id
                     )
                 ).all()
                 if latest_run is not None
                 else []
             )
-            quality_failures = sum(status == "failed" for status in latest_quality_statuses)
-            quality_warnings = sum(status == "warning" for status in latest_quality_statuses)
+            quality_failures = sum(row.status == "failed" for row in latest_quality_rows)
+            quality_warnings = sum(row.status == "warning" for row in latest_quality_rows)
+            # Naming the checks that warned lets a reader, and the alert
+            # classifier, tell an expected condition from a new problem.
+            quality_warning_names = sorted(
+                {row.name for row in latest_quality_rows if row.status == "warning"}
+            )
             age_seconds = (
                 max(0, int((observed_at - _as_utc(latest.finished_at)).total_seconds()))
                 if latest is not None and latest.finished_at is not None
@@ -491,6 +496,7 @@ class ForwardRegistry:
                     or 0
                 ),
                 "latest_quality_warnings": quality_warnings,
+                "latest_quality_warning_names": quality_warning_names,
                 "latest_quality_failures": quality_failures,
             }
 

@@ -59,6 +59,22 @@ def verify_alert_receipt(receipt: Mapping[str, Any]) -> None:
         raise ValueError("Alert receipt hash does not match content")
 
 
+#: Quality warnings that describe an expected condition rather than a problem to
+#: act on. A run that scores nothing because no filing was accepted that day is
+#: the normal case on most days, and paging for it teaches an operator to ignore
+#: the channel. The warning is still recorded in the registry; it just does not
+#: raise an alert on its own.
+_EXPECTED_QUALITY_WARNINGS = frozenset({"prospective_candidate_count"})
+
+
+def _only_expected_warnings(status: Mapping[str, Any]) -> bool:
+    names = status.get("latest_quality_warning_names")
+    if not isinstance(names, list) or not names:
+        # Without names, an older payload cannot be judged; alert as before.
+        return False
+    return all(isinstance(name, str) and name in _EXPECTED_QUALITY_WARNINGS for name in names)
+
+
 def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
     """Map a registry/status payload to one actionable alert kind.
 
@@ -79,7 +95,7 @@ def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
     stale_after = _number(status.get("stale_after_seconds"))
     if age is not None and stale_after is not None and age > stale_after:
         return "stale_runner"
-    if _positive_int(status.get("latest_quality_warnings")):
+    if _positive_int(status.get("latest_quality_warnings")) and not _only_expected_warnings(status):
         return "quality_warning"
     if status.get("health_status") == "warning":
         return "quality_warning"
@@ -124,6 +140,11 @@ def build_status_alert(
         "age_seconds": _number(status.get("age_seconds")),
         "stale_after_seconds": _number(status.get("stale_after_seconds")),
         "latest_quality_warnings": _positive_int(status.get("latest_quality_warnings")) or 0,
+        "latest_quality_warning_names": sorted(
+            name
+            for name in (status.get("latest_quality_warning_names") or [])
+            if isinstance(name, str) and name.replace("_", "").isalnum()
+        ),
         "latest_quality_failures": _positive_int(status.get("latest_quality_failures")) or 0,
     }
     return _build_alert(

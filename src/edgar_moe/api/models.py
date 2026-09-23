@@ -163,6 +163,9 @@ class ForwardStatusResponse(BaseModel):
     stale_after_seconds: int = Field(default=96 * 60 * 60, ge=0)
     running_run_count: int = Field(default=0, ge=0)
     latest_quality_warnings: int = Field(default=0, ge=0)
+    #: Names of the checks that warned on the latest run, so a reader can tell
+    #: an expected condition from a new problem.
+    latest_quality_warning_names: list[str] = Field(default_factory=list)
     latest_quality_failures: int = Field(default=0, ge=0)
     message: str
 
