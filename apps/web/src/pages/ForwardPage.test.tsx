@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ForwardPage } from "./ForwardPage";
 
@@ -189,5 +189,102 @@ describe("Forward Lab", () => {
     expect(screen.getByText(/0 candidates · needs at least 1 candidate/)).toBeInTheDocument();
     expect(screen.getByText("No runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("No forecasts recorded yet.")).toBeInTheDocument();
+  });
+
+  it("lets a reader see only the forecasts that have a result", async () => {
+    // Newest first means the first screen is mostly forecasts still waiting,
+    // on a page whose question is how the settled ones did.
+    const forecast = (ticker: string, realized: number | null) => ({
+      forecast_id: `f-${ticker}`,
+      run_id: "run-1",
+      model_id: "edgar-moe-frozen-v1",
+      event_id: `e-${ticker}`,
+      accession_number: "0000000000-26-000001",
+      ticker,
+      company_name: `${ticker} Inc`,
+      form: "10-Q",
+      accepted_at: "2026-09-18T21:00:00Z",
+      entry_at: "2026-09-21T13:30:00Z",
+      entry_date: "2026-09-21",
+      horizon_at: "2026-10-19T20:00:00Z",
+      forecast_as_of: "2026-09-19T12:06:26Z",
+      score: -0.0009,
+      rank: 1,
+      cohort_size: 1,
+      fundamental_score: null,
+      expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 },
+      realized_abnormal_return: realized,
+      label_recorded_at: realized === null ? null : "2026-10-19T20:00:00Z",
+    });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 3,
+        matured_count: 1, pending_count: 2, latest_successful_run_at: "2026-09-19T12:10:00Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 3, matured_count: 1, pending_count: 2,
+        coverage: 0.33, rank_ic: null, rank_ic_low: null, rank_ic_high: null,
+        rmse: null, mae: null, directional_accuracy: null,
+      });
+      if (url.includes("/data-quality")) return jsonResponse([]);
+      if (url.includes("/runs")) return jsonResponse([]);
+      if (url.includes("/forecasts")) return jsonResponse({
+        items: [forecast("AAA", null), forecast("BBB", 0.031), forecast("CCC", null)],
+        total: 3, offset: 0, limit: 50,
+      });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+    expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All 3" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByText("Not yet known")).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole("button", { name: "With results 1" }));
+
+    expect(screen.getByText("BBB")).toBeInTheDocument();
+    expect(screen.queryByText("AAA")).not.toBeInTheDocument();
+    expect(screen.queryByText("Not yet known")).not.toBeInTheDocument();
+    expect(screen.getByText("+3.1%")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Awaiting 2" }));
+
+    expect(screen.getByText("AAA")).toBeInTheDocument();
+    expect(screen.queryByText("BBB")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Not yet known")).toHaveLength(2);
+  });
+
+  it("says when the table holds only the most recent forecasts", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 90, forecast_count: 400,
+        matured_count: 300, pending_count: 100, latest_successful_run_at: "2026-09-19T12:10:00Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 400, matured_count: 300, pending_count: 100,
+        coverage: 0.75, rank_ic: 0.01, rank_ic_low: -0.1, rank_ic_high: 0.12,
+        rmse: 0.09, mae: 0.07, directional_accuracy: 0.5,
+      });
+      if (url.includes("/data-quality")) return jsonResponse([]);
+      if (url.includes("/runs")) return jsonResponse([]);
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 400, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
+    // The table shows a page; the count beside it describes the whole registry.
+    expect(screen.getByText(/Showing the 0 most recent of 400 recorded/)).toBeInTheDocument();
   });
 });

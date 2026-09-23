@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
+import { useId, useState } from "react";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
@@ -29,6 +30,8 @@ export function ForwardPage() {
     queryFn: api.forwardForecasts,
     enabled,
   });
+  const outcomeLabelId = useId();
+  const [outcome, setOutcome] = useState<"all" | "settled" | "pending">("all");
   const quality = useQuery({
     queryKey: ["forward-quality"],
     queryFn: api.forwardDataQuality,
@@ -55,6 +58,16 @@ export function ForwardPage() {
 
   const metrics = performance.data!;
   const checks = quality.data!;
+  const loaded = forecasts.data!.items;
+  const settledCount = loaded.filter((row) => row.realized_abnormal_return !== null).length;
+  const visible =
+    outcome === "all"
+      ? loaded
+      : loaded.filter((row) =>
+          outcome === "settled"
+            ? row.realized_abnormal_return !== null
+            : row.realized_abnormal_return === null,
+        );
   // An interval that straddles 0 says more than the point estimate does, so it
   // replaces the coverage line whenever enough outcomes have settled to state one.
   const hasInterval = metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
@@ -126,9 +139,27 @@ export function ForwardPage() {
               "Rank in run" compares a forecast only with the other filings scored in the same run.
             </p>
           </div>
-          <span className="count-chip">{forecasts.data!.total} forecasts</span>
+          <div className="control">
+            <span className="control__label" id={outcomeLabelId}>Show</span>
+            <div className="segmented" role="group" aria-labelledby={outcomeLabelId}>
+              <button type="button" aria-pressed={outcome === "all"} onClick={() => setOutcome("all")}>
+                All {loaded.length}
+              </button>
+              <button type="button" aria-pressed={outcome === "settled"} onClick={() => setOutcome("settled")}>
+                With results {settledCount}
+              </button>
+              <button type="button" aria-pressed={outcome === "pending"} onClick={() => setOutcome("pending")}>
+                Awaiting {loaded.length - settledCount}
+              </button>
+            </div>
+          </div>
         </header>
-        <ForecastTable rows={forecasts.data!.items} />
+        {forecasts.data!.total > loaded.length && (
+          <p className="detail-hint">
+            Showing the {loaded.length} most recent of {compact(forecasts.data!.total)} recorded.
+          </p>
+        )}
+        <ForecastTable rows={visible} outcome={outcome} />
       </section>
 
       <section className="content-grid content-grid--two forward-top-grid">
@@ -250,8 +281,20 @@ function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
   );
 }
 
-function ForecastTable({ rows }: { rows: Awaited<ReturnType<typeof api.forwardForecasts>>["items"] }) {
-  if (!rows.length) return <div className="empty-state">No forecasts recorded yet.</div>;
+const EMPTY_FORECASTS: Record<"all" | "settled" | "pending", string> = {
+  all: "No forecasts recorded yet.",
+  settled: "No forecast has a result yet. Each one appears 20 trading days after its entry.",
+  pending: "Every recorded forecast already has its result.",
+};
+
+function ForecastTable({
+  rows,
+  outcome = "all",
+}: {
+  rows: Awaited<ReturnType<typeof api.forwardForecasts>>["items"];
+  outcome?: "all" | "settled" | "pending";
+}) {
+  if (!rows.length) return <div className="empty-state">{EMPTY_FORECASTS[outcome]}</div>;
   return (
     <div className="forward-table-wrap">
       <table className="forward-table">

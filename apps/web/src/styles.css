@@ -478,7 +478,8 @@ main { flex: 1; min-width: 0; }
 .governance-top-grid { align-items: stretch; margin-top: 0; }
 .governance-identity-panel, .governance-boundary-panel { min-height: 100%; }
 .governance-facts { margin: 0; border-top: 1px solid var(--ink); }
-.governance-facts > div { display: grid; grid-template-columns: 190px minmax(0, 1fr); align-items: start; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.governance-facts > div { display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
+.governance-facts .icon-button { width: 32px; height: 32px; margin: -4px -6px 0 0; }
 .governance-facts dt { color: var(--ink-2); font: 600 14px var(--sans); }
 .governance-facts dd { min-width: 0; margin: 0; color: var(--ink); font-size: 14px; text-align: right; }
 .governance-facts code { font: 500 13px var(--mono); overflow-wrap: anywhere; }
@@ -533,6 +534,8 @@ main { flex: 1; min-width: 0; }
 .verify__steps span { margin-top: 3px; color: var(--ink-2); font-size: 15px; line-height: 1.55; }
 .verify__steps code { font: 500 13px var(--mono); overflow-wrap: anywhere; }
 .verify__steps pre { margin: 10px 0 0; padding: 12px 14px; overflow-x: auto; background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink); font: 500 13px/1.55 var(--mono); white-space: pre; }
+.command__actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.command__failed { color: var(--critical); font-size: 13px; }
 .verify a, .decision-list a { color: var(--ink); }
 .decisions { margin-top: 16px; }
 .decision-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
@@ -571,6 +574,7 @@ main { flex: 1; min-width: 0; }
 
 /* ---------- Phone ---------- */
 @media (max-width: 760px) {
+  .verify__steps pre { white-space: pre-wrap; overflow-wrap: anywhere; }
   .topbar__inner { min-height: 58px; gap: 12px; }
   .wordmark { font-size: 23px; }
   .page, .page--overview { padding: 24px var(--gutter) 32px; }
