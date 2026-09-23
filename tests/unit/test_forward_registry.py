@@ -238,6 +238,7 @@ def test_registry_status_reports_freshness_and_quality_health(tmp_path: Path) ->
     assert recent["latest_run_status"] == "succeeded"
     assert recent["latest_quality_failures"] == 0
     assert recent["latest_quality_warnings"] == 0
+    assert recent["latest_quality_warning_names"] == []
     assert recent["age_seconds"] is not None
 
     stale = registry_service.status(
@@ -323,3 +324,28 @@ def test_metrics_report_an_interval_alongside_the_rank_ic() -> None:
     assert metrics.rank_ic_low is not None and metrics.rank_ic_high is not None
     assert metrics.rank_ic_low < metrics.rank_ic < metrics.rank_ic_high
     assert metrics.rank_ic_low < 0  # five outcomes settle nothing
+
+
+def test_status_names_the_checks_that_warned_on_the_latest_run(tmp_path: Path) -> None:
+    # The alert classifier needs the names to tell an expected condition from a
+    # new problem, and a reader needs them for the same reason.
+    database, registry_service = registry(tmp_path)
+    run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        run_id,
+        [
+            QualityCheckDraft(name="availability", status="passed"),
+            QualityCheckDraft(name="prospective_candidate_count", status="warning"),
+            QualityCheckDraft(name="pre_open_schedule_margin", status="warning"),
+        ],
+    )
+    registry_service.complete_run(run_id, result_counts={"forecasts": 0})
+
+    status = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+
+    assert status["latest_quality_warnings"] == 2
+    assert status["latest_quality_warning_names"] == [
+        "pre_open_schedule_margin",
+        "prospective_candidate_count",
+    ]
+    database.dispose()

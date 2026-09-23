@@ -304,7 +304,18 @@ successful run.
 
 If `EDGAR_MOE_ALERT_WEBHOOK_URL` is configured, the runner sends a redacted
 HTTPS JSON alert after a failed cycle and after a successful cycle whose status
-is stale, unavailable, or has quality warnings/failures. Delivery is
+is stale, unavailable, or has quality warnings/failures.
+
+One class of warning is deliberately excluded from that rule. Most runs score
+nothing, because no filing was accepted that day: eight of the nine runs before
+2026-09-23 recorded a `prospective_candidate_count` warning for exactly that
+reason. Paging daily for the normal case is how an operator learns to ignore the
+channel, so a run whose **only** warnings are expected ones does not raise an
+alert. The warning is still appended to the registry and shown on Live tracking;
+it simply does not page. A warning of any other kind, a warning alongside an
+expected one, a failure, a failed run, staleness, and an unavailable registry
+all still alert. The alert payload names the checks that warned, so a recipient
+can see which condition it is. Delivery is
 best-effort (`continue-on-error`) so a notification outage cannot hide the
 original run result. The payload contains only operational identifiers and
 machine-readable classification; database URLs, R2 credentials, raw exception
