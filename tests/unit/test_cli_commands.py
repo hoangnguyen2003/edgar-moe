@@ -240,3 +240,37 @@ def test_database_labels_never_echo_postgres_credentials() -> None:
         == "configured Postgres database"
     )
     assert cli._safe_database_label("sqlite:///local.db") == "sqlite:///local.db"
+
+
+def test_capacity_baseline_keeps_the_registry_url_out_of_its_report(tmp_path: Path) -> None:
+    # The option binds to EDGAR_MOE_REGISTRY_DATABASE_URL, the writer
+    # credential, so an operator who runs this while it is set hands the
+    # command a secret. Port 1 refuses immediately, which exercises the
+    # failure path where a driver error would otherwise quote the URL.
+    output = tmp_path / "baseline.json"
+
+    result = runner.invoke(
+        cli.app,
+        [
+            "capacity-baseline",
+            "--snapshot",
+            "data/demo/snapshot.json",
+            "--database-url",
+            "postgresql://cr3dential:sup3rsecret@127.0.0.1:1/edgar",
+            "--output",
+            str(output),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    report = output.read_text(encoding="utf-8")
+    for fragment in ("sup3rsecret", "cr3dential", "127.0.0.1", "postgresql://"):
+        assert fragment not in report, fragment
+        assert fragment not in result.output, fragment
+
+    registry = json.loads(report)["registry"]
+    assert registry["database_kind"] == "postgres"
+    probes = registry["probes"].values()
+    assert {probe["status"] for probe in probes} == {"unavailable"}
+    # The exception class is retained; its text, which quotes the target, is not.
+    assert {probe["error_type"] for probe in probes} == {"OperationalError"}
