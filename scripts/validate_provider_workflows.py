@@ -18,7 +18,9 @@ PROVIDER_WORKFLOWS = (
 
 # Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
 _PINNED_ACTION = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
-_SECRET_EXPRESSION = re.compile(r"\$\{\{[^}]*\bsecrets\b[^}]*\}\}", re.DOTALL)
+_SECRET_EXPRESSION = re.compile(
+    r"\$\{\{[^}]*\bsecrets\b[^}]*\}\}", re.IGNORECASE | re.DOTALL
+)
 
 
 def validate_provider_workflows(

@@ -70,6 +70,30 @@ def test_provider_reader_secret_alias_cannot_be_job_scoped(tmp_path: Path) -> No
     assert "reader audit secret must not be job-scoped" in result.stdout
 
 
+def test_provider_reader_case_variant_secret_context_cannot_be_job_scoped(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace(
+            "    env:\n      AUDIT_DIR:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{ SECRETS['edgar_moe_registry_read_database_url'] }}\n      AUDIT_DIR:",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit secret must not be job-scoped" in result.stdout
+
+
 def test_provider_reader_job_rename_cannot_bypass_secret_scope(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
@@ -199,6 +223,33 @@ def test_provider_workflow_policy_rejects_alternate_secret_expression_syntax(
         reader_text.replace(
             checkout,
             checkout + "\n        with:\n          token: ${{secrets['UNSAFE_TOKEN']}}",
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "secret expressions may only appear" in result.stdout
+
+
+def test_provider_workflow_policy_rejects_case_variant_secret_context(
+    tmp_path: Path,
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    checkout = next(
+        line
+        for line in reader_text.splitlines()
+        if line.startswith("      - uses: actions/checkout@")
+    )
+    reader.write_text(
+        reader_text.replace(
+            checkout,
+            checkout + "\n        with:\n          token: ${{ SeCrEtS.UNSAFE_TOKEN }}",
         ),
         encoding="utf-8",
     )
