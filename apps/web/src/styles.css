@@ -253,6 +253,8 @@ main { flex: 1; min-width: 0; }
 .explore a:hover > svg { color: var(--ink); transform: translateX(3px); }
 .not-found__path { font: 500 .9em var(--mono); overflow-wrap: anywhere; }
 .not-found__actions { margin: 0 0 var(--s7); }
+/* All nine pages sit three by three rather than four, four and one. */
+.explore--all ul { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 
 /* The gate diagram. */
 .gate__svg { display: block; width: 100%; height: auto; overflow: visible; }

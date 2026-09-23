@@ -29,7 +29,7 @@ export function NotFoundPage({ pathname }: { pathname: string }) {
           <Link className="button button--primary" to={suggestion.to}>Go to {suggestion.label} <ArrowRight size={17} aria-hidden="true" /></Link>
         </div>
       )}
-      <nav className="explore" aria-labelledby="all-pages-title">
+      <nav className="explore explore--all" aria-labelledby="all-pages-title">
         <h2 id="all-pages-title">Every page</h2>
         <PageDirectory entries={navigation} />
       </nav>
