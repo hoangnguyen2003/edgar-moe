@@ -177,7 +177,9 @@ def _validate_reader(name: str, workflow: dict[str, Any]) -> list[str]:
         errors.append(f"{name}: reader database secret must not be workflow-scoped")
     jobs = workflow.get("jobs")
     job = jobs.get("reader-contract") if isinstance(jobs, dict) else None
-    if isinstance(job, dict):
+    if not isinstance(job, dict):
+        errors.append(f"{name}: reader audit job must be named reader-contract")
+    else:
         job_env = job.get("env")
         if isinstance(job_env, dict) and (
             secret_name in job_env

@@ -49,6 +49,23 @@ def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:
     assert "reader database secret must not be job-scoped" in result.stdout
 
 
+def test_provider_reader_job_rename_cannot_bypass_secret_scope(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+
+    reader = tmp_path / "provider-reader-contract-audit.yml"
+    reader_text = reader.read_text(encoding="utf-8")
+    reader.write_text(
+        reader_text.replace("  reader-contract:\n", "  renamed-reader-audit:\n", 1),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "reader audit job must be named reader-contract" in result.stdout
+
+
 def test_provider_reader_secret_cannot_enter_unrelated_step(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
