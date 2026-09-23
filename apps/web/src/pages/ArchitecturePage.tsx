@@ -107,7 +107,7 @@ export function ArchitecturePage() {
         How EDGAR-MoE splits into a public, read-only site and a private, scheduled runner, where the evidence lives,
         and how you can check it yourself.
       </PageHeader>
-      <Takeaway title="The public site can only read, and recorded evidence can only be added to.">
+      <Takeaway variant="quiet" title="The public site can only read, and recorded evidence can only be added to.">
         Every published number comes from a fingerprinted snapshot, and every live forecast is saved before trading
         and never edited.
         {controls && enforced != null && ` ${enforced} of ${controls.length} safeguards are enforced in code; the rest need operator evidence.`}

@@ -155,7 +155,7 @@ function EventRow({ event, active, onSelect }: { event: EventRecord; active: boo
       <span className="event-row__head"><strong>{event.ticker}</strong><SignalBadge direction={event.direction} /></span>
       <span className="event-row__company">{event.company_name}</span>
       <span className="event-row__meta">{event.form} filed {filedDate(event.accepted_at)}</span>
-      <span className="event-row__score"><small>Score</small>{signedDecimal(event.score, 3)}</span>
+      <span className="event-row__score"><small className="sr-only">Score </small>{signedDecimal(event.score, 3)}</span>
     </button>
   );
 }

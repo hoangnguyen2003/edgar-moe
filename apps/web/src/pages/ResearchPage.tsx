@@ -43,7 +43,7 @@ export function ResearchPage() {
         The chosen one was frozen before the final test.
       </PageHeader>
       {selected && selectedName && (
-        <Takeaway label="Chosen model" title={selectedName.family}>
+        <Takeaway variant="quiet" label="Chosen model" title={selectedName.family}>
           <p>
             Picked for the best ranking skill in its weaker validation year: the most consistent candidate, not simply
             the highest average. It ranks #{selectedRank} of {rows.length} on average ranking skill below.
