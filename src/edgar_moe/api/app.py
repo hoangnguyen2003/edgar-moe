@@ -551,9 +551,13 @@ def forward_performance(
     cross-section. It therefore mixes ordering with variation between periods
     and is not comparable to the locked study's rank IC.
 
-    `rank_ic_low` and `rank_ic_high` bound the rank IC at 95% confidence,
-    treating settled forecasts as independent. Forecasts from one run share a
-    trading day, so a true interval is wider.
+    `rank_ic_low` and `rank_ic_high` are a conditional 95% percentile interval
+    from two-calendar-month moving blocks of filing acceptance times. All
+    filings in a month move together. Bounds remain null until at least 100
+    settled outcomes span 12 distinct calendar months, or when the statistic
+    is undefined or exceeds the reviewed 5,000-pair / 120-month capacity envelope. The
+    method/status/month count fields explain that state; the interval is not
+    proof of skill or a correction for model selection or regime change.
     """
     _cache_live(response)
     if registry is None:
@@ -566,6 +570,11 @@ def forward_performance(
             rank_ic=None,
             rank_ic_low=None,
             rank_ic_high=None,
+            rank_ic_interval_method=None,
+            rank_ic_interval_status=None,
+            rank_ic_calendar_months=0,
+            rank_ic_block_months=None,
+            rank_ic_bootstrap_samples=None,
             rmse=None,
             mae=None,
             directional_accuracy=None,

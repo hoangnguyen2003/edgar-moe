@@ -7,7 +7,7 @@ depends on provider configuration or operator action.
 
 - **Status date:** 2026-09-23.
 - **Live system:** [edgar-moe.vercel.app](https://edgar-moe.vercel.app), its [API reference](https://edgar-moe.vercel.app/api/docs), and a plain-language [architecture page](https://edgar-moe.vercel.app/architecture) for visitors.
-- **Decision log:** [26 architecture decision records](adr/README.md).
+- **Decision log:** [27 architecture decision records](adr/README.md).
 - **Detailed views:** [architecture and data flow](architecture.md), [forward-testing operations](forward-testing.md), [improvement plan](architecture-roadmap.md).
 
 ## 1. Context and goals
@@ -90,7 +90,7 @@ Each scenario gives a stimulus, the required response, and the current evidence.
 | Security | The public serving tier is compromised. It cannot write evidence, because routes are GET-only and sessions read-only. | Enforced in code ([ADR 0011](adr/0011-api-read-only-statement-boundary.md)), and by a SELECT-only provider role verified on 2026-09-22 |
 | Security | A credential is committed or bundled. The bundle validator and secret scanning block or flag it. | Enforced in CI; push protection is enabled |
 | Timeliness | A scheduled run starts late. Its margin before the open is recorded, with a warning below 90 minutes. | Enforced ([ADR 0020](adr/0020-pre-open-schedule-margin.md)); manual read-only observers verify a selected dispatch and summarize historical scheduled-time, creation-time, and start-time delays. Punctuality and scheduler origin are not guaranteed by GitHub metadata. |
-| Research honesty | A headline figure rests on a handful of settled outcomes. The page reports the figure's interval and says it is too early to read, rather than presenting it as a finding. | Enforced ([`rank_ic_interval()`](../src/edgar_moe/forward/metrics.py) and the early-sample notice on Live tracking), and stated with its independence assumption |
+| Research honesty | A live ranking figure rests on too few settled outcomes or too few distinct filing months. The page labels the point estimate as a running log and withholds interval bounds; the interval does not treat same-month filings as independent time observations. | Enforced by the [calendar-cluster interval gate](../src/edgar_moe/forward/uncertainty.py), the Live tracking notice, and [ADR 0027](adr/0027-clustered-forward-rank-ic-uncertainty.md). Bounds require at least 100 settled pairs in 12 distinct UTC acceptance months and remain conditional when available. |
 | Recoverability | The registry is lost. It can be restored into an isolated target and reconciled with R2 evidence. | Rehearsed locally and in CI. **Pending:** a provider-side drill; the candidate RPO (24 h) and RTO (4 h) are unverified. |
 | Performance | A change adds weight to the site. The first visit still downloads under 130 KB of compressed HTML, JavaScript, and CSS, and CI fails when it would not. | Enforced ([`check_web_budget.py`](../scripts/check_web_budget.py), budget in [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json)); measured at 97 KB on 2026-09-23 |
 | Cost | A copilot tool loop or provider outage runs long. Wall-clock and context budgets stop it before the next provider call. | Enforced ([ADR 0008](adr/0008-copilot-run-execution-budget.md), [ADR 0009](adr/0009-copilot-context-budget.md)) |
@@ -313,7 +313,7 @@ how it is verified. CI runs the linked tests on every pull request.
 | R10 | Late runs are visible before the open | [`forward/workflow.py`](../src/edgar_moe/forward/workflow.py) ([ADR 0020](adr/0020-pre-open-schedule-margin.md)) | [`test_forward_workflow.py`](../tests/integration/test_forward_workflow.py) |
 | R11 | Copilot citations are bound to real tool output | [`copilot/agent.py`](../src/edgar_moe/copilot/agent.py), [`copilot/verification.py`](../src/edgar_moe/copilot/verification.py) | [`test_copilot_agent.py`](../tests/unit/test_copilot_agent.py), [`test_copilot_verification.py`](../tests/unit/test_copilot_verification.py) |
 | R12 | The first visit stays inside the page-weight budget | [`check_web_budget.py`](../scripts/check_web_budget.py), [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json) | [`test_web_budget.py`](../tests/unit/test_web_budget.py), and the bundle job in CI |
-| R13 | A live figure is published with its uncertainty | [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py), [`ForwardPage.tsx`](../apps/web/src/pages/ForwardPage.tsx) | [`test_forward_registry.py`](../tests/unit/test_forward_registry.py), [`ForwardPage.test.tsx`](../apps/web/src/pages/ForwardPage.test.tsx) |
+| R13 | The live point estimate retains its pooled definition; a time-clustered interval appears only after sufficient calendar history, otherwise a reason is explicit | [`forward/uncertainty.py`](../src/edgar_moe/forward/uncertainty.py), [`ForwardPage.tsx`](../apps/web/src/pages/ForwardPage.tsx), [ADR 0027](adr/0027-clustered-forward-rank-ic-uncertainty.md) | [`test_forward_uncertainty.py`](../tests/unit/test_forward_uncertainty.py), [`test_forward_api.py`](../tests/integration/test_forward_api.py), [`ForwardPage.test.tsx`](../apps/web/src/pages/ForwardPage.test.tsx) |
 
 **Verify the live system yourself.** From a clone, with no credentials, run:
 
@@ -356,4 +356,4 @@ Five decisions carry most of the design:
 4. **Append-only evidence enforced in the database** ([0016](adr/0016-database-append-only-triggers.md)): integrity does not depend on application discipline.
 5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0023](adr/0023-external-forward-scheduler.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded, with an optional external trigger staged behind an observed cutover.
 
-The [ADR index](adr/README.md) lists all 25 decisions by theme.
+The [ADR index](adr/README.md) lists all 27 decisions by theme.

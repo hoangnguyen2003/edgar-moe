@@ -33,6 +33,7 @@ from edgar_moe.forward.models import (
     RunRecord,
     utc_now,
 )
+from edgar_moe.forward.uncertainty import clustered_rank_ic_interval
 
 _MAX_PAGE_OFFSET = 1_000_000
 
@@ -616,15 +617,23 @@ class ForwardRegistry:
                 session.scalar(select(func.count(ForecastRecord.forecast_id)).where(*filters)) or 0
             )
             pairs = session.execute(
-                select(ForecastRecord.score, LabelRecord.realized_abnormal_return)
+                select(
+                    ForecastRecord.score,
+                    LabelRecord.realized_abnormal_return,
+                    ForecastRecord.accepted_at,
+                )
                 .join(LabelRecord, LabelRecord.forecast_id == ForecastRecord.forecast_id)
                 .where(*filters)
+                .order_by(ForecastRecord.accepted_at, ForecastRecord.forecast_id)
             ).all()
+        scores = [float(row.score) for row in pairs]
+        labels = [float(row.realized_abnormal_return) for row in pairs]
         metrics = forward_metrics(
-            [float(row.score) for row in pairs],
-            [float(row.realized_abnormal_return) for row in pairs],
+            scores,
+            labels,
             forecast_count=forecast_count,
         )
+        interval = clustered_rank_ic_interval(scores, labels, [row.accepted_at for row in pairs])
         return {
             "model_id": model_id,
             "forecast_count": metrics.forecast_count,
@@ -632,8 +641,13 @@ class ForwardRegistry:
             "pending_count": metrics.pending_count,
             "coverage": metrics.coverage,
             "rank_ic": metrics.rank_ic,
-            "rank_ic_low": metrics.rank_ic_low,
-            "rank_ic_high": metrics.rank_ic_high,
+            "rank_ic_low": interval.low,
+            "rank_ic_high": interval.high,
+            "rank_ic_interval_method": "calendar_month_moving_block",
+            "rank_ic_interval_status": interval.status,
+            "rank_ic_calendar_months": interval.calendar_months,
+            "rank_ic_block_months": interval.block_months,
+            "rank_ic_bootstrap_samples": interval.resamples,
             "rmse": metrics.rmse,
             "mae": metrics.mae,
             "directional_accuracy": metrics.directional_accuracy,

@@ -501,9 +501,11 @@ excludes zero only when `1.96 / sqrt(n)` drops below the true rank IC:
 | 0.10 | about 400 | about 6 months |
 
 So the live test cannot confirm an edge the size of the one the study measured,
-and will not be able to for years. It would detect a large edge within months,
-and it would detect a badly broken model quickly, because a model that has
-stopped working produces a clearly negative reading rather than a small one.
+and will not be able to for years. These counts are optimistic lower bounds:
+the calculation above treats individual outcomes as independent, while
+same-period filings and overlapping 20-session labels are correlated. A
+strong deterioration may become visible sooner, but one short run is not a
+reliable diagnosis of model failure.
 
 That is not a reason to stop running it. What it demonstrates, from the first
 run, is the part that is usually asserted rather than shown:
@@ -517,9 +519,10 @@ run, is the part that is usually asserted rather than shown:
 - the pipeline's own quality checks are published with the numbers behind them.
 
 Those are claims about process integrity, and a small sample proves them as well
-as a large one. The statistical claim is the one that needs years, which is why
-Live tracking reports an interval, says how many outcomes it rests on, and calls
-itself a running log rather than evidence.
+as a large one. The statistical claim is the one that needs years. Live
+tracking therefore reports the sample size and calls the point estimate a
+running log; it withholds a time-clustered interval until enough calendar
+history exists.
 
 ## How the live rank IC is computed
 
@@ -537,11 +540,32 @@ with a respectable-looking name.
 The cost of pooling is that the figure mixes cross-sectional ordering with
 variation between periods, so it is not comparable to the locked study's rank
 IC, which was computed over a far larger cross-section. Both limits are why the
-page reports an interval and withholds a reading below 100 settled outcomes:
+page withholds a statistical reading below 100 settled outcomes:
 
-- `rank_ic_interval()` in [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py)
-  bounds the figure at 95% confidence, treating settled forecasts as
-  independent, which same-day filings are not.
+- The public API uses [`forward/uncertainty.py`](../src/edgar_moe/forward/uncertainty.py)
+  to draw 1,000 deterministic bootstrap samples of **two consecutive UTC
+  calendar months**. Every filing accepted in the same month moves together;
+  overlapping month blocks retain some dependence across adjacent months.
+  The 2.5th and 97.5th percentiles form a conditional 95% interval. The
+  resampling design follows the moving-block method of
+  [Künsch (1989)](https://projecteuclid.org/journals/annals-of-statistics/volume-17/issue-3/The-Jackknife-and-the-Bootstrap-for-General-Stationary-Observations/10.1214/aos/1176347265.full).
+- Bounds remain `null` until at least **100 settled pairs in 12 distinct
+  acceptance months** exist. The response names the interval status, month
+  count, block length, and resample count instead of treating 24 filings from
+  one month as 24 independent time observations. An undefined correlation,
+  too many degenerate resamples, more than 5,000 settled pairs, or an
+  acceptance-date span above 120 months also leaves bounds `null` with an
+  explicit reason; the capacity cases require review before extending the
+  public calculation.
+- The calculation is capped at 1,000 replicates, cached for at most eight
+  unchanged settled cohorts within a warm API process, and the endpoint's
+  public response is edge-cached for 60 seconds. It is a conditional
+  descriptive interval, **not** a correction for model selection, long-lived
+  market-regime changes, issuer dependence beyond these time blocks, or a
+  guarantee that future performance will match the observed period.
+- The older `rank_ic_interval()` in [`forward/metrics.py`](../src/edgar_moe/forward/metrics.py)
+  remains an explicitly independence-assuming diagnostic helper; the public
+  registry no longer publishes its bounds.
 - Live tracking states how many outcomes the figure rests on, and calls it a
   running log rather than evidence until the sample is large enough to read.
 
