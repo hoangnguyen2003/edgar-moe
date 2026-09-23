@@ -130,6 +130,60 @@ describe("Forward Lab", () => {
     expect(screen.getByRole("button", { name: "What is 95% interval?" })).toBeInTheDocument();
   });
 
+  it("withholds legacy bounds from a small live sample", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 73, forecast_count: 48,
+        matured_count: 24, pending_count: 24, latest_successful_run_at: "2026-09-22T12:45:05Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 48, matured_count: 24, pending_count: 24,
+        coverage: 0.5, rank_ic: -0.179, rank_ic_low: -0.546, rank_ic_high: 0.245,
+        rmse: 0.107, mae: 0.079, directional_accuracy: 0.542,
+      });
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 48, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Live uncertainty unavailable")).toBeInTheDocument();
+    expect(screen.getByText("Too early to tell")).toBeInTheDocument();
+    expect(screen.getByText("−0.179")).toBeInTheDocument();
+    expect(screen.queryByText(/95% independent-event approximation/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is 95% interval?" })).not.toBeInTheDocument();
+  });
+
+  it("withholds bounds when a ready response changes the reviewed bootstrap protocol", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 80, forecast_count: 200,
+        matured_count: 120, pending_count: 80, health_status: "ok",
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 200, matured_count: 120, pending_count: 80,
+        coverage: 0.6, rank_ic: 0.02, rank_ic_low: -0.16, rank_ic_high: 0.2,
+        rmse: 0.09, mae: 0.07, directional_accuracy: 0.51,
+        rank_ic_interval_method: "calendar_month_moving_block", rank_ic_interval_status: "ready",
+        rank_ic_calendar_months: 12, rank_ic_block_months: 1, rank_ic_bootstrap_samples: 1000,
+      });
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 200, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("Live uncertainty unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/Interval withheld: this API release/)).toBeInTheDocument();
+    expect(screen.queryByText(/95% time-clustered interval/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is 95% interval?" })).not.toBeInTheDocument();
+  });
+
   it("states when many settled filings still cover too few calendar months", async () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
@@ -320,6 +374,12 @@ describe("Forward Lab", () => {
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     // The table shows a page; the count beside it describes the whole registry.
     expect(screen.getByText(/Showing the 0 most recent of 400 recorded/)).toBeInTheDocument();
+    // A legacy API response may still contain an independence-assuming range.
+    // It must not be presented as uncertainty evidence, even with 300 results.
+    expect(screen.getByText("Live uncertainty unavailable")).toBeInTheDocument();
+    expect(screen.getByText(/Interval withheld: this API release/)).toBeInTheDocument();
+    expect(screen.queryByText(/independent-event approximation/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is 95% interval?" })).not.toBeInTheDocument();
   });
 
   it("states an unhealthy runner once, in the banner, and names the state in the header", async () => {

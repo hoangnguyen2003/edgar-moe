@@ -58,21 +58,54 @@ export function ForwardPage() {
             ? row.realized_abnormal_return !== null
             : row.realized_abnormal_return === null,
         );
-  const hasClusteredInterval = metrics.rank_ic_interval_status === "ready"
-    && metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
-  const hasLegacyInterval = metrics.rank_ic_interval_status == null
-    && metrics.rank_ic_low !== null && metrics.rank_ic_high !== null;
+  const intervalStatus = metrics.rank_ic_interval_status;
+  const knownIntervalStatus = intervalStatus === "ready"
+    || intervalStatus === "insufficient_pairs"
+    || intervalStatus === "insufficient_months"
+    || intervalStatus === "undefined_rank_ic"
+    || intervalStatus === "degenerate_resamples"
+    || intervalStatus === "capacity_review_required";
+  const calendarMonths = metrics.rank_ic_calendar_months;
+  const hasReviewedProtocol = metrics.rank_ic_interval_method === "calendar_month_moving_block"
+    && knownIntervalStatus
+    && Number.isInteger(calendarMonths)
+    && (calendarMonths ?? -1) >= 0
+    && metrics.rank_ic_block_months === 2
+    && metrics.rank_ic_bootstrap_samples === 1000;
+  const intervalStatusConsistent = hasReviewedProtocol && (
+    intervalStatus === "insufficient_pairs"
+      ? metrics.matured_count < EARLY_RESULT_COUNT
+      : intervalStatus === "insufficient_months"
+        ? metrics.matured_count >= EARLY_RESULT_COUNT && (calendarMonths ?? 0) < 12
+        : metrics.matured_count >= EARLY_RESULT_COUNT && (calendarMonths ?? 0) >= 12
+  );
+  const validBounds = typeof metrics.rank_ic_low === "number"
+    && typeof metrics.rank_ic_high === "number"
+    && Number.isFinite(metrics.rank_ic_low)
+    && Number.isFinite(metrics.rank_ic_high)
+    && -1 <= metrics.rank_ic_low
+    && metrics.rank_ic_low <= metrics.rank_ic_high
+    && metrics.rank_ic_high <= 1;
+  const hasClusteredInterval = intervalStatusConsistent
+    && intervalStatus === "ready"
+    && typeof metrics.rank_ic === "number"
+    && Number.isFinite(metrics.rank_ic)
+    && validBounds;
+  const unreviewedIntervalResponse = metrics.forecast_count > 0
+    && (!intervalStatusConsistent
+      || (intervalStatus === "ready" && !hasClusteredInterval)
+      || (intervalStatus !== "ready" && (metrics.rank_ic_low != null || metrics.rank_ic_high != null)));
   const rankIcDetail = hasClusteredInterval
     ? `95% time-clustered interval ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
-    : hasLegacyInterval
-      ? `95% independent-event approximation ${decimal(metrics.rank_ic_low, 2)} to ${decimal(metrics.rank_ic_high, 2)}`
-      : metrics.rank_ic_interval_status === "insufficient_months"
+    : unreviewedIntervalResponse
+      ? "Interval withheld: this API release has not supplied the reviewed uncertainty contract"
+      : intervalStatus === "insufficient_months"
         ? `${metrics.rank_ic_calendar_months ?? 0} of 12 filing months settled; interval pending`
-        : metrics.rank_ic_interval_status === "insufficient_pairs"
+        : intervalStatus === "insufficient_pairs"
           ? `${compact(metrics.matured_count)} of 100 results settled; interval pending`
-          : metrics.rank_ic_interval_status === "capacity_review_required"
+          : intervalStatus === "capacity_review_required"
             ? "Interval paused for capacity review"
-            : metrics.rank_ic_interval_status === "undefined_rank_ic" || metrics.rank_ic_interval_status === "degenerate_resamples"
+            : intervalStatus === "undefined_rank_ic" || intervalStatus === "degenerate_resamples"
               ? "No stable time-clustered interval yet"
               : `${percent(metrics.coverage)} of forecasts have results`;
   const rankIcInfo = hasClusteredInterval ? "confidenceInterval" : "rankIc";
@@ -114,7 +147,14 @@ export function ForwardPage() {
         <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>
 
-      {metrics.rank_ic_interval_status === "insufficient_months" && (
+      {unreviewedIntervalResponse && (
+        <p className="figures__note">
+          <strong>Live uncertainty unavailable</strong>
+          <span>This API returned an older or inconsistent interval format. Its bounds are hidden; treat the ranking score as a preliminary running log until the deployment is updated.</span>
+        </p>
+      )}
+
+      {!unreviewedIntervalResponse && intervalStatus === "insufficient_months" && (
         <p className="figures__note">
           <strong>More calendar history is needed</strong>
           <span>
