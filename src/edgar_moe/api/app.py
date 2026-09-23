@@ -132,7 +132,14 @@ async def security_headers(
     )
     if not valid_request_id:
         request_id = uuid4().hex
-    response.headers["X-Request-ID"] = request_id
+    # A shared cache may replay this response to other callers, so it must not
+    # carry an identifier belonging to one of them: a reader who quotes it
+    # would send an operator to an unrelated invocation. Every route whose
+    # answer is about this request - health, freshness, forward status, the
+    # documentation - is uncacheable, so the identifier survives where it
+    # means something.
+    if not shared_cacheable(response.headers.get("Cache-Control", "")):
+        response.headers["X-Request-ID"] = request_id
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
@@ -174,6 +181,17 @@ _EDGE_SNAPSHOT_SECONDS = 86_400
 _EDGE_SNAPSHOT_STALE_SECONDS = 604_800
 _EDGE_LIVE_SECONDS = 60
 _EDGE_LIVE_STALE_SECONDS = 300
+
+
+def shared_cacheable(cache_control: str) -> bool:
+    """Whether a shared cache may store this response and serve it to others."""
+
+    names = {
+        item.strip().lower().split("=", 1)[0] for item in cache_control.split(",") if item.strip()
+    }
+    if names & {"no-store", "no-cache", "private"}:
+        return False
+    return bool(names & {"public", "s-maxage", "max-age"})
 
 
 def _cache(
@@ -623,7 +641,9 @@ _SWAGGER_UI_INITIALIZER = """window.ui = SwaggerUIBundle({
 @app.get("/api/docs", include_in_schema=False)
 def api_docs() -> HTMLResponse:
     """Serve Swagger UI with only external scripts so the strict CSP still applies."""
-    return HTMLResponse(_SWAGGER_UI_HTML, headers={"Cache-Control": "public, max-age=3600"})
+    # private: the page is cheap to render, and the deployment smoke check
+    # traces it by request identifier, which a shared cache would replay.
+    return HTMLResponse(_SWAGGER_UI_HTML, headers={"Cache-Control": "private, max-age=3600"})
 
 
 @app.get("/api/docs/swagger-init.js", include_in_schema=False)
@@ -631,7 +651,7 @@ def api_docs_initializer() -> Response:
     return Response(
         _SWAGGER_UI_INITIALIZER,
         media_type="text/javascript",
-        headers={"Cache-Control": "public, max-age=3600"},
+        headers={"Cache-Control": "private, max-age=3600"},
     )
 
 

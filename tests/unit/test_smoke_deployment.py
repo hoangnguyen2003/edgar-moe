@@ -443,3 +443,19 @@ def test_smoke_requires_exact_media_type(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert report["status"] == "failed"
     assert report["checks"][0]["error"] == "unexpected_content_type"
+
+
+def test_the_smoke_check_reads_shared_cacheability_like_the_api() -> None:
+    # The two definitions have to agree, or the gate fails on responses the API
+    # deliberately leaves untraceable.
+    from edgar_moe.api.app import shared_cacheable as api_rule
+
+    for value in (
+        "public, max-age=300, s-maxage=86400",
+        "private, max-age=3600",
+        "no-store",
+        "no-cache",
+        "max-age=60",
+        "",
+    ):
+        assert _MODULE._shared_cacheable(value) is api_rule(value), value

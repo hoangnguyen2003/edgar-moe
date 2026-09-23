@@ -76,6 +76,54 @@ def test_operational_state_is_never_cached(client) -> None:
         assert header in {"no-store", "no-cache"}, f"{route} sent {header}"
 
 
+@pytest.mark.parametrize(
+    ("cache_control", "shared"),
+    [
+        ("public, max-age=300, s-maxage=86400, stale-while-revalidate=604800", True),
+        ("public, max-age=3600", True),
+        ("max-age=60", True),
+        ("private, max-age=3600", False),
+        ("no-store", False),
+        ("no-cache", False),
+        ("", False),
+        ("PUBLIC, S-MAXAGE=60", True),
+    ],
+)
+def test_shared_cacheability_is_read_from_the_directives(cache_control: str, shared: bool) -> None:
+    from edgar_moe.api.app import shared_cacheable
+
+    assert shared_cacheable(cache_control) is shared
+
+
+def test_a_traceable_response_carries_the_caller_s_request_id(client) -> None:
+    for route in ("/api/v1/health", "/api/v1/freshness", "/api/docs"):
+        response = client.get(route, headers={"X-Request-ID": "probe-abc"})
+        assert response.headers.get("x-request-id") == "probe-abc", route
+
+
+def test_a_shared_cacheable_response_carries_no_request_id(client) -> None:
+    # A stored copy is served to everyone, so an identifier on it would send a
+    # reader who quotes it to somebody else's invocation.
+    response = client.get("/api/v1/summary", headers={"X-Request-ID": "probe-abc"})
+
+    assert "x-request-id" not in {key.lower() for key in response.headers}
+
+
+def test_the_documentation_pages_are_not_stored_by_shared_caches(client) -> None:
+    for route in ("/api/docs", "/api/docs/swagger-init.js"):
+        policy = directives(client.get(route).headers["cache-control"])
+        assert "private" in policy, route
+        assert policy["max-age"] == 3_600
+
+
+def test_an_invented_request_id_is_replaced_rather_than_reflected(client) -> None:
+    response = client.get("/api/v1/health", headers={"X-Request-ID": "../../etc/passwd"})
+
+    echoed = response.headers["x-request-id"]
+    assert echoed != "../../etc/passwd"
+    assert echoed.isalnum()
+
+
 def test_the_cache_helpers_cannot_drift_apart() -> None:
     from edgar_moe.api import app as api
 
