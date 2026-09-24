@@ -66,6 +66,25 @@ func TestIntegrity(t *testing.T) {
 		})
 	}
 }
+func TestAuditReportsBytesReadIncludingRejectedObjects(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		store    memoryStore
+		wantRead int64
+	}{
+		{"valid", memoryStore{data: []byte("evidence")}, 8},
+		{"hash mismatch", memoryStore{data: []byte("Evidence")}, 8},
+		{"size mismatch", memoryStore{data: []byte("evidence-extra")}, 9},
+		{"missing", memoryStore{err: os.ErrNotExist}, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			report, _ := check(fixture(), tc.store)
+			if report.BytesRead != tc.wantRead {
+				t.Fatalf("read %d bytes, want %d", report.BytesRead, tc.wantRead)
+			}
+		})
+	}
+}
 func TestRunReconciliation(t *testing.T) {
 	for _, tc := range []struct {
 		status, kind string
@@ -170,6 +189,13 @@ func TestCLIAndRedaction(t *testing.T) {
 	}
 	if strings.Contains(out.String(), dir) {
 		t.Fatal("leaked local path")
+	}
+	var report Report
+	if err = json.Unmarshal(out.Bytes(), &report); err != nil {
+		t.Fatal(err)
+	}
+	if report.BytesRead != 8 || report.DurationMs < 0 || !strings.Contains(out.String(), "audit_duration_ms") {
+		t.Fatalf("missing audit throughput fields: %s", out.String())
 	}
 }
 

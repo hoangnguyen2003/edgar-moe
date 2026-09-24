@@ -37,12 +37,14 @@ type Finding struct {
 	ArtifactID string `json:"artifact_id,omitempty"`
 }
 type Report struct {
-	Version   int       `json:"schema_version"`
-	AuditedAt time.Time `json:"audited_at"`
-	Status    string    `json:"status"`
-	Runs      int       `json:"runs_seen"`
-	Artifacts int       `json:"artifacts_seen"`
-	Verified  int       `json:"objects_verified"`
+	Version    int       `json:"schema_version"`
+	AuditedAt  time.Time `json:"audited_at"`
+	Status     string    `json:"status"`
+	Runs       int       `json:"runs_seen"`
+	Artifacts  int       `json:"artifacts_seen"`
+	Verified   int       `json:"objects_verified"`
+	BytesRead  int64     `json:"object_bytes_read"`
+	DurationMs int64     `json:"audit_duration_ms"`
 	// Failed runs older than -failed-run-window; omitted when the window is off.
 	HistoricalFailedRuns int       `json:"historical_failed_runs,omitempty"`
 	Findings             []Finding `json:"findings"`
@@ -136,6 +138,7 @@ func audit(ctx context.Context, snapshot Snapshot, store ObjectStore, bucket str
 		}
 		hash := sha256.New()
 		n, err := io.Copy(hash, io.LimitReader(body, a.Size+1))
+		report.BytesRead += n
 		closeErr := body.Close()
 		if err != nil || closeErr != nil {
 			add("object_read_failed", a.RunID, a.ID, true)

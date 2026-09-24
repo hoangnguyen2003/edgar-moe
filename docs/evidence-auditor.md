@@ -48,6 +48,12 @@ The default output is one JSON report. Exit codes are:
 `-stale-after` defaults to six hours. `-max-object-bytes` defaults to 64 MiB and
 prevents an unexpected object from consuming unbounded memory or time. Objects
 are streamed through SHA-256; the auditor does not load an artifact into memory.
+The report includes `object_bytes_read` (bytes streamed from objects, including
+objects later rejected for size or hash mismatch) and `audit_duration_ms`
+(elapsed registry load and object verification time, excluding report encoding).
+Track both with `objects_verified` before deciding whether concurrency or a
+different runtime is warranted. A zero duration is possible for tiny offline
+fixtures. These measurements do not change the exit code or integrity verdict.
 
 `-failed-run-window` defaults to `0`, which reports every failed run in the
 registry. Because failed runs are append-only evidence that can never be
