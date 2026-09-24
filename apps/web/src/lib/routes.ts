@@ -75,14 +75,13 @@ export function prepareRoute(client: QueryClient, to: string): Promise<unknown> 
 /**
  * Once the first page has settled, fetch the other pages' code, which is small,
  * so a later visit waits only for its data. Skipped when the reader has asked
- * the browser to save data. The Backtest's charting code is heavy; it loads on
- * intent instead.
+ * the browser to save data.
  */
 export function warmPageCode() {
   const connection = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection;
   if (connection?.saveData) return;
   const whenIdle = window.requestIdleCallback ?? ((callback: () => void) => window.setTimeout(callback, 2000));
   whenIdle(() => {
-    for (const [path, load] of Object.entries(pageLoaders)) if (path !== "/portfolio") void load();
+    for (const load of Object.values(pageLoaders)) void load();
   });
 }
