@@ -144,12 +144,20 @@ def test_history_tool_is_verified_redacted_and_does_not_reopen_sources(tmp_path:
         SnapshotRepository(Path("data/demo/snapshot.json")),
         diagnostic_history_path=history_path,
     )
-    assert "get_forward_diagnostic_history" in {item.name for item in toolset.definitions()}
+    history_tool = next(
+        item for item in toolset.definitions() if item.name == "get_forward_diagnostic_history"
+    )
+    assert "independence is not assessed" in history_tool.description
+    assert "never model-promotion" in history_tool.description
     result = toolset.execute("get_forward_diagnostic_history", {})
 
     assert result.payload["status"] == "ready"
     assert result.payload["report_count"] == 3
+    assert result.payload["snapshot_independence"] == "not_assessed"
+    assert result.payload["promotion_eligible"] is False
     assert result.payload["history_sha256"]
+    assert "snapshot_independence" in result.citations[0].fields
+    assert "disclaimer" in result.citations[0].fields
     assert "must-not-leak" not in json.dumps(result.payload)
     assert "private-event" not in json.dumps(result.payload)
     assert result.citations[0].source == "snapshot:forward-diagnostic-history"

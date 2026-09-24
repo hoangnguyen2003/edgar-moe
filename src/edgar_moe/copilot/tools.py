@@ -125,7 +125,10 @@ class ReadOnlyToolset:
                     description=(
                         "Read a verified, redacted history of repeated short-horizon forward "
                         "diagnostics. It is research-only, does not replace the official "
-                        "20-session evaluation, and contains no forecast or filing observations."
+                        "20-session evaluation, and contains no forecast or filing observations. "
+                        "Its ready status only means the configured snapshot count and report "
+                        "checks passed; snapshots may overlap, independence is not assessed, and "
+                        "the history is never model-promotion or retraining evidence."
                     ),
                     parameters={
                         "type": "object",
@@ -268,20 +271,28 @@ class ReadOnlyToolset:
                     label="Forward diagnostic history availability",
                     fields=("available", "reason"),
                 )
+            fields = [
+                "status",
+                "minimum_reports",
+                "report_count",
+                "horizon_sessions",
+                "latest_as_of",
+                "disclaimer",
+                "research_only",
+                "v1_immutable",
+                "automatic_retraining",
+                "official_evaluation_untouched",
+                "observations",
+                "history_sha256",
+            ]
+            if "snapshot_independence" in payload:
+                fields.extend(("snapshot_independence", "promotion_eligible"))
             return _result(
                 name,
                 payload,
                 source="snapshot:forward-diagnostic-history",
                 label="Verified redacted short-horizon forward diagnostic history",
-                fields=(
-                    "status",
-                    "minimum_reports",
-                    "report_count",
-                    "horizon_sessions",
-                    "latest_as_of",
-                    "observations",
-                    "history_sha256",
-                ),
+                fields=tuple(fields),
             )
         raise ToolInputError(f"tool is not allowlisted: {name}")
 

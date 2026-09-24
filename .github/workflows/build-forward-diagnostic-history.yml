@@ -12,7 +12,7 @@ on:
         required: true
         type: string
       minimum_reports:
-        description: "Reports required before the history can be ready"
+        description: "Snapshots required for collection status ready (not performance readiness)"
         required: true
         default: "3"
         type: string
@@ -134,7 +134,7 @@ jobs:
         shell: bash
         run: |
           if test -s "$REPORT_DIR/history.json"; then
-            jq -r '"History status: \(.status); observations: \(.report_count); hash: \(.history_sha256)"' \
+            jq -r '"Snapshot history status: \(.status); snapshots: \(.report_count); independence: \(.snapshot_independence); promotion eligible: \(.promotion_eligible); hash: \(.history_sha256)"' \
               "$REPORT_DIR/history.json" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Diagnostic history was not produced." >> "$GITHUB_STEP_SUMMARY"

@@ -638,7 +638,12 @@ raw observations, event/forecast identifiers, duplicate timestamps, mixed
 horizons, malformed reports, and tampered history. `insufficient_history` is a
 valid explicit status until the configured minimum number of later artifacts
 exists; a non-ready diagnostic status produces `review_required`. Verification
-never reopens the private source files. This history is not the official
+never reopens the private source files. A `ready` history means only that the
+configured count of structurally valid snapshots was collected. Snapshots may
+overlap or reuse forecasts and labels, and statistical independence is
+explicitly `not_assessed`; never count `report_count` as independent samples.
+New histories set `promotion_eligible` to `false` and carry this interpretation
+in their content-addressed disclaimer. This history is not the official
 20-session evaluation, a performance promotion gate, or a retraining trigger.
 
 ### Build a history from retained GitHub artifacts
@@ -656,7 +661,8 @@ source artifacts into the ephemeral runner, and uploads only the redacted,
 content-addressed history plus `SHA256SUMS`. Raw diagnostic JSON is never
 uploaded by this workflow. A valid `review_required` history is useful evidence
 but is not a readiness decision; the history must still be independently
-reviewed before it can influence research decisions.
+reviewed before it can influence research decisions. Workflow summaries display
+the snapshot count, unassessed independence, and non-promotion status explicitly.
 
 ## Monitoring and recovery
 
