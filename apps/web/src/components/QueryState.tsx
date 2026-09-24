@@ -1,5 +1,5 @@
 import { AlertTriangle, LoaderCircle, RotateCw } from "lucide-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 
 /** How long a load may take before the optional slow-load hint appears. */
 export const SLOW_LOAD_HINT_MS = 4_000;
@@ -8,8 +8,12 @@ export const SLOW_LOAD_HINT_MS = 4_000;
 export const IDLE_DATABASE_HINT =
   "The live database pauses when it has been idle, so the first visit can take several seconds.";
 
-/** Shapes a loading page can sketch while its data arrives. */
-export type SkeletonPart = "figures" | "rows" | "chart";
+/**
+ * Shapes a loading page can sketch while its data arrives. A figure row names
+ * how many figures the page shows ("figures:3"), so the outline has the same
+ * columns as what replaces it; plain "figures" means four.
+ */
+export type SkeletonPart = "figures" | "figures:3" | "figures:5" | "rows" | "chart";
 
 /**
  * A page that is still loading shows the outline of what is coming, so a slow
@@ -52,10 +56,11 @@ export function LoadingState({ label = "Loading research snapshot", slowHint, sk
 }
 
 function SkeletonBlock({ part }: { part: SkeletonPart }) {
-  if (part === "figures") {
+  if (part.startsWith("figures")) {
+    const count = Number(part.split(":")[1] ?? 4);
     return (
-      <div className="skeleton-figures">
-        {[0, 1, 2, 3].map((index) => (
+      <div className="skeleton-figures" style={{ "--figures": count } as CSSProperties}>
+        {Array.from({ length: count }, (_, index) => (
           <div key={index}><i className="skeleton-bar skeleton-bar--label" /><i className="skeleton-bar skeleton-bar--value" /><i className="skeleton-bar skeleton-bar--detail" /></div>
         ))}
       </div>

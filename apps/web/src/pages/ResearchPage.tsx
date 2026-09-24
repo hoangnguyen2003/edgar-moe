@@ -38,7 +38,7 @@ export function ResearchPage() {
       frozen before the final test.
     </PageHeader>
   );
-  if (experiments.isLoading || summary.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the model comparison" skeleton={["figures", "rows"]} /></div>;
+  if (experiments.isLoading || summary.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the model comparison" skeleton={["figures:3", "rows"]} /></div>;
   if (experiments.error) return <div className="page">{header()}<ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);

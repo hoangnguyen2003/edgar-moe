@@ -60,4 +60,14 @@ describe("ErrorState", () => {
     expect(container.querySelector(".skeleton-figures")?.closest("[aria-hidden='true']")).not.toBeNull();
     expect(container.querySelectorAll(".skeleton-bar--row")).toHaveLength(6);
   });
+
+  it("outlines as many figures as the page will show, so nothing jumps when they land", () => {
+    const { container, rerender } = render(<LoadingState skeleton={["figures:3"]} />);
+    const figures = () => container.querySelector(".skeleton-figures") as HTMLElement;
+    expect(figures().children).toHaveLength(3);
+    expect(figures().style.getPropertyValue("--figures")).toBe("3");
+
+    rerender(<LoadingState skeleton={["figures"]} />);
+    expect(figures().children).toHaveLength(4);
+  });
 });

@@ -382,7 +382,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .query-state__line { display: flex; align-items: center; gap: var(--s2); margin: 0 0 var(--s4); color: var(--ink-2); font: 500 var(--t-small) var(--sans); }
 .query-state__line .query-state__hint { margin-top: 0; margin-left: var(--s2); display: inline; }
 .skeleton-bar { display: block; background: var(--paper-2); border-radius: 2px; animation: skeleton-pulse 1.6s ease-in-out infinite alternate; }
-.skeleton-figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+.skeleton-figures { display: grid; grid-template-columns: repeat(var(--figures, 4), minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
 .skeleton-figures > div { display: grid; gap: var(--s2); padding: var(--s3) var(--s4) var(--s4); border-left: 1px solid var(--rule); }
 .skeleton-figures > div:first-child { padding-left: 0; border-left: 0; }
 .skeleton-bar--label { width: 55%; height: 9px; }
