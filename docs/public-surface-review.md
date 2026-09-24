@@ -142,8 +142,8 @@ months, as well as status labels inconsistent with those thresholds. It also
 requires a capacity-review status beyond 5,000 settled pairs or 120 nonempty
 acceptance months. This catches a serving API that emits older or misleading
 uncertainty estimates even when homepage and health checks pass. The retained
-report contains endpoint
-paths, statuses, and non-sensitive contract metadata but never response bodies,
+report contains endpoint paths, statuses, and non-sensitive contract metadata
+but never response bodies,
 numeric performance estimates, or credentials. This is a runtime observation,
 not proof of provider-side rate limits, backups, or database grants.
 

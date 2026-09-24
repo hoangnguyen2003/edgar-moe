@@ -440,6 +440,26 @@ def test_smoke_rejects_capacity_or_undefined_point_estimate_mismatch(
     )
 
 
+@pytest.mark.parametrize(
+    ("matured_count", "calendar_months"),
+    [(5001, 12), (121, 121)],
+)
+def test_smoke_accepts_capacity_review_status_without_bounds(
+    matured_count: int, calendar_months: int
+) -> None:
+    payload = {
+        **_configured_performance_payload(),
+        "forecast_count": matured_count + 24,
+        "matured_count": matured_count,
+        "pending_count": 24,
+        "coverage": matured_count / (matured_count + 24),
+        "rank_ic_calendar_months": calendar_months,
+        "rank_ic_interval_status": "capacity_review_required",
+    }
+
+    assert _MODULE._forward_performance_error(payload) is None
+
+
 def test_smoke_requires_interval_fields_in_performance_schema(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
