@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight } from "lucide-react";
 import { CopyCommand } from "../components/CopyCommand";
 import { PageHeader } from "../components/PageHeader";
+import { remainingNeed } from "../lib/format";
 import { governanceQuery } from "../lib/queries";
 import { Link } from "../lib/router";
 
@@ -106,7 +107,9 @@ export function ArchitecturePage() {
       <PageHeader title="System architecture" answer="The public site can only read, and recorded evidence can only be added to.">
         Every published number comes from a fingerprinted snapshot, and every live forecast is saved before trading and
         never edited.
-        {controls && enforced != null && ` ${enforced} of ${controls.length} safeguards are enforced in code; the rest need operator evidence.`}
+        {controls && enforced != null && ` ${enforced} of ${controls.length} safeguards are enforced in code${
+          enforced < controls.length ? `; ${remainingNeed(controls.length - enforced)} operator evidence` : ""
+        }.`}
       </PageHeader>
 
       <section className="lanes" aria-label="How the system fits together">
@@ -160,8 +163,8 @@ export function ArchitecturePage() {
             <li>
               <strong>Compare the fingerprint</strong>
               <span>
-                The live snapshot fingerprint is{" "}
-                {sha ? <code title={sha}>{sha.slice(0, 16)}…</code> : "shown on the Audit page"}. It must match{" "}
+                The live snapshot fingerprint
+                {sha ? <>, <code title={sha}>{sha.slice(0, 16)}…</code>,</> : " (shown on the Audit page)"} must match{" "}
                 <a href={`${REPOSITORY}/blob/main/config/public_snapshot.lock.json`}>the lock in the repository</a>.
               </span>
             </li>

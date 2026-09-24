@@ -43,14 +43,17 @@ export function ResearchPage() {
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);
   const selectedName = selected ? splitModelName(selected.name) : null;
-  const selectedRank = ranked(rows, "rank_ic").find((entry) => entry.row.selected)?.rank;
+  const byRankIc = ranked(rows, "rank_ic");
+  const chosen = byRankIc.find((entry) => entry.row.selected);
+  // The best of each plainer family, so the comparison below shows its outcome.
+  const bestOf = (family: string) => byRankIc.find((entry) => entry.row.family === family);
   const finalIc = summary.data?.predictive_metrics?.locked_test?.rank_ic;
   return (
     <div className="page">
       {header(selectedName ? (
         <>
           Of {rows.length} candidates, <mark>{selectedName.family}</mark> was chosen: the most consistent across both
-          validation years, not the highest average (#{selectedRank} of {rows.length}).
+          validation years, not the highest average (#{chosen?.rank} of {rows.length}).
         </>
       ) : undefined)}
       <section className="figures figures--three" aria-label="Chosen model results">
@@ -67,12 +70,56 @@ export function ResearchPage() {
           </div>
         </header>
         <ol className="reason-list">
-          <li><strong>Linear model</strong><p>Checks whether a simple weighted sum of the same inputs does just as well.</p></li>
-          <li><strong>Tree model</strong><p>Checks what a flexible model finds without the specialists and the gate.</p></li>
-          <li><strong>Mixture of experts</strong><p>Has to beat both on ranking skill, and then hold up in the cost-aware backtest.</p></li>
+          <li>
+            <strong>Linear model</strong>
+            <p>Checks whether a simple weighted sum of the same inputs does just as well.</p>
+            <Outcome entry={bestOf("linear")} total={rows.length} />
+          </li>
+          <li>
+            <strong>Tree model</strong>
+            <p>Checks what a flexible model finds without the specialists and the gate.</p>
+            <Outcome entry={bestOf("tree")} total={rows.length} />
+          </li>
+          <li>
+            <strong>Mixture of experts</strong>
+            <p>Has to beat both on ranking skill, and then hold up in the cost-aware backtest.</p>
+            <Outcome entry={chosen} total={rows.length} />
+          </li>
         </ol>
       </article>
       {summary.data?.metadata.data_mode === "synthetic_fixture" && <DemoNotice />}
+    </div>
+  );
+}
+
+/** Where one model finished on validation ranking skill: "Elastic Net · #32 of 33 · −0.081". */
+function Outcome({ entry, total }: { entry?: { row: ExperimentRecord; rank: number }; total: number }) {
+  if (!entry) return null;
+  return (
+    <p className="reason-list__outcome">
+      {splitModelName(entry.row.name).family} · #{entry.rank} of {total} · {signedDecimal(entry.row.validation_rank_ic, 3)}
+    </p>
+  );
+}
+
+/** The codes in each candidate's settings, in words. */
+const SETTINGS = [
+  ["h", "hidden units per layer"],
+  ["dropout", "share of units switched off in training, against overfitting"],
+  ["gate", "how far market conditions can shift the specialists' weights; 0 keeps them fixed"],
+  ["moe", "the mixture's share of the score; the Fundamental-Only Expert supplies the rest"],
+] as const;
+
+function SettingsKey() {
+  const labelId = useId();
+  return (
+    <div className="settings-key">
+      <span className="settings-key__label" id={labelId}>Settings</span>
+      <dl aria-labelledby={labelId}>
+        {SETTINGS.map(([code, meaning]) => (
+          <div key={code}><dt>{code}</dt><dd>{meaning}</dd></div>
+        ))}
+      </dl>
     </div>
   );
 }
@@ -103,6 +150,7 @@ function Leaderboard({ rows }: { rows: ExperimentRecord[] }) {
           </div>
         </div>
       </header>
+      <SettingsKey />
       <div className="table-scroll">
         <table className="leaderboard" role="table">
           <caption className="sr-only">Validation results for {rows.length} candidate models, sorted by {sortLabel}.</caption>

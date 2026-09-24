@@ -8,7 +8,7 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { governanceQuery } from "../lib/queries";
-import { humanize, shortDate } from "../lib/format";
+import { humanize, remainingNeed, shortDate } from "../lib/format";
 import type { GovernanceControl, GovernanceResponse } from "../lib/types";
 
 const CONTROL_LABELS: Record<string, string> = {
@@ -21,7 +21,7 @@ const CONTROL_LABELS: Record<string, string> = {
 export function GovernancePage() {
   const governance = useQuery(governanceQuery);
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Audit trail" answer={answer} placeholder="3 of 4 safeguards are enforced in code; the rest need evidence from the people running the service.">
+    <PageHeader title="Audit trail" answer={answer} placeholder="3 of 4 safeguards are enforced in code; the remaining one needs evidence from the people running the service.">
       Evidence that the published results come from the frozen model and haven't been edited since.
     </PageHeader>
   );
@@ -40,8 +40,10 @@ export function GovernancePage() {
     <div className="page">
       {header(
         <>
-          <mark>{enforced} of {data.controls.length} safeguards</mark> are enforced in code; the rest need evidence from the
-          people running the service.
+          <mark>{enforced} of {data.controls.length} safeguards</mark> are enforced in code
+          {enforced < data.controls.length
+            ? `; ${remainingNeed(data.controls.length - enforced)} evidence from the people running the service.`
+            : "."}
         </>,
       )}
 

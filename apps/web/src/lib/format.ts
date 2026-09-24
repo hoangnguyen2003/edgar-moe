@@ -71,12 +71,17 @@ export function filedDate(acceptedAt: string): string {
   }).format(new Date(acceptedAt));
 }
 
-/** A percentile rank the way a reader says it: 0.99 -> "Top 1%", 0.13 -> "Bottom 13%". */
+/**
+ * A percentile rank the way a reader says it: 0.99 -> "Top 1%", 0.13 -> "Bottom 13%".
+ * It rounds up, because "Top 12%" means "within the top 12%": a rank of 0.876 is
+ * not, and rounding to nearest would also put a neutral filing ranked at 0.104
+ * in the "Bottom 10%" that defines a short signal.
+ */
 export function standing(rank: number | null | undefined): string {
   if (rank == null || !Number.isFinite(rank)) return "—";
-  return rank >= 0.5
-    ? `Top ${Math.max(1, Math.round((1 - rank) * 100))}%`
-    : `Bottom ${Math.max(1, Math.round(rank * 100))}%`;
+  // The epsilon absorbs float error, e.g. (1 - 0.88) * 100 = 12.000000000000002.
+  const within = (share: number) => Math.max(1, Math.ceil(share * 100 - 1e-9));
+  return rank >= 0.5 ? `Top ${within(1 - rank)}%` : `Bottom ${within(rank)}%`;
 }
 
 function ordinal(value: number): string {
@@ -108,6 +113,11 @@ export function monthYear(value: string): string {
     .format(new Date(`${value}T00:00:00Z`));
 }
 
+/** A day in the market's calendar, e.g. "Oct 19": when a forecast's 20 trading days end. */
+export function marketDay(value: string): string {
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: "America/New_York" }).format(new Date(value));
+}
+
 export function dateTime(value: string | null | undefined): string {
   if (!value) return "—";
   return new Intl.DateTimeFormat("en", {
@@ -119,6 +129,14 @@ export function dateTime(value: string | null | undefined): string {
     timeZone: "UTC",
     timeZoneName: "short",
   }).format(new Date(value));
+}
+
+/**
+ * The safeguards not enforced in code, with the verb agreeing:
+ * 3 of 4 -> "the remaining one needs", 2 of 4 -> "the remaining 2 need".
+ */
+export function remainingNeed(count: number): string {
+  return count === 1 ? "the remaining one needs" : `the remaining ${count} need`;
 }
 
 /** "authenticated_locked" -> "Authenticated locked". */
@@ -157,18 +175,24 @@ export function splitModelName(name: string): { family: string; params: string[]
  * the margin before the open, days for dataset age, a 0-1 rate for settlement
  * matching, and plain counts elsewhere.
  */
-const CHECK_READINGS: Record<string, { unit: (value: number) => string; limit: "least" | "most" }> = {
+const CHECK_READINGS: Record<string, { name: string; unit: (value: number) => string; limit: "least" | "most" }> = {
   pre_open_schedule_margin: {
+    name: "Time to spare before the open",
     unit: (value) => `${Math.round(value / 60)} min before the open`,
     limit: "least",
   },
-  dataset_freshness_days: { unit: (value) => `${decimal(value, 1)} days old`, limit: "most" },
-  settlement_match_rate: { unit: (value) => `${percent(value)} matched`, limit: "least" },
-  recent_filing_download_failures: { unit: (value) => plural(value, "failure"), limit: "most" },
-  missed_before_entry: { unit: (value) => plural(value, "missed forecast"), limit: "most" },
-  prospective_candidate_count: { unit: (value) => plural(value, "candidate"), limit: "least" },
-  point_in_time_availability: { unit: (value) => plural(value, "violation"), limit: "most" },
+  dataset_freshness_days: { name: "Age of the data", unit: (value) => `${decimal(value, 1)} days old`, limit: "most" },
+  settlement_match_rate: { name: "Due results recorded", unit: (value) => `${percent(value)} matched`, limit: "least" },
+  recent_filing_download_failures: { name: "Filing downloads", unit: (value) => plural(value, "failure"), limit: "most" },
+  missed_before_entry: { name: "Filings missed before trading", unit: (value) => plural(value, "missed forecast"), limit: "most" },
+  prospective_candidate_count: { name: "New filings to score", unit: (value) => plural(value, "candidate"), limit: "least" },
+  point_in_time_availability: { name: "Inputs dated after the forecast", unit: (value) => plural(value, "violation"), limit: "most" },
 };
+
+/** A quality check's name in plain words: "pre_open_schedule_margin" -> "Time to spare before the open". */
+export function checkName(name: string): string {
+  return CHECK_READINGS[name]?.name ?? humanize(name);
+}
 
 function plural(value: number, noun: string): string {
   const count = Math.round(value);

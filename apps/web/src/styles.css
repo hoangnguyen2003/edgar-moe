@@ -375,7 +375,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .notice--forward > svg { color: var(--good); }
 .empty-state { padding: 28px; color: var(--ink-2); font-size: 15px; }
 .empty-state .text-button { margin-top: 0; }
-.pending-label { padding: 2px 7px; border: 1px solid var(--warning); border-radius: 2px; color: var(--warning); font: 600 13px var(--sans); white-space: nowrap; }
+/* A result still to come is expected, not a warning: it recedes, and says when to look again. */
+.pending-label { color: var(--ink-3); font: 500 13px var(--sans); white-space: nowrap; }
 .count-chip { padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--ink-2); font: 600 13px var(--sans); white-space: nowrap; }
 
 /* ---------- Charts ---------- */
@@ -425,6 +426,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .reason-list li { padding-top: 12px; border-top: 1px solid var(--rule); }
 .reason-list strong { font: 600 16px var(--sans); }
 .reason-list p { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+.reason-list .reason-list__outcome { margin-top: var(--s2); color: var(--ink); font: 500 13px/1.5 var(--mono); }
 .leaderboard-panel { margin: 16px 0; }
 .table-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
 .leaderboard { width: 100%; min-width: 640px; border-collapse: collapse; }
@@ -437,6 +439,13 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .leaderboard__model { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .leaderboard__model strong { font-size: 16px; }
 .leaderboard .param-list { margin-top: 6px; }
+/* The settings codes in words, each code set like the chips it explains. */
+.settings-key { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2) var(--s4); align-items: baseline; margin-bottom: var(--s4); }
+.settings-key__label { color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.settings-key dl { display: grid; grid-template-columns: repeat(2, auto minmax(0, 1fr)); gap: var(--s1) var(--s2); align-items: baseline; margin: 0; }
+.settings-key dl > div { display: contents; }
+.settings-key dt { justify-self: start; padding: 0 6px; border: 1px solid var(--rule-strong); background: var(--sheet); color: var(--ink-2); font: 500 12px/1.5 var(--mono); }
+.settings-key dd { margin: 0 var(--s3) 0 0; color: var(--ink-2); font-size: var(--t-micro); line-height: 1.5; }
 .leaderboard tr.is-selected td { background: var(--highlight-soft); }
 .leaderboard tr.is-selected td:first-child { box-shadow: inset 3px 0 var(--ink); color: var(--ink); font-weight: 600; }
 .leaderboard__delta { display: block; margin-top: 3px; color: var(--ink-2); font: 500 13px var(--mono); }
@@ -633,12 +642,14 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .forward-list small, .quality-list small { margin-top: 2px; color: var(--ink-2); font-size: 13px; }
 .forward-list code { color: var(--ink-2); font: 500 13px var(--mono); }
 .run-status, .quality-state { width: fit-content; padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); text-transform: capitalize; }
-.run-status--succeeded, .quality-state--passed { color: var(--good); }
+/* Quiet when healthy: a run that succeeded is a word, not a box; only one that needs a look is boxed. */
+.run-status--succeeded { padding-inline: 0; border-color: transparent; color: var(--good); font-weight: 600; }
 .run-status--running, .quality-state--warning { color: var(--warning); }
 .run-status--failed, .quality-state--failed { color: var(--critical); }
-.quality-list > div > svg { color: var(--good); }
-.quality-list > div:has(.quality-state--warning) > svg { color: var(--warning); }
-.quality-list > div:has(.quality-state--failed) > svg { color: var(--critical); }
+.quality-list__check--passed > svg { color: var(--good); }
+.quality-list__check--warning > svg { color: var(--warning); }
+.quality-list__check--failed > svg { color: var(--critical); }
+.quality-list__check--expected > svg { color: var(--ink-3); }
 .forward-forecast-panel { margin-top: 16px; }
 .forward-table-wrap { overflow-x: auto; }
 .forward-table { width: 100%; min-width: 780px; border-collapse: collapse; }
@@ -810,6 +821,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   /* An odd last figure takes the whole row rather than leaving a hole. */
   .figures .figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .reason-list { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  .settings-key { grid-template-columns: minmax(0, 1fr); }
+  .settings-key dl { grid-template-columns: auto minmax(0, 1fr); }
   .decision-list a { grid-template-columns: minmax(0, 1fr) 16px; }
   .decision-list small { grid-row: 1; padding-top: 0; }
   .decision-list strong { grid-column: 1; grid-row: 2; }

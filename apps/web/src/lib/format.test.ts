@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   bpsPercent,
+  checkName,
   checkReading,
   compact,
   count,
@@ -8,8 +9,10 @@ import {
   featureLabel,
   filedDate,
   humanize,
+  marketDay,
   monthYear,
   percent,
+  remainingNeed,
   runPosition,
   shortDate,
   signedDecimal,
@@ -64,6 +67,14 @@ describe("format helpers", () => {
     expect(standing(null)).toBe("—");
   });
 
+  it("rounds a rank up, so a neutral filing never reads as inside the 10% signal cutoffs", () => {
+    // Long is rank >= 0.9 and short is rank <= 0.1; everything between is neutral.
+    expect(standing(0.9)).toBe("Top 10%");
+    expect(standing(0.1)).toBe("Bottom 10%");
+    expect(standing(0.8966)).toBe("Top 11%");
+    expect(standing(0.1034)).toBe("Bottom 11%");
+  });
+
   it("places a forecast within its run instead of claiming a market-wide percentile", () => {
     expect(runPosition(1, 1)).toBe("Only filing");
     expect(runPosition(1, 4)).toBe("1st of 4");
@@ -88,10 +99,27 @@ describe("format helpers", () => {
     expect(checkReading("recent_filing_download_failures", 2, 0)).toBe("2 failures · needs at most 0 failures");
   });
 
+  it("names a quality check in plain words", () => {
+    expect(checkName("pre_open_schedule_margin")).toBe("Time to spare before the open");
+    expect(checkName("point_in_time_availability")).toBe("Inputs dated after the forecast");
+    expect(checkName("a_check_nobody_has_seen")).toBe("A check nobody has seen");
+  });
+
+  it("dates a forecast's result in the market's calendar", () => {
+    // 20:00 UTC is the 4 p.m. close in New York; 03:00 UTC is still the evening before.
+    expect(marketDay("2026-10-19T20:00:00Z")).toBe("Oct 19");
+    expect(marketDay("2026-10-20T03:00:00Z")).toBe("Oct 19");
+  });
+
   it("says only what a quality check recorded when there is no threshold", () => {
     expect(checkReading("missed_before_entry", 0, null)).toBe("0 missed forecasts");
     expect(checkReading("a_check_nobody_has_seen", 1.5, 2)).toBe("1.50 · needs at least 2.00");
     expect(checkReading("point_in_time_availability", null, 0)).toBe("");
+  });
+
+  it("makes the safeguards still needing evidence agree with their verb", () => {
+    expect(remainingNeed(1)).toBe("the remaining one needs");
+    expect(remainingNeed(2)).toBe("the remaining 2 need");
   });
 
   it("shows basis points as percentages", () => {

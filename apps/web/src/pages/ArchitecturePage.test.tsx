@@ -75,7 +75,10 @@ describe("Architecture page", () => {
       headers: { "Content-Type": "application/json" },
     })));
 
-    expect(await screen.findByText(/3 of 4 safeguards are enforced in code/)).toBeInTheDocument();
-    expect(screen.getByText("06aa652c638d1240…")).toHaveAttribute("title", governance.frozen_v1.sha256);
+    expect(await screen.findByText(/3 of 4 safeguards are enforced in code; the remaining one needs operator evidence\./)).toBeInTheDocument();
+    const fingerprint = screen.getByText("06aa652c638d1240…");
+    expect(fingerprint).toHaveAttribute("title", governance.frozen_v1.sha256);
+    // The shortened fingerprint sits mid-sentence, so its ellipsis never meets a full stop.
+    expect(fingerprint.parentElement).toHaveTextContent("The live snapshot fingerprint, 06aa652c638d1240…, must match the lock in the repository.");
   });
 });
