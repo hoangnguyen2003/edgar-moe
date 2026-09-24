@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
@@ -38,7 +38,7 @@ export function ForwardPage() {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
+    return <div className="page"><ForwardHeader answer={null} /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
   if (error) {
@@ -94,12 +94,18 @@ export function ForwardPage() {
     historicalWarningChecks ? `${historicalWarningChecks} warned before` : "",
   ].filter(Boolean).join(" · ");
 
+  const early = metrics.forecast_count > 0 && metrics.matured_count < EARLY_RESULT_COUNT;
+  const answer = metrics.forecast_count === 0
+    ? "No forecasts have been recorded yet."
+    : early
+      ? <><mark>Too early to tell</mark>: {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a result so far.</>
+      : <>On {compact(metrics.matured_count)} settled forecasts, live ranking skill is <mark>{decimal(metrics.rank_ic, 3)}</mark>.</>;
+
   return (
     <div className="page">
-      <ForwardHeader status={status.data} />
+      <ForwardHeader status={status.data} answer={answer} early={early} />
       {/* Quiet when healthy: the header says so. Loud when not: it needs action. */}
       {status.data.health_status !== "ok" && <RunnerHealthBanner status={status.data} />}
-      <Protocol />
 
       <section className="figures" aria-label="Live results">
         <MetricCard label="Forecasts recorded" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} still waiting for results`} />
@@ -107,17 +113,6 @@ export function ForwardPage() {
         <MetricCard label="Prediction error, live" info="rmse" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} results in so far`} />
         <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
       </section>
-
-      {metrics.forecast_count > 0 && metrics.matured_count < EARLY_RESULT_COUNT && (
-        <p className="figures__note">
-          <strong>Too early to read these numbers</strong>
-          <span>
-            {compact(metrics.matured_count)} of {compact(metrics.forecast_count)} forecasts have a
-            result so far. Treat the live figures as a running log, not evidence: the frozen
-            study's own test used 1,794 filings.
-          </span>
-        </p>
-      )}
 
       {metrics.rank_ic_interval_status === "insufficient_months" && (
         <p className="figures__note">
@@ -139,6 +134,7 @@ export function ForwardPage() {
         </div>
       )}
 
+      <Protocol />
       <section className="panel forward-forecast-panel">
         <header>
           <div>
@@ -196,11 +192,12 @@ function Protocol() {
   );
 }
 
-function ForwardHeader({ status }: { status?: ForwardStatusResponse }) {
+function ForwardHeader({ status, answer, early = false }: { status?: ForwardStatusResponse; answer?: ReactNode; early?: boolean }) {
   return (
-    <PageHeader title="Live tracking" aside={status ? <RunnerStatus status={status} /> : undefined}>
-      Since the model was frozen, it has kept scoring new filings as they arrive. This page shows how those
-      forecasts are doing, with no chance to adjust them in hindsight.
+    <PageHeader title="Live tracking" answer={answer} aside={status ? <RunnerStatus status={status} /> : undefined}>
+      Since the model was frozen, it has kept scoring new filings as they arrive, with no chance to adjust them in
+      hindsight.
+      {early && " Until 100 have a result, treat these figures as a running log, not evidence: the frozen study's own test used 1,794 filings."}
     </PageHeader>
   );
 }
