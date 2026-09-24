@@ -4,17 +4,18 @@ import { Layout } from "./components/Layout";
 import { LoadingState } from "./components/QueryState";
 import { canonicalPath } from "./lib/navigation";
 import { useRouter } from "./lib/router-context";
+import { pageLoaders } from "./lib/routes";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { OverviewPage } from "./pages/OverviewPage";
 
-const ResearchPage = lazy(() => import("./pages/ResearchPage").then((module) => ({ default: module.ResearchPage })));
-const PortfolioPage = lazy(() => import("./pages/PortfolioPage").then((module) => ({ default: module.PortfolioPage })));
-const FilingsPage = lazy(() => import("./pages/FilingsPage").then((module) => ({ default: module.FilingsPage })));
-const SignalsPage = lazy(() => import("./pages/SignalsPage").then((module) => ({ default: module.SignalsPage })));
-const MethodologyPage = lazy(() => import("./pages/MethodologyPage").then((module) => ({ default: module.MethodologyPage })));
-const ForwardPage = lazy(() => import("./pages/ForwardPage").then((module) => ({ default: module.ForwardPage })));
-const GovernancePage = lazy(() => import("./pages/GovernancePage").then((module) => ({ default: module.GovernancePage })));
-const ArchitecturePage = lazy(() => import("./pages/ArchitecturePage").then((module) => ({ default: module.ArchitecturePage })));
+const ResearchPage = lazy(pageLoaders["/research"]);
+const PortfolioPage = lazy(pageLoaders["/portfolio"]);
+const FilingsPage = lazy(pageLoaders["/filings"]);
+const SignalsPage = lazy(pageLoaders["/signals"]);
+const MethodologyPage = lazy(pageLoaders["/methodology"]);
+const ForwardPage = lazy(pageLoaders["/forward"]);
+const GovernancePage = lazy(pageLoaders["/governance"]);
+const ArchitecturePage = lazy(pageLoaders["/architecture"]);
 
 const routes = {
   "/": OverviewPage,

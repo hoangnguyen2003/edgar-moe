@@ -12,7 +12,7 @@ import { MENU_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
 export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const { pathname } = useRouter();
+  const { pathname, pending } = useRouter();
   const collapsed = useMediaQuery(MENU_LAYOUT);
   const { theme, setTheme } = useTheme();
   const summary = useQuery(summaryQuery);
@@ -112,9 +112,11 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
+        {/* A hairline that fills while the next page loads, shown only if the wait is noticeable. */}
+        <span className="route-progress" data-active={pending} aria-hidden="true" />
       </header>
       {menuOpen && <button type="button" className="backdrop" aria-label="Close menu" tabIndex={-1} onClick={closeMenu} />}
-      <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen}>
+      <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen} aria-busy={pending || undefined}>
         {children}
         <NextPage pathname={pathname} />
       </main>
