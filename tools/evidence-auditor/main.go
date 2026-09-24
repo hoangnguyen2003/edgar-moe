@@ -29,6 +29,7 @@ func run(args []string, out, errOut io.Writer) int {
 	if flags.NArg() != 0 || *timeout <= 0 || *stale <= 0 || *failedWindow < 0 || *maxBytes <= 0 || *maxBytes > 1<<40 {
 		return fail("invalid_arguments")
 	}
+	started := time.Now()
 	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
 	defer cancel()
 	var snapshot Snapshot
@@ -82,6 +83,7 @@ func run(args []string, out, errOut io.Writer) int {
 		store = remote
 	}
 	report, code := audit(ctx, snapshot, store, bucket, time.Now().UTC(), *stale, *failedWindow, *maxBytes)
+	report.DurationMs = time.Since(started).Milliseconds()
 	if err := json.NewEncoder(out).Encode(report); err != nil {
 		return 2
 	}
