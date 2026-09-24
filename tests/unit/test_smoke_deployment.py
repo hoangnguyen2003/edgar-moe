@@ -344,6 +344,122 @@ def test_smoke_rejects_invalid_forward_performance_contract(
     assert "-0.17928633594429938" not in json.dumps(report)
 
 
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"rank_ic_block_months": 1},
+        {"rank_ic_bootstrap_samples": 999},
+        {"rank_ic_interval_status": "insufficient_months"},
+        {"rank_ic_calendar_months": 0},
+        {"rank_ic_calendar_months": 25},
+    ],
+)
+def test_smoke_rejects_misleading_forward_interval_design_or_history(
+    monkeypatch: pytest.MonkeyPatch, change: dict[str, Any]
+) -> None:
+    responses = complete_responses()
+    _replace_performance(responses, {**_configured_performance_payload(), **change})
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["error"] == "forward_performance_interval_contract_invalid"
+    assert "rank_ic_low" not in check
+    assert "rank_ic_high" not in check
+
+
+@pytest.mark.parametrize(
+    ("matured_count", "calendar_months", "status", "expected_error"),
+    [
+        (120, 2, "insufficient_months", None),
+        (120, 2, "insufficient_pairs", "forward_performance_interval_contract_invalid"),
+        (120, 12, "insufficient_months", "forward_performance_interval_contract_invalid"),
+        (120, 12, "undefined_rank_ic", None),
+    ],
+)
+def test_smoke_interval_status_tracks_settled_history(
+    matured_count: int,
+    calendar_months: int,
+    status: str,
+    expected_error: str | None,
+) -> None:
+    payload = {
+        **_configured_performance_payload(),
+        "forecast_count": matured_count + 24,
+        "matured_count": matured_count,
+        "pending_count": 24,
+        "coverage": matured_count / (matured_count + 24),
+        "rank_ic_calendar_months": calendar_months,
+        "rank_ic_interval_status": status,
+        "rank_ic": None if status == "undefined_rank_ic" else 0.2,
+    }
+
+    assert _MODULE._forward_performance_error(payload) == expected_error
+
+
+def test_smoke_unconfigured_registry_has_no_interval_design() -> None:
+    responses = complete_responses()
+    payload = json.loads(responses["https://terminal.example/api/v1/forward/performance"]._body)
+    payload["rank_ic_block_months"] = 2
+
+    assert (
+        _MODULE._forward_performance_error(payload)
+        == "forward_performance_interval_contract_invalid"
+    )
+
+
+@pytest.mark.parametrize(
+    ("matured_count", "calendar_months", "status", "rank_ic"),
+    [
+        (5001, 12, "ready", 0.2),
+        (121, 121, "ready", 0.2),
+        (120, 12, "undefined_rank_ic", 0.2),
+    ],
+)
+def test_smoke_rejects_capacity_or_undefined_point_estimate_mismatch(
+    matured_count: int, calendar_months: int, status: str, rank_ic: float
+) -> None:
+    payload = {
+        **_configured_performance_payload(),
+        "forecast_count": matured_count + 24,
+        "matured_count": matured_count,
+        "pending_count": 24,
+        "coverage": matured_count / (matured_count + 24),
+        "rank_ic_calendar_months": calendar_months,
+        "rank_ic_interval_status": status,
+        "rank_ic": rank_ic,
+        "rank_ic_low": 0.1 if status == "ready" else None,
+        "rank_ic_high": 0.3 if status == "ready" else None,
+    }
+
+    assert (
+        _MODULE._forward_performance_error(payload)
+        == "forward_performance_interval_contract_invalid"
+    )
+
+
+@pytest.mark.parametrize(
+    ("matured_count", "calendar_months"),
+    [(5001, 12), (121, 121)],
+)
+def test_smoke_accepts_capacity_review_status_without_bounds(
+    matured_count: int, calendar_months: int
+) -> None:
+    payload = {
+        **_configured_performance_payload(),
+        "forecast_count": matured_count + 24,
+        "matured_count": matured_count,
+        "pending_count": 24,
+        "coverage": matured_count / (matured_count + 24),
+        "rank_ic_calendar_months": calendar_months,
+        "rank_ic_interval_status": "capacity_review_required",
+    }
+
+    assert _MODULE._forward_performance_error(payload) is None
+
+
 def test_smoke_requires_interval_fields_in_performance_schema(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
