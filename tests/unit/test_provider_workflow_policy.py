@@ -28,6 +28,137 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+def test_provider_preflight_rejects_job_scoped_secrets(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-evidence-preflight.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "    env:\n      REPORT_DIR:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}\n      REPORT_DIR:",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "provider secrets must not be job-scoped" in result.stdout
+
+
+def test_provider_preflight_rejects_secrets_in_dependency_setup(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-evidence-preflight.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          DATABASE_ALIAS: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}\n"
+            "        run: uv sync --locked --extra dev",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "provider secrets must not enter Install dependencies" in result.stdout
+
+
+def test_provider_preflight_requires_reviewed_secret_set(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-evidence-preflight.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: "
+            "${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}\n",
+            "",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert (
+        "Run value-redacting prerequisite check must receive only its reviewed secrets"
+        in result.stdout
+    )
+
+
+def test_provider_restore_rejects_job_scoped_secrets(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-restore-rehearsal.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "    env:\n      CONFIRM_ISOLATED_TARGET:",
+            "    env:\n      DATABASE_ALIAS: "
+            "${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}\n"
+            "      CONFIRM_ISOLATED_TARGET:",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "provider secrets must not be job-scoped" in result.stdout
+
+
+def test_provider_restore_rejects_secrets_in_dependency_setup(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-restore-rehearsal.yml"
+    workflow.write_text(
+        workflow.read_text(encoding="utf-8").replace(
+            "      - run: uv sync --locked --extra dev",
+            "      - name: Install dependencies\n"
+            "        env:\n"
+            "          DATABASE_ALIAS: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}\n"
+            "        run: uv sync --locked --extra dev",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert "provider secrets must not enter Install dependencies" in result.stdout
+
+
+def test_provider_restore_requires_secret_on_restore_step(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-restore-rehearsal.yml"
+    text = workflow.read_text(encoding="utf-8")
+    marker = "      - name: Restore into the isolated target"
+    before, after = text.split(marker, 1)
+    after = after.replace(
+        "        env:\n"
+        "          TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}\n",
+        "",
+        1,
+    )
+    workflow.write_text(before + marker + after, encoding="utf-8")
+
+    result = _run_validator(tmp_path)
+
+    assert result.returncode != 0
+    assert (
+        "Restore into the isolated target must receive only its reviewed secrets" in result.stdout
+    )
+
+
 def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
