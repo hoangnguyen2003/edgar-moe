@@ -114,9 +114,12 @@ export function OverviewPage() {
         />
         <MetricCard label="Worst drop" info="drawdown" value={percent(portfolio.maximum_drawdown)} detail="Largest fall from a peak in the backtest" />
       </section>
-      {hasFrozenInterval && <p className="panel__note">
-        The ranking interval groups filings by calendar month and does not adjust for model selection.
-        {" "}<a href="https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md">Read the dated method and caveats</a>.
+      {(hasFrozenInterval || sharpeInterval) && <p className="panel__note">
+        In the marks, the bar is the 95% interval, the dot the estimate, and the tick zero.
+        {hasFrozenInterval && <>
+          {" "}The ranking interval groups filings by calendar month and does not adjust for model selection.
+          {" "}<a href="https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md">Read the dated method and caveats</a>.
+        </>}
       </p>}
 
       <section className="panel fair-test">

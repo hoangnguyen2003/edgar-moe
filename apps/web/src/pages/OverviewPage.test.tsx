@@ -44,6 +44,7 @@ describe("Overview", () => {
     // Both headline uncertainties are drawn as well as stated.
     expect(await screen.findByText(/After 0\.10% trading costs; 95% interval −2\.31 to 0\.94 includes zero/)).toBeInTheDocument();
     expect(document.querySelectorAll(".figures .interval-glyph")).toHaveLength(2);
+    expect(screen.getByText(/In the marks, the bar is the 95% interval, the dot the estimate, and the tick zero\./)).toBeInTheDocument();
     expect(await screen.findByText(/95% two-month calendar-block interval −0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read the dated method and caveats" })).toHaveAttribute(
       "href", "https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md",
