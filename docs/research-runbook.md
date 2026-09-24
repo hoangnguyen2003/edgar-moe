@@ -100,9 +100,10 @@ from that portfolio check. The output defaults to the private ignored
 and refuses overwrite. Keep it private while checking sample sizes, calendar
 coverage, uncertainty, model complexity, cost sensitivity, and data licenses.
 
-The command does not open the locked outcomes, update the forward registry,
-publish the public snapshot, or authorize a v2 résumé/alpha claim. Record a
-fresh locked-test decision separately only after a reviewed protocol and
+The dataset loader reads the complete target array, but this command never
+indexes, scores, or evaluates locked-period labels. It does not update the
+forward registry, publish the public snapshot, or authorize a v2 résumé/alpha
+claim. Record a fresh locked-test decision separately only after a reviewed protocol and
 pretest report exist; never rerun or reinterpret the frozen v1 locked test.
 
 ## 7. Publish honestly

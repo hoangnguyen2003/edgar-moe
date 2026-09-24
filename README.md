@@ -387,7 +387,7 @@ For a separately identified v2 dataset and selection, `edgar-moe v2-pretest-revi
 --dataset-dir <v2-dataset> --selection-dir <v2-selection>` writes a private,
 non-overwritable review of paired pretest rank-IC comparisons and cost-aware
 portfolio scenarios, gated on return coverage. It does not publish results or
-open the locked test; see the [research runbook](docs/research-runbook.md) and
+score locked-period rows; see the [research runbook](docs/research-runbook.md) and
 [13-role evidence map](docs/worldquant-role-evidence.md). No v2 empirical result
 is claimed until that separate study has been run and reviewed.
 

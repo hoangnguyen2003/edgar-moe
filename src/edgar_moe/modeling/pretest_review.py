@@ -1,7 +1,9 @@
 """Identity-checked, pre-test-only review of a separate duration-aware study.
 
-This reads a processed v2 dataset and its saved walk-forward score archive. It
-does not retrain, open the locked test, publish a snapshot, or write a forecast.
+This reads a processed v2 dataset and its saved walk-forward score archive. The
+dataset loader reads the complete target array, but this review never indexes,
+scores, or evaluates locked-period labels. It does not retrain, publish a
+snapshot, or write a forecast.
 All reported model differences are conditional on the same development-era
 selection and therefore are not independent evidence of an alpha.
 """
