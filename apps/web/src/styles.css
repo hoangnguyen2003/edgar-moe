@@ -426,6 +426,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .reason-list li { padding-top: 12px; border-top: 1px solid var(--rule); }
 .reason-list strong { font: 600 16px var(--sans); }
 .reason-list p { margin: 6px 0 0; color: var(--ink-2); font-size: 15px; line-height: 1.6; }
+.reason-list .reason-list__outcome { margin-top: var(--s2); color: var(--ink); font: 500 13px/1.5 var(--mono); }
 .leaderboard-panel { margin: 16px 0; }
 .table-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
 .leaderboard { width: 100%; min-width: 640px; border-collapse: collapse; }
@@ -438,6 +439,13 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .leaderboard__model { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .leaderboard__model strong { font-size: 16px; }
 .leaderboard .param-list { margin-top: 6px; }
+/* The settings codes in words, each code set like the chips it explains. */
+.settings-key { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--s2) var(--s4); align-items: baseline; margin-bottom: var(--s4); }
+.settings-key__label { color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.settings-key dl { display: grid; grid-template-columns: repeat(2, auto minmax(0, 1fr)); gap: var(--s1) var(--s2); align-items: baseline; margin: 0; }
+.settings-key dl > div { display: contents; }
+.settings-key dt { justify-self: start; padding: 0 6px; border: 1px solid var(--rule-strong); background: var(--sheet); color: var(--ink-2); font: 500 12px/1.5 var(--mono); }
+.settings-key dd { margin: 0 var(--s3) 0 0; color: var(--ink-2); font-size: var(--t-micro); line-height: 1.5; }
 .leaderboard tr.is-selected td { background: var(--highlight-soft); }
 .leaderboard tr.is-selected td:first-child { box-shadow: inset 3px 0 var(--ink); color: var(--ink); font-weight: 600; }
 .leaderboard__delta { display: block; margin-top: 3px; color: var(--ink-2); font: 500 13px var(--mono); }
@@ -813,6 +821,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   /* An odd last figure takes the whole row rather than leaving a hole. */
   .figures .figure:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .reason-list { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  .settings-key { grid-template-columns: minmax(0, 1fr); }
+  .settings-key dl { grid-template-columns: auto minmax(0, 1fr); }
   .decision-list a { grid-template-columns: minmax(0, 1fr) 16px; }
   .decision-list small { grid-row: 1; padding-top: 0; }
   .decision-list strong { grid-column: 1; grid-row: 2; }

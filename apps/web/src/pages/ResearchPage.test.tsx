@@ -72,6 +72,24 @@ describe("Experiment leaderboard", () => {
     expect(within(table).queryByText("Elastic Net")).not.toBeInTheDocument();
   });
 
+  it("explains the settings codes and shows where each simpler model finished", async () => {
+    renderPage();
+    await screen.findByRole("table");
+    const key = screen.getByText("Settings").closest(".settings-key") as HTMLElement;
+    for (const code of ["h", "dropout", "gate", "moe"]) {
+      expect(within(key).getByText(code).tagName).toBe("DT");
+    }
+    expect(key).toHaveTextContent("0 keeps them fixed");
+
+    // The comparison states its outcome instead of leaving it below the preview.
+    const reasons = screen.getByRole("heading", { name: "Why compare against simpler models?" }).closest("article")!;
+    const item = (title: string) => within(reasons).getByText(title).closest("li")!;
+    expect(item("Linear model")).toHaveTextContent("Elastic Net · #12 of 12 · \u22120.080");
+    expect(item("Mixture of experts")).toHaveTextContent("Fundamental-Anchored MoE · #11 of 12 · +0.050");
+    // No tree model in this registry, so no outcome is invented for one.
+    expect(item("Tree model").querySelector(".reason-list__outcome")).toBeNull();
+  });
+
   it("re-sorts by prediction error and expands to every candidate", async () => {
     renderPage();
     await screen.findByRole("table");
