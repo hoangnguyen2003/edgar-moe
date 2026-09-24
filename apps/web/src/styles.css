@@ -305,7 +305,9 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 /* The gate diagram. */
 .gate__svg { display: block; width: 100%; height: auto; overflow: visible; }
 .gate__stream { fill: none; stroke: var(--expert); opacity: .9; }
-.gate__flow { fill: none; stroke: var(--sheet); stroke-dasharray: 3 17; opacity: .75; animation: gate-flow 2.6s linear infinite; }
+/* The flow runs twice as the diagram appears, to show which way the filing moves
+   through the gate, then holds still: motion beside reading must not loop (WCAG 2.2.2). */
+.gate__flow { fill: none; stroke: var(--sheet); stroke-dasharray: 3 17; opacity: .75; animation: gate-flow 2.4s linear 2 both; }
 @keyframes gate-flow { to { stroke-dashoffset: -40; } }
 .gate__node { fill: var(--ink); }
 .gate__output { fill: none; stroke: var(--ink); stroke-width: 14; }
