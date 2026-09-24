@@ -98,6 +98,8 @@ jobs:
         run: |
           uv run edgar-moe forward-diagnostic-history --help
           uv run edgar-moe forward-diagnostic-history-verify --help
+          uv run edgar-moe forward-diagnostic-history-review --help
+          uv run edgar-moe forward-diagnostic-history-review-verify --help
       - name: Check research copilot command is runnable
         run: |
           uv run edgar-moe research-copilot --help

@@ -1156,6 +1156,130 @@ def forward_diagnostic_history_verify(
     )
 
 
+@app.command("forward-diagnostic-history-review")
+def forward_diagnostic_history_review(
+    history: Annotated[
+        Path,
+        typer.Option("--history", help="Verified redacted diagnostic-history JSON."),
+    ],
+    reviewer_id: Annotated[
+        str,
+        typer.Option("--reviewer-id", help="Self-reported short identifier; not authenticated."),
+    ],
+    decision: Annotated[
+        str,
+        typer.Option("--decision", help="Either acknowledged or follow_up_required."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option(
+            "--output", help="New private review JSON path; an existing file is never replaced."
+        ),
+    ],
+    reason_code: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--reason-code",
+            help="Stable follow-up reason; repeat for each reason when decision requires follow-up.",
+        ),
+    ] = None,
+    confirm_reviewed: Annotated[
+        bool,
+        typer.Option(
+            "--confirm-reviewed",
+            help="Required attestation that counts, maturity, coverage, and metrics were reviewed.",
+        ),
+    ] = False,
+    acknowledge_limitations: Annotated[
+        bool,
+        typer.Option(
+            "--acknowledge-limitations",
+            help=(
+                "Required attestation: collection status is not performance readiness, snapshot "
+                "independence is unknown, this is not the official 20-session test, v1 stays "
+                "frozen, and promotion/retraining are not authorized."
+            ),
+        ),
+    ] = False,
+) -> None:
+    """Create a separate, self-attested review record for one history artifact."""
+    from edgar_moe.forward.diagnostic_history import (
+        DiagnosticHistoryError,
+        read_forward_diagnostic_history,
+    )
+    from edgar_moe.forward.diagnostic_history_review import (
+        DiagnosticHistoryReviewError,
+        build_forward_diagnostic_history_review,
+        write_forward_diagnostic_history_review,
+    )
+
+    if not acknowledge_limitations:
+        raise typer.BadParameter("--acknowledge-limitations is required to record a review")
+    if not confirm_reviewed:
+        raise typer.BadParameter("--confirm-reviewed is required to record a review")
+    try:
+        history_payload = read_forward_diagnostic_history(history)
+        review = build_forward_diagnostic_history_review(
+            history_payload,
+            reviewer_id=reviewer_id,
+            decision=decision,
+            summary_reviewed=confirm_reviewed,
+            limitations_acknowledged=acknowledge_limitations,
+            reason_codes=reason_code or (),
+            reviewed_at=datetime.now(UTC),
+        )
+        write_forward_diagnostic_history_review(output, review)
+    except (DiagnosticHistoryError, DiagnosticHistoryReviewError, OSError) as error:
+        raise typer.BadParameter(str(error)) from error
+
+    summary = {
+        "decision": review["decision"],
+        "reason_codes": review["reason_codes"],
+        "source_history_sha256": review["source_history"]["history_sha256"],
+        "review_sha256": review["review_sha256"],
+        "reviewed_at": review["reviewed_at"],
+    }
+    typer.echo(f"Wrote self-attested forward-history review to {output}")
+    typer.echo(orjson.dumps(summary, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
+
+
+@app.command("forward-diagnostic-history-review-verify")
+def forward_diagnostic_history_review_verify(
+    review: Annotated[
+        Path,
+        typer.Argument(help="Content-addressed self-attested history review JSON."),
+    ],
+    history: Annotated[
+        Path | None,
+        typer.Option(
+            "--history", help="Optional source history to verify the recorded association."
+        ),
+    ] = None,
+) -> None:
+    """Verify a review record and optionally compare its source-history binding."""
+    from edgar_moe.forward.diagnostic_history import (
+        DiagnosticHistoryError,
+        read_forward_diagnostic_history,
+    )
+    from edgar_moe.forward.diagnostic_history_review import (
+        DiagnosticHistoryReviewError,
+        read_forward_diagnostic_history_review,
+        verify_forward_diagnostic_history_review,
+    )
+
+    try:
+        review_payload = read_forward_diagnostic_history_review(review)
+        history_payload = read_forward_diagnostic_history(history) if history is not None else None
+        verify_forward_diagnostic_history_review(review_payload, history=history_payload)
+    except (DiagnosticHistoryError, DiagnosticHistoryReviewError, OSError) as error:
+        raise typer.BadParameter(str(error)) from error
+    suffix = "; source history matched" if history_payload is not None else "; source not reopened"
+    typer.echo(
+        f"Verified forward-history review {review_payload['review_sha256']} "
+        f"(decision={review_payload['decision']}{suffix})"
+    )
+
+
 @app.command("forward-status")
 def forward_status(
     database_url: Annotated[

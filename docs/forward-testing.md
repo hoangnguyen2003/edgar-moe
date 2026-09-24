@@ -667,6 +667,48 @@ but is not a readiness decision; the history must still be independently
 reviewed before it can influence research decisions. Workflow summaries display
 the snapshot count, unassessed independence, and non-promotion status explicitly.
 
+### Record a separate human review attestation
+
+The source history remains immutable and keeps `human_review_status` as
+`not_recorded`. After reviewing the history's counts, maturity, coverage, metrics,
+and limitations, a maintainer may create a separate, content-addressed
+self-attestation. The CLI requires separate confirmations that the summary was
+reviewed and that its research-only limitations are understood; it does not
+infer either acknowledgement from the review decision:
+
+The review/source separation is recorded in
+[ADR 0028](adr/0028-forward-history-review-attestations.md).
+
+```bash
+uv run edgar-moe forward-diagnostic-history-review \
+  --history /path/to/forward-diagnostic-history.json \
+  --reviewer-id maintainer \
+  --decision acknowledged \
+  --confirm-reviewed \
+  --acknowledge-limitations \
+  --output /private/path/history-review.json
+
+uv run edgar-moe forward-diagnostic-history-review-verify \
+  /private/path/history-review.json \
+  --history /path/to/forward-diagnostic-history.json
+```
+
+Use `--decision follow_up_required` and repeat `--reason-code` with stable
+reason codes such as `metric_anomaly` or `maturity_or_coverage_concern` when
+review found an issue. Supported codes are `history_status_needs_follow_up`,
+`insufficient_history`, `maturity_or_coverage_concern`, `metric_anomaly`,
+`provenance_question`, `snapshot_overlap_or_dependence_question`, and
+`other_follow_up`. A history whose collection status is not `ready` requires
+`follow_up_required`. Use a new output path for each immutable review record;
+existing files are never replaced. Free-form notes are deliberately not accepted. The
+reviewer identifier is self-reported; SHA-256 detects later content changes but
+does not authenticate the person or provide a digital signature. The record
+acknowledges that snapshots may overlap, their independence is not assessed,
+the history is not the official 20-session evaluation, v1 is immutable, and
+neither promotion nor retraining is authorized. It is not a model approval or
+performance result. Keep this private operator evidence separate from the
+history; it does not rewrite the history's `human_review_status` field.
+
 ## Monitoring and recovery
 
 The independent Go [evidence auditor](evidence-auditor.md) verifies registry
