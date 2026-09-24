@@ -591,12 +591,13 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .blotter--short .blotter__head h2 { color: var(--critical); }
 .blotter__table { width: 100%; table-layout: fixed; border-collapse: collapse; }
 /* Fixed columns, so the three groups line up and scores compare down the page. */
-.blotter__table th:nth-child(1) { width: 30%; }
-.blotter__table th:nth-child(2) { width: 19%; }
-.blotter__table th:nth-child(3) { width: 10%; }
-.blotter__table th:nth-child(4) { width: 12%; }
-.blotter__table th:nth-child(5) { width: 16%; }
+.blotter__table th:nth-child(1) { width: 25%; }
+.blotter__table th:nth-child(2) { width: 17%; }
+.blotter__table th:nth-child(3) { width: 9%; }
+.blotter__table th:nth-child(4) { width: 11%; }
+.blotter__table th:nth-child(5) { width: 13%; }
 .blotter__table th:nth-child(6) { width: 13%; }
+.blotter__table th:nth-child(7) { width: 12%; }
 .blotter__table th { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule); color: var(--ink-3); font: 600 var(--t-micro) var(--sans); text-align: left; }
 .blotter__table td { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--rule); color: var(--ink-2); font-size: var(--t-small); vertical-align: middle; transition: background .12s ease; }
 .blotter__table tbody tr:hover td { background: var(--paper-2); }
@@ -612,6 +613,12 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .blotter__link a:hover { text-decoration-color: var(--ink); }
 .blotter__link a:hover svg { transform: translateX(2px); }
 .blotter__link svg { transition: transform .12s ease; }
+/* What happened next: a bar for size and sign beside the number, and for a call,
+   the verdict beneath, so the column stays narrow and every row reads the same way. */
+.call-outcome { display: grid; grid-template-columns: 44px auto; align-items: center; justify-items: start; gap: 5px var(--s2); }
+.call-outcome__bar { width: 44px; height: 6px; }
+.call-outcome__value { color: var(--ink); font: 500 var(--t-small) var(--mono); font-variant-numeric: tabular-nums; }
+.call-outcome .tag { grid-column: 1 / -1; }
 
 /* Quiet answer: the same sentence as the lead, without repeating its fill. */
 .expert-mix { margin-top: 8px; }
@@ -795,13 +802,14 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .forward-table { min-width: 0; }
   .forward-table td[data-label="Saved"], .forward-table td[data-label="Tradable from"] { white-space: normal; }
   .forward-table td:first-child span { max-width: 150px; }
-  /* The blotter's link needs more than 13% at this width. */
-  .blotter__table th:nth-child(1) { width: 27%; }
-  .blotter__table th:nth-child(2) { width: 17%; }
-  .blotter__table th:nth-child(3) { width: 11%; }
-  .blotter__table th:nth-child(4) { width: 12%; }
-  .blotter__table th:nth-child(5) { width: 13%; }
-  .blotter__table th:nth-child(6) { width: 20%; }
+  /* The blotter's link needs more than 12% at this width. */
+  .blotter__table th:nth-child(1) { width: 23%; }
+  .blotter__table th:nth-child(2) { width: 15%; }
+  .blotter__table th:nth-child(3) { width: 10%; }
+  .blotter__table th:nth-child(4) { width: 11%; }
+  .blotter__table th:nth-child(5) { width: 11%; }
+  .blotter__table th:nth-child(6) { width: 14%; }
+  .blotter__table th:nth-child(7) { width: 16%; }
   .expert-mix__bar--compact { width: 100%; max-width: 132px; }
 }
 
@@ -819,8 +827,13 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .blotter__table td[data-label="Score"] { grid-column: 2; grid-row: 1; }
   .blotter__table td[data-label="Rank"] { grid-column: 2; grid-row: 2; color: var(--ink-2); }
   .blotter__table td[data-label="Filed"] { grid-column: 1 / -1; grid-row: 3; margin-top: var(--s1); font-size: var(--t-micro); }
-  .blotter__table td[data-label="Relied on"] { grid-column: 1; grid-row: 4; align-self: center; margin-top: var(--s2); }
-  .blotter__link { grid-column: 2; grid-row: 4; margin-top: var(--s2); }
+  .blotter__table td[data-label="What happened"] { grid-column: 1 / -1; grid-row: 4; margin-top: var(--s2); }
+  .blotter__table td[data-label="Relied on"] { grid-column: 1; grid-row: 5; align-self: center; margin-top: var(--s2); }
+  .blotter__link { grid-column: 2; grid-row: 5; margin-top: var(--s2); }
+  /* A full row on a phone: bar, number and verdict read on one line. */
+  .call-outcome { grid-template-columns: 56px auto auto; }
+  .call-outcome__bar { width: 56px; }
+  .call-outcome .tag { grid-column: auto; }
   .expert-mix__bar--compact { width: 100%; max-width: 180px; }
   .protocol { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
   .protocol li + li { padding-left: 0; border-left: 0; }
