@@ -134,7 +134,7 @@ jobs:
         shell: bash
         run: |
           if test -s "$REPORT_DIR/history.json"; then
-            jq -r '"Snapshot history status: \(.status); snapshots: \(.report_count); independence: \(.snapshot_independence); promotion eligible: \(.promotion_eligible); hash: \(.history_sha256)"' \
+            jq -r '"Snapshot history status: \(.status); snapshots: \(.report_count); diagnostic review required: \(.diagnostic_review_required); human review: \(.human_review_status); independence: \(.snapshot_independence); promotion eligible: \(.promotion_eligible); hash: \(.history_sha256)"' \
               "$REPORT_DIR/history.json" >> "$GITHUB_STEP_SUMMARY"
           else
             echo "Diagnostic history was not produced." >> "$GITHUB_STEP_SUMMARY"

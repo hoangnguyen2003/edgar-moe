@@ -642,9 +642,12 @@ never reopens the private source files. A `ready` history means only that the
 configured count of structurally valid snapshots was collected. Snapshots may
 overlap or reuse forecasts and labels, and statistical independence is
 explicitly `not_assessed`; never count `report_count` as independent samples.
-New histories set `promotion_eligible` to `false` and carry this interpretation
-in their content-addressed disclaimer. This history is not the official
-20-session evaluation, a performance promotion gate, or a retraining trigger.
+The `diagnostic_review_required` flag covers collection and per-report checks;
+`human_review_status` remains `not_recorded` until review is documented outside
+this immutable artifact. New histories set `promotion_eligible` to `false` and
+carry this interpretation in their content-addressed disclaimer. This history
+is not the official 20-session evaluation, a performance promotion gate, or a
+retraining trigger.
 
 ### Build a history from retained GitHub artifacts
 

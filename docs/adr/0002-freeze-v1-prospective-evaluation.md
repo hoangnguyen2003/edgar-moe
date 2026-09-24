@@ -74,7 +74,8 @@ means only that the configured number of structurally valid snapshots was
 collected; cross-snapshot independence is not assessed and the history cannot
 promote a model or authorize retraining. The retained artifact and copilot tool
 must carry these semantics so a rising snapshot count cannot be mistaken for
-independent prospective evidence.
+independent prospective evidence. Collection/report review is distinct from
+human review, which remains `not_recorded` until documented separately.
 
 ### Keep infrastructure observations outside software claims
 
