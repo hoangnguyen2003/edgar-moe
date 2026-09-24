@@ -16,8 +16,9 @@ const summary = {
 };
 
 const signals = [
-  { expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 } },
-  { expert_weights: { text: 0.06, fundamental: 0.9, market: 0.04 } },
+  { event_id: "e-MU", ticker: "MU", direction: "long", score: 0.0038, rank: 0.995, realized_abnormal_return: -0.192, expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 } },
+  { event_id: "e-CSCO", ticker: "CSCO", direction: "long", score: 0.0009, rank: 0.93, realized_abnormal_return: 0.0075, expert_weights: { text: 0.06, fundamental: 0.9, market: 0.04 } },
+  { event_id: "e-TTWO", ticker: "TTWO", direction: "short", score: -0.0067, rank: 0.03, realized_abnormal_return: -0.011, expert_weights: { text: 0.08, fundamental: 0.85, market: 0.07 } },
 ];
 
 function jsonResponse(payload: unknown) {
@@ -51,9 +52,12 @@ describe("Overview", () => {
     );
     expect(await screen.findByText(/it leaned most on financial statements \(85%\)/)).toBeInTheDocument();
 
-    const explore = screen.getByRole("navigation", { name: "Explore the project" });
-    expect(within(explore).getAllByRole("link")).toHaveLength(8);
-    expect(within(explore).getByRole("link", { name: /Backtest/ })).toHaveAttribute("href", "/portfolio");
+    // It ends on cases, not a list of pages the navigation already gives.
+    expect(screen.queryByRole("navigation", { name: "Explore the project" })).not.toBeInTheDocument();
+    const calls = screen.getByRole("region", { name: "Where the study's last calls landed" });
+    expect(calls).toHaveTextContent("Of its last 3 calls, 2 went as called: 1 of 2 longs and the short.");
+    expect(calls).toHaveTextContent("Its most confident long, MU (top 1% of scores), fell 19.2% behind the market.");
+    expect(within(calls).getByRole("link", { name: "All twelve, with what the model relied on" })).toHaveAttribute("href", "/signals");
   });
 
   it("does not attach the frozen interval to a different snapshot identity", async () => {

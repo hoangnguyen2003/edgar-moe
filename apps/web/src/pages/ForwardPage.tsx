@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, CircleDashed, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
+import { ForecastScatter } from "../components/ForecastScatter";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { Tag } from "../components/Tag";
 import { InfoTip } from "../components/InfoTip";
@@ -207,6 +208,21 @@ export function ForwardPage() {
       )}
 
       <Protocol />
+      {settledCount >= 3 && (
+        <section className="panel forecast-scatter-panel" aria-labelledby="settled-title">
+          <header>
+            <div>
+              <h2 id="settled-title">What the settled forecasts did</h2>
+              <p>
+                Each dot is a forecast whose 20 trading days have passed: the score the model saved across, and what the
+                stock then did against the market up. If the ranking worked, the dots would rise from left to right; with{" "}
+                {settledCount} so far, they mostly show how early it is.
+              </p>
+            </div>
+          </header>
+          <ForecastScatter forecasts={loaded} />
+        </section>
+      )}
       <section className="panel forward-forecast-panel">
         <header>
           <div>
