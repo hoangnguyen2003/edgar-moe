@@ -88,6 +88,7 @@ def test_history_is_redacted_chronological_and_deterministic(tmp_path: Path) -> 
     history = build_forward_diagnostic_history(tuple(reversed(summaries)))
     repeated = build_forward_diagnostic_history(summaries)
 
+    assert history["history_version"] == 2
     assert history["status"] == "ready"
     assert history["report_count"] == 3
     assert history["snapshot_independence"] == "not_assessed"
@@ -212,6 +213,7 @@ def test_history_input_bounds_are_rejected(tmp_path: Path) -> None:
     ("field", "value"),
     (
         ("history_version", 99),
+        ("history_version", True),
         ("scope", "wrong"),
         ("research_only", False),
         ("v1_immutable", False),
