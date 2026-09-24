@@ -49,7 +49,14 @@ def main() -> None:
         help="Bounded prospective source window; must retain at least 400 calendar days.",
     )
     parser.add_argument("--device", choices=("cpu", "mps", "auto"), default="cpu")
+    parser.add_argument(
+        "--prewarm-only",
+        action="store_true",
+        help="Refresh sources and build the versioned embedding cache without registry writes.",
+    )
     args = parser.parse_args()
+    if args.prewarm_only and args.diagnostic_output is not None:
+        parser.error("--diagnostic-output is unavailable with --prewarm-only")
 
     cutoff = validate_cutoff(args.cutoff or source_cutoff())
     if args.print_cutoff:
@@ -109,6 +116,20 @@ def main() -> None:
         checkpoint_manifest=checkpoint / "manifest.json",
         cutoff=cutoff,
     )
+    if args.prewarm_only:
+        print(
+            json.dumps(
+                {
+                    "mode": "prewarm_only",
+                    "cutoff": cutoff,
+                    "checkpoint": str(checkpoint),
+                    "dataset": str(dataset),
+                    "new_cached_filings": cached,
+                },
+                sort_keys=True,
+            )
+        )
+        return
     _run(
         executable,
         "forward-forecast",

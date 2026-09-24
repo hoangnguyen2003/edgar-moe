@@ -194,6 +194,31 @@ the longest market feature, includes prior annual filings for text deltas, and
 keeps frozen-model inference tractable on a free CPU runner. `--lookback-days`
 can increase the window but cannot reduce it below 400 calendar days.
 
+### Versioned embedding-cache prewarm
+
+After a reviewed `uv.lock` change that alters the FinBERT/Torch cache identity,
+the first production run may need to encode every filing again. To move that
+compute off the forecast run, manually dispatch **Prewarm forward embedding
+cache** on `main` before the next scheduled cycle. Leave `cutoff` empty for the
+current U.S. source cutoff; enter an explicit valid cutoff only when recovering
+an earlier cycle. The job refreshes the same 730-day source window and builds
+the dataset with the same CPU encoder and cache paths as production. Its runner
+stops before `forward-forecast`, `forward-settle`, and `forward-status`; it has
+no registry or R2 credentials and cannot publish prospective evidence.
+
+The workflow shares the production concurrency group, so it cannot run beside
+an active cycle. Dispatch it when no production run is pending: GitHub may
+replace an older pending run in the same group. It saves a lockfile-keyed GitHub
+Actions cache on success. A production run restores the newest compatible
+runtime cache through its prefix fallback; inspect its `build-dataset` log for
+text-cache hits and encodes to confirm the warm cache was actually used. A
+successful prewarm is **not** a successful forecast, and cache restoration is
+best-effort: if a cache expires, is evicted, or a runtime identity changes
+again, production safely re-encodes. Re-running prewarm for the same cutoff and
+lockfile uses the same cache key, but consumes hosted-runner minutes; run it
+only when a cold encode would threaten the forecast window. The existing
+production cache-maintenance job prunes older runtime caches after a cycle.
+
 The schedule has a structural coverage gap. A filing accepted before the open
 (06:00-09:30 ET) enters at that same morning's open, after the pre-dawn run has
 already finished, so no scheduled run can score it before entry. In the frozen
