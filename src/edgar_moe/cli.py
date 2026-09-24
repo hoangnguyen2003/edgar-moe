@@ -1101,7 +1101,7 @@ def forward_diagnostic_history(
             "--minimum-reports",
             min=1,
             max=128,
-            help="Reports required before history status can become ready.",
+            help="Snapshots required for collection status ready (not performance readiness).",
         ),
     ] = 3,
 ) -> None:

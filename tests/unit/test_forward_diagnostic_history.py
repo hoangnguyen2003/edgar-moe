@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from pathlib import Path
 
+import orjson
 import pytest
 
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER
@@ -88,12 +90,34 @@ def test_history_is_redacted_chronological_and_deterministic(tmp_path: Path) -> 
 
     assert history["status"] == "ready"
     assert history["report_count"] == 3
+    assert history["snapshot_independence"] == "not_assessed"
+    assert history["promotion_eligible"] is False
+    assert "Snapshots may overlap" in history["disclaimer"]
+    assert "ready status means only" in history["disclaimer"]
     assert history["history_sha256"] == repeated["history_sha256"]
     assert [item["sequence"] for item in history["observations"]] == [1, 2, 3]
     serialized = json.dumps(history)
     assert "must-not-leak" not in serialized
     assert "observations" not in history["observations"][0]["unique_event_evaluation"]
     verify_forward_diagnostic_history(history)
+
+
+def test_legacy_v1_history_remains_verifiable(tmp_path: Path) -> None:
+    history = build_forward_diagnostic_history(_summaries(tmp_path))
+    legacy = copy.deepcopy(history)
+    legacy["history_version"] = 1
+    legacy.pop("snapshot_independence")
+    legacy.pop("promotion_eligible")
+    legacy["disclaimer"] = (
+        "Forward diagnostic history is research-only short-horizon evidence; it does not "
+        "replace, modify, or contribute to the official 20-session forward evaluation."
+    )
+    legacy.pop("history_sha256")
+    legacy["history_sha256"] = hashlib.sha256(
+        orjson.dumps(legacy, option=orjson.OPT_SORT_KEYS)
+    ).hexdigest()
+
+    verify_forward_diagnostic_history(legacy)
 
 
 def test_insufficient_history_is_valid_and_verifies(tmp_path: Path) -> None:
@@ -127,6 +151,8 @@ def test_raw_reports_cannot_bypass_the_redaction_boundary() -> None:
         lambda history: history["observations"][0].__setitem__("event_id", "secret"),
         lambda history: history.__setitem__("status", "review_required"),
         lambda history: history.__setitem__("history_sha256", "f" * 64),
+        lambda history: history.__setitem__("snapshot_independence", "independent"),
+        lambda history: history.__setitem__("promotion_eligible", True),
     ),
 )
 def test_tampered_history_is_rejected(tmp_path: Path, mutation: object) -> None:

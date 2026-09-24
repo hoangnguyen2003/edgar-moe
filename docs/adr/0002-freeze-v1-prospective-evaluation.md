@@ -68,6 +68,14 @@ requires enough stable observations and exits non-zero for insufficient,
 warning, incomplete, or error histories. Its hash-pinned summary never changes
 the model or treats drift as a promotion decision.
 
+Short-horizon diagnostic history is a sequence of snapshots, not a set of
+independent trials: snapshots can reuse forecasts and labels. Its `ready` status
+means only that the configured number of structurally valid snapshots was
+collected; cross-snapshot independence is not assessed and the history cannot
+promote a model or authorize retraining. The retained artifact and copilot tool
+must carry these semantics so a rising snapshot count cannot be mistaken for
+independent prospective evidence.
+
 ### Keep infrastructure observations outside software claims
 
 Repository tests and CI prove the software contract. Provider grants, managed

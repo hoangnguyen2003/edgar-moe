@@ -21,7 +21,8 @@ import orjson
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, read_forward_diagnostic_summary
 from edgar_moe.utils.timestamps import parse_aware_timestamp
 
-HISTORY_VERSION = 1
+HISTORY_VERSION = 2
+_LEGACY_HISTORY_VERSION = 1
 OFFICIAL_HORIZON_SESSIONS = 20
 MAX_HISTORY_REPORTS = 128
 MAX_HISTORY_BYTES = 2_000_000
@@ -80,7 +81,7 @@ _UNIQUE_KEYS = frozenset(
         "latest_maturity_at",
     }
 )
-_HISTORY_KEYS = frozenset(
+_HISTORY_KEYS_V1 = frozenset(
     {
         "history_version",
         "scope",
@@ -100,9 +101,21 @@ _HISTORY_KEYS = frozenset(
         "history_sha256",
     }
 )
-_DISCLAIMER = (
+_HISTORY_KEYS = _HISTORY_KEYS_V1 | frozenset({"snapshot_independence", "promotion_eligible"})
+_HISTORY_KEYS_BY_VERSION = {
+    _LEGACY_HISTORY_VERSION: _HISTORY_KEYS_V1,
+    HISTORY_VERSION: _HISTORY_KEYS,
+}
+_DISCLAIMER_V1 = (
     "Forward diagnostic history is research-only short-horizon evidence; it does not replace, "
     "modify, or contribute to the official 20-session forward evaluation."
+)
+_DISCLAIMER = (
+    "Forward diagnostic history is a research-only sequence of short-horizon snapshots. "
+    "Snapshots may overlap or reuse forecasts and labels; statistical independence is not "
+    "assessed. A ready status means only that the configured number of valid snapshots was "
+    "collected. This history is not promotion evidence, does not authorize retraining, and "
+    "does not replace or contribute to the official 20-session forward evaluation."
 )
 _SHA256 = frozenset("0123456789abcdef")
 
@@ -186,6 +199,8 @@ def build_forward_diagnostic_history(
         "official_evaluation_untouched": True,
         "status": status,
         "review_required": status != "ready",
+        "snapshot_independence": "not_assessed",
+        "promotion_eligible": False,
         "minimum_reports": minimum,
         "report_count": report_count,
         "official_horizon_sessions": OFFICIAL_HORIZON_SESSIONS,
@@ -203,17 +218,23 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
     """Verify the history contract without reopening any source report."""
     if not isinstance(history, Mapping):
         raise DiagnosticHistoryError("diagnostic history must be an object")
-    unknown = sorted(str(key) for key in history if key not in _HISTORY_KEYS)
+    history_version = history.get("history_version")
+    if (
+        isinstance(history_version, bool)
+        or not isinstance(history_version, int)
+        or history_version not in _HISTORY_KEYS_BY_VERSION
+    ):
+        raise DiagnosticHistoryError("diagnostic history version is unsupported")
+    expected_keys = _HISTORY_KEYS_BY_VERSION[history_version]
+    unknown = sorted(str(key) for key in history if key not in expected_keys)
     if unknown:
         raise DiagnosticHistoryError(
             "diagnostic history contains unknown fields: " + ", ".join(unknown)
         )
-    required = _HISTORY_KEYS
+    required = expected_keys
     missing = sorted(key for key in required if key not in history)
     if missing:
         raise DiagnosticHistoryError("diagnostic history is missing fields: " + ", ".join(missing))
-    if history.get("history_version") != HISTORY_VERSION:
-        raise DiagnosticHistoryError("diagnostic history version is unsupported")
     if history.get("scope") != "forward_diagnostic_history":
         raise DiagnosticHistoryError("diagnostic history scope is invalid")
     if history.get("research_only") is not True:
@@ -239,7 +260,17 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
     if not 2 <= horizon < OFFICIAL_HORIZON_SESSIONS:
         raise DiagnosticHistoryError("diagnostic history horizon is invalid")
     latest_as_of = _parse_timestamp(history.get("latest_as_of"), "latest_as_of")
-    if history.get("disclaimer") != _DISCLAIMER:
+    if history_version == HISTORY_VERSION:
+        if history.get("snapshot_independence") != "not_assessed":
+            raise DiagnosticHistoryError(
+                "diagnostic history snapshot independence must remain not_assessed"
+            )
+        if history.get("promotion_eligible") is not False:
+            raise DiagnosticHistoryError("diagnostic history cannot be promotion eligible")
+        expected_disclaimer = _DISCLAIMER
+    else:
+        expected_disclaimer = _DISCLAIMER_V1
+    if history.get("disclaimer") != expected_disclaimer:
         raise DiagnosticHistoryError("diagnostic history disclaimer is invalid")
 
     raw_observations = history.get("observations")

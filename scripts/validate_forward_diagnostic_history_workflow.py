@@ -87,6 +87,8 @@ def validate_forward_diagnostic_history_workflow(path: Path) -> list[str]:
         "forward-diagnostic-history",
         "uv run edgar-moe forward-diagnostic-history",
         "forward-diagnostic-history-verify",
+        "snapshot_independence",
+        "promotion_eligible",
         "scripts/validate_redacted_artifacts.py",
         "sha256sum",
         "SHA256SUMS",
