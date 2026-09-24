@@ -6,7 +6,7 @@ import { PageDirectory } from "../components/PageDirectory";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import rankIcInterval from "../data/locked-rank-ic-interval.json";
-import { api } from "../lib/api";
+import { latestSignalsQuery, summaryQuery } from "../lib/queries";
 import { averageWeights, EXPERTS, type ExpertKey } from "../lib/experts";
 import { count, decimal, percent, shortDate } from "../lib/format";
 import { navigation } from "../lib/navigation";
@@ -36,8 +36,8 @@ function gateCaption(weights: Record<ExpertKey, number> | null, cohort: number):
 }
 
 export function OverviewPage() {
-  const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
-  const signals = useQuery({ queryKey: ["latest-signals"], queryFn: api.latestSignals });
+  const summary = useQuery(summaryQuery);
+  const signals = useQuery(latestSignalsQuery);
   if (summary.isLoading) return <Page><LoadingState skeleton={["figures", "rows"]} /></Page>;
   if (summary.error) return <Page><ErrorState error={summary.error} onRetry={() => void summary.refetch()} /></Page>;
   const data = summary.data!;

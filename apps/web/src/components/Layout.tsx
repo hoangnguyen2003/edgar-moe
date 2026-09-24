@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
+import { summaryQuery } from "../lib/queries";
 import { shortDate } from "../lib/format";
 import { navigation, nextPage, pageTitle } from "../lib/navigation";
 import { Link } from "../lib/router";
@@ -15,7 +15,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useRouter();
   const collapsed = useMediaQuery(MENU_LAYOUT);
   const { theme, setTheme } = useTheme();
-  const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
+  const summary = useQuery(summaryQuery);
   const navRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);

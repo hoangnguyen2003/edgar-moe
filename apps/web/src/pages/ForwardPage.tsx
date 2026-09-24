@@ -7,6 +7,7 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
+import { forwardForecastsQuery, forwardPerformanceQuery, forwardQualityQuery, forwardRunsQuery, forwardStatusQuery } from "../lib/queries";
 import { checkReading, compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
@@ -18,26 +19,14 @@ import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 const EARLY_RESULT_COUNT = 100;
 
 export function ForwardPage() {
-  const status = useQuery({ queryKey: ["forward-status"], queryFn: api.forwardStatus });
+  const status = useQuery(forwardStatusQuery);
   const enabled = Boolean(status.data?.available);
-  const performance = useQuery({
-    queryKey: ["forward-performance"],
-    queryFn: api.forwardPerformance,
-    enabled,
-  });
-  const runs = useQuery({ queryKey: ["forward-runs"], queryFn: api.forwardRuns, enabled });
-  const forecasts = useQuery({
-    queryKey: ["forward-forecasts"],
-    queryFn: api.forwardForecasts,
-    enabled,
-  });
+  const performance = useQuery({ ...forwardPerformanceQuery, enabled });
+  const runs = useQuery({ ...forwardRunsQuery, enabled });
+  const forecasts = useQuery({ ...forwardForecastsQuery, enabled });
   const outcomeLabelId = useId();
   const [outcome, setOutcome] = useState<"all" | "settled" | "pending">("all");
-  const quality = useQuery({
-    queryKey: ["forward-quality"],
-    queryFn: api.forwardDataQuality,
-    enabled,
-  });
+  const quality = useQuery({ ...forwardQualityQuery, enabled });
 
   if (status.isLoading) {
     return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;

@@ -4,7 +4,7 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
-import { api } from "../lib/api";
+import { experimentsQuery, summaryQuery } from "../lib/queries";
 import { decimal, signedDecimal, splitModelName } from "../lib/format";
 import type { ExperimentRecord } from "../lib/types";
 
@@ -27,8 +27,8 @@ function ranked(rows: ExperimentRecord[], sort: SortKey) {
 }
 
 export function ResearchPage() {
-  const experiments = useQuery({ queryKey: ["experiments"], queryFn: api.experiments });
-  const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
+  const experiments = useQuery(experimentsQuery);
+  const summary = useQuery(summaryQuery);
   if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading the model comparison" skeleton={["figures", "rows"]} /></div>;
   if (experiments.error) return <div className="page"><ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
   const rows = experiments.data!;

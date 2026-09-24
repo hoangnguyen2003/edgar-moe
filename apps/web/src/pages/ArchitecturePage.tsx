@@ -3,7 +3,7 @@ import { ArrowUpRight } from "lucide-react";
 import { CopyCommand } from "../components/CopyCommand";
 import { PageHeader } from "../components/PageHeader";
 import { Takeaway } from "../components/Takeaway";
-import { api } from "../lib/api";
+import { governanceQuery } from "../lib/queries";
 import { Link } from "../lib/router";
 
 const REPOSITORY = "https://github.com/hoangnguyen2003/edgar-moe";
@@ -97,7 +97,7 @@ const DECISIONS = [
 
 export function ArchitecturePage() {
   // The page stands on its own; the governance contract only adds live figures.
-  const governance = useQuery({ queryKey: ["governance"], queryFn: api.governance });
+  const governance = useQuery(governanceQuery);
   const controls = governance.data?.controls;
   const enforced = controls?.filter((control) => control.status === "enforced").length;
   const sha = governance.data?.frozen_v1.sha256;

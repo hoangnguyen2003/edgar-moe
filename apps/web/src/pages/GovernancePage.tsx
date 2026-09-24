@@ -7,7 +7,7 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
-import { api } from "../lib/api";
+import { governanceQuery } from "../lib/queries";
 import { humanize, shortDate } from "../lib/format";
 import type { GovernanceControl, GovernanceResponse } from "../lib/types";
 
@@ -19,7 +19,7 @@ const CONTROL_LABELS: Record<string, string> = {
 };
 
 export function GovernancePage() {
-  const governance = useQuery({ queryKey: ["governance"], queryFn: api.governance });
+  const governance = useQuery(governanceQuery);
   const header = (
     <PageHeader title="Audit trail">
       Evidence that the published results come from the frozen model and haven't been edited since, and a clear
