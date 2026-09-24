@@ -279,6 +279,17 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
 /* A figure strip after a section's last line needs the same air as under a page header. */
 .panel + .figures { margin-top: var(--s5); }
+.research-evidence { color: var(--ink); }
+.evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s5); }
+.evidence-grid > div { min-width: 0; }
+.evidence-grid > div + div { border-left: 1px solid var(--rule); padding-left: var(--s5); }
+.evidence-grid h3 { margin: 0 0 var(--s2); font-size: var(--t-body); }
+.evidence-grid p { margin: 0 0 var(--s2); line-height: 1.6; }
+.evidence-provenance { overflow-wrap: anywhere; color: var(--ink-2); font-size: var(--t-small); }
+.evidence-table { width: 100%; border-collapse: collapse; margin: var(--s3) 0; font-size: var(--t-small); }
+.evidence-table caption { text-align: left; padding-bottom: var(--s1); color: var(--ink-2); }
+.evidence-table th, .evidence-table td { text-align: left; vertical-align: top; padding: var(--s2); border-bottom: 1px solid var(--rule); }
+@media (max-width: 760px) { .evidence-grid { grid-template-columns: 1fr; } .evidence-grid > div + div { border-left: 0; border-top: 1px solid var(--rule); padding: var(--s4) 0 0; } .evidence-table { min-width: 560px; } }
 .figures--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .figures--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* Each figure spans its row's label, value and detail tracks, so values line

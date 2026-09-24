@@ -36,9 +36,11 @@ from edgar_moe.api.models import (
     HealthResponse,
     MethodologyResponse,
     PublicDataBoundary,
+    ResearchEvidenceResponse,
     SummaryResponse,
 )
 from edgar_moe.api.repository import SnapshotNotFoundError, SnapshotRepository
+from edgar_moe.api.research_evidence import CatalogIntegrityError, build_research_evidence
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.settings import RuntimeSettings, runtime_settings
@@ -290,6 +292,20 @@ def summary(response: Response, repo: RepositoryDependency) -> SummaryResponse:
     """
     _cache(response)
     return SummaryResponse.model_validate(repo.summary())
+
+
+@app.get("/api/v1/research-evidence", response_model=ResearchEvidenceResponse, tags=["research"])
+def research_evidence(response: Response, repo: RepositoryDependency) -> ResearchEvidenceResponse:
+    """Reviewed v1 evidence and the separately identified v2 review state."""
+    try:
+        result = build_research_evidence(repo)
+    except CatalogIntegrityError as error:
+        response.headers["Cache-Control"] = "no-store"
+        raise HTTPException(
+            status_code=503, detail="Public research evidence unavailable"
+        ) from error
+    _cache(response)
+    return result
 
 
 @app.get("/api/v1/experiments", response_model=list[ExperimentRecord], tags=["research"])

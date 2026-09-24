@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "frozen_v1": {
+    "dataset_id": "research-2026-07-31-3553e7ad78dd",
+    "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
+    "locked_test_hash": "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987",
+    "rank_ic_interval_95": {
+      "low": -0.0114,
+      "high": 0.0702,
+      "method": "two_calendar_month_moving_block",
+      "calendar_months": 19,
+      "resamples": 5000,
+      "source_sha256": "2285216dc36a8c0d0bd181eaccf9769d5a0fc1db9b26b04d490530e1096dc138"
+    }
+  },
+  "duration_aware_v2": {
+    "status": "pending_review",
+    "reason": "No separately reviewed duration-aware v2 aggregate is published."
+  }
+}

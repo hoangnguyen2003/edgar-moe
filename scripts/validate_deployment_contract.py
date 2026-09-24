@@ -11,6 +11,7 @@ EXPECTED_BUILD_COMMAND = (
     "npm --prefix apps/web ci && npm --prefix apps/web run build && "
     "npm run build:public && "
     "python3 scripts/verify_public_snapshot_lock.py && "
+    "python3 scripts/verify_research_evidence_catalog.py && "
     "test -f public/robots.txt && test -f public/.well-known/security.txt && "
     "test -f public/data-provenance.json"
 )
@@ -38,6 +39,9 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "uv.lock",
     "scripts/*",
     "!scripts/verify_public_snapshot_lock.py",
+    "!scripts/verify_research_evidence_catalog.py",
+    "reports/*",
+    "!reports/locked_rank_ic_interval_2026-09-23.md",
     "config/*",
     "!config/public_snapshot.lock.json",
     "data/cache",

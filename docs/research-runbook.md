@@ -126,6 +126,39 @@ forward registry, publish the public snapshot, or authorize a v2 résumé/alpha
 claim. Record a fresh locked-test decision separately only after a reviewed protocol and
 pretest report exist; never rerun or reinterpret the frozen v1 locked test.
 
+### Reviewed aggregate publication boundary
+
+The public Research page calls the read-only `GET /api/v1/research-evidence`
+contract. It always identifies frozen v1 with its selection/snapshot hashes,
+sample count, calendar-block rank-IC interval spanning zero, and negative
+10 bps Sharpe. V2 is explicitly `pending_review` until an operator reviews a
+**separate** pretest report. A successful pipeline run alone must not publish
+v2 or change the v1 snapshot.
+
+After checking the private report's source/data/selection identities, full
+five-baseline roster, interval readiness, sample sizes, cost panel (or reason
+for unavailability), data licenses, and absence of locked-test predictions,
+the maintainer may stage only allowlisted aggregates:
+
+```bash
+uv run python scripts/publish_v2_research_evidence.py \
+  --private-review data/artifacts/v2-reviews/<dataset-id>/pretest-review.json \
+  --approval-reference review/issue-<number>
+uv run python scripts/verify_research_evidence_catalog.py
+```
+
+`--approval-reference` is an auditable self-attestation, **not** an access
+control or substitute for PR review. The publisher refuses a bad private
+report hash, locked-test predictions, a non-duration-aware policy, or an
+already-reviewed catalog; it strips row-level/private report fields. Review
+the staged JSON and SHA-256 lock in a PR, run Python/frontend tests and CI,
+then squash-merge. Never commit the private report, events, OOF scores,
+returns, credentials, or checkpoint files. The build verifies the catalog
+against its hash lock and v1 companion report; the API independently
+validates the lock and frozen snapshot identity at request time and returns
+503 if these drift. The UI distinguishes pending, reviewed-development, and
+unavailable evidence without implying independent alpha.
+
 ## 7. Publish honestly
 
 - Validate the snapshot and run all Python and frontend checks.

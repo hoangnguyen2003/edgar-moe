@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SnapshotMetadata(BaseModel):
@@ -38,6 +38,95 @@ class SummaryResponse(BaseModel):
     summary: ResearchSummary
     predictive_metrics: dict[str, dict[str, float | None]]
     portfolio_scenarios: list[dict[str, float | None]]
+
+
+class RankICInterval(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    low: float
+    high: float
+    method: Literal["two_calendar_month_moving_block"]
+    calendar_months: int = Field(ge=1)
+    resamples: int = Field(ge=100)
+    source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class FrozenResearchEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    status: Literal["frozen_locked_test"]
+    dataset_id: str
+    as_of: date
+    selection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    locked_test_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    snapshot_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    total_events: int = Field(ge=1)
+    validation_events: int = Field(ge=0)
+    locked_test_events: int = Field(ge=1)
+    locked_rank_ic: float
+    locked_rank_ic_interval_95: RankICInterval
+    portfolio_10bps_sharpe: float
+    interpretation: str
+
+
+class V2PendingEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["pending_review"]
+    reason: str
+
+
+class V2ComparisonEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    baseline: str
+    rank_ic_delta: float
+    interval_status: Literal["ready", "insufficient_calendar_months", "degenerate_resamples"]
+    interval_low: float | None
+    interval_high: float | None
+
+
+class V2CostScenario(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    model: str
+    cost_bps: Literal[10, 25, 50]
+    sharpe: float | None
+    annualized_return: float | None
+
+
+class V2ReviewedEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
+
+    status: Literal["reviewed_pretest"]
+    dataset_id: str
+    source_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    selection_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    review_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    oof_events: int = Field(ge=1)
+    champion_name: str
+    champion_weighted_rank_ic: float
+    uncertainty_method: Literal["paired_calendar_month_moving_block_within_fold"]
+    block_months: int = Field(ge=1)
+    bootstrap_resamples: int = Field(ge=100)
+    comparisons: list[V2ComparisonEvidence]
+    portfolio_status: Literal[
+        "development_only",
+        "unavailable_no_prelocked_signals",
+        "unavailable_return_calendar",
+        "unavailable_incomplete_return_coverage",
+    ]
+    cost_scenarios: list[V2CostScenario]
+    cost_definition: str | None
+    approval_reference: str
+    interpretation: str
+
+
+class ResearchEvidenceResponse(BaseModel):
+    schema_version: Literal[1]
+    catalog_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    frozen_v1: FrozenResearchEvidence
+    duration_aware_v2: V2PendingEvidence | V2ReviewedEvidence
 
 
 class ExperimentRecord(BaseModel):

@@ -8,6 +8,7 @@ export const summaryQuery = queryOptions({ queryKey: ["summary"], queryFn: api.s
 export const latestSignalsQuery = queryOptions({ queryKey: ["latest-signals"], queryFn: api.latestSignals });
 export const freshnessQuery = queryOptions({ queryKey: ["freshness"], queryFn: api.freshness });
 export const experimentsQuery = queryOptions({ queryKey: ["experiments"], queryFn: api.experiments });
+export const researchEvidenceQuery = queryOptions({ queryKey: ["research-evidence"], queryFn: api.researchEvidence });
 export const methodologyQuery = queryOptions({ queryKey: ["methodology"], queryFn: api.methodology });
 export const governanceQuery = queryOptions({ queryKey: ["governance"], queryFn: api.governance });
 

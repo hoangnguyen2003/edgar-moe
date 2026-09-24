@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ExperimentRecord } from "../lib/types";
+import type { ExperimentRecord, ResearchEvidenceResponse } from "../lib/types";
 import { ResearchPage } from "./ResearchPage";
 
 function candidate(index: number, rankIc: number, rmse: number, selected = false): ExperimentRecord {
@@ -25,10 +25,34 @@ function jsonResponse(payload: unknown) {
   return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } }));
 }
 
-function renderPage() {
+const pendingEvidence: ResearchEvidenceResponse = {
+  schema_version: 1,
+  catalog_sha256: "a".repeat(64),
+  frozen_v1: {
+    status: "frozen_locked_test",
+    dataset_id: "v1-frozen",
+    as_of: "2026-07-31",
+    selection_hash: "b".repeat(64),
+    locked_test_hash: "c".repeat(64),
+    snapshot_sha256: "d".repeat(64),
+    total_events: 1794,
+    validation_events: 500,
+    locked_test_events: 600,
+    locked_rank_ic: 0.031624,
+    locked_rank_ic_interval_95: { low: -0.0114, high: 0.0702, method: "two_calendar_month_moving_block", calendar_months: 24, resamples: 1000, source_sha256: "e".repeat(64) },
+    portfolio_10bps_sharpe: -0.632,
+    interpretation: "Positive skill or tradable alpha is not established.",
+  },
+  duration_aware_v2: { status: "pending_review", reason: "No reviewed v2 aggregate." },
+};
+
+function renderPage(evidence: ResearchEvidenceResponse | "error" = pendingEvidence) {
   vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
     const path = new URL(String(input), "https://terminal.example").pathname;
     if (path === "/api/v1/experiments") return jsonResponse(experiments);
+    if (path === "/api/v1/research-evidence") return evidence === "error"
+      ? Promise.resolve(new Response(JSON.stringify({ detail: "unavailable" }), { status: 503 }))
+      : jsonResponse(evidence);
     return jsonResponse({ metadata: { data_mode: "authenticated_locked_test" } });
   }));
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -40,8 +64,47 @@ function renderPage() {
 }
 
 function bodyRows() {
-  return within(screen.getByRole("table")).getAllByRole("row").slice(1);
+  return within(document.querySelector(".leaderboard-panel table") as HTMLElement).getAllByRole("row").slice(1);
 }
+
+describe("Reviewed research evidence", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("shows frozen uncertainty and an explicit pending v2 state", async () => {
+    renderPage();
+    const panel = await screen.findByRole("region", { name: "Evidence and uncertainty" });
+    expect(panel).toHaveTextContent("−0.011 to +0.070");
+    expect(panel).toHaveTextContent("10 bps cost-aware Sharpe");
+    expect(panel).toHaveTextContent("Pending review. No v2 comparison");
+    expect(panel).not.toHaveTextContent("v2 beat");
+  });
+
+  it("does not hide the leaderboard if the evidence endpoint fails", async () => {
+    renderPage("error");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Reviewed evidence is unavailable");
+    expect(document.querySelector(".leaderboard-panel table")).toBeInTheDocument();
+  });
+
+  it("labels reviewed v2 comparisons as development-only and surfaces cost assumptions", async () => {
+    const reviewed: ResearchEvidenceResponse = {
+      ...pendingEvidence,
+      duration_aware_v2: {
+        status: "reviewed_pretest", dataset_id: "v2", source_manifest_sha256: "f".repeat(64), selection_sha256: "1".repeat(64),
+        review_sha256: "2".repeat(64), oof_events: 100, champion_name: "Example model", champion_weighted_rank_ic: 0.02,
+        uncertainty_method: "paired_calendar_month_moving_block_within_fold", block_months: 2, bootstrap_resamples: 1000,
+        comparisons: [{ baseline: "Elastic Net", rank_ic_delta: 0.01, interval_status: "ready", interval_low: -0.02, interval_high: 0.04 }],
+        portfolio_status: "development_only", cost_scenarios: [{ model: "Example model", cost_bps: 10, sharpe: -0.2, annualized_return: -0.03 }],
+        cost_definition: "10/25/50 bps per unit of one-sided turnover plus configured short borrow",
+        approval_reference: "review/12345", interpretation: "Conditional on selection; not independent evidence.",
+      },
+    };
+    renderPage(reviewed);
+    const panel = await screen.findByRole("region", { name: "Evidence and uncertainty" });
+    expect(panel).toHaveTextContent("Conditional on selection; not independent evidence.");
+    expect(within(panel).getByRole("table", { name: /Development-fold rank IC difference/ })).toHaveTextContent("Elastic Net");
+    expect(within(panel).getByRole("table", { name: /Development-fold cost scenarios/ })).toHaveTextContent("10 bps");
+  });
+});
 
 describe("Experiment leaderboard", () => {
   afterEach(() => vi.unstubAllGlobals());
