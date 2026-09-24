@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight } from "lucide-react";
 import { CopyCommand } from "../components/CopyCommand";
 import { PageHeader } from "../components/PageHeader";
-import { Takeaway } from "../components/Takeaway";
 import { governanceQuery } from "../lib/queries";
 import { Link } from "../lib/router";
 
@@ -103,15 +102,11 @@ export function ArchitecturePage() {
   const sha = governance.data?.frozen_v1.sha256;
   return (
     <div className="page">
-      <PageHeader title="System architecture">
-        How EDGAR-MoE splits into a public, read-only site and a private, scheduled runner, where the evidence lives,
-        and how you can check it yourself.
-      </PageHeader>
-      <Takeaway variant="quiet" title="The public site can only read, and recorded evidence can only be added to.">
-        Every published number comes from a fingerprinted snapshot, and every live forecast is saved before trading
-        and never edited.
+      <PageHeader title="System architecture" answer="The public site can only read, and recorded evidence can only be added to.">
+        Every published number comes from a fingerprinted snapshot, and every live forecast is saved before trading and
+        never edited.
         {controls && enforced != null && ` ${enforced} of ${controls.length} safeguards are enforced in code; the rest need operator evidence.`}
-      </Takeaway>
+      </PageHeader>
 
       <section className="lanes" aria-label="How the system fits together">
         {LANES.map((lane) => (

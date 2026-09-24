@@ -1,10 +1,10 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
 import { ExpertLegend, ExpertMix } from "../components/Experts";
 import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { Takeaway } from "../components/Takeaway";
 import { latestSignalsQuery, freshnessQuery } from "../lib/queries";
 import { filedDate, shortDate, signedDecimal, standing } from "../lib/format";
 import { Link } from "../lib/router";
@@ -19,24 +19,20 @@ const DIRECTIONS: Array<{ direction: EventRecord["direction"]; title: string; no
 export function SignalsPage() {
   const signals = useQuery(latestSignalsQuery);
   const freshness = useQuery(freshnessQuery);
-  const header = (
-    <PageHeader title="Study signals">
-      The final filings scored in the published study, grouped by what a long-short portfolio would do with them.
-      Each row's "Why this score" link opens the details behind it. Forecasts recorded since the study ended are
-      on <Link to="/forward">Live tracking</Link>.
+  const header = (answer?: ReactNode) => (
+    <PageHeader title="Study signals" answer={answer}>
+      The study's final filings, grouped by what a long-short portfolio would do with them: long and short are the top
+      and bottom 10% of scores. Forecasts recorded since the study ended are on <Link to="/forward">Live tracking</Link>.
     </PageHeader>
   );
-  if (signals.isLoading) return <div className="page">{header}<LoadingState label="Loading the study's final filings" skeleton={["rows"]} /></div>;
-  if (signals.error) return <div className="page">{header}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
+  if (signals.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the study's final filings" skeleton={["rows"]} /></div>;
+  if (signals.error) return <div className="page">{header()}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
   const items = signals.data!;
   const counts = DIRECTIONS.map(({ direction, title }) => `${items.filter((item) => item.direction === direction).length} ${title.toLowerCase()}`);
   const updated = freshness.data?.last_successful_update;
   return (
     <div className="page">
-      {header}
-      <Takeaway variant="quiet" title={`${items.length} filings scored: ${counts.join(", ")}.`}>
-        {updated ? `Updated ${shortDate(updated.slice(0, 10))}. ` : ""}Long and short are the top and bottom 10% of scores.
-      </Takeaway>
+      {header(<>{items.length} filings scored: {counts.join(", ")}.{updated && <small className="page-header__stamp">Updated {shortDate(updated.slice(0, 10))}</small>}</>)}
       <p className="caveat">
         <strong>Research output, not investment advice.</strong> Signals can be wrong, out of date, or impossible to
         trade. This site never places orders.

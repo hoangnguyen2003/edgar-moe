@@ -16,6 +16,7 @@
   --highlight: #e2f25c;
   --highlight-soft: rgba(226, 242, 92, .55);
   --on-highlight: #16191c;
+  --mark: var(--highlight);
   --stamp: #2447b8;
   --good: #1a6f35;
   --warning: #8a5a00;
@@ -67,6 +68,7 @@
     --rule-strong: #6f757c;
     --highlight: #d9ec52;
     --highlight-soft: rgba(217, 236, 82, .2);
+    --mark: rgba(217, 236, 82, .34);
     --stamp: #8aa4ff;
     --good: #57c27a;
     --warning: #e0b04a;
@@ -91,6 +93,7 @@
   --rule-strong: #6f757c;
   --highlight: #d9ec52;
   --highlight-soft: rgba(217, 236, 82, .2);
+  --mark: rgba(217, 236, 82, .34);
   --stamp: #8aa4ff;
   --good: #57c27a;
   --warning: #e0b04a;
@@ -166,6 +169,14 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header__main { max-width: 800px; }
 .page-header h1 { margin: 0; font: 500 clamp(34px, 4.2vw, 52px)/1.08 var(--serif); letter-spacing: -.02em; }
 .page-header__lede { max-width: 68ch; margin: 12px 0 0; color: var(--ink-2); font-size: 17px; line-height: 1.6; }
+/* The page's answer, read before anything else; the lede becomes its context. */
+.page-header__answer { max-width: 42ch; margin: 14px 0 0; color: var(--ink); font: 500 clamp(21px, 2.1vw, 26px)/1.3 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
+.page-header__answer + .page-header__lede { margin-top: 10px; font-size: 16px; }
+/* The answer's key fact carries a low highlighter band in the lime that marks
+   "the answer" and "where you are" everywhere on the site. */
+.page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.page-header__stamp { display: block; margin-top: 8px; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.skeleton-bar--answer { display: block; width: min(30ch, 90%); height: 1.05em; }
 
 /* The page's answer, before its evidence. */
 .takeaway { margin: 0 0 24px; padding: 18px 22px 20px; background: var(--highlight-soft); border-left: 4px solid var(--ink); }
@@ -532,8 +543,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .blotter__link svg { transition: transform .12s ease; }
 
 /* Quiet answer: the same sentence as the lead, without repeating its fill. */
-.takeaway--quiet { padding: 0 0 0 var(--s4); background: none; border-left: 2px solid var(--ink); }
-.takeaway--quiet .takeaway__title { font-size: clamp(20px, 2vw, 24px); }
 .expert-mix { margin-top: 8px; }
 .expert-mix__bar { display: flex; gap: 2px; height: 8px; }
 .expert-mix__bar span { min-width: 2px; background: var(--expert); }

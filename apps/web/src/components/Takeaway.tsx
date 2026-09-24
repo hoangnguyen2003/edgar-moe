@@ -1,18 +1,16 @@
 import type { ReactNode } from "react";
 
 /**
- * A page's answer in one sentence, placed before the detail that supports it.
- * The filled `lead` treatment belongs to the site's headline answer; elsewhere
- * a `quiet` rule carries the same sentence without repeating the device.
+ * The site's headline answer, on the Overview, in the one filled box the site
+ * uses. Other pages state their answer in their header (see PageHeader).
  */
-export function Takeaway({ label = "In short", title, children, variant = "lead" }: {
+export function Takeaway({ label = "In short", title, children }: {
   label?: string;
   title: string;
   children?: ReactNode;
-  variant?: "lead" | "quiet";
 }) {
   return (
-    <section className={variant === "quiet" ? "takeaway takeaway--quiet" : "takeaway"} aria-label={label}>
+    <section className="takeaway" aria-label={label}>
       <p className="takeaway__label">{label}</p>
       <p className="takeaway__title">{title}</p>
       {children && <div className="takeaway__detail">{children}</div>}

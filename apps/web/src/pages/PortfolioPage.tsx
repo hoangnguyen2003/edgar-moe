@@ -1,11 +1,10 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { EquityChart } from "../components/EquityChart";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { Takeaway } from "../components/Takeaway";
 import { DEFAULT_COST_BPS, equityQuery } from "../lib/queries";
 import { bpsPercent, decimal, dollars, monthYear, percent, shortDate } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
@@ -13,12 +12,12 @@ import type { EquityCurveResponse, EquityPoint } from "../lib/types";
 
 const COSTS = [DEFAULT_COST_BPS, 25, 50];
 
-/** What the scenario means, in one sentence, for the summary box. */
-function outcome(metrics: EquityCurveResponse["metrics"], costBps: number) {
+/** What the scenario means, in one sentence, with its result marked. */
+function outcome(metrics: EquityCurveResponse["metrics"], costBps: number): ReactNode {
   const annual = metrics.annualized_return;
-  if (annual == null) return null;
+  if (annual == null) return undefined;
   const verb = annual < 0 ? "lost" : "gained";
-  return `At ${bpsPercent(costBps)} trading cost, the portfolio ${verb} ${percent(Math.abs(annual))} a year.`;
+  return <>At {bpsPercent(costBps)} trading cost, the portfolio <mark>{verb} {percent(Math.abs(annual))} a year</mark>.</>;
 }
 
 function uncertainty(low: number | null | undefined, estimate: number | null | undefined, high: number | null | undefined): string {
@@ -46,14 +45,14 @@ export function PortfolioPage() {
       </div>
     </div>
   );
-  const header = (
-    <PageHeader title="Backtest" aside={costControl}>
-      What would have happened if a market-neutral portfolio had traded on the model's scores through the 2025–2026
-      final test, after trading and borrowing costs. Pick a trading cost to compare.
+  const header = (answer?: ReactNode) => (
+    <PageHeader title="Backtest" aside={costControl} answer={answer}>
+      A market-neutral portfolio traded on the model's scores through the 2025–2026 final test, after trading costs and a
+      2% yearly fee for borrowing shares. Pick a trading cost to compare.
     </PageHeader>
   );
-  if (curve.isPending) return <div className="page">{header}<LoadingState label="Repricing the backtest" skeleton={["figures", "chart"]} /></div>;
-  if (curve.isError) return <div className="page">{header}<ErrorState error={curve.error} onRetry={() => void curve.refetch()} /></div>;
+  if (curve.isPending) return <div className="page">{header(null)}<LoadingState label="Repricing the backtest" skeleton={["chart", "figures"]} /></div>;
+  if (curve.isError) return <div className="page">{header()}<ErrorState error={curve.error} onRetry={() => void curve.refetch()} /></div>;
   const data = curve.data;
   const { metrics } = data;
   const updating = curve.isPlaceholderData;
@@ -62,33 +61,17 @@ export function PortfolioPage() {
   const summary = stats
     ? `One dollar grows to ${dollars(stats.end.equity)} between ${shortDate(stats.start.date)} and ${shortDate(stats.end.date)}; high ${dollars(stats.high.equity)}, low ${dollars(stats.low.equity)}.`
     : "No equity observations.";
-  const headline = outcome(metrics, data.cost_bps);
   return (
     <div className="page">
-      {header}
+      {header(outcome(metrics, data.cost_bps))}
       <div className={updating ? "scenario is-updating" : "scenario"} aria-busy={updating}>
-        {headline && (
-          <Takeaway variant="quiet" title={headline}>
-            At its worst it fell {metrics.maximum_drawdown == null ? "—" : percent(Math.abs(metrics.maximum_drawdown))} from
-            a peak, and returns swung {percent(metrics.annualized_volatility)} a year. Short positions also paid a 2% yearly
-            borrowing fee.
-          </Takeaway>
-        )}
-        <section className="figures figures--five" aria-label={`Backtest results at ${bpsPercent(data.cost_bps)} trading cost`}>
-          <MetricCard label="Yearly return" value={percent(metrics.annualized_return)} detail="After all costs" />
-          <MetricCard label="Volatility" info="volatility" value={percent(metrics.annualized_volatility)} detail="Yearly swing in returns" />
-          <MetricCard label="Sharpe ratio" info="sharpe" value={decimal(metrics.sharpe)} detail="Below 0 means it lost money" />
-          <MetricCard label="Worst drop" info="drawdown" value={percent(metrics.maximum_drawdown)} detail="Largest fall from a peak" />
-          <MetricCard label="Daily turnover" info="turnover" value={percent(metrics.average_turnover)} detail="Share traded on an average day" />
-        </section>
         <article className="panel chart-panel chart-panel--large">
           <header>
             <div>
               <h2>Growth of $1</h2>
               <p>
-                What one dollar became over the final test, after {bpsPercent(data.cost_bps)} trading costs and borrowing fees.
-                Above the dashed $1.00 line is a profit. Point at or tap the chart, or tab to it and use the arrow keys,
-                to read any day.
+                What one dollar became, after {bpsPercent(data.cost_bps)} trading costs and borrowing fees. Above the dashed
+                $1.00 line is a profit. Point at or tap the chart, or tab to it and use the arrow keys, to read any day.
               </p>
             </div>
           </header>
@@ -124,6 +107,13 @@ export function PortfolioPage() {
             </details>
           </figure>
         </article>
+        <section className="figures figures--five" aria-label={`Backtest results at ${bpsPercent(data.cost_bps)} trading cost`}>
+          <MetricCard label="Yearly return" value={percent(metrics.annualized_return)} detail="After all costs" />
+          <MetricCard label="Volatility" info="volatility" value={percent(metrics.annualized_volatility)} detail="Yearly swing in returns" />
+          <MetricCard label="Sharpe ratio" info="sharpe" value={decimal(metrics.sharpe)} detail="Below 0 means it lost money" />
+          <MetricCard label="Worst drop" info="drawdown" value={percent(metrics.maximum_drawdown)} detail="Largest fall from a peak" />
+          <MetricCard label="Daily turnover" info="turnover" value={percent(metrics.average_turnover)} detail="Share traded on an average day" />
+        </section>
         <section className="content-grid content-grid--two">
           <article className="panel">
             <header>
