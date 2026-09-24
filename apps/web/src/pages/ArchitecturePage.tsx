@@ -191,7 +191,7 @@ export function ArchitecturePage() {
         <header>
           <div>
             <h2 id="decisions-title">Key design decisions</h2>
-            <p>Eight of the 28 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
+            <p>Eight of the 29 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
           </div>
           <a className="button button--secondary button--small" href={`${REPOSITORY}/blob/main/docs/adr/README.md`}>
             All decisions <ArrowUpRight size={14} aria-hidden="true" />
