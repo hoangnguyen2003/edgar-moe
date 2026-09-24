@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
+import io
 import json
 from pathlib import Path
 from typing import Any
+from urllib.error import HTTPError
 from urllib.request import Request
 
 import pytest
@@ -135,6 +137,30 @@ def complete_responses() -> dict[str, FakeResponse]:
             ),
             "application/json",
         ),
+        f"{base}/api/v1/forward/performance": FakeResponse(
+            f"{base}/api/v1/forward/performance",
+            json.dumps(
+                {
+                    "model_id": None,
+                    "forecast_count": 0,
+                    "matured_count": 0,
+                    "pending_count": 0,
+                    "coverage": 0.0,
+                    "rank_ic": None,
+                    "rank_ic_low": None,
+                    "rank_ic_high": None,
+                    "rank_ic_interval_method": None,
+                    "rank_ic_interval_status": None,
+                    "rank_ic_calendar_months": 0,
+                    "rank_ic_block_months": None,
+                    "rank_ic_bootstrap_samples": None,
+                    "rmse": None,
+                    "mae": None,
+                    "directional_accuracy": None,
+                }
+            ),
+            "application/json",
+        ),
         f"{base}/api/v1/health": FakeResponse(
             f"{base}/api/v1/health",
             json.dumps({"status": "ok", "snapshot_loaded": True}),
@@ -198,12 +224,235 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
     api_checks = [check for check in report["checks"] if check["path"].startswith("/api/")]
-    assert len(api_checks) == 3
+    assert len(api_checks) == 4
     for check in api_checks:
         request_id = check["request_id"]
         assert isinstance(request_id, str)
         assert len(request_id) == 32
         assert all(character in "0123456789abcdef" for character in request_id)
+
+
+def _configured_performance_payload() -> dict[str, Any]:
+    return {
+        "model_id": None,
+        "forecast_count": 48,
+        "matured_count": 24,
+        "pending_count": 24,
+        "coverage": 0.5,
+        "rank_ic": -0.17928633594429938,
+        "rank_ic_low": None,
+        "rank_ic_high": None,
+        "rank_ic_interval_method": "calendar_month_moving_block",
+        "rank_ic_interval_status": "insufficient_pairs",
+        "rank_ic_calendar_months": 1,
+        "rank_ic_block_months": 2,
+        "rank_ic_bootstrap_samples": 1000,
+        "rmse": 0.10668738446157225,
+        "mae": 0.07864952580658127,
+        "directional_accuracy": 0.5416666666666666,
+    }
+
+
+def _replace_performance(responses: dict[str, FakeResponse], payload: dict[str, Any]) -> None:
+    url = "https://terminal.example/api/v1/forward/performance"
+    responses[url] = FakeResponse(url, json.dumps(payload), "application/json")
+
+
+def test_smoke_checks_forward_performance_contract_without_retaining_metrics(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    governance_url = "https://terminal.example/api/v1/governance"
+    governance_payload = json.loads(responses[governance_url]._body)
+    governance_payload["forward_status"] = {"configured": True, "available": True}
+    responses[governance_url] = FakeResponse(
+        governance_url, json.dumps(governance_payload), "application/json"
+    )
+    _replace_performance(responses, _configured_performance_payload())
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "passed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["availability"] == "available"
+    assert check["forecast_count"] == 48
+    assert check["matured_count"] == 24
+    assert check["rank_ic_interval_method"] == "calendar_month_moving_block"
+    assert check["rank_ic_interval_status"] == "insufficient_pairs"
+    assert "rank_ic" not in check
+    assert "-0.17928633594429938" not in json.dumps(report)
+
+
+def test_smoke_accepts_ready_interval_only_after_the_minimum_history(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    payload = {
+        **_configured_performance_payload(),
+        "forecast_count": 144,
+        "matured_count": 120,
+        "pending_count": 24,
+        "coverage": 120 / 144,
+        "rank_ic": 0.3,
+        "rank_ic_low": 0.2,
+        "rank_ic_high": 0.4,
+        "rank_ic_interval_status": "ready",
+        "rank_ic_calendar_months": 12,
+    }
+    _replace_performance(responses, payload)
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "passed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["rank_ic_interval_status"] == "ready"
+    assert "rank_ic_low" not in check
+    assert "rank_ic_high" not in check
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "error"),
+    [
+        ("pending_count", 23, "forward_performance_counts_inconsistent"),
+        ("coverage", 0.6, "forward_performance_coverage_inconsistent"),
+        (
+            "rank_ic_interval_method",
+            "independent_event",
+            "forward_performance_interval_contract_invalid",
+        ),
+        ("rank_ic_interval_status", "ready", "forward_performance_interval_contract_invalid"),
+        ("rank_ic_low", -0.5, "forward_performance_interval_contract_invalid"),
+    ],
+)
+def test_smoke_rejects_invalid_forward_performance_contract(
+    monkeypatch: pytest.MonkeyPatch,
+    field: str,
+    value: Any,
+    error: str,
+) -> None:
+    responses = complete_responses()
+    _replace_performance(responses, {**_configured_performance_payload(), field: value})
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["error"] == error
+    assert "-0.17928633594429938" not in json.dumps(report)
+
+
+def test_smoke_requires_interval_fields_in_performance_schema(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    payload = _configured_performance_payload()
+    del payload["rank_ic_interval_status"]
+    _replace_performance(responses, payload)
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["error"] == "forward_performance_response_fields_missing"
+
+
+def test_smoke_accepts_explicit_registry_unavailable_degraded_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    governance_url = "https://terminal.example/api/v1/governance"
+    governance_payload = json.loads(responses[governance_url]._body)
+    governance_payload["forward_status"] = {"configured": True, "available": False}
+    responses[governance_url] = FakeResponse(
+        governance_url, json.dumps(governance_payload), "application/json"
+    )
+    performance_url = "https://terminal.example/api/v1/forward/performance"
+    unavailable = FakeResponse(
+        performance_url,
+        json.dumps({"detail": "Forward registry unavailable"}),
+        "application/json",
+    )
+    unavailable.status = 503
+    responses[performance_url] = unavailable
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "passed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["http_status"] == 503
+    assert check["availability"] == "unavailable"
+    assert check["degraded_mode"] == "registry_unavailable"
+    assert "_json" not in check
+
+
+def test_smoke_accepts_urllib_http_error_for_documented_registry_outage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    governance_url = "https://terminal.example/api/v1/governance"
+    governance_payload = json.loads(responses[governance_url]._body)
+    governance_payload["forward_status"] = {"configured": True, "available": False}
+    responses[governance_url] = FakeResponse(
+        governance_url, json.dumps(governance_payload), "application/json"
+    )
+    performance_url = "https://terminal.example/api/v1/forward/performance"
+    performance_response = FakeResponse(
+        performance_url,
+        json.dumps({"detail": "Forward registry unavailable"}),
+        "application/json",
+    )
+    fallback = fake_urlopen_factory(responses)
+
+    def fake_open(request: Any, *, timeout: float, origin: tuple[str, str]) -> FakeResponse:
+        if request.full_url != performance_url:
+            return fallback(request, timeout=timeout, origin=origin)
+        headers = FakeHeaders(performance_response.headers.copy())
+        request_id = request.get_header("X-request-id")
+        assert request_id is not None
+        headers["X-Request-ID"] = request_id
+        raise HTTPError(
+            performance_url,
+            503,
+            "Service Unavailable",
+            headers,
+            io.BytesIO(performance_response._body),
+        )
+
+    monkeypatch.setattr(_MODULE, "_open_url", fake_open)
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "passed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["http_status"] == 503
+    assert check["availability"] == "unavailable"
+    assert check["degraded_mode"] == "registry_unavailable"
+
+
+def test_smoke_rejects_unconfirmed_registry_unavailable_degraded_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    responses = complete_responses()
+    performance_url = "https://terminal.example/api/v1/forward/performance"
+    unavailable = FakeResponse(
+        performance_url,
+        json.dumps({"detail": "Forward registry unavailable"}),
+        "application/json",
+    )
+    unavailable.status = 503
+    responses[performance_url] = unavailable
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
+
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    assert check["error"] == "forward_registry_unavailability_unconfirmed"
 
 
 def test_smoke_requires_api_request_id_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:

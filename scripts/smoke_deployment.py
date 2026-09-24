@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
 from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeGuard
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -39,6 +40,17 @@ _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # The frozen identity a deployment publishes twice (governance API and provenance
 # manifest) and the repository pins in config/public_snapshot.lock.json.
 _IDENTITY_FIELDS = ("path", "data_mode", "as_of", "sha256", "selection_hash", "locked_test_hash")
+_FORWARD_INTERVAL_STATUSES = frozenset(
+    {
+        "ready",
+        "insufficient_pairs",
+        "insufficient_months",
+        "undefined_rank_ic",
+        "degenerate_resamples",
+        "capacity_review_required",
+    }
+)
+_FORWARD_INTERVAL_METHOD = "calendar_month_moving_block"
 
 
 class _ScriptCollector(HTMLParser):
@@ -169,9 +181,20 @@ def run_smoke(
             "application/json",
             timeout,
         ),
+        _check_endpoint(
+            base,
+            origin,
+            "/api/v1/forward/performance",
+            "forward_performance",
+            "application/json",
+            timeout,
+            accepted_statuses=frozenset({200, 503}),
+        ),
         _check_endpoint(base, origin, "/api/v1/health", "health", "application/json", timeout),
     ]
 
+    forward_registry_configured: bool | None = None
+    forward_registry_available: bool | None = None
     for check in checks:
         if check["name"] == "robots":
             body = check.pop("_body", "")
@@ -241,6 +264,9 @@ def run_smoke(
                     isinstance(forward_status.get(field), bool)
                     for field in ("configured", "available")
                 )
+                if forward_valid and isinstance(forward_status, dict):
+                    forward_registry_configured = forward_status["configured"]
+                    forward_registry_available = forward_status["available"]
                 if not isinstance(payload, dict) or payload.get("schema_version") != 1:
                     check.update(status="failed", error="governance_schema_invalid")
                 elif not frozen_valid:
@@ -253,6 +279,43 @@ def run_smoke(
                     check.update(status="failed", error="governance_forward_status_invalid")
                 elif expected_identity is not None:
                     _verify_identity(check, frozen, expected_identity, "governance")
+        elif check["name"] == "forward_performance":
+            payload = check.pop("_json", None)
+            if check["status"] == "passed":
+                if check.get("http_status") == 503:
+                    if (
+                        isinstance(payload, dict)
+                        and payload.get("detail") == "Forward registry unavailable"
+                        and forward_registry_configured is True
+                        and forward_registry_available is False
+                    ):
+                        # A read-path outage is an explicitly supported degraded
+                        # mode: historical results stay available and governance
+                        # reports that live registry data is unavailable.
+                        check["availability"] = "unavailable"
+                        check["degraded_mode"] = "registry_unavailable"
+                    else:
+                        check.update(
+                            status="failed",
+                            error="forward_registry_unavailability_unconfirmed",
+                        )
+                else:
+                    error = _forward_performance_error(payload)
+                    if error is not None:
+                        check.update(status="failed", error=error)
+                    else:
+                        assert isinstance(payload, dict)
+                        method = payload["rank_ic_interval_method"]
+                        status = payload["rank_ic_interval_status"]
+                        check.update(
+                            availability="unconfigured" if method is None else "available",
+                            forecast_count=payload["forecast_count"],
+                            matured_count=payload["matured_count"],
+                            pending_count=payload["pending_count"],
+                            rank_ic_interval_method=method,
+                            rank_ic_interval_status=status,
+                            rank_ic_calendar_months=payload["rank_ic_calendar_months"],
+                        )
         elif check["name"] == "provenance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -332,6 +395,139 @@ def _shared_cacheable(cache_control: str) -> bool:
     return bool(names & {"public", "s-maxage", "max-age"})
 
 
+def _is_finite_number(value: Any) -> TypeGuard[int | float]:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and math.isfinite(value)
+
+
+def _is_nonnegative_int(value: Any) -> TypeGuard[int]:
+    return type(value) is int and value >= 0
+
+
+def _is_positive_int(value: Any) -> TypeGuard[int]:
+    return type(value) is int and value > 0
+
+
+def _forward_performance_error(payload: Any) -> str | None:
+    """Validate public performance invariants without retaining numeric metrics."""
+    if not isinstance(payload, dict):
+        return "forward_performance_response_not_object"
+    required_fields = {
+        "model_id",
+        "forecast_count",
+        "matured_count",
+        "pending_count",
+        "coverage",
+        "rank_ic",
+        "rank_ic_low",
+        "rank_ic_high",
+        "rank_ic_interval_method",
+        "rank_ic_interval_status",
+        "rank_ic_calendar_months",
+        "rank_ic_block_months",
+        "rank_ic_bootstrap_samples",
+        "rmse",
+        "mae",
+        "directional_accuracy",
+    }
+    if not required_fields.issubset(payload):
+        return "forward_performance_response_fields_missing"
+    if payload["model_id"] is not None and not isinstance(payload["model_id"], str):
+        return "forward_performance_response_fields_invalid"
+
+    forecast_count = payload.get("forecast_count")
+    matured_count = payload.get("matured_count")
+    pending_count = payload.get("pending_count")
+    if not all(
+        _is_nonnegative_int(value) for value in (forecast_count, matured_count, pending_count)
+    ):
+        return "forward_performance_counts_invalid"
+    assert _is_nonnegative_int(forecast_count)
+    assert _is_nonnegative_int(matured_count)
+    assert _is_nonnegative_int(pending_count)
+    if forecast_count != matured_count + pending_count:
+        return "forward_performance_counts_inconsistent"
+
+    coverage = payload.get("coverage")
+    if not _is_finite_number(coverage) or not 0 <= coverage <= 1:
+        return "forward_performance_metrics_invalid"
+    expected_coverage = matured_count / forecast_count if forecast_count else 0.0
+    if not math.isclose(float(coverage), expected_coverage, rel_tol=0.0, abs_tol=1e-9):
+        return "forward_performance_coverage_inconsistent"
+
+    bounded_metrics = ("rank_ic", "rank_ic_low", "rank_ic_high")
+    for name in bounded_metrics:
+        value = payload.get(name)
+        if value is not None and (not _is_finite_number(value) or not -1 <= value <= 1):
+            return "forward_performance_metrics_invalid"
+    for name in ("rmse", "mae"):
+        value = payload.get(name)
+        if value is not None and (not _is_finite_number(value) or value < 0):
+            return "forward_performance_metrics_invalid"
+    directional_accuracy = payload.get("directional_accuracy")
+    if directional_accuracy is not None and (
+        not _is_finite_number(directional_accuracy) or not 0 <= directional_accuracy <= 1
+    ):
+        return "forward_performance_metrics_invalid"
+
+    calendar_months = payload.get("rank_ic_calendar_months")
+    if not _is_nonnegative_int(calendar_months):
+        return "forward_performance_interval_contract_invalid"
+    if matured_count == 0 and any(
+        payload[name] is not None
+        for name in (
+            "rank_ic",
+            "rank_ic_low",
+            "rank_ic_high",
+            "rmse",
+            "mae",
+            "directional_accuracy",
+        )
+    ):
+        return "forward_performance_metrics_invalid"
+    low, high = payload.get("rank_ic_low"), payload.get("rank_ic_high")
+    if (low is None) != (high is None):
+        return "forward_performance_interval_contract_invalid"
+
+    method = payload.get("rank_ic_interval_method")
+    status = payload.get("rank_ic_interval_status")
+    if method is None and status is None:
+        if (
+            forecast_count != 0
+            or matured_count != 0
+            or pending_count != 0
+            or calendar_months != 0
+            or low is not None
+            or high is not None
+        ):
+            return "forward_performance_interval_contract_invalid"
+        return None
+    if method != _FORWARD_INTERVAL_METHOD or status not in _FORWARD_INTERVAL_STATUSES:
+        return "forward_performance_interval_contract_invalid"
+
+    block_months = payload.get("rank_ic_block_months")
+    bootstrap_samples = payload.get("rank_ic_bootstrap_samples")
+    if not _is_positive_int(block_months) or not _is_positive_int(bootstrap_samples):
+        return "forward_performance_interval_contract_invalid"
+    if status == "ready":
+        if (
+            low is None
+            or high is None
+            or payload.get("rank_ic") is None
+            or matured_count < 100
+            or calendar_months < 12
+        ):
+            return "forward_performance_interval_contract_invalid"
+        if not _is_finite_number(low) or not _is_finite_number(high) or low > high:
+            return "forward_performance_interval_contract_invalid"
+    elif low is not None or high is not None:
+        return "forward_performance_interval_contract_invalid"
+    return None
+
+
 def _check_endpoint(
     base: str,
     origin: tuple[str, str],
@@ -339,6 +535,8 @@ def _check_endpoint(
     name: str,
     expected_content_type: str,
     timeout: float,
+    *,
+    accepted_statuses: frozenset[int] = frozenset({200}),
 ) -> dict[str, Any]:
     request_id = uuid4().hex
     request = Request(
@@ -352,7 +550,14 @@ def _check_endpoint(
     )
     check: dict[str, Any] = {"name": name, "path": path, "status": "failed"}
     try:
-        with _open_url(request, timeout=timeout, origin=origin) as response:
+        try:
+            opened_response = _open_url(request, timeout=timeout, origin=origin)
+        except HTTPError as error:
+            if error.code not in accepted_statuses:
+                check.update(http_status=error.code, error="unexpected_http_status")
+                return check
+            opened_response = error
+        with opened_response as response:
             body = response.read(_MAX_BODY_BYTES + 1)
             status_code = int(response.status)
             content_type = response.headers.get("Content-Type", "").lower()
@@ -367,7 +572,7 @@ def _check_endpoint(
             if final_origin != origin:
                 check["error"] = "redirected_to_different_origin"
                 return check
-            if status_code != 200:
+            if status_code not in accepted_statuses:
                 check["error"] = "unexpected_http_status"
                 return check
             if len(body) > _MAX_BODY_BYTES:
@@ -401,7 +606,7 @@ def _check_endpoint(
                     # arbitrary response header value in the redacted artifact.
                     check["request_id"] = request_id
             decoded = body.decode("utf-8")
-            if name in {"health", "provenance", "governance"}:
+            if name in {"health", "provenance", "governance", "forward_performance"}:
                 try:
                     check["_json"] = json.loads(decoded)
                 except json.JSONDecodeError:
