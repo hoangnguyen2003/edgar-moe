@@ -21,7 +21,7 @@ const CONTROL_LABELS: Record<string, string> = {
 export function GovernancePage() {
   const governance = useQuery(governanceQuery);
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Audit trail" answer={answer}>
+    <PageHeader title="Audit trail" answer={answer} placeholder="3 of 4 safeguards are enforced in code; the rest need evidence from the people running the service.">
       Evidence that the published results come from the frozen model and haven't been edited since.
     </PageHeader>
   );

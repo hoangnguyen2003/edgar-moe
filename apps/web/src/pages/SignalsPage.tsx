@@ -19,8 +19,10 @@ const DIRECTIONS: Array<{ direction: EventRecord["direction"]; title: string; no
 export function SignalsPage() {
   const signals = useQuery(latestSignalsQuery);
   const freshness = useQuery(freshnessQuery);
+  const updated = freshness.data?.last_successful_update;
+  const stamp = updated ? `Updated ${shortDate(updated.slice(0, 10))}` : freshness.isError ? undefined : null;
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Study signals" answer={answer}>
+    <PageHeader title="Study signals" answer={answer} placeholder="12 filings scored: 4 long, 6 neutral, 2 short." stamp={stamp}>
       The study's final filings, grouped by what a long-short portfolio would do with them: long and short are the top
       and bottom 10% of scores. Forecasts recorded since the study ended are on <Link to="/forward">Live tracking</Link>.
     </PageHeader>
@@ -29,10 +31,9 @@ export function SignalsPage() {
   if (signals.error) return <div className="page">{header()}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
   const items = signals.data!;
   const counts = DIRECTIONS.map(({ direction, title }) => `${items.filter((item) => item.direction === direction).length} ${title.toLowerCase()}`);
-  const updated = freshness.data?.last_successful_update;
   return (
     <div className="page">
-      {header(<>{items.length} filings scored: {counts.join(", ")}.{updated && <small className="page-header__stamp">Updated {shortDate(updated.slice(0, 10))}</small>}</>)}
+      {header(`${items.length} filings scored: ${counts.join(", ")}.`)}
       <p className="caveat">
         <strong>Research output, not investment advice.</strong> Signals can be wrong, out of date, or impossible to
         trade. This site never places orders.

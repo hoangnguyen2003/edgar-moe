@@ -46,7 +46,7 @@ export function PortfolioPage() {
     </div>
   );
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Backtest" aside={costControl} answer={answer}>
+    <PageHeader title="Backtest" aside={costControl} answer={answer} placeholder="At 0.10% trading cost, the portfolio lost 3.3% a year.">
       A market-neutral portfolio traded on the model's scores through the 2025–2026 final test, after trading costs and a
       2% yearly fee for borrowing shares. Pick a trading cost to compare.
     </PageHeader>

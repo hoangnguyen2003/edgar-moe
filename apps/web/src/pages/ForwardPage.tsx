@@ -29,7 +29,7 @@ export function ForwardPage() {
   const quality = useQuery({ ...forwardQualityQuery, enabled });
 
   if (status.isLoading) {
-    return <div className="page"><ForwardHeader /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
+    return <div className="page"><ForwardHeader answer={null} early /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
   }
   if (status.error) {
     return <div className="page"><ForwardHeader /><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
@@ -38,7 +38,7 @@ export function ForwardPage() {
     return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
-    return <div className="page"><ForwardHeader answer={null} /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
+    return <div className="page"><ForwardHeader answer={null} early /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
   }
   const error = performance.error ?? runs.error ?? forecasts.error ?? quality.error;
   if (error) {
@@ -194,7 +194,12 @@ function Protocol() {
 
 function ForwardHeader({ status, answer, early = false }: { status?: ForwardStatusResponse; answer?: ReactNode; early?: boolean }) {
   return (
-    <PageHeader title="Live tracking" answer={answer} aside={status ? <RunnerStatus status={status} /> : undefined}>
+    <PageHeader
+      title="Live tracking"
+      answer={answer}
+      placeholder="Too early to tell: 24 of 48 forecasts have a result so far."
+      aside={status ? <RunnerStatus status={status} /> : undefined}
+    >
       Since the model was frozen, it has kept scoring new filings as they arrive, with no chance to adjust them in
       hindsight.
       {early && " Until 100 have a result, treat these figures as a running log, not evidence: the frozen study's own test used 1,794 filings."}

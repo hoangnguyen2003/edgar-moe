@@ -29,7 +29,11 @@ export function ResearchPage() {
   const experiments = useQuery(experimentsQuery);
   const summary = useQuery(summaryQuery);
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Model comparison" answer={answer}>
+    <PageHeader
+      title="Model comparison"
+      answer={answer}
+      placeholder="Of 33 candidates, Fundamental-Anchored MoE was chosen: the most consistent across both validation years, not the highest average (#2 of 33)."
+    >
       Every candidate learned from the same filings and was compared on 2023–2024 validation data; the chosen one was
       frozen before the final test.
     </PageHeader>
