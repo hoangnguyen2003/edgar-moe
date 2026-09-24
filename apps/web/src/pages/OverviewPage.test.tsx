@@ -35,7 +35,7 @@ describe("Overview", () => {
 
     const answer = await screen.findByRole("region", { name: "Short answer" });
     expect(answer).toHaveTextContent("Not convincingly, and not profitably.");
-    expect(answer).toHaveTextContent("rank IC point estimate was 0.032, but its 95% interval includes zero");
+    expect(answer).toHaveTextContent("ranking skill was 0.032, too small to tell from luck: its 95% interval includes zero");
     expect(answer).toHaveTextContent("lost 3.3% a year after trading costs");
     expect(await screen.findByText(/95% two-month calendar-block interval −0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read the dated method and caveats" })).toHaveAttribute(

@@ -53,7 +53,7 @@ export function OverviewPage() {
   const answer = hasFrozenInterval && portfolio.annualized_return != null && portfolio.annualized_return < 0
     ? {
         title: "Not convincingly, and not profitably.",
-        detail: `On 2025–2026 filings, the rank IC point estimate was ${decimal(test.rank_ic, 3)}, but its 95% interval includes zero. A portfolio trading on those scores lost ${percent(-portfolio.annualized_return)} a year after trading costs.`,
+        detail: `On 2025–2026 filings it had never seen, the model's ranking skill was ${decimal(test.rank_ic, 3)}, too small to tell from luck: its 95% interval includes zero. A portfolio trading on those scores lost ${percent(-portfolio.annualized_return)} a year after trading costs.`,
       }
     : verdict(test.rank_ic, portfolio.annualized_return);
   return (
