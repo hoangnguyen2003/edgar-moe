@@ -1,5 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
-import { useMediaQuery } from "./useMediaQuery";
+import { flushSync } from "react-dom";
+import { matchesMedia, REDUCED_MOTION, useMediaQuery } from "./useMediaQuery";
 
 export type Theme = "light" | "dark";
 
@@ -54,9 +55,17 @@ export function useTheme(): { theme: Theme; setTheme: (theme: Theme) => void } {
   const override = useSyncExternalStore(subscribe, currentOverride, () => null);
   const theme = override ?? (systemDark ? "dark" : "light");
   const setTheme = useCallback((next: Theme) => {
-    document.documentElement.dataset.theme = next;
-    writeStored(next);
-    listeners.forEach((listener) => listener());
+    const apply = () => {
+      document.documentElement.dataset.theme = next;
+      writeStored(next);
+      // Flushed at once, so the toggle's own icon changes inside the fade too.
+      flushSync(() => listeners.forEach((listener) => listener()));
+    };
+    // Cross-fade between editions rather than flipping every colour in one
+    // frame; browsers without view transitions, and reduced motion, switch at once.
+    const doc = document as Document & { startViewTransition?: (update: () => void) => unknown };
+    if (typeof doc.startViewTransition === "function" && !matchesMedia(REDUCED_MOTION)) doc.startViewTransition(apply);
+    else apply();
   }, []);
   return { theme, setTheme };
 }
