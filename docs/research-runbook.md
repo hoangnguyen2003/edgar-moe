@@ -67,6 +67,44 @@ The current authenticated run used selection SHA-256 `0bce6d674607af4e6f8e093033
 
 Preserve the selection hash, eventual locked-test hash, model state, processed manifest, source manifest, report, and environment/package lock together.
 
+## Separate post-v1 duration-aware study (development only)
+
+The v1 result above is immutable. For a new hypothesis, use a **new** checkpoint,
+dataset ID, and `config/authenticated-v2.yaml`; do not rebuild or relabel the
+v1 dataset. Record the duration-aware XBRL policy, revised split/early-stopping
+protocol, source manifest, configuration, code commit, and any universe changes
+before selecting a model. In particular, do not infer that the negative v1
+locked result has been repaired by the new feature definition.
+
+After `build-dataset --config config/authenticated-v2.yaml` and
+`walk-forward-study --config config/authenticated-v2.yaml` have produced a
+separate v2 dataset and selection, run:
+
+```bash
+uv run edgar-moe v2-pretest-review \
+  --dataset-dir data/processed/<v2-dataset-id> \
+  --selection-dir data/artifacts/walk-forward/<v2-dataset-id>
+```
+
+This command verifies dataset/selection/OOF hashes and revised protocol
+identities, recalculates each model's saved fold metrics, and reports paired
+calendar-month-block rank-IC differences against five simpler models. Its
+intervals are **conditional on the same development-fold selection**; they are
+not independent significance tests. A separate pre-locked OOF portfolio check
+shows 10/25/50 bps transaction-cost scenarios and short-borrow cost for the
+champion and fundamental baseline only if the active security-day return panel
+passes a completeness gate. Otherwise it reports an unavailable reason, not
+zero-filled performance. Events extending into the locked period are excluded
+from that portfolio check. The output defaults to the private ignored
+`data/artifacts/v2-reviews/<dataset-id>/pretest-review.json`, is hash-pinned,
+and refuses overwrite. Keep it private while checking sample sizes, calendar
+coverage, uncertainty, model complexity, cost sensitivity, and data licenses.
+
+The command does not open the locked outcomes, update the forward registry,
+publish the public snapshot, or authorize a v2 résumé/alpha claim. Record a
+fresh locked-test decision separately only after a reviewed protocol and
+pretest report exist; never rerun or reinterpret the frozen v1 locked test.
+
 ## 7. Publish honestly
 
 - Validate the snapshot and run all Python and frontend checks.
