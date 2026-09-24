@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import Any
 
 EXPECTED_BUILD_COMMAND = (
-    "npm --prefix apps/web ci && npm --prefix apps/web run build && "
-    "npm run build:public && "
+    "npm --prefix apps/web ci && npm run build:public && "
     "python3 scripts/verify_public_snapshot_lock.py && "
-    "test -f public/robots.txt && test -f public/.well-known/security.txt && "
-    "test -f public/data-provenance.json"
+    "python3 scripts/verify_research_evidence_catalog.py && "
+    "python3 scripts/validate_public_bundle.py"
 )
+MAX_BUILD_COMMAND_LENGTH = 256
 REQUIRED_HEADERS = {
     "X-Content-Type-Options",
     "X-Frame-Options",
@@ -38,6 +38,10 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "uv.lock",
     "scripts/*",
     "!scripts/verify_public_snapshot_lock.py",
+    "!scripts/verify_research_evidence_catalog.py",
+    "!scripts/validate_public_bundle.py",
+    "reports/*",
+    "!reports/locked_rank_ic_interval_2026-09-23.md",
     "config/*",
     "!config/public_snapshot.lock.json",
     "data/cache",
@@ -78,6 +82,11 @@ def validate_deployment_contract(
         errors.append("outputDirectory must be public")
     if payload.get("buildCommand") != EXPECTED_BUILD_COMMAND:
         errors.append("buildCommand must run deployment and public-bundle validation")
+    if (
+        isinstance(payload.get("buildCommand"), str)
+        and len(payload["buildCommand"]) > MAX_BUILD_COMMAND_LENGTH
+    ):
+        errors.append("buildCommand exceeds Vercel's 256-character schema limit")
     if payload.get("regions") != ["sin1"]:
         errors.append("regions must pin the documented sin1 serving region")
 

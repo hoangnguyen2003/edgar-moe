@@ -32,6 +32,66 @@ export interface SummaryResponse {
   portfolio_scenarios: Array<Record<string, number | null>>;
 }
 
+export interface ResearchEvidenceResponse {
+  schema_version: 1;
+  catalog_sha256: string;
+  frozen_v1: {
+    status: "frozen_locked_test";
+    dataset_id: string;
+    as_of: string;
+    selection_hash: string;
+    locked_test_hash: string;
+    snapshot_sha256: string;
+    total_events: number;
+    validation_events: number;
+    locked_test_events: number;
+    locked_rank_ic: number;
+    locked_rank_ic_interval_95: {
+      low: number;
+      high: number;
+      method: "two_calendar_month_moving_block";
+      calendar_months: number;
+      resamples: number;
+      source_sha256: string;
+    };
+    portfolio_10bps_sharpe: number;
+    interpretation: string;
+  };
+  duration_aware_v2: {
+    status: "pending_review";
+    reason: string;
+  } | {
+    status: "reviewed_pretest";
+    dataset_id: string;
+    source_manifest_sha256: string;
+    selection_sha256: string;
+    review_sha256: string;
+    oof_events: number;
+    champion_name: string;
+    champion_weighted_rank_ic: number;
+    uncertainty_method: "paired_calendar_month_moving_block_within_fold";
+    block_months: number;
+    bootstrap_resamples: number;
+    comparisons: Array<{
+      baseline: string;
+      rank_ic_delta: number;
+      interval_status: "ready" | "insufficient_calendar_months" | "degenerate_resamples";
+      interval_low: number | null;
+      interval_high: number | null;
+    }>;
+    portfolio_status: "development_only" | "unavailable_no_prelocked_signals" | "unavailable_return_calendar" | "unavailable_incomplete_return_coverage";
+    cost_scenarios: Array<{
+      model: string;
+      cost_bps: 10 | 25 | 50;
+      sharpe: number | null;
+      annualized_return: number | null;
+    }>;
+    cost_definition: string | null;
+    approval_reference: string;
+    interpretation: string;
+  };
+}
+
 export interface ExperimentRecord {
   name: string;
   family: string;

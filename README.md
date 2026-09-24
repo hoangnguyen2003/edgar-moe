@@ -116,7 +116,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app into both supported output directories, verifies the content-addressed snapshot identity against its public provenance manifest, and checks the disclosure files; CI remains the gate for source/bundle and snapshot-lock validation. The `.vercelignore` source boundary excludes `uv.lock`, private research caches, and the operator/research tree, then explicitly retains only the snapshot-lock input and its validator. The Python Function repeats the private-data exclusions and explicitly includes both `data/demo/snapshot.json` and `config/public_snapshot.lock.json`; the serving repository verifies the lock at runtime and fails closed if either the snapshot bytes or identity metadata drift. This keeps raw filings, processed tables, model artifacts, and forward-run files out of the serving bundle while the Function installs serving dependencies from `pyproject.toml` without bundling the training stack. After a successful Production deployment, the `Deployment smoke check` GitHub workflow automatically probes the configured `EDGAR_MOE_PUBLIC_DEPLOYMENT_URL` repository variable (falling back to the deployment target when the variable is absent) and retains a redacted report; it can also be triggered manually for rechecks. Vercel applies browser security headers to the static response, while FastAPI applies the same policy to API responses. Viewing the frozen study requires no database, secrets, or paid data service. A custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app, verifies the frozen snapshot lock, the reviewed research-evidence catalog and its companion interval report, and checks the disclosure files. CI also validates source/bundle and snapshot integrity. The `.vercelignore` boundary excludes `uv.lock`, private research caches, and operator/research trees, retaining only the reviewed public inputs and build validators. The Python Function excludes those private trees and explicitly includes the frozen snapshot, its lock, and the public evidence catalog; the serving repository fails closed on identity drift. Raw filings, processed tables, model artifacts, and forward-run files stay outside the serving bundle. After a successful Production deployment, the `Deployment smoke check` workflow probes the configured public URL and retains a redacted report. Vercel and FastAPI apply browser security headers. Viewing the frozen study requires no database, secrets, or paid data service; a custom domain is optional.
 
 The repository also ships a provider-neutral container path for a future host:
 
@@ -390,6 +390,11 @@ portfolio scenarios, gated on return coverage. It does not publish results or
 score locked-period rows; see the [research runbook](docs/research-runbook.md) and
 [13-role evidence map](docs/worldquant-role-evidence.md). No v2 empirical result
 is claimed until that separate study has been run and reviewed.
+The [Research page](apps/web/src/pages/ResearchPage.tsx) now serves the frozen
+v1 uncertainty and negative cost-aware result through a hash-locked evidence
+catalog, while v2 remains explicitly pending. The [review procedure](docs/research-runbook.md#reviewed-aggregate-publication-boundary)
+allows only approved aggregate-only v2 development results into the public API;
+it never copies the private pretest report or changes the immutable v1 snapshot.
 
 The earlier single-window diagnostic remains in `reports/validation_report.md`;
 the walk-forward report supersedes it for model selection. `open-frozen-test`
