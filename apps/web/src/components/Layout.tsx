@@ -12,7 +12,7 @@ import { MENU_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
 export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const { pathname, pending } = useRouter();
+  const { pathname, pending, destination } = useRouter();
   const collapsed = useMediaQuery(MENU_LAYOUT);
   const { theme, setTheme } = useTheme();
   const summary = useQuery(summaryQuery);
@@ -79,8 +79,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 <li key={to}>
                   <Link
                     to={to}
-                    className={pathname === to ? "active" : undefined}
-                    aria-current={pathname === to ? "page" : undefined}
+                    className={destination === to ? "active" : undefined}
+                    aria-current={destination === to ? "page" : undefined}
                     onClick={() => setOpen(false)}
                   >
                     <span className="site-nav__label">{label}</span>

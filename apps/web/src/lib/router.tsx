@@ -31,6 +31,7 @@ export function RouterProvider({ children, prepare }: {
 }) {
   const [pathname, setPathname] = useState(currentPathname);
   const [preparing, setPreparing] = useState(false);
+  const [target, setTarget] = useState<string | null>(null);
   const [switching, startTransition] = useTransition();
   const shown = useRef(pathname);
   const ticket = useRef(0);
@@ -66,6 +67,7 @@ export function RouterProvider({ children, prepare }: {
       if (next === shown.current) {
         window.scrollTo({ top: 0 });
         setPreparing(false);
+        setTarget(null);
         return;
       }
       scrollOnShow.current = true;
@@ -73,16 +75,22 @@ export function RouterProvider({ children, prepare }: {
       startTransition(() => {
         setPathname(next);
         setPreparing(false);
+        setTarget(null);
       });
     };
     if (!prepare) return show();
     setPreparing(true);
+    setTarget(currentPathname());
     const waited = new Promise((resolve) => window.setTimeout(resolve, READY_WAIT_MS));
     void Promise.race([prepare(to).catch(() => undefined), waited]).then(show);
   }, [prepare]);
 
   const pending = preparing || switching;
-  const value = useMemo(() => ({ pathname, navigate, prefetch, pending }), [navigate, pathname, prefetch, pending]);
+  const destination = target ?? pathname;
+  const value = useMemo(
+    () => ({ pathname, navigate, prefetch, pending, destination }),
+    [navigate, pathname, prefetch, pending, destination],
+  );
   return <RouterContext.Provider value={value}>{children}</RouterContext.Provider>;
 }
 

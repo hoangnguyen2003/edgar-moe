@@ -8,6 +8,8 @@ export type RouterValue = {
   prefetch: (to: string) => void;
   /** True between a click and the next page appearing. */
   pending: boolean;
+  /** The page being shown, or the one on its way while it prepares. */
+  destination: string;
 };
 
 export const RouterContext = createContext<RouterValue | null>(null);

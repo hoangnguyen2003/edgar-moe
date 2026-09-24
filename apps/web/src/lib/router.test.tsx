@@ -4,8 +4,8 @@ import { useRouter } from "./router-context";
 import { Link, RouterProvider } from "./router";
 
 function CurrentRoute() {
-  const { pathname, pending } = useRouter();
-  return <output>{pathname}{pending ? " (pending)" : ""}</output>;
+  const { pathname, pending, destination } = useRouter();
+  return <><output>{pathname}{pending ? " (pending)" : ""}</output><data value={destination}>{`to ${destination}`}</data></>;
 }
 
 describe("client router", () => {
@@ -44,9 +44,10 @@ describe("client router", () => {
 
     fireEvent.click(screen.getByRole("link", { name: "Research" }));
 
-    // The address changes at once; the view waits.
+    // The address and the destination change at once; the view waits.
     expect(window.location.pathname).toBe("/research");
     expect(screen.getByText("/ (pending)")).toBeInTheDocument();
+    expect(screen.getByText("to /research")).toBeInTheDocument();
     expect(window.scrollTo).not.toHaveBeenCalled();
 
     await act(async () => ready());
