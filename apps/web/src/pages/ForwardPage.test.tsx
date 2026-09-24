@@ -93,8 +93,10 @@ describe("Forward Lab", () => {
     expect(screen.getByText("DELL").closest("tr")).toHaveTextContent("2nd of 4");
     expect(screen.getByRole("button", { name: "What is Rank in run?" })).toBeInTheDocument();
     // Two settled results are nowhere near enough to read the live metrics.
-    expect(screen.getByText("Too early to read these numbers")).toBeInTheDocument();
-    expect(screen.getByText(/0 of 2 forecasts have a result so far/)).toBeInTheDocument();
+    const answer = document.querySelector(".page-header__answer");
+    expect(answer).toHaveTextContent("Too early to tell: 0 of 2 forecasts have a result so far.");
+    expect(answer?.querySelector("mark")).toHaveTextContent("Too early to tell");
+    expect(screen.getByText(/treat these figures as a running log, not evidence/)).toBeInTheDocument();
   });
 
   it("drops the early-sample caution once enough outcomes have settled", async () => {
@@ -121,7 +123,8 @@ describe("Forward Lab", () => {
     renderPage();
 
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
-    expect(screen.queryByText("Too early to read these numbers")).not.toBeInTheDocument();
+    expect(document.querySelector(".page-header__answer")).toHaveTextContent("On 120 settled forecasts, live ranking skill is 0.020.");
+    expect(screen.queryByText(/running log, not evidence/)).not.toBeInTheDocument();
     // The UI labels the time-clustered interval rather than implying independent events.
     expect(screen.getByText("95% time-clustered interval −0.16 to 0.20")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is 95% interval?" })).toBeInTheDocument();

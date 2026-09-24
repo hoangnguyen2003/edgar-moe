@@ -1,9 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { useId, useState } from "react";
+import { type ReactNode, useId, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { Takeaway } from "../components/Takeaway";
 import { experimentsQuery, summaryQuery } from "../lib/queries";
 import { decimal, signedDecimal, splitModelName } from "../lib/format";
 import type { ExperimentRecord } from "../lib/types";
@@ -29,8 +28,18 @@ function ranked(rows: ExperimentRecord[], sort: SortKey) {
 export function ResearchPage() {
   const experiments = useQuery(experimentsQuery);
   const summary = useQuery(summaryQuery);
-  if (experiments.isLoading || summary.isLoading) return <div className="page"><LoadingState label="Loading the model comparison" skeleton={["figures", "rows"]} /></div>;
-  if (experiments.error) return <div className="page"><ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
+  const header = (answer?: ReactNode) => (
+    <PageHeader
+      title="Model comparison"
+      answer={answer}
+      placeholder="Of 33 candidates, Fundamental-Anchored MoE was chosen: the most consistent across both validation years, not the highest average (#2 of 33)."
+    >
+      Every candidate learned from the same filings and was compared on 2023–2024 validation data; the chosen one was
+      frozen before the final test.
+    </PageHeader>
+  );
+  if (experiments.isLoading || summary.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the model comparison" skeleton={["figures", "rows"]} /></div>;
+  if (experiments.error) return <div className="page">{header()}<ErrorState error={experiments.error} onRetry={() => void experiments.refetch()} /></div>;
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);
   const selectedName = selected ? splitModelName(selected.name) : null;
@@ -38,19 +47,12 @@ export function ResearchPage() {
   const finalIc = summary.data?.predictive_metrics?.locked_test?.rank_ic;
   return (
     <div className="page">
-      <PageHeader title="Model comparison">
-        {rows.length} candidate models learned from the same filings and were compared on 2023–2024 validation data.
-        The chosen one was frozen before the final test.
-      </PageHeader>
-      {selected && selectedName && (
-        <Takeaway variant="quiet" label="Chosen model" title={selectedName.family}>
-          <p>
-            Picked for the best ranking skill in its weaker validation year: the most consistent candidate, not simply
-            the highest average. It ranks #{selectedRank} of {rows.length} on average ranking skill below.
-          </p>
-          {selectedName.params.length > 0 && <ParamList params={selectedName.params} />}
-        </Takeaway>
-      )}
+      {header(selectedName ? (
+        <>
+          Of {rows.length} candidates, <mark>{selectedName.family}</mark> was chosen: the most consistent across both
+          validation years, not the highest average (#{selectedRank} of {rows.length}).
+        </>
+      ) : undefined)}
       <section className="figures figures--three" aria-label="Chosen model results">
         <MetricCard label="Ranking skill, validation" info="rankIc" value={decimal(selected?.validation_rank_ic, 3)} detail="2023–2024; higher is better" />
         <MetricCard label="Prediction error, validation" info="rmse" value={decimal(selected?.validation_rmse, 5)} detail="2023–2024; lower is better" />

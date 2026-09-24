@@ -46,12 +46,15 @@ function bodyRows() {
 describe("Experiment leaderboard", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("leads with the chosen model, its settings as chips, and its place in the ranking", async () => {
+  it("answers with the chosen model and its place in the ranking; its settings sit in its row", async () => {
     renderPage();
-    const chosen = await screen.findByRole("region", { name: "Chosen model" });
-    expect(within(chosen).getByText("Fundamental-Anchored MoE")).toBeInTheDocument();
-    expect(within(chosen).getByText("gate=1.00")).toBeInTheDocument();
-    expect(chosen).toHaveTextContent("It ranks #11 of 12");
+    await screen.findByRole("table");
+    const answer = document.querySelector(".page-header__answer")!;
+    expect(answer).toHaveTextContent("Of 12 candidates, Fundamental-Anchored MoE was chosen");
+    expect(answer).toHaveTextContent("(#11 of 12)");
+    expect(within(answer as HTMLElement).getByText("Fundamental-Anchored MoE").tagName).toBe("MARK");
+    const chosenRow = bodyRows().find((row) => row.classList.contains("is-selected"))!;
+    expect(within(chosenRow).getByText("gate=1.00")).toBeInTheDocument();
   });
 
   it("ranks by rank IC and pins the selection when it falls below the preview", async () => {

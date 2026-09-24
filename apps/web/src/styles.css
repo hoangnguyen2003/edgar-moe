@@ -16,6 +16,7 @@
   --highlight: #e2f25c;
   --highlight-soft: rgba(226, 242, 92, .55);
   --on-highlight: #16191c;
+  --mark: var(--highlight);
   --stamp: #2447b8;
   --good: #1a6f35;
   --warning: #8a5a00;
@@ -67,6 +68,7 @@
     --rule-strong: #6f757c;
     --highlight: #d9ec52;
     --highlight-soft: rgba(217, 236, 82, .2);
+    --mark: rgba(217, 236, 82, .34);
     --stamp: #8aa4ff;
     --good: #57c27a;
     --warning: #e0b04a;
@@ -91,6 +93,7 @@
   --rule-strong: #6f757c;
   --highlight: #d9ec52;
   --highlight-soft: rgba(217, 236, 82, .2);
+  --mark: rgba(217, 236, 82, .34);
   --stamp: #8aa4ff;
   --good: #57c27a;
   --warning: #e0b04a;
@@ -121,6 +124,8 @@ table, .figure__value, .num { font-variant-numeric: tabular-nums; }
 ::selection { background: var(--highlight); color: var(--on-highlight); }
 :focus-visible { outline: 2px solid var(--stamp); outline-offset: 3px; border-radius: 2px; }
 main:focus { outline: none; }
+/* The link onward appears with the page's content, not beside its loading outline. */
+main:has(.query-state) .next-page { display: none; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .skip-link { position: fixed; top: 10px; left: 10px; z-index: 60; padding: 10px 14px; background: var(--ink); color: var(--paper); font-weight: 700; text-decoration: none; transform: translateY(-180%); transition: transform .15s ease; }
 .skip-link:focus { transform: translateY(0); }
@@ -166,6 +171,21 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header__main { max-width: 800px; }
 .page-header h1 { margin: 0; font: 500 clamp(34px, 4.2vw, 52px)/1.08 var(--serif); letter-spacing: -.02em; }
 .page-header__lede { max-width: 68ch; margin: 12px 0 0; color: var(--ink-2); font-size: 17px; line-height: 1.6; }
+/* The page's answer, read before anything else; the lede becomes its context. */
+.page-header__answer { max-width: 42ch; margin: 14px 0 0; color: var(--ink); font: 500 clamp(21px, 2.1vw, 26px)/1.3 var(--serif); letter-spacing: -.01em; text-wrap: balance; }
+.page-header__answer + .page-header__lede { margin-top: 10px; font-size: 16px; }
+/* The answer's key fact carries a low highlighter band in the lime that marks
+   "the answer" and "where you are" everywhere on the site. */
+.page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.page-header__stamp { margin: 8px 0 0; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+/* While the answer loads, a sentence of its shape holds its lines as a skeleton. */
+.page-header__placeholder { color: transparent; background: var(--paper-2); border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: skeleton-pulse 1.6s ease-in-out infinite alternate; user-select: none; }
+/* When the page's first section opens with a rule, the header's rule is that
+   rule, rather than a second line a few pixels below it. */
+.page-header:has(+ :is(.panel, .figures, .lanes, .scenario, .content-grid)) { margin-bottom: 0; }
+.page-header + :is(.panel, .figures, .lanes),
+.page-header + .scenario > :first-child,
+.page-header + .content-grid > .panel { border-top: 0; }
 
 /* The page's answer, before its evidence. */
 .takeaway { margin: 0 0 24px; padding: 18px 22px 20px; background: var(--highlight-soft); border-left: 4px solid var(--ink); }
@@ -229,6 +249,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 
 /* ---------- Key figures ---------- */
 .figures { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin: 0 0 var(--s5); border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
+/* A figure strip after a section's last line needs the same air as under a page header. */
+.panel + .figures { margin-top: var(--s5); }
 .figures--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .figures--five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 /* Each figure spans its row's label, value and detail tracks, so values line
@@ -532,8 +554,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .blotter__link svg { transition: transform .12s ease; }
 
 /* Quiet answer: the same sentence as the lead, without repeating its fill. */
-.takeaway--quiet { padding: 0 0 0 var(--s4); background: none; border-left: 2px solid var(--ink); }
-.takeaway--quiet .takeaway__title { font-size: clamp(20px, 2vw, 24px); }
 .expert-mix { margin-top: 8px; }
 .expert-mix__bar { display: flex; gap: 2px; height: 8px; }
 .expert-mix__bar span { min-width: 2px; background: var(--expert); }

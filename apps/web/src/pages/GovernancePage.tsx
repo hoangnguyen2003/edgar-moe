@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LockKeyhole } from "lucide-react";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
@@ -6,7 +7,6 @@ import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
-import { Takeaway } from "../components/Takeaway";
 import { governanceQuery } from "../lib/queries";
 import { humanize, shortDate } from "../lib/format";
 import type { GovernanceControl, GovernanceResponse } from "../lib/types";
@@ -20,18 +20,17 @@ const CONTROL_LABELS: Record<string, string> = {
 
 export function GovernancePage() {
   const governance = useQuery(governanceQuery);
-  const header = (
-    <PageHeader title="Audit trail">
-      Evidence that the published results come from the frozen model and haven't been edited since, and a clear
-      line between what the code enforces and what still needs a person to confirm.
+  const header = (answer?: ReactNode) => (
+    <PageHeader title="Audit trail" answer={answer} placeholder="3 of 4 safeguards are enforced in code; the rest need evidence from the people running the service.">
+      Evidence that the published results come from the frozen model and haven't been edited since.
     </PageHeader>
   );
 
   if (governance.isLoading) {
-    return <div className="page">{header}<LoadingState label="Loading the audit trail" slowHint={IDLE_DATABASE_HINT} skeleton={["rows"]} /></div>;
+    return <div className="page">{header(null)}<LoadingState label="Loading the audit trail" slowHint={IDLE_DATABASE_HINT} skeleton={["rows"]} /></div>;
   }
   if (governance.error) {
-    return <div className="page">{header}<ErrorState error={governance.error} onRetry={() => void governance.refetch()} /></div>;
+    return <div className="page">{header()}<ErrorState error={governance.error} onRetry={() => void governance.refetch()} /></div>;
   }
 
   const data = governance.data!;
@@ -39,10 +38,12 @@ export function GovernancePage() {
 
   return (
     <div className="page">
-      {header}
-      <Takeaway variant="quiet" title={`${enforced} of ${data.controls.length} safeguards are enforced in code.`}>
-        The rest depend on the people running the service and are marked as needing their evidence.
-      </Takeaway>
+      {header(
+        <>
+          <mark>{enforced} of {data.controls.length} safeguards</mark> are enforced in code; the rest need evidence from the
+          people running the service.
+        </>,
+      )}
 
       <section className="content-grid content-grid--two governance-top-grid">
         <FrozenIdentity identity={data.frozen_v1} />
