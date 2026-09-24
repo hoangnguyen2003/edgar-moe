@@ -9,7 +9,7 @@ const chartThemes = {
     axisLine: "#857c6b",
     tick: "#5f6468",
     reference: "#3d4247",
-    font: "IBM Plex Mono, monospace",
+    font: "IBM Plex Mono, IBM Plex Mono Fallback, monospace",
   },
   dark: {
     series: "#3987e5",
@@ -18,7 +18,7 @@ const chartThemes = {
     axisLine: "#6f757c",
     tick: "#9c9587",
     reference: "#c8c1b2",
-    font: "IBM Plex Mono, monospace",
+    font: "IBM Plex Mono, IBM Plex Mono Fallback, monospace",
   },
 } as const satisfies Record<Theme, Record<string, string>>;
 

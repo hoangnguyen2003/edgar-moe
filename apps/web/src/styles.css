@@ -26,9 +26,9 @@
   --expert-market: #1baf7a;
   --series: #2a78d6;
   --shadow: 0 1px 0 rgba(22, 25, 28, .04), 0 18px 32px -26px rgba(22, 25, 28, .45);
-  --serif: "Newsreader", "Iowan Old Style", Georgia, serif;
-  --sans: "Public Sans", system-ui, -apple-system, sans-serif;
-  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  --serif: "Newsreader", "Newsreader Fallback", "Iowan Old Style", Georgia, serif;
+  --sans: "Public Sans", "Public Sans Fallback", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", "IBM Plex Mono Fallback", ui-monospace, "SFMono-Regular", monospace;
   --page-max: 1280px;
   --gutter: clamp(16px, 4vw, 56px);
   /* One spacing scale, 4px based. Every margin and pad comes from it. */

@@ -5,6 +5,7 @@ import App from "./App";
 import { RouterProvider } from "./lib/router";
 import { prepareRoute, warmPageCode } from "./lib/routes";
 import { applyStoredTheme } from "./lib/theme";
+import "./fonts.css";
 import "./styles.css";
 
 applyStoredTheme();
