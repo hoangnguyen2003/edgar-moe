@@ -161,7 +161,8 @@ th.num, td.num { text-align: right; }
 .topbar__actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; }
 .icon-button { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 2px; background: transparent; color: var(--ink-2); }
 .icon-button:hover { color: var(--ink); background: var(--paper-2); }
-.theme-toggle { border: 1px solid var(--rule-strong); border-radius: 50%; }
+.theme-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 42px; padding: 0 13px 0 11px; border: 1px solid var(--rule-strong); border-radius: 2px; background: transparent; color: var(--ink-2); font: 600 14px var(--sans); }
+.theme-toggle:hover { border-color: var(--ink); background: var(--paper-2); color: var(--ink); }
 .menu-button { display: none; align-items: center; gap: 8px; min-height: 42px; padding: 0 14px; border: 1px solid var(--ink); border-radius: 2px; background: transparent; color: var(--ink); font: 600 15px var(--sans); }
 .menu-button:hover { background: var(--paper-2); }
 .backdrop { display: none; }
@@ -523,7 +524,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .signal-badge { padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); text-transform: capitalize; }
 .signal-badge--long { color: var(--good); }
 .signal-badge--short { color: var(--critical); }
-.signal-badge--neutral { color: var(--ink-2); }
+/* Most filings are neutral, so neutral is a quiet word and long and short are what the eye finds. */
+.signal-badge--neutral { padding-inline: 0; border-color: transparent; color: var(--ink-3); font-weight: 600; }
 .event-detail { min-height: 560px; scroll-margin-top: 80px; }
 .event-detail h2 { font-size: var(--t-title); letter-spacing: -.02em; }
 .event-detail__back { margin: 0 0 14px; }
@@ -929,5 +931,5 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 
 /* ---------- Press feedback ---------- */
 /* A pressed control moves with the finger; the shift is a pixel, not an animation. */
-.button:active, .segmented button:active, .icon-button:active, .menu-button:active { transform: translateY(1px); }
+.button:active, .segmented button:active, .icon-button:active, .menu-button:active, .theme-toggle:active { transform: translateY(1px); }
 .segmented button:focus-visible { position: relative; z-index: 1; outline-offset: 2px; }

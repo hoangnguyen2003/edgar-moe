@@ -100,10 +100,13 @@ describe("Layout", () => {
 
   it("switches to the dark theme and remembers it", () => {
     renderLayout();
-    fireEvent.click(screen.getByRole("button", { name: "Switch to dark theme" }));
+    const toggle = screen.getByRole("button", { name: "Switch to dark theme" });
+    // Named in words, like the Menu beside it; the spoken name contains the visible one.
+    expect(toggle).toHaveTextContent("Dark");
+    fireEvent.click(toggle);
 
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(window.localStorage.getItem("edgar-moe-theme")).toBe("dark");
-    expect(screen.getByRole("button", { name: "Switch to light theme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Switch to light theme" })).toHaveTextContent("Light");
   });
 });

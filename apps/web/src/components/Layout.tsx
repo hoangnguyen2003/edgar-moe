@@ -92,14 +92,15 @@ export function Layout({ children }: { children: ReactNode }) {
             </ul>
           </nav>
           <div className="topbar__actions">
+            {/* Named in words like the Menu beside it, so the two top-bar controls read as a pair. */}
             <button
               type="button"
-              className="icon-button theme-toggle"
+              className="theme-toggle"
               aria-label={`Switch to ${nextTheme} theme`}
-              title={`Switch to ${nextTheme} theme`}
               onClick={() => setTheme(nextTheme)}
             >
-              {theme === "dark" ? <Sun size={19} aria-hidden="true" /> : <Moon size={19} aria-hidden="true" />}
+              {theme === "dark" ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
+              <span aria-hidden="true">{nextTheme === "dark" ? "Dark" : "Light"}</span>
             </button>
             <button
               ref={menuButtonRef}
