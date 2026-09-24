@@ -1,0 +1,60 @@
+<!doctype html>
+<!--
+  Source of apps/web/public/social-card.png, the 1200x630 link preview.
+  Render it with `python scripts/render_brand_images.py`, which screenshots this
+  page in headless Chrome and keeps only PNG pixel chunks (ADR 0024).
+  It may state only figures the site publishes: the Overview's question, its
+  answer, and three of its figures (data/demo/snapshot.json and
+  apps/web/src/data/locked-rank-ic-interval.json). Keep the three in step.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>EDGAR-MoE link preview</title>
+<style>
+  @font-face { font-family: "Newsreader"; font-weight: 500; src: url("../src/fonts/newsreader-500-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Public Sans"; font-weight: 400 700; src: url("../src/fonts/public-sans-400-700-latin.woff2") format("woff2"); }
+  @font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url("../src/fonts/ibm-plex-mono-500-latin.woff2") format("woff2"); }
+  :root { --paper: #f4f0e6; --paper-2: #ece6d8; --ink: #16191c; --ink-2: #3d4247; --ink-3: #5f6468; --rule: #d9d1c1; --highlight: #e2f25c; --stamp: #2447b8; --series: #2a78d6; }
+  html, body { margin: 0; }
+  body { width: 1200px; height: 630px; overflow: hidden; background: var(--paper); color: var(--ink); font-family: "Public Sans", sans-serif; }
+  .card { box-sizing: border-box; display: flex; flex-direction: column; height: 100%; padding: 56px 72px 60px; }
+  .masthead { display: flex; align-items: center; justify-content: space-between; }
+  .masthead svg { width: 204px; height: 25.5px; fill: var(--ink); }
+  .masthead .dash { fill: var(--stamp); }
+  .masthead span { color: var(--ink-3); font: 500 17px "IBM Plex Mono", monospace; letter-spacing: .02em; }
+  h1 { margin: 46px 0 0; font: 500 80px/1.02 "Newsreader", serif; letter-spacing: -.028em; }
+  .answer { margin: 20px 0 0; font: 500 44px/1.2 "Newsreader", serif; letter-spacing: -.01em; }
+  .answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--highlight) 60%); color: inherit; }
+  .figures { display: grid; grid-template-columns: 1fr 1.25fr 1fr; margin-top: auto; border-top: 1px solid var(--ink); }
+  .figure { padding: 16px 24px 0 0; }
+  .figure + .figure { padding-left: 24px; border-left: 1px solid var(--rule); }
+  .figure > span { color: var(--ink-3); font: 500 14px "IBM Plex Mono", monospace; letter-spacing: .12em; text-transform: uppercase; }
+  .figure strong { display: block; margin-top: 8px; font: 500 46px/1 "IBM Plex Mono", monospace; letter-spacing: -.03em; }
+  .figure small { display: block; margin-top: 10px; color: var(--ink-2); font-size: 18px; }
+  .glyph { position: relative; height: 4px; margin: 20px 0 0; background: var(--paper-2); }
+  .glyph i { position: absolute; top: 0; height: 4px; background: var(--series); }
+  .glyph b { position: absolute; top: -8px; width: 1.5px; height: 20px; margin-left: -.75px; background: var(--ink); }
+  .glyph u { position: absolute; top: -5px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--paper); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="masthead">
+      <svg viewBox="72 -1418 11894 1486" aria-label="EDGAR-MoE"><path d="M940 -977 935 -709 940 -441H859L824 -654L354 -657V-761L824 -764L859 -977ZM1215 -962 1164 -950 960 -1281 1044 -1244H344V-1352H993L1115 -1413H1139ZM990 -70 1210 -418 1256 -406 1171 68H1145L1016 0H344V-108H1058ZM72 0V-41L223 -96V-1256L72 -1311V-1352H491V0Z M2448 -693Q2448 -975 2301 -1110Q2154 -1244 1894 -1244H1624L1607 -1352H1943Q2205 -1352 2380 -1282Q2554 -1211 2642 -1070Q2729 -928 2729 -715Q2729 -487 2626 -328Q2524 -168 2347 -84Q2170 0 1947 0H1607L1624 -108H1915Q2076 -108 2196 -168Q2315 -227 2382 -356Q2448 -485 2448 -693ZM1340 0V-41L1491 -96V-1256L1340 -1311V-1352H1759V0Z M4118 -169 4158 -85V-75Q4078 -43 3991 -20Q3904 2 3812 13Q3719 24 3620 24Q3442 24 3300 -22Q3157 -69 3057 -158Q2957 -248 2904 -376Q2852 -504 2852 -667Q2852 -879 2948 -1039Q3045 -1199 3226 -1288Q3406 -1376 3656 -1376Q3730 -1376 3798 -1368Q3866 -1359 3949 -1338L3866 -1322L4000 -1418H4029L4100 -927L4046 -916L3838 -1260L3947 -1149Q3869 -1209 3789 -1238Q3709 -1267 3611 -1267Q3496 -1267 3406 -1234Q3317 -1202 3256 -1136Q3194 -1069 3162 -970Q3131 -872 3131 -739Q3131 -525 3198 -378Q3266 -232 3382 -158Q3499 -84 3645 -84Q3704 -84 3760 -94Q3816 -104 3864 -124Q3912 -145 3944 -174L3853 -44V-505L3683 -563V-604H4250V-563L4118 -509Z M4559 -470V-574H5236V-470ZM5559 -98 5708 -41V0H5105V-41L5274 -96L4832 -1141L4883 -1143L4469 -96L4630 -41V0H4195V-41L4348 -97L4867 -1363H5013Z M6315 -736Q6433 -736 6507 -801Q6581 -866 6581 -991Q6581 -1071 6548 -1128Q6516 -1184 6444 -1214Q6371 -1244 6251 -1244H5916L5956 -1352H6376Q6547 -1352 6651 -1306Q6755 -1261 6802 -1184Q6849 -1108 6849 -1014Q6849 -925 6807 -854Q6765 -782 6682 -736Q6599 -690 6476 -677V-682Q6564 -678 6616 -656Q6668 -633 6700 -588Q6732 -542 6757 -468L6847 -211Q6871 -144 6893 -114Q6915 -83 6944 -75Q6973 -67 7017 -67V2Q6892 11 6814 8Q6737 6 6692 -14Q6646 -34 6620 -74Q6595 -114 6575 -179L6490 -443Q6467 -517 6444 -557Q6422 -597 6390 -613Q6357 -629 6303 -629H5949L5908 -736ZM6135 -1352V-96L6287 -41V0H5716V-41L5868 -96V-1256L5716 -1311V-1352Z M9620 -98 9776 -41V0H9188V-41L9348 -92L9268 -1175L9282 -1172L8797 11H8655L8157 -1166L8171 -1169L8107 -97L8267 -41V0H7836V-41L7995 -97L8075 -1245L7910 -1311V-1352H8372L8822 -272H8798L9242 -1352H9683V-1311L9526 -1256Z M10266 -64Q10327 -64 10372 -98Q10418 -133 10444 -208Q10469 -284 10469 -406Q10469 -541 10444 -632Q10420 -724 10372 -771Q10325 -818 10257 -818Q10196 -818 10150 -784Q10104 -749 10078 -674Q10053 -598 10053 -475Q10053 -341 10078 -250Q10103 -158 10150 -111Q10198 -64 10266 -64ZM10255 24Q10117 24 10014 -34Q9910 -91 9854 -194Q9797 -296 9797 -430Q9797 -569 9858 -676Q9919 -784 10025 -845Q10131 -906 10267 -906Q10407 -906 10510 -848Q10613 -791 10669 -689Q10725 -587 10725 -452Q10725 -313 10664 -206Q10604 -98 10498 -37Q10392 24 10255 24Z M11650 -977 11645 -709 11650 -441H11569L11534 -654L11064 -657V-761L11534 -764L11569 -977ZM11925 -962 11874 -950 11670 -1281 11754 -1244H11054V-1352H11703L11825 -1413H11849ZM11700 -70 11920 -418 11966 -406 11881 68H11855L11726 0H11054V-108H11768ZM10782 0V-41L10933 -96V-1256L10782 -1311V-1352H11201V0Z"/><path class="dash" d="M6988 -501H7808V-400H6988Z"/></svg>
+      <span>edgar-moe.vercel.app</span>
+    </div>
+    <h1>Can SEC filings predict stock&nbsp;returns?</h1>
+    <p class="answer"><mark>Not convincingly, and not profitably.</mark></p>
+    <div class="figures">
+      <div class="figure"><span>Filings analyzed</span><strong>5,961</strong><small>From 421 companies</small></div>
+      <div class="figure">
+        <span>Ranking skill</span><strong>0.032</strong>
+        <div class="glyph" aria-hidden="true"><i style="left: 42.88%; width: 51.01%"></i><b style="left: 50%"></b><u style="left: 69.77%"></u></div>
+        <small>95% interval &minus;0.011 to 0.070 includes zero</small>
+      </div>
+      <div class="figure"><span>Sharpe ratio</span><strong>&minus;0.63</strong><small>After 0.10% trading costs</small></div>
+    </div>
+  </div>
+</body>
+</html>

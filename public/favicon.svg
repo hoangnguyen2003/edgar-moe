@@ -1,6 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="EDGAR-MoE">
   <title>EDGAR-MoE</title>
-  <rect width="64" height="64" rx="12" fill="#e2f25c"/>
-  <text x="32" y="46" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="44" font-weight="600" fill="#16191c">E</text>
-  <rect x="16" y="50" width="32" height="4" rx="2" fill="#2447b8"/>
+  <!-- The logotype's opening "E–": Newsreader's own outline (weight 600, optical size 25)
+       from components/Wordmark.tsx, on the highlighter lime, with the dash in stamp blue. -->
+  <rect width="64" height="64" rx="4" fill="#e2f25c"/>
+  <path transform="translate(1.948 52) scale(0.0285)" fill="#16191c" d="M940 -977 935 -709 940 -441H859L824 -654L354 -657V-761L824 -764L859 -977ZM1215 -962 1164 -950 960 -1281 1044 -1244H344V-1352H993L1115 -1413H1139ZM990 -70 1210 -418 1256 -406 1171 68H1145L1016 0H344V-108H1058ZM72 0V-41L223 -96V-1256L72 -1311V-1352H491V0Z"/>
+  <rect x="42" y="34" width="16" height="5" fill="#2447b8"/>
 </svg>
