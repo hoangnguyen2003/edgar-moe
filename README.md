@@ -383,6 +383,14 @@ uv run edgar-moe open-frozen-test \
 
 `build-dataset` constructs a prior-month liquid universe, attaches an availability record to every feature, rejects look-ahead violations, caches text embeddings, and censors labels that have not matured. `walk-forward-study` refits preprocessing and models independently in expanding 2023 and 2024 folds, compares 33 standalone and anchored candidates, and freezes the champion by worst-fold rank IC. New studies should build datasets with `config/authenticated-v2.yaml`, whose duration-aware XBRL fundamentals replace the v1 definition; `config/authenticated-free.yaml` keeps the frozen v1 features for the prospective runner. It writes content-hashed out-of-fold predictions and never transforms, predicts, or evaluates the locked rows.
 
+For a separately identified v2 dataset and selection, `edgar-moe v2-pretest-review
+--dataset-dir <v2-dataset> --selection-dir <v2-selection>` writes a private,
+non-overwritable review of paired pretest rank-IC comparisons and cost-aware
+portfolio scenarios, gated on return coverage. It does not publish results or
+score locked-period rows; see the [research runbook](docs/research-runbook.md) and
+[13-role evidence map](docs/worldquant-role-evidence.md). No v2 empirical result
+is claimed until that separate study has been run and reviewed.
+
 The earlier single-window diagnostic remains in `reports/validation_report.md`;
 the walk-forward report supersedes it for model selection. `open-frozen-test`
 verified the selection and OOF-prediction hashes before accessing locked outcomes,

@@ -757,6 +757,56 @@ def walk_forward_study(
     typer.echo(f"Wrote {report_output}; locked-test predictions: 0")
 
 
+@app.command("v2-pretest-review")
+def v2_pretest_review(
+    dataset_dir: Annotated[Path, typer.Option(help="Processed duration-aware v2 dataset.")],
+    selection_dir: Annotated[
+        Path, typer.Option(help="Saved walk-forward selection and OOF archive directory.")
+    ],
+    output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/v2-reviews"),
+    bootstrap_samples: Annotated[int, typer.Option(min=100, max=5000)] = 1000,
+    block_months: Annotated[int, typer.Option(min=1, max=6)] = 2,
+) -> None:
+    """Review paired pre-test evidence without opening or replacing frozen v1."""
+    import hashlib
+    import os
+    import tempfile
+
+    from edgar_moe.features.dataset import ResearchDataset
+    from edgar_moe.modeling.pretest_review import review_v2_pretest
+
+    dataset = ResearchDataset.load(dataset_dir)
+    report = review_v2_pretest(
+        dataset,
+        selection_dir,
+        bootstrap_samples=bootstrap_samples,
+        block_months=block_months,
+    )
+    destination = output_dir / dataset.dataset_id / "pretest-review.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if destination.exists():
+        raise typer.BadParameter("pre-test review already exists; use a new output directory")
+    report["review_sha256"] = hashlib.sha256(
+        orjson.dumps(report, option=orjson.OPT_SORT_KEYS)
+    ).hexdigest()
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    typer.echo(
+        f"Wrote v2 development-only review to {destination}; "
+        f"{report['oof_events']:,} OOF events; locked-test predictions: 0"
+    )
+
+
 @app.command("open-frozen-test")
 def open_frozen_test(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
