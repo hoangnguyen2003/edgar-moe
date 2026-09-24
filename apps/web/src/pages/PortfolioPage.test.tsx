@@ -35,6 +35,28 @@ describe("Portfolio page", () => {
   });
   afterEach(() => vi.unstubAllGlobals());
 
+  it("fetches a trading cost's scenario as soon as the reader reaches for it", async () => {
+    const fetch = vi.fn((input: RequestInfo | URL) => {
+      const cost = Number(new URL(String(input), "https://terminal.example").searchParams.get("cost_bps"));
+      return Promise.resolve(jsonResponse(curve(cost, -0.63)));
+    });
+    vi.stubGlobal("fetch", fetch);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><PortfolioPage /></QueryClientProvider>);
+    await screen.findByText("−0.63", { selector: ".figure__value" });
+    const requested = () => fetch.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example").searchParams.get("cost_bps"));
+    expect(requested()).toEqual(["10"]);
+
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "0.50%" }));
+    fireEvent.focus(screen.getByRole("button", { name: "0.25%" }));
+
+    expect(requested()).toEqual(["10", "50", "25"]);
+    // Reaching again for one already in hand asks for nothing more.
+    fireEvent.pointerEnter(screen.getByRole("button", { name: "0.50%" }));
+    await Promise.resolve();
+    expect(requested()).toHaveLength(3);
+  });
+
   it("keeps the current scenario on screen while another cost loads", async () => {
     let release: (response: Response) => void = () => {};
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {

@@ -1,10 +1,58 @@
-import { type KeyboardEvent, type PointerEvent, useEffect, useId, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, type PointerEvent, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { BREAK_EVEN, monthTicks, valueDomain, valueTicks } from "../lib/chartScale";
 import { dollars, monthYear, percent, shortDate } from "../lib/format";
 import type { EquityPoint } from "../lib/types";
+import { matchesMedia, REDUCED_MOTION } from "../lib/useMediaQuery";
 
 /** About a month of trading days, for Shift + arrow. */
 const MONTH_OF_DAYS = 21;
+/** How long the curve takes to glide to a new scenario. */
+const GLIDE_MS = 560;
+
+/** Two series over the same trading days, so one can glide into the other. */
+function sameDays(a: EquityPoint[], b: EquityPoint[]): boolean {
+  return a.length > 0 && a.length === b.length && a[0].date === b[0].date && a[a.length - 1].date === b[b.length - 1].date;
+}
+
+function canGlide(from: EquityPoint[], to: EquityPoint[]): boolean {
+  return from !== to && sameDays(from, to) && !matchesMedia(REDUCED_MOTION) && typeof requestAnimationFrame === "function";
+}
+
+/**
+ * The values to draw. When the same days arrive with new values (another
+ * trading cost), the curve glides from what is on screen to the new series,
+ * so the reader watches what the change did instead of seeing one chart
+ * replace another. A change mid-glide starts from wherever the curve is.
+ */
+function useGlide(points: EquityPoint[]): EquityPoint[] {
+  const [values, setValues] = useState(points);
+  const drawn = useRef(points);
+  useLayoutEffect(() => {
+    const from = drawn.current;
+    if (from === points) return;
+    if (!canGlide(from, points)) {
+      drawn.current = points;
+      setValues(points);
+      return;
+    }
+    let frame = 0;
+    const start = performance.now();
+    const tick = (now: number) => {
+      const progress = Math.min(1, (now - start) / GLIDE_MS);
+      const eased = 1 - (1 - progress) ** 3;
+      const next = progress < 1
+        ? points.map((point, index) => ({ ...point, equity: from[index].equity + (point.equity - from[index].equity) * eased }))
+        : points;
+      drawn.current = next;
+      setValues(next);
+      if (progress < 1) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [points]);
+  // Until the glide's first frame, keep the old values on screen rather than flash the new ones.
+  return sameDays(values, points) && !matchesMedia(REDUCED_MOTION) ? values : points;
+}
 
 function extremes(points: EquityPoint[]) {
   let high = 0;
@@ -26,7 +74,8 @@ function reading(point: EquityPoint): string {
  * and break-even, so its size is the gain or loss rather than distance from an
  * arbitrary axis floor. A crosshair reads any day, by pointer or arrow keys.
  */
-export function EquityChart({ points, summary }: { points: EquityPoint[]; summary: string }) {
+export function EquityChart({ points: target, summary }: { points: EquityPoint[]; summary: string }) {
+  const points = useGlide(target);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [active, setActive] = useState<number | null>(null);
@@ -53,6 +102,9 @@ export function EquityChart({ points, summary }: { points: EquityPoint[]; summar
     const top = 12;
     const bottom = size.height - 28;
     const [low, high] = valueDomain(points);
+    // Ticks come from where the curve is heading, so their labels hold still while
+    // the scale glides; each is drawn only once it is inside the plot.
+    const ticks = valueTicks(...valueDomain(target));
     const x = (index: number) => left + (points.length > 1 ? (index / (points.length - 1)) * (right - left) : 0);
     const y = (value: number) => bottom - ((value - low) / (high - low)) * (bottom - top);
     const line = points.map((point, index) => `${index ? "L" : "M"}${x(index).toFixed(1)} ${y(point.equity).toFixed(1)}`).join("");
@@ -60,11 +112,12 @@ export function EquityChart({ points, summary }: { points: EquityPoint[]; summar
     const band = `${line}L${x(points.length - 1).toFixed(1)} ${base.toFixed(1)}L${left} ${base.toFixed(1)}Z`;
     return {
       left, right, top, bottom, x, y, line, band, base,
-      valueTicks: valueTicks(low, high),
+      valueTicks: ticks.filter((value) => value >= low && value <= high),
       monthTicks: monthTicks(points, x, narrow ? 72 : 92, size.width - 28),
-      ...extremes(points),
+      // The high and low are the destination's, so their labels move with the curve, not between days.
+      ...extremes(target),
     };
-  }, [points, size]);
+  }, [points, target, size]);
 
   const last = points.length - 1;
   const show = (index: number, announce: boolean) => {
