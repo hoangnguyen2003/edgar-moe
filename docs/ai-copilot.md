@@ -251,7 +251,8 @@ raw observations, event/forecast identifiers, or filesystem paths. Invalid or
 tampered history is reported as unavailable without exposing parser details.
 The tool contract also states that `ready` means only the configured snapshot
 count and report checks passed: snapshots may overlap, independence is not
-assessed, and this history is never model-promotion or retraining evidence.
+assessed, the artifact does not record human review, and this history is never
+model-promotion or retraining evidence.
 
 ## Run it locally
 

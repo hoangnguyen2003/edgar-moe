@@ -128,7 +128,8 @@ class ReadOnlyToolset:
                         "20-session evaluation, and contains no forecast or filing observations. "
                         "Its ready status only means the configured snapshot count and report "
                         "checks passed; snapshots may overlap, independence is not assessed, and "
-                        "the history is never model-promotion or retraining evidence."
+                        "human review is not recorded; the history is never model-promotion or "
+                        "retraining evidence."
                     ),
                     parameters={
                         "type": "object",
@@ -285,6 +286,8 @@ class ReadOnlyToolset:
                 "observations",
                 "history_sha256",
             ]
+            if "human_review_status" in payload:
+                fields.extend(("diagnostic_review_required", "human_review_status"))
             if "snapshot_independence" in payload:
                 fields.extend(("snapshot_independence", "promotion_eligible"))
             return _result(

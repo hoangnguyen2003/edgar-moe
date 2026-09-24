@@ -89,6 +89,8 @@ def validate_forward_diagnostic_history_workflow(path: Path) -> list[str]:
         "forward-diagnostic-history-verify",
         "snapshot_independence",
         "promotion_eligible",
+        "diagnostic_review_required",
+        "human_review_status",
         "scripts/validate_redacted_artifacts.py",
         "sha256sum",
         "SHA256SUMS",

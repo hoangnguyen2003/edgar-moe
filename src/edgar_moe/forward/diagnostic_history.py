@@ -21,8 +21,9 @@ import orjson
 from edgar_moe.copilot.diagnostics import DIAGNOSTIC_DISCLAIMER, read_forward_diagnostic_summary
 from edgar_moe.utils.timestamps import parse_aware_timestamp
 
-HISTORY_VERSION = 2
+HISTORY_VERSION = 3
 _LEGACY_HISTORY_VERSION = 1
+_INTERMEDIATE_HISTORY_VERSION = 2
 OFFICIAL_HORIZON_SESSIONS = 20
 MAX_HISTORY_REPORTS = 128
 MAX_HISTORY_BYTES = 2_000_000
@@ -101,21 +102,38 @@ _HISTORY_KEYS_V1 = frozenset(
         "history_sha256",
     }
 )
-_HISTORY_KEYS = _HISTORY_KEYS_V1 | frozenset({"snapshot_independence", "promotion_eligible"})
+_HISTORY_KEYS_V2 = _HISTORY_KEYS_V1 | frozenset({"snapshot_independence", "promotion_eligible"})
+_HISTORY_KEYS = (_HISTORY_KEYS_V1 - {"review_required"}) | frozenset(
+    {
+        "snapshot_independence",
+        "promotion_eligible",
+        "diagnostic_review_required",
+        "human_review_status",
+    }
+)
 _HISTORY_KEYS_BY_VERSION = {
     _LEGACY_HISTORY_VERSION: _HISTORY_KEYS_V1,
+    _INTERMEDIATE_HISTORY_VERSION: _HISTORY_KEYS_V2,
     HISTORY_VERSION: _HISTORY_KEYS,
 }
 _DISCLAIMER_V1 = (
     "Forward diagnostic history is research-only short-horizon evidence; it does not replace, "
     "modify, or contribute to the official 20-session forward evaluation."
 )
-_DISCLAIMER = (
+_DISCLAIMER_V2 = (
     "Forward diagnostic history is a research-only sequence of short-horizon snapshots. "
     "Snapshots may overlap or reuse forecasts and labels; statistical independence is not "
     "assessed. A ready status means only that the configured number of valid snapshots was "
     "collected. This history is not promotion evidence, does not authorize retraining, and "
     "does not replace or contribute to the official 20-session forward evaluation."
+)
+_DISCLAIMER = (
+    "Forward diagnostic history is a research-only sequence of short-horizon snapshots. "
+    "Snapshots may overlap or reuse forecasts and labels; statistical independence is not "
+    "assessed. A ready status means only that the configured number of valid snapshots was "
+    "collected and each report passed its diagnostic checks. Human review is not recorded. "
+    "This history is not promotion evidence, does not authorize retraining, and does not replace "
+    "or contribute to the official 20-session forward evaluation."
 )
 _SHA256 = frozenset("0123456789abcdef")
 
@@ -198,7 +216,8 @@ def build_forward_diagnostic_history(
         "automatic_retraining": False,
         "official_evaluation_untouched": True,
         "status": status,
-        "review_required": status != "ready",
+        "diagnostic_review_required": status != "ready",
+        "human_review_status": "not_recorded",
         "snapshot_independence": "not_assessed",
         "promotion_eligible": False,
         "minimum_reports": minimum,
@@ -248,7 +267,10 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
     status = history.get("status")
     if status not in _HISTORY_STATUSES:
         raise DiagnosticHistoryError("diagnostic history status is invalid")
-    if not isinstance(history.get("review_required"), bool):
+    if history_version in {
+        _LEGACY_HISTORY_VERSION,
+        _INTERMEDIATE_HISTORY_VERSION,
+    } and not isinstance(history.get("review_required"), bool):
         raise DiagnosticHistoryError("diagnostic history review_required must be boolean")
     minimum = _positive_int(history.get("minimum_reports"), "minimum_reports")
     report_count = _positive_int(history.get("report_count"), "report_count")
@@ -260,14 +282,25 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
     if not 2 <= horizon < OFFICIAL_HORIZON_SESSIONS:
         raise DiagnosticHistoryError("diagnostic history horizon is invalid")
     latest_as_of = _parse_timestamp(history.get("latest_as_of"), "latest_as_of")
-    if history_version == HISTORY_VERSION:
+    if history_version in {_INTERMEDIATE_HISTORY_VERSION, HISTORY_VERSION}:
         if history.get("snapshot_independence") != "not_assessed":
             raise DiagnosticHistoryError(
                 "diagnostic history snapshot independence must remain not_assessed"
             )
         if history.get("promotion_eligible") is not False:
             raise DiagnosticHistoryError("diagnostic history cannot be promotion eligible")
+    if history_version == HISTORY_VERSION:
+        if history.get("human_review_status") != "not_recorded":
+            raise DiagnosticHistoryError(
+                "diagnostic history human review status must remain not_recorded"
+            )
+        if history.get("diagnostic_review_required") is not (status != "ready"):
+            raise DiagnosticHistoryError(
+                "diagnostic history diagnostic_review_required is inconsistent"
+            )
         expected_disclaimer = _DISCLAIMER
+    elif history_version == _INTERMEDIATE_HISTORY_VERSION:
+        expected_disclaimer = _DISCLAIMER_V2
     else:
         expected_disclaimer = _DISCLAIMER_V1
     if history.get("disclaimer") != expected_disclaimer:
@@ -292,7 +325,9 @@ def verify_forward_diagnostic_history(history: Mapping[str, Any]) -> None:
     )
     if status != expected_status:
         raise DiagnosticHistoryError("diagnostic history status is inconsistent")
-    if history.get("review_required") is not (status != "ready"):
+    if history_version in {_LEGACY_HISTORY_VERSION, _INTERMEDIATE_HISTORY_VERSION} and history.get(
+        "review_required"
+    ) is not (status != "ready"):
         raise DiagnosticHistoryError("diagnostic history review_required is inconsistent")
     expected_hash = history.get("history_sha256")
     if not _is_sha256(expected_hash):

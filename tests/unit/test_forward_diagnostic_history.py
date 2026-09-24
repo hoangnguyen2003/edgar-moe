@@ -82,15 +82,25 @@ def _summaries(tmp_path: Path) -> tuple[dict[str, object], ...]:
     return tuple(summaries)
 
 
+def _rehash(history: dict[str, object]) -> None:
+    history.pop("history_sha256")
+    history["history_sha256"] = hashlib.sha256(
+        orjson.dumps(history, option=orjson.OPT_SORT_KEYS)
+    ).hexdigest()
+
+
 def test_history_is_redacted_chronological_and_deterministic(tmp_path: Path) -> None:
     summaries = _summaries(tmp_path)
 
     history = build_forward_diagnostic_history(tuple(reversed(summaries)))
     repeated = build_forward_diagnostic_history(summaries)
 
-    assert history["history_version"] == 2
+    assert history["history_version"] == 3
     assert history["status"] == "ready"
     assert history["report_count"] == 3
+    assert "review_required" not in history
+    assert history["diagnostic_review_required"] is False
+    assert history["human_review_status"] == "not_recorded"
     assert history["snapshot_independence"] == "not_assessed"
     assert history["promotion_eligible"] is False
     assert "Snapshots may overlap" in history["disclaimer"]
@@ -107,25 +117,45 @@ def test_legacy_v1_history_remains_verifiable(tmp_path: Path) -> None:
     history = build_forward_diagnostic_history(_summaries(tmp_path))
     legacy = copy.deepcopy(history)
     legacy["history_version"] = 1
+    legacy.pop("diagnostic_review_required")
+    legacy.pop("human_review_status")
     legacy.pop("snapshot_independence")
     legacy.pop("promotion_eligible")
+    legacy["review_required"] = legacy["status"] != "ready"
     legacy["disclaimer"] = (
         "Forward diagnostic history is research-only short-horizon evidence; it does not "
         "replace, modify, or contribute to the official 20-session forward evaluation."
     )
-    legacy.pop("history_sha256")
-    legacy["history_sha256"] = hashlib.sha256(
-        orjson.dumps(legacy, option=orjson.OPT_SORT_KEYS)
-    ).hexdigest()
+    _rehash(legacy)
 
     verify_forward_diagnostic_history(legacy)
+
+
+def test_intermediate_v2_history_remains_verifiable(tmp_path: Path) -> None:
+    history = build_forward_diagnostic_history(_summaries(tmp_path))
+    intermediate = copy.deepcopy(history)
+    intermediate["history_version"] = 2
+    intermediate.pop("diagnostic_review_required")
+    intermediate.pop("human_review_status")
+    intermediate["review_required"] = intermediate["status"] != "ready"
+    intermediate["disclaimer"] = (
+        "Forward diagnostic history is a research-only sequence of short-horizon snapshots. "
+        "Snapshots may overlap or reuse forecasts and labels; statistical independence is not "
+        "assessed. A ready status means only that the configured number of valid snapshots was "
+        "collected. This history is not promotion evidence, does not authorize retraining, and "
+        "does not replace or contribute to the official 20-session forward evaluation."
+    )
+    _rehash(intermediate)
+
+    verify_forward_diagnostic_history(intermediate)
 
 
 def test_insufficient_history_is_valid_and_verifies(tmp_path: Path) -> None:
     history = build_forward_diagnostic_history(_summaries(tmp_path)[:1], minimum_reports=3)
 
     assert history["status"] == "insufficient_history"
-    assert history["review_required"] is True
+    assert history["diagnostic_review_required"] is True
+    assert history["human_review_status"] == "not_recorded"
     verify_forward_diagnostic_history(history)
 
 
@@ -154,6 +184,9 @@ def test_raw_reports_cannot_bypass_the_redaction_boundary() -> None:
         lambda history: history.__setitem__("history_sha256", "f" * 64),
         lambda history: history.__setitem__("snapshot_independence", "independent"),
         lambda history: history.__setitem__("promotion_eligible", True),
+        lambda history: history.__setitem__("diagnostic_review_required", True),
+        lambda history: history.__setitem__("human_review_status", "approved"),
+        lambda history: history.__setitem__("review_required", False),
     ),
 )
 def test_tampered_history_is_rejected(tmp_path: Path, mutation: object) -> None:
@@ -220,7 +253,8 @@ def test_history_input_bounds_are_rejected(tmp_path: Path) -> None:
         ("automatic_retraining", True),
         ("official_evaluation_untouched", False),
         ("status", "wrong"),
-        ("review_required", "wrong"),
+        ("diagnostic_review_required", True),
+        ("human_review_status", "approved"),
         ("minimum_reports", 0),
         ("report_count", MAX_HISTORY_REPORTS + 1),
         ("official_horizon_sessions", 19),
