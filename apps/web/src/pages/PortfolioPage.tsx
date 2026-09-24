@@ -17,7 +17,9 @@ function outcome(metrics: EquityCurveResponse["metrics"], costBps: number): Reac
   const annual = metrics.annualized_return;
   if (annual == null) return undefined;
   const verb = annual < 0 ? "lost" : "gained";
-  return <>At {bpsPercent(costBps)} trading cost, the portfolio <mark>{verb} {percent(Math.abs(annual))} a year</mark>.</>;
+  const result = `${verb} ${percent(Math.abs(annual))} a year`;
+  // Keyed by its words, so a new result draws its highlight in again.
+  return <>At {bpsPercent(costBps)} trading cost, the portfolio <mark key={result}>{result}</mark>.</>;
 }
 
 function uncertainty(low: number | null | undefined, estimate: number | null | undefined, high: number | null | undefined): string {

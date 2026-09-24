@@ -176,7 +176,9 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header__answer + .page-header__lede { margin-top: 10px; font-size: 16px; }
 /* The answer's key fact carries a low highlighter band in the lime that marks
    "the answer" and "where you are" everywhere on the site. */
-.page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%) no-repeat 0 0 / 100% 100%; color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: mark-sweep .7s cubic-bezier(.3, .7, .2, 1) .2s both; }
+/* The highlighter draws in, left to right, once the answer is on the page. */
+@keyframes mark-sweep { from { background-size: 0 100%; } }
 .page-header__stamp { margin: 8px 0 0; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
 /* While the answer loads, a sentence of its shape holds its lines as a skeleton. */
 .page-header__placeholder { color: transparent; background: var(--paper-2); border-radius: 3px; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: skeleton-pulse 1.6s ease-in-out infinite alternate; user-select: none; }
@@ -260,6 +262,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .figure__label { color: var(--ink-3); font: var(--eyebrow); line-height: 16px; letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
 .figure__value { display: flex; align-items: baseline; gap: var(--s2); margin: var(--s2) 0 var(--s1); color: var(--ink); font: 600 clamp(24px, 2.3vw, 31px)/1.05 var(--sans); letter-spacing: -.025em; font-variant-numeric: tabular-nums; }
 .figure__value svg { flex: 0 0 auto; color: var(--ink-2); }
+/* Only as wide as its number, so the wash that marks a change hugs the digits. */
+.figure__value { justify-self: start; margin-inline: -.1em; padding-inline: .1em; border-radius: 2px; }
 .figure__detail { display: block; color: var(--ink-2); font-size: var(--t-small); line-height: 1.45; }
 
 /* ---------- Overview ---------- */
