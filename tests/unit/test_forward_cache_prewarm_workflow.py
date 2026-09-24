@@ -13,7 +13,7 @@ def _workflow(path: Path) -> dict[str, Any]:
     return cast(dict[str, Any], document)
 
 
-def test_prewarm_is_manual_main_only_and_cannot_cancel_production() -> None:
+def test_prewarm_is_manual_main_only_and_preserves_an_active_cycle() -> None:
     prewarm = _workflow(PREWARM)
     production = _workflow(PRODUCTION)
     trigger = prewarm.get("on", prewarm.get(True))

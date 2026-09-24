@@ -206,8 +206,9 @@ the dataset with the same CPU encoder and cache paths as production. Its runner
 stops before `forward-forecast`, `forward-settle`, and `forward-status`; it has
 no registry or R2 credentials and cannot publish prospective evidence.
 
-The workflow shares the production concurrency group, so it will queue behind
-an in-flight cycle instead of racing it. It saves a lockfile-keyed GitHub
+The workflow shares the production concurrency group, so it cannot run beside
+an active cycle. Dispatch it when no production run is pending: GitHub may
+replace an older pending run in the same group. It saves a lockfile-keyed GitHub
 Actions cache on success. A production run restores the newest compatible
 runtime cache through its prefix fallback; inspect its `build-dataset` log for
 text-cache hits and encodes to confirm the warm cache was actually used. A
