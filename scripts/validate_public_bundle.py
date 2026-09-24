@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import struct
@@ -42,6 +43,27 @@ _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _ALLOWED_PNG_CHUNKS = frozenset(
     {"IHDR", "PLTE", "tRNS", "IDAT", "IEND", "sRGB", "gAMA", "cHRM", "pHYs"}
 )
+# Fonts cannot be reviewed as text either. Only these exact files may ship: the
+# site's latin and latin-ext subsets (apps/web/src/fonts.css), identified by
+# content because the build gives them hashed names. Replacing a font means
+# reviewing it and updating its digest here.
+_REVIEWED_FONT_DIGESTS = frozenset(
+    {
+        "f1050dc5317b43434c0aeda599d4624c774ffc162e87a8cf204b949b6a85816d",  # ibm-plex-mono-400-latin-ext.woff2
+        "c36f509c0a8f9f85f29cb44bc8701d8a9e0b14c499e77a884f789ead7093a7ac",  # ibm-plex-mono-400-latin.woff2
+        "77f03e26f981c582bdba3a7abed4baa2d3149211c01366bb3ab3ba7622ec4ae5",  # ibm-plex-mono-500-latin-ext.woff2
+        "a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0",  # ibm-plex-mono-500-latin.woff2
+        "1b6b18fd0fd240bc6d5850f4df621484722d4b5d3650ebdd1e3a8bbd81c75854",  # ibm-plex-mono-600-latin-ext.woff2
+        "ad4580d8cb4b5f627c2d18457656732f7f7b070f7837fbc380e08054157e6f6c",  # ibm-plex-mono-600-latin.woff2
+        "cbca001188852d514d8654be7ddc97868f039bdf986b926ec5c985c117853cfd",  # newsreader-400-700-latin-ext.woff2
+        "01817351be3edfc1714fe6d60ddea6a22a169a5ebd033b50c7f9495e5d9c386a",  # newsreader-400-700-latin.woff2
+        "1c8a26c0ed4312dacc36670714794c9f4b4a0972ccb45f2936646bd8d444d5f8",  # public-sans-400-700-latin-ext.woff2
+        "c1b6da516e0062e9c2f341b3a51dd2d621d946da72f06c6cfe05fd9d2dd8622d",  # public-sans-400-700-latin.woff2
+    }
+)
+_MAX_FONT_BYTES = 200_000
+_WOFF2_SIGNATURE = b"wOF2"
+_WOFF2_HEADER_BYTES = 48
 # security.txt fields: a value must sit on its field's own line ([^\S\n] is any
 # whitespace except a newline, which still allows CRLF endings), and a language
 # tag cannot contain a comma, so the list pattern matches in only one way and
@@ -82,6 +104,10 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
         relative = path.relative_to(root).as_posix()
         if path.suffix == ".map" or path.name.startswith(".env"):
             errors.append(f"forbidden publishable file: {relative}")
+            continue
+        # A font is checked as a font even if its bytes happen to decode as text.
+        if path.suffix == ".woff2":
+            _validate_reviewed_font(path, relative, errors)
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -145,6 +171,25 @@ def _validate_reviewed_image(path: Path, relative: str, errors: list[str]) -> No
         offset = end
     if not seen_end:
         errors.append(f"publishable image is missing its PNG end marker: {relative}")
+
+
+def _validate_reviewed_font(path: Path, relative: str, errors: list[str]) -> None:
+    """Accept a font only as a well-formed WOFF2 file that is one of the reviewed files."""
+    data = path.read_bytes()
+    if len(data) > _MAX_FONT_BYTES:
+        errors.append(f"publishable font is larger than {_MAX_FONT_BYTES} bytes: {relative}")
+        return
+    if len(data) < _WOFF2_HEADER_BYTES or not data.startswith(_WOFF2_SIGNATURE):
+        errors.append(f"publishable font must be WOFF2: {relative}")
+        return
+    # The header's total-length field must describe exactly this file, so nothing
+    # can ride along after the font data.
+    (declared_length,) = struct.unpack(">I", data[8:12])
+    if declared_length != len(data):
+        errors.append(f"publishable font length does not match its header: {relative}")
+        return
+    if hashlib.sha256(data).hexdigest() not in _REVIEWED_FONT_DIGESTS:
+        errors.append(f"publishable font is not a reviewed file: {relative}")
 
 
 def _validate_disclosure_metadata(root: Path, errors: list[str]) -> None:

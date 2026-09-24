@@ -208,6 +208,41 @@ def test_public_bundle_still_rejects_undeclared_binaries(tmp_path: Path) -> None
     )
 
 
+_FONTS = Path(__file__).parents[2] / "apps" / "web" / "src" / "fonts"
+
+
+def test_public_bundle_accepts_every_reviewed_font_under_its_hashed_build_name(
+    tmp_path: Path,
+) -> None:
+    write_bundle(tmp_path)
+    fonts = sorted(_FONTS.glob("*.woff2"))
+    assert len(fonts) == 10
+    for font in fonts:
+        (tmp_path / "assets" / f"{font.stem}-Ab12Cd34.woff2").write_bytes(font.read_bytes())
+
+    assert validate_public_bundle(tmp_path) == []
+
+
+def test_public_bundle_rejects_fonts_that_were_not_reviewed(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    reviewed = (_FONTS / "public-sans-400-700-latin.woff2").read_bytes()
+    font = tmp_path / "assets" / "public-sans-Ab12Cd34.woff2"
+
+    altered = bytearray(reviewed)
+    altered[-1] ^= 0xFF
+    font.write_bytes(bytes(altered))
+    assert any("not a reviewed file" in error for error in validate_public_bundle(tmp_path))
+
+    font.write_bytes(reviewed + b"appended")
+    assert any("does not match its header" in error for error in validate_public_bundle(tmp_path))
+
+    font.write_bytes(b"\x00\x01\x00\x00" + b"\x00" * 60)
+    assert any("must be WOFF2" in error for error in validate_public_bundle(tmp_path))
+
+    font.write_bytes(b"wOF2" + b"\x00" * 200_001)
+    assert any("larger than" in error for error in validate_public_bundle(tmp_path))
+
+
 def test_public_bundle_rejects_public_raw_sources(tmp_path: Path) -> None:
     write_bundle(tmp_path)
     manifest = json.loads((tmp_path / "data-provenance.json").read_text(encoding="utf-8"))
