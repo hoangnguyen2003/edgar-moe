@@ -5,7 +5,7 @@ import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
-import { api } from "../lib/api";
+import { latestSignalsQuery, freshnessQuery } from "../lib/queries";
 import { filedDate, shortDate, signedDecimal, standing } from "../lib/format";
 import { Link } from "../lib/router";
 import type { EventRecord } from "../lib/types";
@@ -17,8 +17,8 @@ const DIRECTIONS: Array<{ direction: EventRecord["direction"]; title: string; no
 ];
 
 export function SignalsPage() {
-  const signals = useQuery({ queryKey: ["latest-signals"], queryFn: api.latestSignals });
-  const freshness = useQuery({ queryKey: ["freshness"], queryFn: api.freshness });
+  const signals = useQuery(latestSignalsQuery);
+  const freshness = useQuery(freshnessQuery);
   const header = (
     <PageHeader title="Study signals">
       The final filings scored in the published study, grouped by what a long-short portfolio would do with them.

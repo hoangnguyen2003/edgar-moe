@@ -16,14 +16,14 @@ import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
-import { api } from "../lib/api";
+import { DEFAULT_COST_BPS, equityQuery } from "../lib/queries";
 import { useChartTheme } from "../lib/chartTheme";
 import { bpsPercent, decimal, fixed, monthYear, percent, shortDate } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
 import type { EquityCurveResponse, EquityPoint } from "../lib/types";
 import { REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
-const COSTS = [10, 25, 50];
+const COSTS = [DEFAULT_COST_BPS, 25, 50];
 
 function dollars(value: number | null | undefined): string {
   return value == null || !Number.isFinite(value) ? "—" : `$${fixed(value, 2)}`;
@@ -46,17 +46,13 @@ function uncertainty(low: number | null | undefined, estimate: number | null | u
 }
 
 export function PortfolioPage() {
-  const [cost, setCost] = useState(10);
+  const [cost, setCost] = useState(DEFAULT_COST_BPS);
   const costLabelId = useId();
   const reducedMotion = useMediaQuery(REDUCED_MOTION);
   const chartTheme = useChartTheme();
   const tick = { fill: chartTheme.tick, fontSize: 12, fontFamily: chartTheme.font };
   // Keep the current scenario on screen while another one loads.
-  const curve = useQuery({
-    queryKey: ["equity", cost],
-    queryFn: () => api.equityCurve(cost),
-    placeholderData: keepPreviousData,
-  });
+  const curve = useQuery({ ...equityQuery(cost), placeholderData: keepPreviousData });
   const costControl = (
     <div className="control">
       <span className="control__label"><span id={costLabelId}>Trading cost</span><InfoTip term="tradingCost" /></span>

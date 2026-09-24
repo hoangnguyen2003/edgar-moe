@@ -132,6 +132,11 @@ th.num, td.num { text-align: right; }
 /* ---------- Top bar ---------- */
 .shell { min-height: 100vh; display: flex; flex-direction: column; }
 .topbar { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 1px solid var(--ink); }
+.route-progress { position: absolute; right: 0; bottom: -1px; left: 0; height: 2px; overflow: hidden; pointer-events: none; }
+.route-progress::after { content: ""; position: absolute; inset: 0; background: var(--highlight); transform: scaleX(0); transform-origin: left; }
+/* Waits under 150ms show nothing; longer ones fill towards the end, easing off. */
+.route-progress[data-active="true"]::after { animation: route-progress 2.4s cubic-bezier(.15, .7, .2, 1) .15s both; }
+@keyframes route-progress { from { transform: scaleX(0); } to { transform: scaleX(.9); } }
 .topbar__inner { display: flex; align-items: center; gap: 28px; width: min(var(--page-max), 100%); min-height: 62px; margin: 0 auto; padding: 0 var(--gutter); }
 .wordmark { flex: 0 0 auto; color: var(--ink); font: 600 25px/1 var(--serif); letter-spacing: -.02em; text-decoration: none; white-space: nowrap; }
 .wordmark__dash { color: var(--stamp); }
@@ -150,7 +155,9 @@ th.num, td.num { text-align: right; }
 .backdrop { display: none; }
 
 /* ---------- Page frame ---------- */
-main { flex: 1; min-width: 0; }
+/* At least a screen tall, so the footer never sits in view while a page loads
+   and then jumps away when its content arrives. */
+main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); min-height: calc(100svh - var(--topbar-height)); }
 .page { width: min(var(--page-max), 100%); margin: 0 auto; padding: 36px var(--gutter) 40px; animation: page-in .22s ease-out both; }
 @keyframes page-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .page { animation: none; } }
@@ -719,6 +726,7 @@ main { flex: 1; min-width: 0; }
   .steps { grid-template-columns: minmax(0, 1fr); }
   .steps li, .steps li + li { padding: var(--s3) 0; border-left: 0; border-bottom: 1px solid var(--rule); }
   .verify__steps pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  :root { --topbar-height: 59px; }
   .topbar__inner { min-height: 58px; gap: 12px; }
   .wordmark { font-size: 23px; }
   .page, .page--overview { padding: 24px var(--gutter) 32px; }

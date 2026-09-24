@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, Menu, Moon, Sun, X } from "lucide-react";
 import { type ReactNode, useEffect, useRef, useState } from "react";
-import { api } from "../lib/api";
+import { summaryQuery } from "../lib/queries";
 import { shortDate } from "../lib/format";
 import { navigation, nextPage, pageTitle } from "../lib/navigation";
 import { Link } from "../lib/router";
@@ -12,10 +12,10 @@ import { MENU_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
 export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [announcement, setAnnouncement] = useState("");
-  const { pathname } = useRouter();
+  const { pathname, pending, destination } = useRouter();
   const collapsed = useMediaQuery(MENU_LAYOUT);
   const { theme, setTheme } = useTheme();
-  const summary = useQuery({ queryKey: ["summary"], queryFn: api.summary });
+  const summary = useQuery(summaryQuery);
   const navRef = useRef<HTMLElement>(null);
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -79,8 +79,8 @@ export function Layout({ children }: { children: ReactNode }) {
                 <li key={to}>
                   <Link
                     to={to}
-                    className={pathname === to ? "active" : undefined}
-                    aria-current={pathname === to ? "page" : undefined}
+                    className={destination === to ? "active" : undefined}
+                    aria-current={destination === to ? "page" : undefined}
                     onClick={() => setOpen(false)}
                   >
                     <span className="site-nav__label">{label}</span>
@@ -112,9 +112,11 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           </div>
         </div>
+        {/* A hairline that fills while the next page loads, shown only if the wait is noticeable. */}
+        <span className="route-progress" data-active={pending} aria-hidden="true" />
       </header>
       {menuOpen && <button type="button" className="backdrop" aria-label="Close menu" tabIndex={-1} onClick={closeMenu} />}
-      <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen}>
+      <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen} aria-busy={pending || undefined}>
         {children}
         <NextPage pathname={pathname} />
       </main>

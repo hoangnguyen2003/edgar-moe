@@ -3,6 +3,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import { RouterProvider } from "./lib/router";
+import { prepareRoute, warmPageCode } from "./lib/routes";
 import { applyStoredTheme } from "./lib/theme";
 import "./styles.css";
 
@@ -14,12 +15,18 @@ const queryClient = new QueryClient({
   },
 });
 
+const prepare = (to: string) => prepareRoute(queryClient, to);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider>
+      <RouterProvider prepare={prepare}>
         <App />
       </RouterProvider>
     </QueryClientProvider>
   </StrictMode>,
 );
+
+// After the first page has loaded, fetch the other pages' code while the browser is idle.
+if (document.readyState === "complete") warmPageCode();
+else window.addEventListener("load", warmPageCode, { once: true });

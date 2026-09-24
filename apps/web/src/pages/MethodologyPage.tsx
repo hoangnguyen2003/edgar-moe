@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { api } from "../lib/api";
+import { methodologyQuery } from "../lib/queries";
 import { GLOSSARY, GLOSSARY_ORDER } from "../lib/glossary";
 
 const STEPS = [
@@ -24,7 +24,7 @@ const STEPS = [
 ];
 
 export function MethodologyPage() {
-  const methodology = useQuery({ queryKey: ["methodology"], queryFn: api.methodology });
+  const methodology = useQuery(methodologyQuery);
   const header = (
     <PageHeader title="How it works">
       How a filing becomes a score, how the score was tested, and what the results can't tell you.

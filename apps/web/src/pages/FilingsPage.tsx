@@ -6,32 +6,17 @@ import { InfoLabel } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { SignalBadge } from "../components/SignalBadge";
-import { api } from "../lib/api";
 import { dateTime, featureLabel, filedDate, shortDate, signedDecimal, signedPercent, standing } from "../lib/format";
+import { EVENTS_COMPACT_PAGE_SIZE, EVENTS_PAGE_SIZE, eventsQuery, filingsView } from "../lib/queries";
 import type { EventRecord } from "../lib/types";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { COMPACT_LAYOUT, REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
-// The side-by-side list scrolls on its own, so it can hold a long page; on
-// phones the list is part of the page, so it loads fewer at a time.
-const PAGE_SIZE = 100;
-const COMPACT_PAGE_SIZE = 25;
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
-const SIGNALS = new Set(["long", "neutral", "short"]);
-
-function eventParams(direction: string, search: string, cursor: string | null, pageSize: number) {
-  const params = new URLSearchParams({ limit: String(pageSize) });
-  if (direction) params.set("direction", direction);
-  if (search) params.set("q", search);
-  if (cursor) params.set("cursor", cursor);
-  return params;
-}
 
 /** Links such as /filings?q=MU&event=… (from the signals page, or a refreshed view) open on that filing. */
 function linkedFiling() {
-  const params = new URLSearchParams(window.location.search);
-  const signal = params.get("signal") ?? "";
-  return { query: params.get("q") ?? "", direction: SIGNALS.has(signal) ? signal : "", eventId: params.get("event") };
+  return filingsView(window.location.search);
 }
 
 export function FilingsPage() {
@@ -60,7 +45,7 @@ export function FilingsPage() {
   const detailRef = useRef<HTMLElement>(null);
   // Search runs server-side so it covers every indexed event, not just one page.
   const search = useDebouncedValue(query.trim(), 250);
-  const pageSize = compact ? COMPACT_PAGE_SIZE : PAGE_SIZE;
+  const pageSize = compact ? EVENTS_COMPACT_PAGE_SIZE : EVENTS_PAGE_SIZE;
   // The address follows the view, so a refresh or a shared link opens the same
   // search, filter and filing. Replacing the entry keeps Back meaning "previous page".
   useEffect(() => {
@@ -71,13 +56,7 @@ export function FilingsPage() {
     const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
     if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(window.history.state, "", next);
   }, [search, direction, selectedId]);
-  const events = useInfiniteQuery({
-    queryKey: ["events", direction, search, pageSize],
-    queryFn: ({ pageParam }) => api.events(eventParams(direction, search, pageParam, pageSize)),
-    initialPageParam: null as string | null,
-    getNextPageParam: (lastPage) => lastPage.next_cursor,
-    placeholderData: keepPreviousData,
-  });
+  const events = useInfiniteQuery({ ...eventsQuery(direction, search, pageSize), placeholderData: keepPreviousData });
   const header = (
     <PageHeader title="Filing explorer">
       Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards.
