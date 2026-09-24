@@ -852,13 +852,21 @@ def _regime_vector(
     return np.asarray(values, dtype=np.float32), availability
 
 
+def _nanosecond_timestamps(values: pd.Series) -> np.ndarray:
+    """Use the same epoch unit as ``Timestamp.value`` across pandas versions."""
+    return np.asarray(
+        pd.to_datetime(values, utc=True).dt.as_unit("ns").astype("int64").to_numpy(),
+        dtype=np.int64,
+    )
+
+
 def _indexed_market_groups(
     market_features: pd.DataFrame,
 ) -> dict[str, tuple[np.ndarray, pd.DataFrame]]:
     result: dict[str, tuple[np.ndarray, pd.DataFrame]] = {}
     for symbol, group in market_features.groupby("symbol", sort=False):
         ordered = group.sort_values("available_at").reset_index(drop=True)
-        timestamps = pd.to_datetime(ordered["available_at"], utc=True).astype("int64").to_numpy()
+        timestamps = _nanosecond_timestamps(ordered["available_at"])
         result[str(symbol)] = timestamps, ordered
     return result
 
@@ -869,7 +877,7 @@ def _indexed_macro_groups(
     result: dict[str, tuple[np.ndarray, pd.DataFrame]] = {}
     for series, frame in macro_groups.items():
         ordered = frame.sort_values("available_at").reset_index(drop=True)
-        timestamps = pd.to_datetime(ordered["available_at"], utc=True).astype("int64").to_numpy()
+        timestamps = _nanosecond_timestamps(ordered["available_at"])
         result[series] = timestamps, ordered
     return result
 
@@ -897,7 +905,7 @@ def _nyse_schedule(start: date, end: date) -> pd.DataFrame:
 def _event_timing(
     accepted_at: datetime, schedule: pd.DataFrame, horizon_sessions: int
 ) -> tuple[datetime, datetime] | None:
-    opens = schedule["market_open"].astype("int64").to_numpy()
+    opens = _nanosecond_timestamps(schedule["market_open"])
     entry_index = int(np.searchsorted(opens, pd.Timestamp(accepted_at).value, side="right"))
     horizon_index = entry_index + horizon_sessions - 1
     if entry_index >= len(schedule) or horizon_index >= len(schedule):
