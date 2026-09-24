@@ -120,6 +120,10 @@ p, li, dd, .page-header__lede, .takeaway__detail { text-wrap: pretty; }
 .takeaway__title, .next-page strong { text-wrap: balance; }
 /* Links are underlined, never by colour alone, with an offset that clears descenders. */
 a { text-decoration-thickness: from-font; text-underline-offset: .18em; }
+/* Links in running text: a quiet underline that firms up on hover, the same
+   language as the blotter's "Why this score" links. */
+:is(p, li, dd) a { text-decoration-color: var(--rule-strong); transition: text-decoration-color .12s ease; }
+:is(p, li, dd) a:hover { text-decoration-color: currentColor; }
 /* Numbers line up wherever they are compared. */
 table, .figure__value, .num { font-variant-numeric: tabular-nums; }
 ::selection { background: var(--highlight); color: var(--on-highlight); }
