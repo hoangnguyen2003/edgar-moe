@@ -570,6 +570,11 @@ page withholds a statistical reading below 100 settled outcomes:
   registry no longer publishes its bounds.
 - Live tracking states how many outcomes the figure rests on, and calls it a
   running log rather than evidence until the sample is large enough to read.
+  The browser displays bounds only when the API names the reviewed
+  calendar-block method, reports `ready`, and supplies finite ordered bounds
+  after the minimum pair and month history. If an older API still sends
+  independence-assuming bounds without that metadata, the browser hides them
+  and shows a release-mismatch notice; the point estimate remains preliminary.
 
 ## Short-horizon diagnostic
 
