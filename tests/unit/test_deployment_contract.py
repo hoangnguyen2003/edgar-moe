@@ -16,6 +16,7 @@ validate_deployment_contract = _VALIDATOR_MODULE.validate_deployment_contract
 
 def test_checked_in_deployment_contract_is_valid() -> None:
     assert validate_deployment_contract(Path("vercel.json")) == []
+    assert len(_VALIDATOR_MODULE.EXPECTED_BUILD_COMMAND) <= 256
 
 
 def test_deployment_contract_rejects_wrong_build_command(tmp_path: Path) -> None:
@@ -27,6 +28,17 @@ def test_deployment_contract_rejects_wrong_build_command(tmp_path: Path) -> None
     errors = validate_deployment_contract(path)
 
     assert "buildCommand must run deployment and public-bundle validation" in errors
+
+
+def test_deployment_contract_rejects_vercel_schema_length_violation(tmp_path: Path) -> None:
+    payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
+    payload["buildCommand"] = "x" * 257
+    path = tmp_path / "vercel.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+    errors = validate_deployment_contract(path)
+
+    assert "buildCommand exceeds Vercel's 256-character schema limit" in errors
 
 
 def test_deployment_contract_rejects_private_runtime_names(tmp_path: Path) -> None:
@@ -49,6 +61,7 @@ def test_deployment_contract_requires_serving_only_vercel_source_boundary(
     errors = validate_deployment_contract(Path("vercel.json"), vercelignore_path=ignore_path)
 
     assert any("!scripts/verify_public_snapshot_lock.py" in error for error in errors)
+    assert any("!scripts/validate_public_bundle.py" in error for error in errors)
     assert any("config/*" in error for error in errors)
     assert any("!config/public_snapshot.lock.json" in error for error in errors)
 

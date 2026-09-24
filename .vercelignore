@@ -28,6 +28,7 @@ migrations
 scripts/*
 !scripts/verify_public_snapshot_lock.py
 !scripts/verify_research_evidence_catalog.py
+!scripts/validate_public_bundle.py
 config/*
 !config/public_snapshot.lock.json
 .github
