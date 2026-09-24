@@ -113,6 +113,43 @@ def test_forward_api_contracts(tmp_path: Path) -> None:
             assert performance["rank_ic_interval_status"] == "insufficient_pairs"
             assert performance["rank_ic_calendar_months"] == 0
             assert client.get("/api/v1/forward/data-quality").json()[0]["status"] == "passed"
+            warning_forecast = registry.start_run(
+                RunRegistration(
+                    run_type="forecast",
+                    as_of=forecast_as_of + timedelta(minutes=1),
+                    code_revision="deadbeef",
+                    config_hash=HASH_C,
+                    dataset_id="dataset-1",
+                    model_id="model-1",
+                ),
+                run_id="run-2",
+            )
+            registry.add_quality_checks(
+                warning_forecast.run_id,
+                [QualityCheckDraft(name="pre_open_schedule_margin", status="warning")],
+            )
+            registry.complete_run(warning_forecast.run_id, result_counts={"forecasts": 0})
+            settlement = registry.start_run(
+                RunRegistration(
+                    run_type="settlement",
+                    as_of=forecast_as_of + timedelta(minutes=2),
+                    code_revision="deadbeef",
+                    config_hash=HASH_C,
+                    dataset_id="dataset-1",
+                    model_id="model-1",
+                ),
+                run_id="run-3",
+            )
+            registry.add_quality_checks(
+                settlement.run_id,
+                [QualityCheckDraft(name="settlement_match_rate", status="passed")],
+            )
+            registry.complete_run(settlement.run_id, result_counts={"labels": 0})
+            cycle_status = client.get("/api/v1/forward/status").json()
+            assert cycle_status["latest_run_status"] == "succeeded"
+            assert cycle_status["latest_cycle_forecast_status"] == "succeeded"
+            assert cycle_status["latest_quality_warning_names"] == ["pre_open_schedule_margin"]
+            assert cycle_status["health_status"] == "warning"
     finally:
         app.dependency_overrides.clear()
         database.dispose()

@@ -758,11 +758,22 @@ uv run edgar-moe forward-status
 
 The `status` object includes a machine-readable `health_status` (`ok`, `warning`,
 or `degraded`), the latest run state, the age of the latest successful run, the
-freshness threshold, active-run count, and quality-gate counts. The same payload
+freshness threshold, active-run count, and quality-gate counts. For a settlement,
+quality health combines its checks with the most recent preceding forecast on
+the same UTC `as_of` date, dataset, and model. A later result for the same check
+name supersedes an earlier one; a prior day's forecast cannot carry its warning
+into an unpaired settlement. `latest_cycle_forecast_status` shows the paired
+forecast state separately from `latest_run_status`, so a failed forecast cannot
+be hidden by a later successful settlement. No registry records are rewritten:
+status is computed from append-only rows at read time. The same payload
 is exposed by the read-only `GET /api/v1/forward/status` endpoint and rendered on
 the Live tracking page, so the dashboard and the scheduled job summary use the same health
 decision. The default freshness window is 96 hours, which allows for the
 Tuesday–Saturday schedule and its weekend gap.
+
+An expected `prospective_candidate_count` warning still appears in health and
+quality counts, but does not send a webhook alert by itself. Actionable forecast
+warnings such as `pre_open_schedule_margin` remain alertable after settlement.
 
 Monitor failed runs, failed/warning quality checks, dataset freshness, unmatched settlements, registry availability, and the age of the latest successful run. Failed runs remain in the ledger. Fix the source problem and start a new run; never delete or repurpose the failed identity.
 

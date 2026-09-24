@@ -87,7 +87,10 @@ def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
         or status.get("health_status") == "unavailable"
     ):
         return "registry_unavailable"
-    if status.get("latest_run_status") == "failed":
+    if (
+        status.get("latest_run_status") == "failed"
+        or status.get("latest_cycle_forecast_status") == "failed"
+    ):
         return "failed_run"
     if _positive_int(status.get("latest_quality_failures")):
         return "quality_failure"
@@ -98,6 +101,8 @@ def classify_forward_status(status: Mapping[str, Any]) -> AlertKind | None:
     if _positive_int(status.get("latest_quality_warnings")) and not _only_expected_warnings(status):
         return "quality_warning"
     if status.get("health_status") == "warning":
+        if _positive_int(status.get("latest_quality_warnings")) and _only_expected_warnings(status):
+            return None
         return "quality_warning"
     if status.get("health_status") == "degraded":
         # For example, no successful run has ever been recorded, so there is no

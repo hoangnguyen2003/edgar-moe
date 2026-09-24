@@ -353,3 +353,148 @@ def test_status_names_the_checks_that_warned_on_the_latest_run(tmp_path: Path) -
         "prospective_candidate_count",
     ]
     database.dispose()
+
+
+def test_status_keeps_forecast_warnings_after_the_cycle_settles(tmp_path: Path) -> None:
+    database, registry_service = registry(tmp_path)
+    forecast_run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        forecast_run_id,
+        [
+            QualityCheckDraft(name="prospective_candidate_count", status="warning"),
+            QualityCheckDraft(name="pre_open_schedule_margin", status="warning"),
+            # The settlement's later result must supersede this check name.
+            QualityCheckDraft(name="settlement_match_rate", status="warning"),
+        ],
+    )
+    registry_service.complete_run(forecast_run_id, result_counts={"forecasts": 0})
+    settlement = registry_service.start_run(
+        RunRegistration(
+            run_type="settlement",
+            as_of=AS_OF + timedelta(minutes=5),
+            code_revision="deadbeef",
+            config_hash=HASH_C,
+            dataset_id="dataset-v2",
+            model_id="edgar-moe-v1",
+        ),
+        run_id="run-settlement-1",
+    )
+    registry_service.add_quality_checks(
+        settlement.run_id,
+        [QualityCheckDraft(name="settlement_match_rate", status="passed")],
+    )
+    registry_service.complete_run(settlement.run_id, result_counts={"labels": 0})
+
+    status = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+
+    assert status["latest_run_status"] == "succeeded"
+    assert status["latest_cycle_forecast_status"] == "succeeded"
+    assert status["latest_quality_warnings"] == 2
+    assert status["latest_quality_warning_names"] == [
+        "pre_open_schedule_margin",
+        "prospective_candidate_count",
+    ]
+    assert status["health_status"] == "warning"
+    from edgar_moe.forward.alerts import classify_forward_status
+
+    assert classify_forward_status(status) == "quality_warning"
+    database.dispose()
+
+
+def test_status_does_not_page_for_expected_forecast_warning_after_settlement(
+    tmp_path: Path,
+) -> None:
+    database, registry_service = registry(tmp_path)
+    forecast_run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        forecast_run_id,
+        [QualityCheckDraft(name="prospective_candidate_count", status="warning")],
+    )
+    registry_service.complete_run(forecast_run_id, result_counts={"forecasts": 0})
+    settlement = registry_service.start_run(
+        RunRegistration(
+            run_type="settlement",
+            as_of=AS_OF + timedelta(minutes=5),
+            code_revision="deadbeef",
+            config_hash=HASH_C,
+            dataset_id="dataset-v2",
+            model_id="edgar-moe-v1",
+        ),
+        run_id="run-settlement-expected-warning",
+    )
+    registry_service.complete_run(settlement.run_id, result_counts={"labels": 0})
+
+    status = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+
+    assert status["health_status"] == "warning"
+    assert status["latest_quality_warning_names"] == ["prospective_candidate_count"]
+    from edgar_moe.forward.alerts import classify_forward_status
+
+    assert classify_forward_status(status) is None
+    database.dispose()
+
+
+def test_status_retains_failed_forecast_after_a_later_settlement(tmp_path: Path) -> None:
+    database, registry_service = registry(tmp_path)
+    forecast_run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        forecast_run_id,
+        [QualityCheckDraft(name="point_in_time_availability", status="failed")],
+    )
+    registry_service.fail_run(forecast_run_id, error_message="quality gate failed")
+    settlement = registry_service.start_run(
+        RunRegistration(
+            run_type="settlement",
+            as_of=AS_OF + timedelta(minutes=5),
+            code_revision="deadbeef",
+            config_hash=HASH_C,
+            dataset_id="dataset-v2",
+            model_id="edgar-moe-v1",
+        ),
+        run_id="run-settlement-1",
+    )
+    registry_service.complete_run(settlement.run_id, result_counts={"labels": 0})
+
+    status = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+
+    assert status["latest_run_status"] == "succeeded"
+    assert status["latest_cycle_forecast_status"] == "failed"
+    assert status["latest_quality_failures"] == 1
+    assert status["health_status"] == "degraded"
+    from edgar_moe.forward.alerts import classify_forward_status
+
+    assert classify_forward_status(status) == "failed_run"
+    database.dispose()
+
+
+def test_status_does_not_carry_warnings_into_an_unpaired_settlement(tmp_path: Path) -> None:
+    database, registry_service = registry(tmp_path)
+    forecast_run_id = prepare_forecast_run(registry_service)
+    registry_service.add_quality_checks(
+        forecast_run_id,
+        [QualityCheckDraft(name="pre_open_schedule_margin", status="warning")],
+    )
+    registry_service.complete_run(forecast_run_id, result_counts={"forecasts": 0})
+    settlement = registry_service.start_run(
+        RunRegistration(
+            run_type="settlement",
+            as_of=AS_OF + timedelta(days=1),
+            code_revision="deadbeef",
+            config_hash=HASH_C,
+            dataset_id="dataset-v2",
+            model_id="edgar-moe-v1",
+        ),
+        run_id="run-settlement-next-day",
+    )
+    registry_service.add_quality_checks(
+        settlement.run_id,
+        [QualityCheckDraft(name="settlement_match_rate", status="passed")],
+    )
+    registry_service.complete_run(settlement.run_id, result_counts={"labels": 0})
+
+    status = registry_service.status(now=datetime.now(UTC) + timedelta(minutes=1))
+
+    assert status["latest_cycle_forecast_status"] is None
+    assert status["latest_quality_warnings"] == 0
+    assert status["health_status"] == "ok"
+    database.dispose()

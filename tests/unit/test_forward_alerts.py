@@ -51,6 +51,10 @@ def test_failure_alert_is_allowlisted_and_deduplicable() -> None:
     [
         ({"available": False}, "registry_unavailable"),
         ({"latest_run_status": "failed"}, "failed_run"),
+        (
+            {"latest_run_status": "succeeded", "latest_cycle_forecast_status": "failed"},
+            "failed_run",
+        ),
         ({"latest_quality_failures": 1}, "quality_failure"),
         ({"age_seconds": 100, "stale_after_seconds": 96}, "stale_runner"),
         ({"latest_quality_warnings": 1}, "quality_warning"),
@@ -187,6 +191,17 @@ def test_an_expected_warning_does_not_page(names: list[str], expected: str | Non
         status["latest_quality_warning_names"] = names
 
     assert classify_forward_status(status) == expected
+
+
+def test_expected_warning_does_not_page_when_registry_health_is_warning() -> None:
+    status = {
+        **_HEALTHY,
+        "health_status": "warning",
+        "latest_quality_warnings": 1,
+        "latest_quality_warning_names": ["prospective_candidate_count"],
+    }
+
+    assert classify_forward_status(status) is None
 
 
 def test_a_failure_still_pages_even_among_expected_warnings() -> None:

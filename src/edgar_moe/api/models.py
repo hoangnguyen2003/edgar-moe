@@ -248,6 +248,7 @@ class ForwardStatusResponse(BaseModel):
     health_message: str | None = None
     latest_run_at: datetime | None = None
     latest_run_status: Literal["running", "succeeded", "failed"] | None = None
+    latest_cycle_forecast_status: Literal["running", "succeeded", "failed"] | None = None
     latest_failed_run_at: datetime | None = None
     age_seconds: int | None = Field(default=None, ge=0)
     stale_after_seconds: int = Field(default=96 * 60 * 60, ge=0)
