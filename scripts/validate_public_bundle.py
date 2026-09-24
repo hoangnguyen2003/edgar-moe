@@ -55,8 +55,8 @@ _REVIEWED_FONT_DIGESTS = frozenset(
         "a76f53ca6612e7b3828eec2311098675b7f9849ae4169a8bcef6302aec02a6c0",  # ibm-plex-mono-500-latin.woff2
         "1b6b18fd0fd240bc6d5850f4df621484722d4b5d3650ebdd1e3a8bbd81c75854",  # ibm-plex-mono-600-latin-ext.woff2
         "ad4580d8cb4b5f627c2d18457656732f7f7b070f7837fbc380e08054157e6f6c",  # ibm-plex-mono-600-latin.woff2
-        "cbca001188852d514d8654be7ddc97868f039bdf986b926ec5c985c117853cfd",  # newsreader-400-700-latin-ext.woff2
-        "01817351be3edfc1714fe6d60ddea6a22a169a5ebd033b50c7f9495e5d9c386a",  # newsreader-400-700-latin.woff2
+        "c2981efde5a48340b9bd2f44590b5561a327b665bcb1120b5aa6f411e88cfadb",  # newsreader-500-latin-ext.woff2
+        "718cb7a8bf106615983ff02cb92c9fa950a18dab0b7137a967adabc9293c58c9",  # newsreader-500-latin.woff2
         "1c8a26c0ed4312dacc36670714794c9f4b4a0972ccb45f2936646bd8d444d5f8",  # public-sans-400-700-latin-ext.woff2
         "c1b6da516e0062e9c2f341b3a51dd2d621d946da72f06c6cfe05fd9d2dd8622d",  # public-sans-400-700-latin.woff2
     }
