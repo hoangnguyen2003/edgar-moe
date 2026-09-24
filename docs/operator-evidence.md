@@ -138,6 +138,14 @@ workflow and its retained redacted artifact remain the evidence boundary. A
 blocked result is expected until the missing provider-side secrets are
 configured.
 
+The hosted preflight exposes secret values only to its prerequisite-check step;
+checkout, dependency installation, hashing, redaction, and artifact upload do
+not receive them. The isolated restore rehearsal similarly passes each database
+or read-only R2 credential only to the steps that use it. CI pins those
+step-level bindings and rejects provider secrets at workflow/job scope or in
+unrelated steps. This reduces the exposure of privileged restore credentials
+without claiming that the provider-side roles have been tested.
+
 ## Required operator evidence
 
 The packet is a record format, not proof by itself. For the current roadmap,

@@ -143,7 +143,7 @@ def _validate_common(name: str, workflow: dict[str, Any]) -> list[str]:
 
 
 def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
-    """Ensure secret expressions are only assigned through environment mappings."""
+    """Keep provider secrets out of broad scopes and non-environment inputs."""
     errors: list[str] = []
 
     def visit(value: Any, path: tuple[str, ...]) -> None:
@@ -161,6 +161,58 @@ def _validate_secrets(name: str, workflow: dict[str, Any]) -> list[str]:
             errors.append(f"{name}: secret expressions may only appear in job/step env mappings")
 
     visit(workflow, ())
+    if _secret_bindings(workflow.get("env")):
+        errors.append(f"{name}: provider secrets must not be workflow-scoped")
+    jobs = workflow.get("jobs")
+    if isinstance(jobs, dict):
+        for job_name, job in jobs.items():
+            if isinstance(job, dict) and _secret_bindings(job.get("env")):
+                errors.append(f"{name}: provider secrets must not be job-scoped ({job_name})")
+    return errors
+
+
+def _secret_bindings(env: Any) -> dict[str, str]:
+    """Return only secret-backed environment bindings, never secret values."""
+    if not isinstance(env, dict):
+        return {}
+    return {
+        str(key): value
+        for key, value in env.items()
+        if isinstance(value, str) and _SECRET_EXPRESSION.search(value)
+    }
+
+
+def _validate_step_secret_bindings(
+    name: str,
+    workflow: dict[str, Any],
+    job_name: str,
+    consumers: dict[str, dict[str, str]],
+) -> list[str]:
+    """Require exactly the reviewed secret set on each audited consumer step."""
+    jobs = workflow.get("jobs")
+    job = jobs.get(job_name) if isinstance(jobs, dict) else None
+    if not isinstance(job, dict):
+        return [f"{name}: provider job must be named {job_name}"]
+    steps = job.get("steps")
+    if not isinstance(steps, list):
+        return [f"{name}: provider job must define steps"]
+    errors: list[str] = []
+    observed: set[str] = set()
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        step_name = str(step.get("name", ""))
+        bindings = _secret_bindings(step.get("env"))
+        if step_name in consumers:
+            if step_name in observed:
+                errors.append(f"{name}: duplicate secret consumer {step_name}")
+            observed.add(step_name)
+            if bindings != consumers[step_name]:
+                errors.append(f"{name}: {step_name} must receive only its reviewed secrets")
+        elif bindings:
+            errors.append(f"{name}: provider secrets must not enter {step_name or 'unnamed step'}")
+    for missing in sorted(consumers.keys() - observed):
+        errors.append(f"{name}: missing secret consumer {missing}")
     return errors
 
 
@@ -250,6 +302,34 @@ def _validate_preflight(name: str, workflow: dict[str, Any]) -> list[str]:
             errors.append(
                 f"{name}: provider preflight must not execute provider mutations: {forbidden}"
             )
+    preflight_secrets = (
+        "EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
+        "EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL",
+        "EDGAR_MOE_R2_ENDPOINT_URL",
+        "EDGAR_MOE_R2_BUCKET",
+        "EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID",
+        "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY",
+        "EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL",
+        "EDGAR_MOE_RESTORE_TARGET_DATABASE_URL",
+        "EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL",
+        "EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL",
+        "EDGAR_MOE_REGISTRY_DATABASE_URL",
+        "EDGAR_MOE_R2_ACCESS_KEY_ID",
+        "EDGAR_MOE_R2_SECRET_ACCESS_KEY",
+    )
+    errors.extend(
+        _validate_step_secret_bindings(
+            name,
+            workflow,
+            "preflight",
+            {
+                "Run value-redacting prerequisite check": {
+                    secret_name: "${{ secrets." + secret_name + " }}"
+                    for secret_name in preflight_secrets
+                }
+            },
+        )
+    )
     return errors
 
 
@@ -375,6 +455,35 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
     for forbidden in ("--clean", "DROP DATABASE", "TRUNCATE"):
         if forbidden in text:
             errors.append(f"{name}: destructive restore marker is forbidden: {forbidden}")
+    source = "${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}"
+    target = "${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}"
+    source_auditor = "${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}"
+    target_auditor = "${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}"
+    r2 = {
+        "AUDITOR_R2_ENDPOINT_URL": "${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}",
+        "AUDITOR_R2_BUCKET": "${{ secrets.EDGAR_MOE_R2_BUCKET }}",
+        "AUDITOR_R2_ACCESS_KEY_ID": "${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}",
+        "AUDITOR_R2_SECRET_ACCESS_KEY": "${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}",
+    }
+    consumers = {
+        "Validate isolated target and read-only audit credentials": {
+            "SOURCE_DATABASE_URL": source,
+            "TARGET_DATABASE_URL": target,
+            "SOURCE_AUDITOR_DATABASE_URL": source_auditor,
+            "TARGET_AUDITOR_DATABASE_URL": target_auditor,
+            **r2,
+        },
+        "Export source registry counts": {"SOURCE_DATABASE_URL": source},
+        "Audit source registry and R2 evidence": {"AUDITOR_DATABASE_URL": source_auditor, **r2},
+        "Dump source into private temporary storage": {"SOURCE_DATABASE_URL": source},
+        "Re-check target emptiness before restore": {"TARGET_DATABASE_URL": target},
+        "Restore into the isolated target": {"TARGET_DATABASE_URL": target},
+        "Check restored schema": {"EDGAR_MOE_REGISTRY_DATABASE_URL": target},
+        "Export restored registry counts": {"TARGET_DATABASE_URL": target},
+        "Audit restored registry and R2 evidence": {"AUDITOR_DATABASE_URL": target_auditor, **r2},
+        "Probe restored read path": {"EDGAR_MOE_REGISTRY_READ_DATABASE_URL": target_auditor},
+    }
+    errors.extend(_validate_step_secret_bindings(name, workflow, "restore-rehearsal", consumers))
     return errors
 
 

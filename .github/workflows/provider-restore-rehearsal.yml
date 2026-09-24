@@ -24,14 +24,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     env:
-      SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
-      TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
-      SOURCE_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
-      TARGET_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
-      AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
-      AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
-      AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
-      AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
       CONFIRM_ISOLATED_TARGET: ${{ inputs.confirm_isolated_target }}
       REHEARSAL_DIR: reports/provider-restore
       WORK_DIR: /tmp/edgar-moe-provider-restore
@@ -61,6 +53,15 @@ jobs:
         id: preflight
         continue-on-error: true
         shell: bash
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
+          TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
+          SOURCE_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
+          TARGET_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           fail_preflight() {
@@ -136,6 +137,8 @@ jobs:
         if: ${{ steps.preflight.outcome == 'success' }}
         continue-on-error: true
         shell: bash
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
         run: |
           uv run python scripts/export_forward_registry_counts.py \
             --database-url "$SOURCE_DATABASE_URL" \
@@ -146,7 +149,11 @@ jobs:
         if: ${{ steps.source_counts.outcome == 'success' }}
         working-directory: tools/evidence-auditor
         env:
-          AUDITOR_DATABASE_URL: ${{ env.SOURCE_AUDITOR_DATABASE_URL }}
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         shell: bash
         run: |
           set +e
@@ -163,6 +170,8 @@ jobs:
         if: ${{ steps.source_counts.outcome == 'success' }}
         continue-on-error: true
         shell: bash
+        env:
+          SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
         run: |
           set +e
           pg_dump --format=custom --no-owner --no-privileges \
@@ -183,6 +192,8 @@ jobs:
         if: ${{ steps.source_dump.outcome == 'success' }}
         continue-on-error: true
         shell: bash
+        env:
+          TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
         run: |
           set -euo pipefail
           target_table_count="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
@@ -198,6 +209,8 @@ jobs:
         if: ${{ steps.target_empty.outcome == 'success' }}
         continue-on-error: true
         shell: bash
+        env:
+          TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
         run: |
           set +e
           restore_started_epoch="$(date +%s)"
@@ -221,7 +234,7 @@ jobs:
         continue-on-error: true
         shell: bash
         env:
-          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.TARGET_DATABASE_URL }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
         run: uv run alembic check > "$REHEARSAL_DIR/alembic-check.txt" 2>&1
 
       - name: Export restored registry counts
@@ -229,6 +242,8 @@ jobs:
         if: ${{ steps.restore.outcome == 'success' }}
         continue-on-error: true
         shell: bash
+        env:
+          TARGET_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}
         run: |
           uv run python scripts/export_forward_registry_counts.py \
             --database-url "$TARGET_DATABASE_URL" \
@@ -239,10 +254,15 @@ jobs:
         if: ${{ steps.restored_counts.outcome == 'success' }}
         working-directory: tools/evidence-auditor
         shell: bash
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         run: |
           set +e
-          AUDITOR_DATABASE_URL="$TARGET_AUDITOR_DATABASE_URL" \
-            go run . -timeout 10m -stale-after 96h \
+          go run . -timeout 10m -stale-after 96h \
             > "../../$REHEARSAL_DIR/restored-evidence-audit.json" \
             2> "../../$REHEARSAL_DIR/restored-evidence-audit.error"
           audit_code=$?
@@ -256,7 +276,7 @@ jobs:
         continue-on-error: true
         shell: bash
         env:
-          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.TARGET_AUDITOR_DATABASE_URL }}
+          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
           EDGAR_MOE_REGISTRY_DATABASE_URL: ""
         run: |
           uv run python - <<'PY' > "$REHEARSAL_DIR/read-path.json"
