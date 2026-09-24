@@ -256,6 +256,70 @@ def _validate_preflight(name: str, workflow: dict[str, Any]) -> list[str]:
 def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
     text = _workflow_text(workflow)
     errors: list[str] = []
+    credentials = {
+        "AUDITOR_DATABASE_URL": "${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}",
+        "AUDITOR_R2_ENDPOINT_URL": "${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}",
+        "AUDITOR_R2_BUCKET": "${{ secrets.EDGAR_MOE_R2_BUCKET }}",
+        "AUDITOR_R2_ACCESS_KEY_ID": "${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}",
+        "AUDITOR_R2_SECRET_ACCESS_KEY": "${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}",
+    }
+    secret_names = (
+        "EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL",
+        "EDGAR_MOE_R2_ENDPOINT_URL",
+        "EDGAR_MOE_R2_BUCKET",
+        "EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID",
+        "EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY",
+    )
+
+    def references_secret(value: Any) -> bool:
+        normalized_value = str(value).casefold()
+        return any(secret_name.casefold() in normalized_value for secret_name in secret_names)
+
+    def exposes_credentials(value: Any) -> bool:
+        return isinstance(value, dict) and any(
+            key in credentials or references_secret(item) for key, item in value.items()
+        )
+
+    if exposes_credentials(workflow.get("env")):
+        errors.append(f"{name}: R2 audit credentials must not be workflow-scoped")
+    jobs = workflow.get("jobs")
+    job = jobs.get("r2-audit") if isinstance(jobs, dict) else None
+    if not isinstance(job, dict):
+        errors.append(f"{name}: R2 audit job must be named r2-audit")
+    else:
+        if exposes_credentials(job.get("env")):
+            errors.append(f"{name}: R2 audit credentials must not be job-scoped")
+        consumers = {
+            "Require read-only provider credentials",
+            "Run the independent Go auditor",
+        }
+        observed: set[str] = set()
+        steps = job.get("steps")
+        if isinstance(steps, list):
+            for step in steps:
+                if not isinstance(step, dict):
+                    continue
+                step_name = str(step.get("name", ""))
+                step_env = step.get("env")
+                if step_name in consumers:
+                    observed.add(step_name)
+                    if not isinstance(step_env, dict) or any(
+                        step_env.get(key) != expression for key, expression in credentials.items()
+                    ):
+                        errors.append(f"{name}: {step_name} must receive the read-only credentials")
+                    if isinstance(step_env, dict) and any(
+                        key not in credentials and references_secret(item)
+                        for key, item in step_env.items()
+                    ):
+                        errors.append(
+                            f"{name}: R2 audit credentials must use dedicated step variables"
+                        )
+                elif exposes_credentials(step_env):
+                    errors.append(
+                        f"{name}: R2 audit credentials must not enter {step_name or 'unnamed step'}"
+                    )
+        for missing_step in sorted(consumers - observed):
+            errors.append(f"{name}: missing R2 audit credential consumer {missing_step}")
     for required in (
         "actions/setup-go@",
         "AUDITOR_DATABASE_URL",

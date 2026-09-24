@@ -15,11 +15,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
-      AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
-      AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
-      AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
-      AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
       AUDIT_DIR: reports/provider-r2-audit
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,6 +38,12 @@ jobs:
       - name: Require read-only provider credentials
         id: secret
         shell: bash
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         run: |
           set -euo pipefail
           missing=()
@@ -70,6 +71,12 @@ jobs:
         if: ${{ always() && steps.secret.outcome == 'success' }}
         working-directory: tools/evidence-auditor
         shell: bash
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_AUDITOR_DATABASE_URL }}
+          AUDITOR_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          AUDITOR_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}
+          AUDITOR_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY }}
         run: |
           set +e
           go run . -timeout 10m -stale-after 96h \

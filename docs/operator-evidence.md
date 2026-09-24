@@ -107,6 +107,12 @@ secret produces a redacted `not_run` artifact and cannot be treated as a passed
 hosted-role audit; a URL configured only in Vercel does not configure GitHub
 Actions.
 
+The read-only R2 audit credentials are exposed only to its prerequisite check
+and independent Go auditor. Checkout, dependency/tool setup, hashing,
+redaction, and artifact upload do not receive the database or object-store
+credentials. This narrows the workflow's execution boundary; it does not prove
+that the hosted roles and bucket grants are configured or that an audit passed.
+
 ## Preflight the provider workflows
 
 Before starting a hosted audit, run the value-redacting preflight locally or
