@@ -269,7 +269,7 @@ describe("Forward Lab", () => {
 
     expect(await screen.findByText("No qualifying forecasts yet")).toBeInTheDocument();
     expect(screen.getByText("Forward runner is healthy and within its freshness window.")).toBeInTheDocument();
-    expect(screen.getByText(/\(2 min ago\)/)).toBeInTheDocument();
+    expect(screen.getByText("Last successful run 2 min ago")).toBeInTheDocument();
     expect(screen.getByText("Latest data checks")).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
     expect(screen.getByText(/1 warned before/)).toBeInTheDocument();

@@ -116,10 +116,24 @@
   descent-override: 24.36%;
   line-gap-override: 0%;
 }
+/* Public Sans is sized against the site's own text, measured in both faces: sized
+   from the font files alone, the fallback ran 2% narrow, so paragraphs set before
+   the font arrived gained a line when it did. Bold gets its own face (Arial Bold,
+   which runs wider than Public Sans at 600), where a synthesised bold ran 3.5% narrow. */
 @font-face {
   font-family: "Public Sans Fallback";
-  src: local("Arial"), local("Liberation Sans"), local("Arimo");
-  size-adjust: 101.89%;
+  font-weight: 100 500;
+  src: local("Arial"), local("ArialMT"), local("Liberation Sans"), local("Arimo");
+  size-adjust: 103.92%;
+  ascent-override: 93.24%;
+  descent-override: 22.08%;
+  line-gap-override: 0%;
+}
+@font-face {
+  font-family: "Public Sans Fallback";
+  font-weight: 600 900;
+  src: local("Arial Bold"), local("Arial-BoldMT"), local("Liberation Sans Bold"), local("Arimo Bold");
+  size-adjust: 98.66%;
   ascent-override: 93.24%;
   descent-override: 22.08%;
   line-gap-override: 0%;
