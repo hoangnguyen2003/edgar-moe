@@ -1,0 +1,40 @@
+name: Vercel release status evidence
+
+on:
+  status:
+
+permissions:
+  contents: read
+
+jobs:
+  retain-failed-main-status:
+    # For status events GITHUB_SHA is the default-branch tip, not necessarily
+    # the status target. Requiring equality excludes preview-branch failures.
+    if: >-
+      github.event.context == 'Vercel' &&
+      (github.event.state == 'failure' || github.event.state == 'error') &&
+      github.event.sha == github.sha
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Write redacted main-commit status evidence
+        env:
+          DEFAULT_SHA: ${{ github.sha }}
+        run: |
+          python3 scripts/write_vercel_status_failure.py \
+            --event "$GITHUB_EVENT_PATH" \
+            --default-sha "$DEFAULT_SHA" \
+            --output reports/deployment-smoke/vercel-status-failure.json
+      - name: Validate retained evidence redaction
+        run: python3 scripts/validate_redacted_artifacts.py --root reports/deployment-smoke
+      - name: Upload status evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vercel-status-failure-${{ github.run_id }}
+          path: reports/deployment-smoke/vercel-status-failure.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Annotate the release gap
+        run: |
+          echo '::warning::Vercel reported a failed status on the default-branch tip. Inspect the redacted artifact and retry deployment before claiming this commit is live.'

@@ -106,6 +106,17 @@ the result in [run #35953224871](https://github.com/hoangnguyen2003/edgar-moe/ac
 If a later deployment reports no SHA, verify that Vercel still exposes system
 environment variables to the Python Function before redeploying.
 
+A provider can fail before creating a GitHub deployment object. A Vercel
+build-rate-limit failure, for example, may leave only a failed `Vercel` commit
+status on the default-branch tip, so the `deployment_status` smoke workflow
+cannot observe it. The separate [status-evidence workflow](../.github/workflows/vercel-status-evidence.yml)
+retains a 30-day redacted artifact for that case. It keeps the commit SHA,
+status ID, context, and terminal state, but never copies the provider's free-text
+description, target URL, sender, or payload. It has read-only permissions and
+does not retry, deploy, or claim that a Production deployment was observed.
+The failed provider status remains the release signal; the evidence workflow's
+own warning is not a replacement for a successful deployment and smoke check.
+
 ## Current personal-project mode
 
 Branch protection is not enabled because the repository has a single
