@@ -7,6 +7,7 @@ import { navigation, nextPage, pageTitle } from "../lib/navigation";
 import { Link } from "../lib/router";
 import { useRouter } from "../lib/router-context";
 import { useTheme } from "../lib/theme";
+import { Wordmark } from "./Wordmark";
 import { MENU_LAYOUT, useMediaQuery } from "../lib/useMediaQuery";
 
 export function Layout({ children }: { children: ReactNode }) {
@@ -60,7 +61,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <a className="skip-link" href="#main-content">Skip to content</a>
       <header className="topbar">
         <div className="topbar__inner">
-          <Link to="/" className="wordmark">EDGAR<span className="wordmark__dash">–</span>MoE</Link>
+          <Link to="/" className="wordmark"><Wordmark /><span className="sr-only">EDGAR–MoE</span></Link>
           <nav
             id="site-nav"
             ref={navRef}
