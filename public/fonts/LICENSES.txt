@@ -4,6 +4,10 @@ Fonts served by this site
 Newsreader, Public Sans and IBM Plex Mono are used under the SIL Open Font
 License, Version 1.1. Each family's copyright notice and license follow.
 
+The Newsreader files served here are modified versions: subset to latin and
+latin-ext and instanced at weight 500 with optical sizes 16 to 72. Newsreader
+reserves no font name, and the modified files remain under the same license.
+
 
 --- Newsreader ---
 
