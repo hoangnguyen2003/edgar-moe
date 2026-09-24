@@ -20,7 +20,8 @@ export function SignalsPage() {
   const signals = useQuery(latestSignalsQuery);
   const freshness = useQuery(freshnessQuery);
   const updated = freshness.data?.last_successful_update;
-  const stamp = updated ? `Updated ${shortDate(updated.slice(0, 10))}` : freshness.isError ? undefined : null;
+  // The stamp's line is held only while freshness loads; without a date it is left out.
+  const stamp = freshness.isPending ? null : updated ? `Updated ${shortDate(updated.slice(0, 10))}` : undefined;
   const header = (answer?: ReactNode) => (
     <PageHeader title="Study signals" answer={answer} placeholder="12 filings scored: 4 long, 6 neutral, 2 short." stamp={stamp}>
       The study's final filings, grouped by what a long-short portfolio would do with them: long and short are the top
