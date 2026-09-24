@@ -10,6 +10,12 @@ import "./styles.css";
 
 applyStoredTheme();
 
+// Ask for the body face now, while the page's data is on its way. Found only at
+// the first render, it shared the line with every other face and often landed
+// after the content, whose paragraphs could then re-wrap. Asked for here, once
+// the app's own code is in, it takes no bandwidth from that code.
+void document.fonts?.load("1em 'Public Sans'").catch(() => undefined);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 5 * 60_000, retry: 1, refetchOnWindowFocus: false },
