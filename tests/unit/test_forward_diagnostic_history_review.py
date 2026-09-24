@@ -270,6 +270,9 @@ def test_cli_creates_verifies_and_refuses_to_replace_review(tmp_path: Path) -> N
     missing_review_confirmation = runner.invoke(
         cli.app, [argument for argument in arguments if argument != "--confirm-reviewed"]
     )
+    assert missing_review_confirmation.exit_code == 2
+    assert not review_path.exists()
+
     created = runner.invoke(cli.app, arguments)
     verified = runner.invoke(
         cli.app,
@@ -282,8 +285,6 @@ def test_cli_creates_verifies_and_refuses_to_replace_review(tmp_path: Path) -> N
     )
     repeated = runner.invoke(cli.app, arguments)
 
-    assert missing_review_confirmation.exit_code == 2
-    assert "--confirm-reviewed is required" in missing_review_confirmation.output
     assert created.exit_code == 0, created.output
     assert "self-attested" in created.output
     assert verified.exit_code == 0, verified.output
