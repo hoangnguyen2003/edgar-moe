@@ -97,11 +97,14 @@ The health response publishes only a validated 40-character
 variables. To verify the serving revision, add `--expect-commit <full-git-sha>`
 to a manual smoke check or supply the optional workflow input. A check without
 that argument verifies the frozen identity but does not establish which
-application revision is serving. The automatic Production check remains on the
-existing frozen-identity gate until the commit value is observed on a real
-deployment; only then should a follow-up PR require the deployment-event SHA.
-If the value is unavailable, verify that Vercel exposes system environment
-variables to the Python Function before enabling that gate.
+application revision is serving. The automatic Production check now requires
+the health response to match the exact GitHub deployment-event SHA; missing or
+different values fail the smoke gate even if the frozen snapshot is unchanged.
+This was enabled after Production returned the exact SHA for commit
+`067164e994f279597be42830267341decc36e19e` and an opt-in smoke run retained
+the result in [run #35953224871](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/35953224871).
+If a later deployment reports no SHA, verify that Vercel still exposes system
+environment variables to the Python Function before redeploying.
 
 ## Current personal-project mode
 
