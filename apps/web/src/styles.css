@@ -177,6 +177,12 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%); color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .page-header__stamp { display: block; margin-top: 8px; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
 .skeleton-bar--answer { display: block; width: min(30ch, 90%); height: 1.05em; }
+/* When the page's first section opens with a rule, the header's rule is that
+   rule, rather than a second line a few pixels below it. */
+.page-header:has(+ :is(.panel, .figures, .lanes, .scenario, .content-grid)) { margin-bottom: 0; }
+.page-header + :is(.panel, .figures, .lanes),
+.page-header + .scenario > :first-child,
+.page-header + .content-grid > .panel { border-top: 0; }
 
 /* The page's answer, before its evidence. */
 .takeaway { margin: 0 0 24px; padding: 18px 22px 20px; background: var(--highlight-soft); border-left: 4px solid var(--ink); }
