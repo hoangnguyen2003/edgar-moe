@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EquityPoint } from "../lib/types";
 import { monthTicks, niceStep, valueDomain, valueTicks } from "../lib/chartScale";
@@ -64,6 +64,42 @@ describe("EquityChart", () => {
     expect(screen.getByText("High $1.05")).toBeInTheDocument();
     expect(screen.getByText("Low $0.95")).toBeInTheDocument();
     expect(screen.getByText("One dollar grows to $0.95.")).toHaveAttribute("id");
+  });
+
+  it("glides to another scenario from the values on screen, instead of swapping charts", () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+    vi.spyOn(performance, "now").mockReturnValue(0);
+    // The same trading days at a higher trading cost.
+    const costlier = points.map((point) => ({ ...point, equity: point.equity - 0.05 }));
+    const { container, rerender } = render(<EquityChart points={points} summary="" />);
+    const end = () => container.querySelector(".equity-chart__end-label")?.textContent;
+    expect(end()).toBe("$0.95");
+
+    rerender(<EquityChart points={costlier} summary="" />);
+    // No flash of the new chart: the old values hold until the glide's first frame.
+    expect(end()).toBe("$0.95");
+
+    // Halfway through, the curve is most of the way there, because it eases out.
+    act(() => frames.shift()!(280));
+    expect(end()).toBe("$0.91");
+    act(() => frames.shift()!(560));
+    expect(end()).toBe("$0.90");
+    expect(frames).toHaveLength(0);
+  });
+
+  it("switches scenarios at once for a reader who prefers less motion", () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(prefers-reduced-motion: reduce)" }));
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => frames.push(callback));
+    const costlier = points.map((point) => ({ ...point, equity: point.equity - 0.05 }));
+    const { container, rerender } = render(<EquityChart points={points} summary="" />);
+
+    rerender(<EquityChart points={costlier} summary="" />);
+
+    expect(container.querySelector(".equity-chart__end-label")).toHaveTextContent("$0.90");
+    expect(frames).toHaveLength(0);
   });
 
   it("reads any day from the keyboard, and announces it", () => {
