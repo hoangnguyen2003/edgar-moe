@@ -136,7 +136,6 @@ main:has(.query-state) .next-page { display: none; }
 .skip-link:focus { transform: translateY(0); }
 .num { color: var(--ink); font: 500 14px var(--mono); font-variant-numeric: tabular-nums; }
 th.num, td.num { text-align: right; }
-.positive { color: var(--good) !important; }
 .negative { color: var(--critical) !important; }
 
 /* ---------- Top bar ---------- */
@@ -228,7 +227,17 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .segmented button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
 .badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 2px; font: 700 12px/1.2 var(--sans); white-space: nowrap; }
 .badge--chosen { background: var(--ink); color: var(--paper); }
-.badge--frozen { border: 1.5px solid var(--stamp); color: var(--stamp); }
+/* The one tag for a state worth noticing (components/Tag.tsx): a word in its tone,
+   boxed by a hairline of the same tone. A quiet tag drops the box, so common,
+   healthy states read as a word and the notable ones are what the eye finds. */
+.tag { display: inline-block; width: fit-content; padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); white-space: nowrap; }
+.tag--good { color: var(--good); }
+.tag--warning { color: var(--warning); }
+.tag--critical { color: var(--critical); }
+.tag--stamp { color: var(--stamp); }
+.tag--muted { color: var(--ink-3); }
+.tag--quiet { padding-inline: 0; border-color: transparent; font-weight: 600; }
+.signal-badge, .run-status, .quality-state { text-transform: capitalize; }
 
 /* ---------- Panels ---------- */
 .panel { position: relative; min-width: 0; margin: 0; padding: var(--s5) 0 0; background: transparent; border: 0; border-top: 1px solid var(--ink); }
@@ -523,11 +532,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .event-row__score small { display: block; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
 .event-table .load-more { display: block; width: 100%; min-height: 52px; border: 0; background: transparent; color: var(--ink); font: 600 15px var(--sans); text-align: center; text-decoration: underline; text-underline-offset: 3px; }
 .event-table .load-more:disabled { color: var(--ink-3); cursor: progress; }
-.signal-badge { padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); text-transform: capitalize; }
-.signal-badge--long { color: var(--good); }
-.signal-badge--short { color: var(--critical); }
-/* Most filings are neutral, so neutral is a quiet word and long and short are what the eye finds. */
-.signal-badge--neutral { padding-inline: 0; border-color: transparent; color: var(--ink-3); font-weight: 600; }
 .event-detail { min-height: 560px; scroll-margin-top: 80px; }
 .event-detail h2 { font-size: var(--t-title); letter-spacing: -.02em; }
 .event-detail__back { margin: 0 0 14px; }
@@ -651,11 +655,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .forward-list strong::first-letter, .quality-list strong::first-letter { text-transform: uppercase; }
 .forward-list small, .quality-list small { margin-top: 2px; color: var(--ink-2); font-size: 13px; }
 .forward-list code { color: var(--ink-2); font: 500 13px var(--mono); }
-.run-status, .quality-state { width: fit-content; padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); text-transform: capitalize; }
-/* Quiet when healthy: a run that succeeded is a word, not a box; only one that needs a look is boxed. */
-.run-status--succeeded { padding-inline: 0; border-color: transparent; color: var(--good); font-weight: 600; }
-.run-status--running, .quality-state--warning { color: var(--warning); }
-.run-status--failed, .quality-state--failed { color: var(--critical); }
 .quality-list__check--passed > svg { color: var(--good); }
 .quality-list__check--warning > svg { color: var(--warning); }
 .quality-list__check--failed > svg { color: var(--critical); }
@@ -687,18 +686,15 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .governance-facts code { font: 500 13px var(--mono); overflow-wrap: anywhere; }
 .governance-boundary-list { border-top: 1px solid var(--ink); }
 .governance-boundary-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--s3); min-height: 44px; border-bottom: 1px solid var(--rule); }
-.governance-boundary-row span { color: var(--ink); font-size: 15px; }
-.governance-boundary-row strong { font: 700 13px var(--sans); }
+.governance-boundary-row__label { color: var(--ink); font-size: 15px; }
 .governance-controls-panel, .governance-forward-panel { margin-top: 16px; }
 .governance-forward-panel .notice { margin-top: 0; }
 .governance-forward-panel .figures { margin-top: var(--s4); }
 .governance-controls { border-top: 1px solid var(--ink); }
 .governance-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: var(--s3); padding: var(--s3) 0; border-bottom: 1px solid var(--rule); }
-.governance-control strong, .governance-control span { display: block; }
-.governance-control strong { font: 600 16px var(--sans); }
-.governance-control span { margin-top: 2px; color: var(--ink-2); font-size: var(--t-small); line-height: 1.55; }
-.governance-control small { padding: 2px 7px; border: 1px solid var(--good); border-radius: 2px; color: var(--good); font: 600 var(--t-micro)/1.3 var(--sans); white-space: nowrap; }
-.governance-control--pending small { border-color: var(--warning); color: var(--warning); }
+.governance-control > div > strong, .governance-control > div > span { display: block; }
+.governance-control > div > strong { font: 600 16px var(--sans); }
+.governance-control > div > span { margin-top: 2px; color: var(--ink-2); font-size: var(--t-small); line-height: 1.55; }
 
 /* ---------- Architecture ---------- */
 /* Swimlanes: each lane is labelled on the left and flows to the right. The
@@ -867,7 +863,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .governance-facts > div { grid-template-columns: minmax(0, 1fr); gap: 4px; }
   .governance-facts dd { text-align: left; }
   .governance-control { grid-template-columns: minmax(0, 1fr); }
-  .governance-control small { grid-column: 1; justify-self: start; }
+  .governance-control > .tag { grid-column: 1; justify-self: start; }
   .chart-panel--large .chart-wrap { height: 300px; }
   .next-page { padding-bottom: 40px; }
   .next-page a { padding: 16px 18px; }
