@@ -697,6 +697,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .governance-facts { margin: 0; border-top: 1px solid var(--ink); }
 .governance-facts > div { display: grid; grid-template-columns: 190px minmax(0, 1fr) auto; align-items: start; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--rule); }
 .governance-facts .icon-button { width: 32px; height: 32px; margin: -4px -6px 0 0; }
+.copy-value.is-copied { color: var(--good); }
+.copy-value.is-blocked { color: var(--warning); }
 .governance-facts dt { color: var(--ink-2); font: 600 14px var(--sans); }
 .governance-facts dd { min-width: 0; margin: 0; color: var(--ink); font-size: 14px; text-align: right; }
 .governance-facts code { font: 500 13px var(--mono); overflow-wrap: anywhere; }
