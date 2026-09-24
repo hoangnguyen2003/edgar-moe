@@ -92,6 +92,7 @@ const DECISIONS = [
   { adr: "0018-workflow-supply-chain", title: "Pin every workflow action and scope every secret", why: "A compromised action or step sees as little as possible." },
   { adr: "0020-pre-open-schedule-margin", title: "Record how close each run gets to the market open", why: "A late scheduler becomes visible instead of silently risky." },
   { adr: "0022-copilot-review-profiles", title: "Keep AI review profiles bounded and read-only", why: "The copilot can help with quant and architecture reviews without gaining model or deployment authority." },
+  { adr: "0028-forward-history-review-attestations", title: "Separate human review records from diagnostic evidence", why: "A reviewer decision is bound to one immutable history without implying model approval." },
 ];
 
 export function ArchitecturePage() {
@@ -187,7 +188,7 @@ export function ArchitecturePage() {
         <header>
           <div>
             <h2 id="decisions-title">Key design decisions</h2>
-            <p>Seven of the 27 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
+            <p>Eight of the 28 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
           </div>
           <a className="button button--secondary button--small" href={`${REPOSITORY}/blob/main/docs/adr/README.md`}>
             All decisions <ArrowUpRight size={14} aria-hidden="true" />

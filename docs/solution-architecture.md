@@ -5,9 +5,9 @@ operated, and verified. It summarizes and links the detailed documents rather
 than repeating them. Every claim separates what the code enforces from what
 depends on provider configuration or operator action.
 
-- **Status date:** 2026-09-23.
+- **Status date:** 2026-09-24.
 - **Live system:** [edgar-moe.vercel.app](https://edgar-moe.vercel.app), its [API reference](https://edgar-moe.vercel.app/api/docs), and a plain-language [architecture page](https://edgar-moe.vercel.app/architecture) for visitors.
-- **Decision log:** [27 architecture decision records](adr/README.md).
+- **Decision log:** [28 architecture decision records](adr/README.md).
 - **Detailed views:** [architecture and data flow](architecture.md), [forward-testing operations](forward-testing.md), [improvement plan](architecture-roadmap.md).
 
 ## 1. Context and goals
@@ -205,6 +205,9 @@ Evidence is never erased to make a retry look clean.
 - **Prospective evidence:** forecasts, labels, runs, quality checks, artifacts,
   and audit events live in Postgres. Evidence rows are append-only. Artifacts are
   content-addressed and mirrored to R2.
+- **Diagnostic review:** a separate hash-pinned self-attestation can record a
+  human review of one short-horizon history without rewriting it. It does not
+  authenticate reviewer identity or authorize model changes ([ADR 0028](adr/0028-forward-history-review-attestations.md)).
 - **Public boundary:**
   - Only derived results are published. Raw licensed data never leaves the
     private tier ([public-surface review](public-surface-review.md)).
@@ -356,4 +359,4 @@ Five decisions carry most of the design:
 4. **Append-only evidence enforced in the database** ([0016](adr/0016-database-append-only-triggers.md)): integrity does not depend on application discipline.
 5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0023](adr/0023-external-forward-scheduler.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded, with an optional external trigger staged behind an observed cutover.
 
-The [ADR index](adr/README.md) lists all 27 decisions by theme.
+The [ADR index](adr/README.md) lists all 28 decisions by theme.

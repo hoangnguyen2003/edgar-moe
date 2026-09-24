@@ -59,9 +59,13 @@ describe("Architecture page", () => {
       "href",
       "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0022-copilot-review-profiles.md",
     );
+    expect(within(decisions).getByRole("link", { name: /Separate human review records from diagnostic evidence/ })).toHaveAttribute(
+      "href",
+      "https://github.com/hoangnguyen2003/edgar-moe/blob/main/docs/adr/0028-forward-history-review-attestations.md",
+    );
     // scripts/validate_adr_catalog.py owns the exact count; it must match the
     // records on disk, so asserting it here as well only duplicates that check.
-    expect(within(decisions).getByText(/Seven of the \d+ recorded decisions/)).toBeInTheDocument();
+    expect(within(decisions).getByText(/Eight of the \d+ recorded decisions/)).toBeInTheDocument();
     expect(screen.getByText(/--expect-lock config\/public_snapshot.lock.json/)).toBeInTheDocument();
   });
 
