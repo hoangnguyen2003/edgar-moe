@@ -475,6 +475,16 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .select-field select:focus-visible { outline: none; }
 .result-count { display: grid; place-items: center; padding: 0 var(--s3); color: var(--ink-3); font: 500 var(--t-small) var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .explorer { display: grid; grid-template-columns: 380px minmax(0, 1fr); gap: 16px; align-items: start; transition: opacity .2s ease; }
+/* A search that finds nothing takes the whole width, says what it looked for,
+   and offers searches that work. */
+.explorer--empty { grid-template-columns: minmax(0, 1fr); }
+.no-matches { padding: var(--s5) 0 var(--s6); border-top: 1px solid var(--ink); }
+.no-matches__title { margin: 0; color: var(--ink); font: 500 clamp(21px, 2.1vw, 26px)/1.3 var(--serif); letter-spacing: -.01em; }
+.no-matches__title q { quotes: "\201C" "\201D"; }
+.no-matches__help { max-width: 62ch; margin: var(--s2) 0 0; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
+.no-matches__help .text-button { display: inline; margin: 0; padding: 0; font: 600 16px var(--mono); }
+.no-matches__actions { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s4); }
+.no-matches__actions:empty { display: none; }
 .event-table { max-height: 760px; overflow: auto; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--rule); }
 .event-table button[data-event-id] { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px var(--s3); width: 100%; min-height: 64px; padding: var(--s2) var(--s3); border: 0; border-bottom: 1px solid var(--rule); background: transparent; color: var(--ink); text-align: left; transition: background .12s ease; }
 .event-table button[data-event-id]:hover { background: var(--paper-2); }

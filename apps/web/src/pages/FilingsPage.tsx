@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, ExternalLink, Search, X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ExpertBars } from "../components/Experts";
@@ -13,6 +13,14 @@ import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { COMPACT_LAYOUT, REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
+const LEGAL_SUFFIXES = new Set(["INC", "CORP", "CORPORATION", "CO", "COMPANY", "LTD", "PLC", "LLC", "HOLDING", "HOLDINGS", "GROUP"]);
+
+/** A company's name as a reader would type it: "JABIL INC" becomes "Jabil". */
+function everydayName(name: string): string {
+  const words = name.replace(/[.,]/g, " ").split(/\s+/).filter(Boolean);
+  while (words.length > 1 && LEGAL_SUFFIXES.has(words[words.length - 1].toUpperCase())) words.pop();
+  return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()).join(" ");
+}
 
 /** Links such as /filings?q=MU&event=… (from the signals page, or a refreshed view) open on that filing. */
 function linkedFiling() {
@@ -46,6 +54,7 @@ export function FilingsPage() {
   // Search runs server-side so it covers every indexed event, not just one page.
   const search = useDebouncedValue(query.trim(), 250);
   const pageSize = compact ? EVENTS_COMPACT_PAGE_SIZE : EVENTS_PAGE_SIZE;
+  const queryClient = useQueryClient();
   // The address follows the view, so a refresh or a shared link opens the same
   // search, filter and filing. Replacing the entry keeps Back meaning "previous page".
   useEffect(() => {
@@ -140,31 +149,75 @@ export function FilingsPage() {
           {`${total} ${filtered ? "matching " : ""}${total === 1 ? "filing" : "filings"}`}
         </span>
       </div>
-      <section className={events.isPlaceholderData ? "explorer is-updating" : "explorer"} aria-busy={events.isPlaceholderData}>
-        <div className="event-table">
-          <ul ref={listRef} aria-label="Filings" onKeyDown={moveSelection}>
-            {items.map((event) => (
-              <li key={event.event_id}>
-                <EventRow event={event} active={active?.event_id === event.event_id} onSelect={() => select(event.event_id, true)} />
-              </li>
-            ))}
-          </ul>
-          {!items.length && (
-            <div className="empty-state">
-              No filings match these filters.{" "}
-              {filtered && (
-                <button type="button" className="text-button" onClick={() => { setQuery(""); setDirection(""); }}>Clear filters</button>
+      <section
+        className={`explorer${items.length ? "" : " explorer--empty"}${events.isPlaceholderData ? " is-updating" : ""}`}
+        aria-busy={events.isPlaceholderData}
+      >
+        {items.length ? (
+          <>
+            <div className="event-table">
+              <ul ref={listRef} aria-label="Filings" onKeyDown={moveSelection}>
+                {items.map((event) => (
+                  <li key={event.event_id}>
+                    <EventRow event={event} active={active?.event_id === event.event_id} onSelect={() => select(event.event_id, true)} />
+                  </li>
+                ))}
+              </ul>
+              {events.hasNextPage && (
+                <button type="button" className="load-more" onClick={() => void events.fetchNextPage()} disabled={events.isFetchingNextPage}>
+                  {events.isFetchingNextPage ? "Loading…" : `Load more (${items.length} of ${total})`}
+                </button>
               )}
             </div>
-          )}
-          {events.hasNextPage && (
-            <button type="button" className="load-more" onClick={() => void events.fetchNextPage()} disabled={events.isFetchingNextPage}>
-              {events.isFetchingNextPage ? "Loading…" : `Load more (${items.length} of ${total})`}
-            </button>
-          )}
-        </div>
-        {active && <EventDetail event={active} ref={detailRef} onBack={compact ? backToList : undefined} />}
+            {active && <EventDetail event={active} ref={detailRef} onBack={compact ? backToList : undefined} />}
+          </>
+        ) : (
+          <NoMatches
+            search={search}
+            direction={direction}
+            examples={examplesFrom(queryClient.getQueryData(eventsQuery(direction, "", pageSize).queryKey)?.pages[0]?.items)}
+            onSearch={(text) => { setQuery(text); searchRef.current?.focus(); }}
+            onShowAllSignals={() => setDirection("")}
+          />
+        )}
       </section>
+    </div>
+  );
+}
+
+/** Two real filings from the unsearched list to suggest, one by ticker and one by name. */
+function examplesFrom(items: EventRecord[] | undefined) {
+  if (!items || items.length < 2) return null;
+  return { ticker: items[0].ticker, name: everydayName(items[1].company_name) };
+}
+
+/** What to do when a search finds nothing: what search covers, two searches that work, and a way back. */
+function NoMatches({ search, direction, examples, onSearch, onShowAllSignals }: {
+  search: string;
+  direction: string;
+  examples: { ticker: string; name: string } | null;
+  onSearch: (text: string) => void;
+  onShowAllSignals: () => void;
+}) {
+  const scope = direction ? `${direction} filings` : "filings";
+  return (
+    <div className="no-matches">
+      <p className="no-matches__title">{search ? <>No {scope} match <q>{search}</q>.</> : <>No {scope} to show.</>}</p>
+      <p className="no-matches__help">
+        Search looks for a ticker or a company name in every scored filing.
+        {examples && (
+          <>
+            {" "}Try a ticker such as{" "}
+            <button type="button" className="text-button" onClick={() => onSearch(examples.ticker)}>{examples.ticker}</button>
+            {" "}or a name such as{" "}
+            <button type="button" className="text-button" onClick={() => onSearch(examples.name)}>{examples.name}</button>.
+          </>
+        )}
+      </p>
+      <div className="no-matches__actions">
+        {search && <button type="button" className="button button--secondary button--small" onClick={() => onSearch("")}>Clear search</button>}
+        {direction && <button type="button" className="button button--secondary button--small" onClick={onShowAllSignals}>Show all signals</button>}
+      </div>
     </div>
   );
 }

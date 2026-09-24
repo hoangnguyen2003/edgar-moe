@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventRecord } from "../lib/types";
 import { COMPACT_LAYOUT } from "../lib/useMediaQuery";
@@ -169,6 +169,28 @@ describe("Filing explorer", () => {
     expect(await screen.findByText("NVDA")).toBeInTheDocument();
     const limits = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example").searchParams.get("limit"));
     expect(limits).toEqual(["25"]);
+  });
+
+  it("explains a search that finds nothing, suggests searches that work, and clears back to every filing", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const q = new URL(String(input), "https://terminal.example").searchParams.get("q");
+      if (q === "zzzz") return page([], 0, null);
+      return page([event("NVDA", "NVIDIA", 1), event("JBL", "JABIL INC", 2)], 2, null);
+    }));
+
+    renderPage();
+    expect(await screen.findByText("JBL")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("Search by ticker or company"), { target: { value: "zzzz" } });
+
+    const message = await screen.findByText(/No filings match/, undefined, { timeout: 3000 });
+    expect(message).toHaveTextContent("No filings match zzzz.");
+    // The suggestions come from filings already listed, so they are known to match.
+    expect(screen.getByRole("button", { name: "NVDA" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Jabil" })).toBeInTheDocument();
+
+    fireEvent.click(within(message.closest(".no-matches") as HTMLElement).getByRole("button", { name: "Clear search" }));
+    expect(await screen.findByText("JBL", undefined, { timeout: 3000 })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("Search by ticker or company")).toHaveValue("");
   });
 
   it("jumps to search on slash, but never while the reader is typing elsewhere", async () => {
