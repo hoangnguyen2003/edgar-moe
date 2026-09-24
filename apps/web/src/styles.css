@@ -375,7 +375,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .notice--forward > svg { color: var(--good); }
 .empty-state { padding: 28px; color: var(--ink-2); font-size: 15px; }
 .empty-state .text-button { margin-top: 0; }
-.pending-label { padding: 2px 7px; border: 1px solid var(--warning); border-radius: 2px; color: var(--warning); font: 600 13px var(--sans); white-space: nowrap; }
+/* A result still to come is expected, not a warning: it recedes, and says when to look again. */
+.pending-label { color: var(--ink-3); font: 500 13px var(--sans); white-space: nowrap; }
 .count-chip { padding: 5px 10px; border: 1px solid var(--rule-strong); border-radius: 2px; color: var(--ink-2); font: 600 13px var(--sans); white-space: nowrap; }
 
 /* ---------- Charts ---------- */
@@ -633,12 +634,14 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .forward-list small, .quality-list small { margin-top: 2px; color: var(--ink-2); font-size: 13px; }
 .forward-list code { color: var(--ink-2); font: 500 13px var(--mono); }
 .run-status, .quality-state { width: fit-content; padding: 2px 7px; border: 1px solid currentColor; border-radius: 2px; font: 700 12px/1.3 var(--sans); text-transform: capitalize; }
-.run-status--succeeded, .quality-state--passed { color: var(--good); }
+/* Quiet when healthy: a run that succeeded is a word, not a box; only one that needs a look is boxed. */
+.run-status--succeeded { padding-inline: 0; border-color: transparent; color: var(--good); font-weight: 600; }
 .run-status--running, .quality-state--warning { color: var(--warning); }
 .run-status--failed, .quality-state--failed { color: var(--critical); }
-.quality-list > div > svg { color: var(--good); }
-.quality-list > div:has(.quality-state--warning) > svg { color: var(--warning); }
-.quality-list > div:has(.quality-state--failed) > svg { color: var(--critical); }
+.quality-list__check--passed > svg { color: var(--good); }
+.quality-list__check--warning > svg { color: var(--warning); }
+.quality-list__check--failed > svg { color: var(--critical); }
+.quality-list__check--expected > svg { color: var(--ink-3); }
 .forward-forecast-panel { margin-top: 16px; }
 .forward-table-wrap { overflow-x: auto; }
 .forward-table { width: 100%; min-width: 780px; border-collapse: collapse; }

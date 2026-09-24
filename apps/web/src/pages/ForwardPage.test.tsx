@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ForwardPage } from "./ForwardPage";
 
@@ -273,8 +273,10 @@ describe("Forward Lab", () => {
     expect(screen.getByText("Latest data checks")).toBeInTheDocument();
     expect(screen.getByText("Passing")).toBeInTheDocument();
     expect(screen.getByText(/1 warned before/)).toBeInTheDocument();
-    // The check reads as a number against its threshold, not just "warning".
-    expect(screen.getByText(/0 candidates · needs at least 1 candidate/)).toBeInTheDocument();
+    // A run with no new filing to score is a normal day, not a warning to act on.
+    expect(screen.getByText("New filings to score")).toBeInTheDocument();
+    expect(screen.getByText(/No new filing to score on this run/)).toBeInTheDocument();
+    expect(screen.queryByText("warning")).not.toBeInTheDocument();
     expect(screen.getByText("No runs recorded yet.")).toBeInTheDocument();
     expect(screen.getByText("No forecasts recorded yet.")).toBeInTheDocument();
   });
@@ -331,20 +333,75 @@ describe("Forward Lab", () => {
     renderPage();
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All 3" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getAllByText("Not yet known")).toHaveLength(2);
+    // A result still to come says when it is due, not just that it is unknown.
+    expect(screen.getAllByText("Due Oct 19")).toHaveLength(2);
 
     fireEvent.click(screen.getByRole("button", { name: "With results 1" }));
 
     expect(screen.getByText("BBB")).toBeInTheDocument();
     expect(screen.queryByText("AAA")).not.toBeInTheDocument();
-    expect(screen.queryByText("Not yet known")).not.toBeInTheDocument();
+    expect(screen.queryByText("Due Oct 19")).not.toBeInTheDocument();
     expect(screen.getByText("+3.1%")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Awaiting 2" }));
 
     expect(screen.getByText("AAA")).toBeInTheDocument();
     expect(screen.queryByText("BBB")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Not yet known")).toHaveLength(2);
+    expect(screen.getAllByText("Due Oct 19")).toHaveLength(2);
+  });
+
+  it("reads the latest result of every check, from the forecast run as well as the settlement run", async () => {
+    // A scheduled job records a forecast run, then a settlement run. The status
+    // endpoint counts only the most recent run, so its figure alone would say
+    // "Passing" beside a list that shows the forecast run's warning.
+    const check = (id: string, name: string, status: string, observed: number, threshold: number, createdAt: string) => ({
+      check_id: id, run_id: id.split(":")[0], name, status, observed_value: observed, threshold, details: {}, created_at: createdAt,
+    });
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/status")) return jsonResponse({
+        configured: true, available: true, model_count: 1, run_count: 4, forecast_count: 0,
+        matured_count: 0, pending_count: 0, latest_successful_run_at: "2026-09-23T13:17:40Z",
+        health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
+        latest_run_at: "2026-09-23T13:17:40Z", latest_run_status: "succeeded", latest_failed_run_at: null,
+        age_seconds: 600, stale_after_seconds: 345600, running_run_count: 0,
+        latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      });
+      if (url.includes("/performance")) return jsonResponse({
+        model_id: "edgar-moe-frozen-v1", forecast_count: 0, matured_count: 0, pending_count: 0,
+        coverage: 0, rank_ic: null, rank_ic_low: null, rank_ic_high: null, rmse: null, mae: null, directional_accuracy: null,
+      });
+      if (url.includes("/data-quality")) return jsonResponse([
+        check("settle-2:match", "settlement_match_rate", "passed", 1, 1, "2026-09-23T13:17:40Z"),
+        check("forecast-2:margin", "pre_open_schedule_margin", "warning", 780, 5400, "2026-09-23T13:17:20Z"),
+        check("forecast-2:candidates", "prospective_candidate_count", "warning", 0, 1, "2026-09-23T13:17:20Z"),
+        check("forecast-2:age", "dataset_freshness_days", "passed", 0, 4, "2026-09-23T13:17:20Z"),
+        check("settle-1:match", "settlement_match_rate", "passed", 1, 1, "2026-09-22T12:45:00Z"),
+        check("forecast-1:margin", "pre_open_schedule_margin", "passed", 6000, 5400, "2026-09-22T12:44:00Z"),
+      ]);
+      if (url.includes("/runs")) return jsonResponse([]);
+      if (url.includes("/forecasts")) return jsonResponse({ items: [], total: 0, offset: 0, limit: 50 });
+      return jsonResponse([]);
+    }));
+
+    renderPage();
+
+    expect(await screen.findByText("1 warning")).toBeInTheDocument();
+    // The figure names what needs a look.
+    expect(screen.getByText("Latest data checks").closest(".figure")).toHaveTextContent("Time to spare before the open");
+    const list = within(screen.getByRole("heading", { name: "Data checks" }).closest("article")!);
+    const checks = list.getAllByText(/^(Time to spare before the open|Due results recorded|Age of the data|New filings to score)$/);
+    // Each check appears once, by its latest result, with the one that needs a look first.
+    expect(checks.map((node) => node.textContent)).toEqual([
+      "Time to spare before the open",
+      "Due results recorded",
+      "Age of the data",
+      "New filings to score",
+    ]);
+    expect(screen.getByText(/13 min before the open · needs at least 90 min before the open/)).toBeInTheDocument();
+    // Only the warning carries a tag; checks that passed stay quiet.
+    expect(screen.getAllByText("warning")).toHaveLength(1);
+    expect(screen.queryByText("passed")).not.toBeInTheDocument();
   });
 
   it("says when the table holds only the most recent forecasts", async () => {

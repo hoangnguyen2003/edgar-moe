@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, CheckCircle2, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
+import { Activity, CheckCircle2, CircleDashed, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
 import { InfoTip } from "../components/InfoTip";
@@ -8,7 +8,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { api } from "../lib/api";
 import { forwardForecastsQuery, forwardPerformanceQuery, forwardQualityQuery, forwardRunsQuery, forwardStatusQuery } from "../lib/queries";
-import { checkReading, compact, dateTime, decimal, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
+import { checkName, checkReading, compact, dateTime, decimal, marketDay, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
 import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
 
 /**
@@ -17,6 +17,33 @@ import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
  * test: the frozen study's own locked test used 1,794 events.
  */
 const EARLY_RESULT_COUNT = 100;
+
+/**
+ * Warnings that describe a normal condition rather than a problem: on most days
+ * no new filing is accepted, so a run has nothing to score. Mirrors
+ * `_EXPECTED_QUALITY_WARNINGS` in src/edgar_moe/forward/alerts.py.
+ */
+const EXPECTED_WARNINGS = new Set(["prospective_candidate_count"]);
+
+type CheckTone = "failed" | "warning" | "passed" | "expected";
+const TONE_ORDER: Record<CheckTone, number> = { failed: 0, warning: 1, passed: 2, expected: 3 };
+
+function checkTone(check: ForwardQualityRecord): CheckTone {
+  return check.status === "warning" && EXPECTED_WARNINGS.has(check.name) ? "expected" : check.status;
+}
+
+/**
+ * The newest result of each check, problems first. A scheduled job records a
+ * forecast run and a settlement run, each with its own checks, so "the latest
+ * run" alone would miss half of them.
+ */
+function latestChecks(checks: ForwardQualityRecord[]): ForwardQualityRecord[] {
+  const newest = new Map<string, ForwardQualityRecord>();
+  for (const check of [...checks].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))) {
+    if (!newest.has(check.name)) newest.set(check.name, check);
+  }
+  return [...newest.values()].sort((a, b) => TONE_ORDER[checkTone(a)] - TONE_ORDER[checkTone(b)]);
+}
 
 export function ForwardPage() {
   const status = useQuery(forwardStatusQuery);
@@ -111,21 +138,25 @@ export function ForwardPage() {
   const rankIcInfo = hasClusteredInterval ? "confidenceInterval" : "rankIc";
   const historicalFailedChecks = checks.filter((check) => check.status === "failed").length;
   const historicalWarningChecks = checks.filter((check) => check.status === "warning").length;
-  const latestQualityLabel = status.data.latest_quality_failures
-    ? `${status.data.latest_quality_failures} failed`
-    : status.data.latest_quality_warnings
-      ? `${status.data.latest_quality_warnings} warning${status.data.latest_quality_warnings === 1 ? "" : "s"}`
-      : "Passing";
-  const LatestQualityIcon = status.data.latest_quality_failures
-    ? TriangleAlert
-    : status.data.latest_quality_warnings
-      ? Activity
-      : CheckCircle2;
-  const historicalQualityDetail = [
-    `${checks.length} checks recorded`,
-    historicalFailedChecks ? `${historicalFailedChecks} failed before` : "",
-    historicalWarningChecks ? `${historicalWarningChecks} warned before` : "",
-  ].filter(Boolean).join(" · ");
+  const latest = latestChecks(checks);
+  const latestFailed = latest.filter((check) => checkTone(check) === "failed");
+  const latestWarned = latest.filter((check) => checkTone(check) === "warning");
+  const latestQualityLabel = !checks.length
+    ? "None yet"
+    : latestFailed.length
+      ? `${latestFailed.length} failed`
+      : latestWarned.length
+        ? `${latestWarned.length} warning${latestWarned.length === 1 ? "" : "s"}`
+        : "Passing";
+  const LatestQualityIcon = latestFailed.length ? TriangleAlert : latestWarned.length ? Activity : CheckCircle2;
+  // Name what needs attention; when nothing does, say how much history there is.
+  const latestQualityDetail = latestFailed.length || latestWarned.length
+    ? [...latestFailed, ...latestWarned].map((check) => checkName(check.name)).join(" · ")
+    : [
+        `${checks.length} checks recorded`,
+        historicalFailedChecks ? `${historicalFailedChecks} failed before` : "",
+        historicalWarningChecks ? `${historicalWarningChecks} warned before` : "",
+      ].filter(Boolean).join(" · ");
 
   const early = metrics.forecast_count > 0 && metrics.matured_count < EARLY_RESULT_COUNT;
   const answer = metrics.forecast_count === 0
@@ -144,7 +175,7 @@ export function ForwardPage() {
         <MetricCard label="Forecasts recorded" value={compact(metrics.forecast_count)} detail={`${compact(metrics.pending_count)} still waiting for results`} />
         <MetricCard label="Ranking skill, live" info={rankIcInfo} value={decimal(metrics.rank_ic, 3)} detail={rankIcDetail} />
         <MetricCard label="Prediction error, live" info="rmse" value={decimal(metrics.rmse, 4)} detail={`${compact(metrics.matured_count)} results in so far`} />
-        <MetricCard label="Latest data checks" value={latestQualityLabel} detail={historicalQualityDetail} adornment={<LatestQualityIcon size={20} aria-hidden="true" />} />
+        <MetricCard label="Latest data checks" value={latestQualityLabel} detail={latestQualityDetail} adornment={checks.length ? <LatestQualityIcon size={20} aria-hidden="true" /> : undefined} />
       </section>
 
       {unreviewedIntervalResponse && (
@@ -213,8 +244,8 @@ export function ForwardPage() {
           <RunLedger rows={runs.data!} />
         </article>
         <article className="panel">
-          <header><div><h2>Data checks</h2><p>Automatic checks on each run's inputs and outputs.</p></div></header>
-          <QualityList rows={checks} />
+          <header><div><h2>Data checks</h2><p>The latest result of each automatic check on a run's inputs and outputs.</p></div></header>
+          <QualityList rows={latest} />
         </article>
       </section>
     </div>
@@ -280,20 +311,28 @@ function RunLedger({ rows }: { rows: Awaited<ReturnType<typeof api.forwardRuns>>
   );
 }
 
+/** Quiet when a check passed; a warning or failure carries a tag, so it is what the eye finds. */
 function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
   if (!rows.length) return <div className="empty-state">Checks appear after the first run.</div>;
   return (
     <div className="quality-list">
-      {rows.slice(0, 8).map((check) => (
-        <div key={check.check_id}>
-          {check.status === "passed" ? <CheckCircle2 size={15} aria-hidden="true" /> : <TriangleAlert size={15} aria-hidden="true" />}
-          <div>
-            <strong>{check.name.replaceAll("_", " ")}</strong>
-            <small>{[checkReading(check.name, check.observed_value, check.threshold), dateTime(check.created_at)].filter(Boolean).join(" · ")}</small>
+      {rows.map((check) => {
+        const tone = checkTone(check);
+        const Icon = tone === "passed" ? CheckCircle2 : tone === "expected" ? CircleDashed : TriangleAlert;
+        const reading = tone === "expected"
+          ? "No new filing to score on this run"
+          : checkReading(check.name, check.observed_value, check.threshold);
+        return (
+          <div key={check.check_id} className={`quality-list__check quality-list__check--${tone}`}>
+            <Icon size={15} aria-hidden="true" />
+            <div>
+              <strong>{checkName(check.name)}</strong>
+              <small>{[reading, dateTime(check.created_at)].filter(Boolean).join(" · ")}</small>
+            </div>
+            {(tone === "failed" || tone === "warning") && <span className={`quality-state quality-state--${tone}`}>{tone}</span>}
           </div>
-          <span className={`quality-state quality-state--${check.status}`}>{check.status}</span>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -333,7 +372,7 @@ function ForecastTable({
               <td data-label="Tradable from">{dateTime(row.entry_at)}</td>
               <td className="num" data-label="Score">{signedDecimal(row.score, 4)}</td>
               <td className="num" data-label="Rank in run">{runPosition(row.rank, row.cohort_size)}</td>
-              <td className="num" data-label="20-day result">{row.realized_abnormal_return == null ? <span className="pending-label">Not yet known</span> : signedPercent(row.realized_abnormal_return)}</td>
+              <td className="num" data-label="20-day result">{row.realized_abnormal_return == null ? <span className="pending-label">Due {marketDay(row.horizon_at)}</span> : signedPercent(row.realized_abnormal_return)}</td>
             </tr>
           ))}
         </tbody>
