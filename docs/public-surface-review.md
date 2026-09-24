@@ -91,8 +91,11 @@ The bundle is reviewable UTF-8 text apart from two declared images,
 `apple-touch-icon.png` and `social-card.png`. The validator accepts them only as
 PNG pixel data: allowed chunk types only, valid chunk checksums, nothing after
 `IEND`, and at most 200,000 bytes, so no text, EXIF, or colour-profile chunk can
-carry unreviewed content. `favicon.svg` and `sitemap.xml` stay text. The social
-image repeats only figures already published on the site. See
+carry unreviewed content. `favicon.svg` and `sitemap.xml` stay text. The two
+images are rendered from text sources by `scripts/render_brand_images.py`: the
+card from `apps/web/brand/social-card.html`, and the touch icon from
+`favicon.svg`, which draws the logotype's own "E" outline. The social image
+repeats only figures already published on the site. See
 [ADR 0024](adr/0024-reviewed-public-images.md).
 
 ## Failure behavior
