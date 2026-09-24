@@ -1,0 +1,90 @@
+name: Prewarm forward embedding cache
+
+on:
+  workflow_dispatch:
+    inputs:
+      cutoff:
+        description: Optional source-system cutoff (YYYY-MM-DD)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# A prewarm must not race a forecast cycle that uses the same immutable caches.
+concurrency:
+  group: edgar-moe-forward-production
+  cancel-in-progress: false
+
+jobs:
+  prewarm:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    env:
+      HF_HOME: ${{ github.workspace }}/data/cache/huggingface
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          prune-cache: true
+
+      - name: Install research runtime
+        run: uv sync --locked --extra research
+
+      - name: Resolve the U.S. source cutoff
+        id: cutoff
+        shell: bash
+        env:
+          REQUESTED_CUTOFF: ${{ inputs.cutoff }}
+        run: |
+          if [[ -n "$REQUESTED_CUTOFF" ]]; then
+            cutoff="$(uv run python scripts/run_forward_cycle.py --print-cutoff --cutoff "$REQUESTED_CUTOFF")"
+          else
+            cutoff="$(uv run python scripts/run_forward_cycle.py --print-cutoff)"
+          fi
+          echo "date=$cutoff" >> "$GITHUB_OUTPUT"
+          echo "Source cutoff: $cutoff"
+
+      - name: Restore immutable filing and embedding caches
+        id: runtime_cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            data/cache/forward-filings
+            data/artifacts/embedding-cache-finbert
+            ${{ env.HF_HOME }}
+          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-prewarm-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
+          restore-keys: |
+            forward-runtime-${{ runner.os }}-
+
+      # No registry writer, R2 writer, or model artifact is present in this job.
+      # The same source refresh and dataset builder produce cache keys used by
+      # the production cycle, but --prewarm-only stops before any forecast.
+      - name: Refresh sources and prewarm embeddings
+        if: ${{ steps.runtime_cache.outputs.cache-hit != 'true' }}
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+        run: >-
+          timeout --signal=INT --kill-after=30s 300m
+          uv run python scripts/run_forward_cycle.py
+          --prewarm-only
+          --cutoff "${{ steps.cutoff.outputs.date }}"
+          --device cpu
+
+      - name: Save versioned forward runtime cache
+        if: ${{ success() && steps.runtime_cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            data/cache/forward-filings
+            data/artifacts/embedding-cache-finbert
+            ${{ env.HF_HOME }}
+          key: forward-runtime-${{ runner.os }}-${{ steps.cutoff.outputs.date }}-prewarm-${{ hashFiles('uv.lock', 'config/authenticated-free.yaml', 'config/universe.research.csv') }}
