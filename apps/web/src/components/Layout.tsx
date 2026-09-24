@@ -141,8 +141,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
 /** Where to go after this page, so reading the site never dead-ends. */
 function NextPage({ pathname }: { pathname: string }) {
-  // The overview ends with its own guide to every page.
-  const next = pathname === "/" ? null : nextPage(pathname);
+  const next = nextPage(pathname);
   if (!next) return null;
   const { entry, wraps } = next;
   return (

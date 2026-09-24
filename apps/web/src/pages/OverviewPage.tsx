@@ -1,16 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight } from "lucide-react";
+import { CallsStrip } from "../components/CallsStrip";
 import { GateDiagram } from "../components/GateDiagram";
 import { MetricCard } from "../components/MetricCard";
-import { PageDirectory } from "../components/PageDirectory";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import rankIcInterval from "../data/locked-rank-ic-interval.json";
 import { latestSignalsQuery, summaryQuery } from "../lib/queries";
 import { averageWeights, EXPERTS, type ExpertKey } from "../lib/experts";
-import { count, decimal, percent, shortDate } from "../lib/format";
+import { tallyCalls } from "../lib/calls";
+import { count, decimal, percent, shortDate, standing } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
-import { navigation } from "../lib/navigation";
 import { Link } from "../lib/router";
+import type { EventRecord } from "../lib/types";
 
 /** The study's answer in plain words, derived from the locked-test figures. */
 function verdict(rankIc: number | null | undefined, annualReturn: number | null | undefined) {
@@ -26,6 +27,23 @@ function verdict(rankIc: number | null | undefined, annualReturn: number | null 
     title,
     detail: `On 2025–2026 filings it had never seen, the model ranked stocks ${skill} (rank IC ${decimal(rankIc, 3)}). A portfolio trading on its scores ${money} after trading costs.`,
   };
+}
+
+/**
+ * The study's last calls in a sentence: how many went as called, and what its
+ * most confident long did, so the abstract figures above have a case to hold.
+ */
+function callsSummary(signals: EventRecord[] | undefined): string | null {
+  const tally = tallyCalls(signals ?? []);
+  if (!tally) return null;
+  const confident = [...(signals ?? [])]
+    .filter((signal) => signal.direction === "long" && signal.realized_abnormal_return != null)
+    .sort((a, b) => b.score - a.score)[0];
+  const result = confident?.realized_abnormal_return;
+  const example = confident && result != null
+    ? ` Its most confident long, ${confident.ticker} (${standing(confident.rank).toLowerCase()} of scores), ${result < 0 ? `fell ${percent(-result)} behind` : `beat by ${percent(result)}`} the market.`
+    : "";
+  return `Of its last ${tally.calls} calls, ${tally.right} went as called: ${tally.bySide}.${example} A call comes true when its stock lands in the shaded side over the next 20 trading days.`;
 }
 
 function gateCaption(weights: Record<ExpertKey, number> | null, cohort: number): string {
@@ -51,6 +69,7 @@ export function OverviewPage() {
     && test.rank_ic != null
     && Math.abs(test.rank_ic - rankIcInterval.rank_ic) < 1e-12;
   const sharpeInterval = intervalLayout(portfolio.sharpe_ci_low, portfolio.sharpe, portfolio.sharpe_ci_high);
+  const calls = callsSummary(signals.data);
   const answer = hasFrozenInterval && portfolio.annualized_return != null && portfolio.annualized_return < 0
     ? {
         title: "Not convincingly, and not profitably.",
@@ -156,10 +175,21 @@ export function OverviewPage() {
         </p>
       </section>
 
-      <nav className="explore" aria-labelledby="explore-title">
-        <h2 id="explore-title">Explore the project</h2>
-        <PageDirectory entries={navigation.slice(1)} />
-      </nav>
+      {calls && (
+        <section className="panel calls-panel" aria-labelledby="calls-title">
+          <header>
+            <div>
+              <h2 id="calls-title">Where the study's last calls landed</h2>
+              <p>{calls}</p>
+            </div>
+          </header>
+          <CallsStrip calls={signals.data ?? []} />
+          <p className="panel__note">
+            A dozen filings illustrate the model; the backtest of all 1,794 tests it.{" "}
+            <Link to="/signals">All twelve, with what the model relied on</Link>.
+          </p>
+        </section>
+      )}
     </Page>
   );
 }

@@ -313,6 +313,21 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .hero__meta { margin: 18px 0 0; color: var(--ink-2); font-size: 14px; }
 .hero__figure { box-shadow: none; }
 .fair-test { margin-bottom: 40px; }
+/* The study's last calls on one axis of what happened next: long calls above it,
+   short calls below, each side's shaded half where its calls come true. */
+.calls-panel { margin-top: var(--s6); }
+.calls-strip { margin: var(--s2) 0 0; }
+.calls-strip__ends { display: flex; justify-content: space-between; gap: var(--s3); margin-bottom: var(--s2); color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.calls-strip__plot { width: 100%; min-height: 118px; }
+.calls-strip svg { display: block; overflow: visible; }
+.calls-strip__zone { fill: color-mix(in srgb, var(--good) 9%, transparent); }
+.calls-strip__axis { stroke: var(--rule-strong); }
+.calls-strip__zero { stroke: var(--ink); }
+.calls-strip__band { fill: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.calls-strip__leader { stroke: var(--rule-strong); }
+.calls-strip__dot { fill: var(--critical); stroke: var(--paper); stroke-width: 2; }
+.calls-strip__call.is-right .calls-strip__dot { fill: var(--good); }
+.calls-strip__label { fill: var(--ink); font: 500 12px var(--mono); }
 .explore h2 { margin: 0 0 var(--s4); font: 500 var(--t-title)/1.15 var(--serif); letter-spacing: -.02em; }
 .explore ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0 var(--s5); }
 .explore a { position: relative; display: flex; flex-direction: column; gap: var(--s1); height: 100%; padding: var(--s3) var(--s7) var(--s4) 0; border-top: 1px solid var(--ink); color: var(--ink); text-decoration: none; transition: background .15s ease, padding-left .15s ease; }
@@ -943,7 +958,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 }
 
 @media (forced-colors: active) {
-  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .interval__zero, .interval-glyph__range, .interval-glyph__point, .interval-glyph__zero, .gate__stream { forced-color-adjust: none; }
+  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .interval__zero, .interval-glyph__range, .interval-glyph__point, .interval-glyph__zero, .gate__stream, .calls-strip__zone, .calls-strip__dot { forced-color-adjust: none; }
   .site-nav a.active, .segmented button[aria-pressed="true"] { outline: 2px solid CanvasText; outline-offset: -2px; }
 }
 
