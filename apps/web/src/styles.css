@@ -17,14 +17,20 @@
   --highlight-soft: rgba(226, 242, 92, .55);
   --on-highlight: #16191c;
   --mark: var(--highlight);
+  /* "You are here" in the navigation: the highlighter, which sits near the
+     paper's own lightness, so it reads as a stroke of ink, not a block. */
+  --here: var(--highlight);
+  --on-here: var(--on-highlight);
   --stamp: #2447b8;
   --good: #1a6f35;
   --warning: #8a5a00;
   --critical: #b42318;
-  /* Expert identity: a validated categorical set per theme, distinct from status colors. */
-  --expert-text: #eb6834;
+  /* Expert identity: a validated categorical set per theme, distinct from status colors.
+     Each hue holds 3:1 against paper and the paper-2 bar track, as the dark set does,
+     so an unlabelled bar (Signals' "Relied on") is still legible. */
+  --expert-text: #e55117;
   --expert-fundamental: #2a78d6;
-  --expert-market: #1baf7a;
+  --expert-market: #179468;
   --series: #2a78d6;
   --shadow: 0 1px 0 rgba(22, 25, 28, .04), 0 18px 32px -26px rgba(22, 25, 28, .45);
   --serif: "Newsreader", "Newsreader Fallback", "Iowan Old Style", Georgia, serif;
@@ -68,8 +74,13 @@
     --rule: #33383d;
     --rule-strong: #6f757c;
     --highlight: #d9ec52;
-    --highlight-soft: rgba(217, 236, 82, .2);
+    /* Selected rows: at .12 the muted and status text on them still reads at 4.5:1. */
+    --highlight-soft: rgba(217, 236, 82, .12);
     --mark: rgba(217, 236, 82, .34);
+    /* Full lime on near-black would be the brightest thing on the page; the
+       answer's olive band carries the same weight the lime has on paper. */
+    --here: #565d2a;
+    --on-here: var(--ink);
     --stamp: #8aa4ff;
     --good: #57c27a;
     --warning: #e0b04a;
@@ -93,8 +104,11 @@
   --rule: #33383d;
   --rule-strong: #6f757c;
   --highlight: #d9ec52;
-  --highlight-soft: rgba(217, 236, 82, .2);
+  /* Selected rows: at .12 the muted and status text on them still reads at 4.5:1. */
+  --highlight-soft: rgba(217, 236, 82, .12);
   --mark: rgba(217, 236, 82, .34);
+  --here: #565d2a;
+  --on-here: var(--ink);
   --stamp: #8aa4ff;
   --good: #57c27a;
   --warning: #e0b04a;
@@ -147,7 +161,8 @@ th.num, td.num { text-align: right; }
 .route-progress[data-active="true"]::after { animation: route-progress 2.4s cubic-bezier(.15, .7, .2, 1) .15s both; }
 @keyframes route-progress { from { transform: scaleX(0); } to { transform: scaleX(.9); } }
 .topbar__inner { display: flex; align-items: center; gap: 28px; width: min(var(--page-max), 100%); min-height: 62px; margin: 0 auto; padding: 0 var(--gutter); }
-.wordmark { display: inline-flex; flex: 0 0 auto; align-items: center; color: var(--ink); font-size: 25px; text-decoration: none; }
+/* The mark is 19px tall; the link around it is a full 44px target. */
+.wordmark { display: inline-flex; flex: 0 0 auto; align-items: center; min-height: 44px; color: var(--ink); font-size: 25px; text-decoration: none; }
 /* Sized in em from the logotype's ink box, so the phone rule's smaller size scales it too. */
 .wordmark__logotype { display: block; width: 5.947em; height: 0.743em; fill: currentColor; }
 .wordmark__dash { fill: var(--stamp); }
@@ -156,7 +171,7 @@ th.num, td.num { text-align: right; }
 .site-nav ul { display: flex; gap: 2px; }
 .site-nav a { display: block; padding: 7px 10px; border-radius: 2px; color: var(--ink-2); font: 600 15px var(--sans); text-decoration: none; white-space: nowrap; transition: background .12s ease, color .12s ease; }
 .site-nav a:hover { color: var(--ink); background: var(--paper-2); }
-.site-nav a.active { color: var(--on-highlight); background: var(--highlight); }
+.site-nav a.active { color: var(--on-here); background: var(--here); }
 .topbar__actions { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; margin-left: auto; }
 .icon-button { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto; border: 0; border-radius: 2px; background: transparent; color: var(--ink-2); }
 .icon-button:hover { color: var(--ink); background: var(--paper-2); }
@@ -351,7 +366,8 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .site-footer p { max-width: 72ch; margin: 0; }
 .site-footer strong { color: var(--ink); }
 .site-footer nav { display: flex; flex-wrap: wrap; gap: 8px 22px; }
-.site-footer a { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
+/* Small links keep their place in the line but take a 44px-tall target (padding offset by margin). */
+.site-footer a { padding-block: 11px; margin-block: -11px; color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
 
 /* ---------- Loading, errors, notices ---------- */
 .query-state { display: flex; align-items: flex-start; justify-content: center; gap: 12px; max-width: 520px; min-height: 110px; margin: 72px auto; color: var(--ink-2); font: 500 15px var(--sans); }
@@ -430,7 +446,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .equity-chart__hit { fill: transparent; cursor: crosshair; touch-action: pan-y; }
 .equity-chart__tooltip { position: absolute; top: 4px; z-index: 2; pointer-events: none; white-space: nowrap; }
 .chart-table { margin-top: var(--s3); }
-.chart-table summary { width: fit-content; color: var(--ink-2); font: 600 var(--t-small) var(--sans); cursor: pointer; }
+.chart-table summary { width: fit-content; padding-block: 12px; margin-block: -12px; color: var(--ink-2); font: 600 var(--t-small) var(--sans); cursor: pointer; }
 .chart-table summary:hover { color: var(--ink); }
 .chart-table table { width: 100%; max-width: 520px; margin-top: var(--s2); border-collapse: collapse; font-size: var(--t-small); }
 .chart-table th, .chart-table td { padding: 6px var(--s3) 6px 0; border-bottom: 1px solid var(--rule); font-weight: 400; text-align: left; }
@@ -592,7 +608,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .blotter__filing span { max-width: 260px; margin-top: 1px; overflow: hidden; color: var(--ink-3); font-size: var(--t-micro); text-overflow: ellipsis; white-space: nowrap; }
 .expert-mix__bar--compact { width: 132px; height: 8px; }
 .blotter__link { text-align: right; white-space: nowrap; }
-.blotter__link a { display: inline-flex; align-items: center; gap: var(--s1); color: var(--ink); font: 600 var(--t-small) var(--sans); text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
+.blotter__link a { display: inline-flex; align-items: center; gap: var(--s1); padding-block: 14px; margin-block: -14px; color: var(--ink); font: 600 var(--t-small) var(--sans); text-decoration: underline; text-decoration-color: var(--rule-strong); text-underline-offset: 3px; }
 .blotter__link a:hover { text-decoration-color: var(--ink); }
 .blotter__link a:hover svg { transform: translateX(2px); }
 .blotter__link svg { transition: transform .12s ease; }
@@ -749,7 +765,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .site-nav ul { display: block; }
   .site-nav a, .site-nav a:hover, .site-nav a.active { padding: 14px 0; border-bottom: 1px solid var(--rule); border-radius: 0; background: transparent; color: var(--ink); white-space: normal; }
   .site-nav__label { display: inline-block; padding: 0 6px; margin-left: -6px; font: 600 19px var(--sans); }
-  .site-nav a.active .site-nav__label { background: var(--highlight); color: var(--on-highlight); }
+  .site-nav a.active .site-nav__label { background: var(--here); color: var(--on-here); }
   .site-nav__description { display: block; margin-top: 2px; color: var(--ink-2); font: 400 15px var(--sans); }
 }
 
