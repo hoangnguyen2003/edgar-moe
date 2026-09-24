@@ -1,4 +1,4 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
 import { type ReactNode, useId, useState } from "react";
 import { EquityChart } from "../components/EquityChart";
 import { InfoTip } from "../components/InfoTip";
@@ -33,6 +33,10 @@ function uncertainty(low: number | null | undefined, estimate: number | null | u
 export function PortfolioPage() {
   const [cost, setCost] = useState(DEFAULT_COST_BPS);
   const costLabelId = useId();
+  const queryClient = useQueryClient();
+  // Fetch a scenario as the pointer or focus reaches its button, so by the
+  // click it is usually in hand and the curve can glide to it at once.
+  const prepare = (value: number) => () => void queryClient.prefetchQuery(equityQuery(value));
   // Keep the current scenario on screen while another one loads.
   const curve = useQuery({ ...equityQuery(cost), placeholderData: keepPreviousData });
   const costControl = (
@@ -40,7 +44,14 @@ export function PortfolioPage() {
       <span className="control__label"><span id={costLabelId}>Trading cost</span><InfoTip term="tradingCost" /></span>
       <div className="segmented" role="group" aria-labelledby={costLabelId}>
         {COSTS.map((value) => (
-          <button type="button" key={value} aria-pressed={cost === value} onClick={() => setCost(value)}>
+          <button
+            type="button"
+            key={value}
+            aria-pressed={cost === value}
+            onPointerEnter={prepare(value)}
+            onFocus={prepare(value)}
+            onClick={() => setCost(value)}
+          >
             {bpsPercent(value)}
           </button>
         ))}
