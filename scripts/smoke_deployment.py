@@ -52,6 +52,14 @@ _FORWARD_INTERVAL_STATUSES = frozenset(
     }
 )
 _FORWARD_INTERVAL_METHOD = "calendar_month_moving_block"
+# Independently pin the reviewed serving contract from forward/uncertainty.py.
+# A research-method change must update this release gate in the same reviewed PR.
+_FORWARD_INTERVAL_BLOCK_MONTHS = 2
+_FORWARD_INTERVAL_BOOTSTRAP_SAMPLES = 1000
+_FORWARD_INTERVAL_MINIMUM_PAIRS = 100
+_FORWARD_INTERVAL_MINIMUM_MONTHS = 12
+_FORWARD_INTERVAL_MAXIMUM_PAIRS = 5000
+_FORWARD_INTERVAL_MAXIMUM_SPAN_MONTHS = 120
 
 
 class _ScriptCollector(HTMLParser):
@@ -493,6 +501,8 @@ def _forward_performance_error(payload: Any) -> str | None:
     calendar_months = payload.get("rank_ic_calendar_months")
     if not _is_nonnegative_int(calendar_months):
         return "forward_performance_interval_contract_invalid"
+    if calendar_months > matured_count or (matured_count > 0 and calendar_months == 0):
+        return "forward_performance_interval_contract_invalid"
     if matured_count == 0 and any(
         payload[name] is not None
         for name in (
@@ -519,6 +529,8 @@ def _forward_performance_error(payload: Any) -> str | None:
             or calendar_months != 0
             or low is not None
             or high is not None
+            or payload.get("rank_ic_block_months") is not None
+            or payload.get("rank_ic_bootstrap_samples") is not None
         ):
             return "forward_performance_interval_contract_invalid"
         return None
@@ -527,21 +539,45 @@ def _forward_performance_error(payload: Any) -> str | None:
 
     block_months = payload.get("rank_ic_block_months")
     bootstrap_samples = payload.get("rank_ic_bootstrap_samples")
-    if not _is_positive_int(block_months) or not _is_positive_int(bootstrap_samples):
+    if (
+        block_months != _FORWARD_INTERVAL_BLOCK_MONTHS
+        or bootstrap_samples != _FORWARD_INTERVAL_BOOTSTRAP_SAMPLES
+        or type(block_months) is not int
+        or type(bootstrap_samples) is not int
+    ):
+        return "forward_performance_interval_contract_invalid"
+    expected_history_status = (
+        "insufficient_pairs"
+        if matured_count < _FORWARD_INTERVAL_MINIMUM_PAIRS
+        else "insufficient_months"
+        if calendar_months < _FORWARD_INTERVAL_MINIMUM_MONTHS
+        else None
+    )
+    if expected_history_status is not None and status != expected_history_status:
+        return "forward_performance_interval_contract_invalid"
+    if expected_history_status is None and status in {"insufficient_pairs", "insufficient_months"}:
+        return "forward_performance_interval_contract_invalid"
+    if (
+        matured_count > _FORWARD_INTERVAL_MAXIMUM_PAIRS
+        or calendar_months > _FORWARD_INTERVAL_MAXIMUM_SPAN_MONTHS
+    ) and status != "capacity_review_required":
         return "forward_performance_interval_contract_invalid"
     if status == "ready":
         if (
             low is None
             or high is None
             or payload.get("rank_ic") is None
-            or matured_count < 100
-            or calendar_months < 12
+            or matured_count < _FORWARD_INTERVAL_MINIMUM_PAIRS
+            or calendar_months < _FORWARD_INTERVAL_MINIMUM_MONTHS
         ):
             return "forward_performance_interval_contract_invalid"
         if not _is_finite_number(low) or not _is_finite_number(high) or low > high:
             return "forward_performance_interval_contract_invalid"
-    elif low is not None or high is not None:
-        return "forward_performance_interval_contract_invalid"
+    else:
+        if status == "undefined_rank_ic" and payload.get("rank_ic") is not None:
+            return "forward_performance_interval_contract_invalid"
+        if low is not None or high is not None:
+            return "forward_performance_interval_contract_invalid"
     return None
 
 

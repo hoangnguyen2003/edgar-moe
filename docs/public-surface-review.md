@@ -130,12 +130,21 @@ the workflow falls back to the deployment status target when the variable is
 absent. The same workflow keeps a manual HTTPS-origin trigger for rechecks and
 non-GitHub deployments. It performs only bounded `GET` requests to the
 homepage, `robots.txt`, `/.well-known/security.txt`, `data-provenance.json`,
-`/api/v1/governance`, and `/api/v1/health`; it requires the served frozen identity to equal the
-reviewed `config/public_snapshot.lock.json` at the deployed commit, and rejects cross-origin redirects, unexpected content types,
-any mismatch in the full security-header contract (including a one-year HSTS
-minimum), degraded health, and
-oversized responses. The retained report contains paths, statuses, and health
-state but never response bodies or credentials. This is a runtime observation,
+`/api/docs`, `/api/v1/governance`, `/api/v1/forward/performance`, and
+`/api/v1/health`. It requires the served frozen identity to equal the reviewed
+`config/public_snapshot.lock.json` at the deployed commit, and rejects
+cross-origin redirects, unexpected content types, security-header mismatches
+(including a one-year HSTS minimum), degraded health, and oversized responses.
+The forward-performance check requires calendar-clustered interval metadata
+and enforces the reviewed two-month-block, 1,000-resample design. It rejects
+interval bounds published before 100 settled pairs and 12 nonempty acceptance
+months, as well as status labels inconsistent with those thresholds. It also
+requires a capacity-review status beyond 5,000 settled pairs or 120 nonempty
+acceptance months. This catches a serving API that emits older or misleading
+uncertainty estimates even when homepage and health checks pass. The retained
+report contains endpoint
+paths, statuses, and non-sensitive contract metadata but never response bodies,
+numeric performance estimates, or credentials. This is a runtime observation,
 not proof of provider-side rate limits, backups, or database grants.
 
 If GitHub receives a terminal failure (`failure`, `error`, or `inactive`) for a
