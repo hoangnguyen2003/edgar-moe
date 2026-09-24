@@ -18,6 +18,11 @@ const queryClient = new QueryClient({
 
 const prepare = (to: string) => prepareRoute(queryClient, to);
 
+// Start the first page's code and its data together, before the first render,
+// as a click on a link does. Otherwise a cold load asks for the page's data only
+// once its code has arrived and rendered: one round trip lost on every page.
+void prepare(window.location.pathname + window.location.search).catch(() => undefined);
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
