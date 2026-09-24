@@ -698,6 +698,19 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .quality-list__check--failed > svg { color: var(--critical); }
 .quality-list__check--expected > svg { color: var(--ink-3); }
 .forward-forecast-panel { margin-top: 16px; }
+/* Every settled forecast: its score across, its 20-day result up. */
+.forecast-scatter { margin: 0; }
+.forecast-scatter__plot { height: 280px; }
+.forecast-scatter svg { display: block; overflow: visible; }
+.forecast-scatter__axis { margin: 0; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.forecast-scatter__axis--y { margin-bottom: var(--s2); }
+.forecast-scatter__axis--x { margin-top: var(--s1); text-align: right; }
+.forecast-scatter__grid { stroke: var(--rule); }
+.forecast-scatter__zero { stroke: var(--ink-3); }
+.forecast-scatter__tick { fill: var(--ink-3); font: 500 11px var(--mono); }
+.forecast-scatter__note { fill: var(--ink-3); font: 500 11px var(--sans); }
+.forecast-scatter__dot { fill: var(--series); fill-opacity: .85; stroke: var(--paper); stroke-width: 1.5; transition: fill-opacity .12s ease; }
+.forecast-scatter__dot:hover { fill-opacity: 1; stroke: var(--ink); }
 .forward-table-wrap { overflow-x: auto; }
 .forward-table { width: 100%; min-width: 780px; border-collapse: collapse; }
 .forward-table th { padding: var(--s2) var(--s3); border-bottom: 1px solid var(--ink); color: var(--ink-2); font: 600 var(--t-small) var(--sans); text-align: left; }
@@ -850,6 +863,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .call-outcome { grid-template-columns: 56px auto auto; justify-content: start; }
   .call-outcome__bar { width: 56px; }
   .call-outcome .tag { grid-column: auto; }
+  .forecast-scatter__plot { height: 230px; }
   .expert-mix__bar--compact { width: 100%; max-width: 180px; }
   .protocol { grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
   .protocol li + li { padding-left: 0; border-left: 0; }
@@ -958,7 +972,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 }
 
 @media (forced-colors: active) {
-  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .interval__zero, .interval-glyph__range, .interval-glyph__point, .interval-glyph__zero, .gate__stream, .calls-strip__zone, .calls-strip__dot { forced-color-adjust: none; }
+  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .interval__zero, .interval-glyph__range, .interval-glyph__point, .interval-glyph__zero, .gate__stream, .calls-strip__zone, .calls-strip__dot, .forecast-scatter__dot { forced-color-adjust: none; }
   .site-nav a.active, .segmented button[aria-pressed="true"] { outline: 2px solid CanvasText; outline-offset: -2px; }
 }
 

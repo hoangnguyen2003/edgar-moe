@@ -333,6 +333,8 @@ describe("Forward Lab", () => {
     renderPage();
     expect(await screen.findByText("Recorded forecasts")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "All 3" })).toHaveAttribute("aria-pressed", "true");
+    // Fewer than three results make no picture worth drawing.
+    expect(screen.queryByRole("heading", { name: "What the settled forecasts did" })).not.toBeInTheDocument();
     // A result still to come says when it is due, not just that it is unknown.
     expect(screen.getAllByText("Due Oct 19")).toHaveLength(2);
 
