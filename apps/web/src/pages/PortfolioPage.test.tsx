@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EquityCurveResponse } from "../lib/types";
-import { BreakEvenLabel, PortfolioPage } from "./PortfolioPage";
+import { PortfolioPage } from "./PortfolioPage";
 
 function curve(costBps: number, sharpe: number): EquityCurveResponse {
   return {
@@ -30,7 +30,7 @@ function jsonResponse(payload: unknown) {
 
 describe("Portfolio page", () => {
   beforeEach(() => {
-    // Recharts sizes charts with ResizeObserver, which jsdom does not implement.
+    // The chart sizes itself with ResizeObserver, which jsdom does not implement.
     vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -58,29 +58,13 @@ describe("Portfolio page", () => {
     expect(screen.getByText("−0.63", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Backtest results at 0.10% trading cost").closest(".scenario")).toHaveAttribute("aria-busy", "true");
 
+    // The chart's values are readable without hovering, one row per month.
+    expect(screen.getByText("Month-end values")).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "Jul 2026 $0.95 −10.0%" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: "Jun 2025 $1.05 At its peak" })).toBeInTheDocument();
+
     release(jsonResponse(curve(25, -0.91)));
     expect(await screen.findByText("−0.91", { selector: ".figure__value" })).toBeInTheDocument();
     expect(screen.getByLabelText("Backtest results at 0.25% trading cost").closest(".scenario")).toHaveAttribute("aria-busy", "false");
-  });
-});
-
-describe("BreakEvenLabel", () => {
-  const line = { x: 60, y: 120, width: 500 };
-
-  it("names the line at its right end, on the side the curve has left clear", () => {
-    const { container, rerender } = render(<svg><BreakEvenLabel viewBox={line} above fill="#000" halo="#fff" /></svg>);
-    const label = container.querySelector("text");
-    expect(label).toHaveTextContent("Break-even");
-    expect(label).toHaveAttribute("x", "556");
-    expect(label).toHaveAttribute("y", "113");
-    expect(label).toHaveAttribute("text-anchor", "end");
-
-    rerender(<svg><BreakEvenLabel viewBox={line} above={false} fill="#000" halo="#fff" /></svg>);
-    expect(container.querySelector("text")).toHaveAttribute("y", "136");
-  });
-
-  it("draws nothing until the chart has measured the line", () => {
-    const { container } = render(<svg><BreakEvenLabel above fill="#000" halo="#fff" /></svg>);
-    expect(container.querySelector("text")).toBeNull();
   });
 });

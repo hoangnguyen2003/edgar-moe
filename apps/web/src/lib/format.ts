@@ -17,6 +17,11 @@ export function percent(value: number | null | undefined, digits = 1): string {
   return value == null || !Number.isFinite(value) ? "—" : `${fixed(value * 100, digits)}%`;
 }
 
+/** A dollar amount to the cent, e.g. "$1.05" or "$−0.07". */
+export function dollars(value: number | null | undefined): string {
+  return value == null || !Number.isFinite(value) ? "—" : `$${fixed(value, 2)}`;
+}
+
 export function decimal(value: number | null | undefined, digits = 2): string {
   return value == null || !Number.isFinite(value) ? "—" : fixed(value, digits);
 }

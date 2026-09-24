@@ -1,33 +1,17 @@
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useId, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  CartesianGrid,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  type TooltipContentProps,
-  XAxis,
-  YAxis,
-} from "recharts";
+import { EquityChart } from "../components/EquityChart";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { Takeaway } from "../components/Takeaway";
 import { DEFAULT_COST_BPS, equityQuery } from "../lib/queries";
-import { useChartTheme } from "../lib/chartTheme";
-import { bpsPercent, decimal, fixed, monthYear, percent, shortDate } from "../lib/format";
+import { bpsPercent, decimal, dollars, monthYear, percent, shortDate } from "../lib/format";
 import { intervalLayout } from "../lib/interval";
 import type { EquityCurveResponse, EquityPoint } from "../lib/types";
-import { REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
 const COSTS = [DEFAULT_COST_BPS, 25, 50];
-
-function dollars(value: number | null | undefined): string {
-  return value == null || !Number.isFinite(value) ? "—" : `$${fixed(value, 2)}`;
-}
 
 /** What the scenario means, in one sentence, for the summary box. */
 function outcome(metrics: EquityCurveResponse["metrics"], costBps: number) {
@@ -48,9 +32,6 @@ function uncertainty(low: number | null | undefined, estimate: number | null | u
 export function PortfolioPage() {
   const [cost, setCost] = useState(DEFAULT_COST_BPS);
   const costLabelId = useId();
-  const reducedMotion = useMediaQuery(REDUCED_MOTION);
-  const chartTheme = useChartTheme();
-  const tick = { fill: chartTheme.tick, fontSize: 12, fontFamily: chartTheme.font };
   // Keep the current scenario on screen while another one loads.
   const curve = useQuery({ ...equityQuery(cost), placeholderData: keepPreviousData });
   const costControl = (
@@ -106,40 +87,14 @@ export function PortfolioPage() {
               <h2>Growth of $1</h2>
               <p>
                 What one dollar became over the final test, after {bpsPercent(data.cost_bps)} trading costs and borrowing fees.
-                Above the dashed $1.00 line is a profit. Hover over or tap the chart for dates and values.
+                Above the dashed $1.00 line is a profit. Point at or tap the chart, or tab to it and use the arrow keys,
+                to read any day.
               </p>
             </div>
           </header>
           <figure className="chart-figure">
             <div className="chart-wrap">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.points} margin={{ left: 0, right: 28, top: 12, bottom: 0 }} title="Growth of one dollar" desc={summary}>
-                  <CartesianGrid stroke={chartTheme.grid} vertical={false} />
-                  <XAxis dataKey="date" minTickGap={48} tickFormatter={monthYear} tick={tick} tickLine={false} axisLine={{ stroke: chartTheme.axisLine }} />
-                  <YAxis domain={["auto", "auto"]} tickFormatter={(value: number) => `$${fixed(value, 2)}`} tick={tick} tickLine={false} axisLine={false} width={54} />
-                  <ReferenceLine
-                    y={1}
-                    ifOverflow="extendDomain"
-                    stroke={chartTheme.reference}
-                    strokeOpacity={0.7}
-                    strokeDasharray="5 4"
-                    label={<BreakEvenLabel above={!stats || stats.end.equity < 1} fill={chartTheme.tick} halo={chartTheme.paper} />}
-                  />
-                  <Tooltip cursor={{ stroke: chartTheme.reference, strokeWidth: 1 }} content={EquityTooltip} isAnimationActive={false} />
-                  <Area
-                    type="monotone"
-                    dataKey="equity"
-                    name="Value of $1"
-                    stroke={chartTheme.series}
-                    strokeWidth={2}
-                    fill={chartTheme.series}
-                    fillOpacity={0.12}
-                    dot={false}
-                    activeDot={{ r: 4, fill: chartTheme.series, stroke: chartTheme.paper, strokeWidth: 2 }}
-                    isAnimationActive={!reducedMotion}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+              <EquityChart points={data.points} summary={summary} />
             </div>
             {stats && (
               <figcaption className="chart-caption">
@@ -149,6 +104,24 @@ export function PortfolioPage() {
                 <span>Low <strong>{dollars(stats.low.equity)}</strong> <small>{shortDate(stats.low.date)}</small></span>
               </figcaption>
             )}
+            {/* The chart's values without hovering: one row per month. */}
+            <details className="chart-table">
+              <summary>Month-end values</summary>
+              <table>
+                <thead>
+                  <tr><th scope="col">Month</th><th scope="col" className="num">Value of $1</th><th scope="col" className="num">From its peak</th></tr>
+                </thead>
+                <tbody>
+                  {monthEnds(data.points).map((point) => (
+                    <tr key={point.date}>
+                      <th scope="row">{monthYear(point.date)}</th>
+                      <td className="num">{dollars(point.equity)}</td>
+                      <td className="num">{point.drawdown < 0 ? `−${percent(Math.abs(point.drawdown))}` : "At its peak"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
           </figure>
         </article>
         <section className="content-grid content-grid--two">
@@ -211,40 +184,7 @@ function equityStats(points: EquityPoint[]) {
   return { start: points[0], end: points[points.length - 1], high, low };
 }
 
-type LineBox = { x?: number; y?: number; width?: number };
-
-/**
- * Names the $1.00 line at its right end. Every curve starts on the line, so a
- * label on the left sits on the data; by the end the curve has moved away, and
- * the label takes the side it left clear. The halo keeps it legible regardless.
- */
-export function BreakEvenLabel({ viewBox, above, fill, halo }: { viewBox?: LineBox; above: boolean; fill: string; halo: string }) {
-  if (viewBox?.x == null || viewBox.y == null || viewBox.width == null) return null;
-  return (
-    <text
-      className="chart-annotation"
-      x={viewBox.x + viewBox.width - 4}
-      y={viewBox.y + (above ? -7 : 16)}
-      textAnchor="end"
-      fill={fill}
-      stroke={halo}
-      strokeWidth={4}
-      strokeLinejoin="round"
-      paintOrder="stroke"
-    >
-      Break-even
-    </text>
-  );
-}
-
-function EquityTooltip({ active, payload }: TooltipContentProps) {
-  const point = payload?.[0]?.payload as EquityPoint | undefined;
-  if (!active || !point) return null;
-  return (
-    <div className="chart-tooltip">
-      <strong>{dollars(point.equity)}</strong>
-      <span>{shortDate(point.date)}</span>
-      <small>{point.drawdown < 0 ? `${percent(Math.abs(point.drawdown))} below its peak` : "At its peak"}</small>
-    </div>
-  );
+/** The last trading day of each month. */
+function monthEnds(points: EquityPoint[]) {
+  return points.filter((point, index) => index === points.length - 1 || points[index + 1].date.slice(0, 7) !== point.date.slice(0, 7));
 }
