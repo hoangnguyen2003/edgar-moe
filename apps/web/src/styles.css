@@ -726,6 +726,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .steps { grid-template-columns: minmax(0, 1fr); }
   .steps li, .steps li + li { padding: var(--s3) 0; border-left: 0; border-bottom: 1px solid var(--rule); }
   .verify__steps pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  :root { --topbar-height: 59px; }
   .topbar__inner { min-height: 58px; gap: 12px; }
   .wordmark { font-size: 23px; }
   .page, .page--overview { padding: 24px var(--gutter) 32px; }
