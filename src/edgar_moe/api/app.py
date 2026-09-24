@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import re
 from collections.abc import Awaitable, Callable, MutableMapping
 from datetime import date
 from pathlib import Path
@@ -42,6 +44,15 @@ from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.settings import RuntimeSettings, runtime_settings
 
 settings = runtime_settings()
+_GIT_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _served_commit_sha() -> str | None:
+    """Expose only a validated, non-secret deployment identity."""
+    value = os.environ.get("VERCEL_GIT_COMMIT_SHA", "")
+    return value if _GIT_COMMIT_SHA.fullmatch(value) else None
+
+
 repository = SnapshotRepository(
     settings.edgar_moe_demo_snapshot,
     lock_path=settings.edgar_moe_public_snapshot_lock,
@@ -250,15 +261,23 @@ def health(response: Response, repo: RepositoryDependency) -> HealthResponse:
     """
     # A cached health answer would report the state of some earlier moment.
     response.headers["Cache-Control"] = "no-store"
+    commit_sha = _served_commit_sha()
     try:
         snapshot = repo.load()
     except (SnapshotNotFoundError, ValueError):
-        return HealthResponse(status="degraded", snapshot_loaded=False, data_mode=None, as_of=None)
+        return HealthResponse(
+            status="degraded",
+            snapshot_loaded=False,
+            data_mode=None,
+            as_of=None,
+            commit_sha=commit_sha,
+        )
     return HealthResponse(
         status="ok",
         snapshot_loaded=True,
         data_mode=snapshot["metadata"]["data_mode"],
         as_of=snapshot["metadata"]["as_of"],
+        commit_sha=commit_sha,
     )
 
 

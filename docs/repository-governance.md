@@ -92,6 +92,17 @@ uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app \
   --expect-lock config/public_snapshot.lock.json
 ```
 
+The health response publishes only a validated 40-character
+`VERCEL_GIT_COMMIT_SHA` (or `null` when unavailable), never other environment
+variables. To verify the serving revision, add `--expect-commit <full-git-sha>`
+to a manual smoke check or supply the optional workflow input. A check without
+that argument verifies the frozen identity but does not establish which
+application revision is serving. The automatic Production check remains on the
+existing frozen-identity gate until the commit value is observed on a real
+deployment; only then should a follow-up PR require the deployment-event SHA.
+If the value is unavailable, verify that Vercel exposes system environment
+variables to the Python Function before enabling that gate.
+
 ## Current personal-project mode
 
 Branch protection is not enabled because the repository has a single

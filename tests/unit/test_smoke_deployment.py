@@ -455,6 +455,47 @@ def test_smoke_rejects_unconfirmed_registry_unavailable_degraded_mode(
     assert check["error"] == "forward_registry_unavailability_unconfirmed"
 
 
+@pytest.mark.parametrize(
+    ("served", "expected_error"),
+    [
+        ("b" * 40, None),
+        ("c" * 40, "served_commit_mismatch"),
+        (None, "served_commit_unavailable"),
+        ("not-a-commit", "served_commit_unavailable"),
+    ],
+)
+def test_smoke_verifies_served_commit(
+    monkeypatch: pytest.MonkeyPatch, served: str | None, expected_error: str | None
+) -> None:
+    responses = complete_responses()
+    health_url = "https://terminal.example/api/v1/health"
+    responses[health_url] = FakeResponse(
+        health_url,
+        json.dumps({"status": "ok", "snapshot_loaded": True, "commit_sha": served}),
+        "application/json",
+    )
+    monkeypatch.setattr(_MODULE, "_open_url", fake_urlopen_factory(responses))
+
+    report = _MODULE.run_smoke(
+        "https://terminal.example", timeout=2.0, expected_commit_sha="b" * 40
+    )
+
+    assert report["expected_commit_sha"] == "b" * 40
+    health = report["checks"][-1]
+    if expected_error is None:
+        assert report["status"] == "passed"
+        assert health["commit_verified"] is True
+    else:
+        assert report["status"] == "failed"
+        assert health["error"] == expected_error
+        assert "c" * 40 not in json.dumps(health)
+
+
+def test_smoke_rejects_invalid_expected_commit() -> None:
+    with pytest.raises(ValueError, match="expected commit"):
+        _MODULE.run_smoke("https://terminal.example", expected_commit_sha="short")
+
+
 def test_smoke_requires_api_request_id_round_trip(monkeypatch: pytest.MonkeyPatch) -> None:
     responses = complete_responses()
     monkeypatch.setattr(

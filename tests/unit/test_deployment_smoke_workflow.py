@@ -28,6 +28,21 @@ def test_deployment_smoke_keeps_manual_origin_override() -> None:
     assert "github.event.deployment_status.target_url" in text
 
 
+def test_deployment_smoke_allows_opt_in_exact_serving_commit_check() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+
+    assert (
+        "ref: ${{ github.event_name == 'deployment_status' && github.event.deployment.sha || github.sha }}"
+        in text
+    )
+    assert (
+        "EXPECTED_COMMIT_SHA: ${{ github.event_name == 'workflow_dispatch' && "
+        "inputs.expected_commit_sha || '' }}"
+    ) in text
+    assert 'smoke_args+=(--expect-commit "$EXPECTED_COMMIT_SHA")' in text
+    assert "expected_commit_sha:" in text
+
+
 def test_failed_production_deployments_retain_redacted_evidence() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
     script = FAILURE_SCRIPT.read_text(encoding="utf-8")
