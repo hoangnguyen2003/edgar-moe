@@ -253,7 +253,7 @@ def _portfolio_cost_review(
         }
 
     results = []
-    for name in (champion_name, "Fundamental-Only Expert"):
+    for name in dict.fromkeys((champion_name, "Fundamental-Only Expert")):
         signals = selected[
             ["entry_date", "exit_date", "security_id", "ticker", "beta", "industry_code"]
         ].copy()
@@ -268,6 +268,7 @@ def _portfolio_cost_review(
         "observed_trading_days": len(dates),
         "cost_definition": "10/25/50 bps per unit of one-sided turnover plus configured short borrow",
         "models": results,
+        "fundamental_is_champion": champion_name == "Fundamental-Only Expert",
         "caveat": "Same selected development folds; not an independent or live trading estimate.",
     }
 

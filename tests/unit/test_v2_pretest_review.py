@@ -191,6 +191,11 @@ def test_v2_portfolio_review_requires_complete_returns_and_charges_costs(tmp_pat
         result["models"][0]["scenarios"][0]["annualized_return"]
         >= result["models"][0]["scenarios"][2]["annualized_return"]
     )
+    baseline_wins = _portfolio_cost_review(
+        narrowed, np.asarray([0, 1]), names, scores, names[1], config
+    )
+    assert baseline_wins["fundamental_is_champion"] is True
+    assert len(baseline_wins["models"]) == 1
 
     missing = returns.loc[
         ~((returns["date"] == dates[5]) & (returns["security_id"] == "security-1"))
