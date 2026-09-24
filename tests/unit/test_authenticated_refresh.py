@@ -5,6 +5,7 @@ import pytest
 
 from edgar_moe.data.refresh import (
     UniverseMember,
+    _download_filing_record,
     collect_authenticated_data,
     load_universe_csv,
     refresh_authenticated_to_disk,
@@ -181,3 +182,195 @@ async def test_streaming_refresh_excludes_issuers_without_periodic_forms(tmp_pat
     assert manifest.row_counts["ineligible_form_issuers"] == 1
     assert [row["symbol"] for row in universe] == ["TEST"]
     assert bar_symbols == {"SPY", "TEST"}
+
+
+async def test_completed_refresh_resume_is_immutable_and_rejects_changed_inputs(tmp_path) -> None:
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    options = {
+        "output_root": tmp_path,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+    }
+    destination = await refresh_authenticated_to_disk(
+        StreamingFakeSec(), FakeMarket(), FakeMacro(), members, **options
+    )
+    manifest_path = destination / "manifest.json"
+    original_manifest = manifest_path.read_bytes()
+
+    class NoFetchSec(StreamingFakeSec):
+        async def complete_submissions(self, cik: str, start=None) -> dict:
+            raise AssertionError("completed checkpoint must not refetch SEC")
+
+    reused = await refresh_authenticated_to_disk(
+        NoFetchSec(), FakeMarket(), FakeMacro(), members, resume=True, **options
+    )
+    assert reused == destination
+    assert manifest_path.read_bytes() == original_manifest
+    with pytest.raises(ValueError, match="request differs"):
+        await refresh_authenticated_to_disk(
+            NoFetchSec(), FakeMarket(), FakeMacro(), members, resume=True, feed="sip", **options
+        )
+    assert manifest_path.read_bytes() == original_manifest
+
+    bars = destination / "market" / "daily-bars.ndjson"
+    bars.write_bytes(bars.read_bytes().splitlines(keepends=True)[0])
+    with pytest.raises(ValueError, match="Hash mismatch"):
+        await refresh_authenticated_to_disk(
+            NoFetchSec(), FakeMarket(), FakeMacro(), members, resume=True, **options
+        )
+    assert manifest_path.read_bytes() == original_manifest
+
+
+async def test_interrupted_refresh_refetches_tampered_bars_and_rejects_wrong_request(
+    tmp_path,
+) -> None:
+    class FailAfterBarsMarket(FakeMarket):
+        async def corporate_actions(self, start, end, symbols=None) -> dict:
+            raise RuntimeError("injected outage after market bars")
+
+    class CountingMarket(FakeMarket):
+        def __init__(self) -> None:
+            self.bars_calls = 0
+
+        async def daily_bars(self, symbols, start, end, feed="iex") -> dict:
+            self.bars_calls += 1
+            return await super().daily_bars(symbols, start, end, feed=feed)
+
+    class CountingSec(StreamingFakeSec):
+        def __init__(self) -> None:
+            self.submission_calls = 0
+            self.fact_calls = 0
+            self.html_calls = 0
+
+        async def complete_submissions(self, cik: str, start=None) -> dict:
+            self.submission_calls += 1
+            return await super().complete_submissions(cik, start)
+
+        async def company_facts(self, cik: str) -> dict:
+            self.fact_calls += 1
+            return await super().company_facts(cik)
+
+        async def filing_html(self, cik: str, accession: str, primary_document: str) -> str:
+            self.html_calls += 1
+            return await super().filing_html(cik, accession, primary_document)
+
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    options = {
+        "output_root": tmp_path,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+    }
+    with pytest.raises(RuntimeError, match="injected outage"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(), FailAfterBarsMarket(), FakeMacro(), members, **options
+        )
+    destination = tmp_path / "2025-12-31"
+    assert not (destination / "manifest.json").exists()
+    bars = destination / "market" / "daily-bars.ndjson"
+    assert len(bars.read_bytes().splitlines()) == 2
+    bars.write_bytes(bars.read_bytes().splitlines(keepends=True)[0])
+    facts = destination / "sec" / "CIK0000000001-companyfacts.json.gz"
+    facts.write_bytes(facts.read_bytes() + b"damaged")
+    filing = destination / "sec" / "filings" / "CIK0000000001" / "0000000001-25-000001.html.gz"
+    filing.with_name(filing.name + ".sha256").unlink()
+
+    with pytest.raises(FileExistsError, match="use resume=True"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(), FakeMarket(), FakeMacro(), members, **options
+        )
+
+    with pytest.raises(ValueError, match="original request"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            resume=True,
+            macro_series=["DGS10"],
+            **{key: value for key, value in options.items() if key != "macro_series"},
+        )
+    market = CountingMarket()
+    sec = CountingSec()
+    resumed = await refresh_authenticated_to_disk(
+        sec, market, FakeMacro(), members, resume=True, **options
+    )
+    assert resumed == destination
+    assert market.bars_calls == 1
+    assert sec.submission_calls == 0
+    assert sec.fact_calls == 1
+    assert sec.html_calls == 1
+    assert verify_authenticated_bundle(resumed).row_counts["daily_bars"] == 2
+
+
+async def test_completed_legacy_checkpoint_can_resume_but_unidentified_partial_cannot(
+    tmp_path,
+) -> None:
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    options = {
+        "output_root": tmp_path,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+    }
+    destination = await refresh_authenticated_to_disk(
+        StreamingFakeSec(), FakeMarket(), FakeMacro(), members, **options
+    )
+    manifest_path = destination / "manifest.json"
+    legacy = orjson.loads(manifest_path.read_bytes())
+    legacy["hashes"].pop("request")
+    legacy["configuration"]["assets"].pop("request")
+    legacy["configuration"].pop("market_batch_size")
+    manifest_path.write_bytes(orjson.dumps(legacy))
+    (destination / "request.json").unlink()
+
+    assert (
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(), FakeMarket(), FakeMacro(), members, resume=True, **options
+        )
+        == destination
+    )
+    assert not (destination / "request.json").exists()
+
+    partial = tmp_path / "2025-12-30"
+    partial.mkdir()
+    (partial / "unidentified-file").write_bytes(b"old")
+    with pytest.raises(ValueError, match="no request contract"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            resume=True,
+            as_of=date(2025, 12, 30),
+            end=date(2025, 12, 30),
+            **{key: value for key, value in options.items() if key not in {"as_of", "end"}},
+        )
+
+
+async def test_failed_filing_refetch_does_not_promote_stale_local_document(tmp_path) -> None:
+    class FailedFilingSec(StreamingFakeSec):
+        async def filing_html(self, cik: str, accession: str, primary_document: str) -> str:
+            raise RuntimeError("injected SEC outage")
+
+    issuer_directory = tmp_path / "sec" / "filings" / "CIK0000000001"
+    issuer_directory.mkdir(parents=True)
+    stale = issuer_directory / "0000000001-25-000001.html.gz"
+    stale.write_bytes(b"stale incomplete document")
+    result = await _download_filing_record(
+        FailedFilingSec(),
+        UniverseMember(cik="1", symbol="TEST"),
+        {"accessionNumber": "0000000001-25-000001", "primaryDocument": "example.htm"},
+        issuer_directory=issuer_directory,
+        run_directory=tmp_path,
+        resume=True,
+    )
+
+    assert result["status"] == "failed"
+    assert result["localPath"] == ""
+    assert "injected SEC outage" in result["error"]
+    assert stale.read_bytes() == b"stale incomplete document"

@@ -268,10 +268,45 @@ async def refresh_authenticated_to_disk(
 
     run_directory = Path(output_root) / as_of.isoformat()
     manifest_path = run_directory / "manifest.json"
-    if manifest_path.exists() and not resume:
-        raise FileExistsError(
-            f"Authenticated checkpoint already exists at {run_directory}; use resume=True"
-        )
+    normalized_series = sorted(
+        {series.strip().upper() for series in macro_series if series.strip()}
+    )
+    requested_universe = [member.model_dump(mode="json") for member in members]
+    request = {
+        "schema_version": 1,
+        "universe": requested_universe,
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "as_of": as_of.isoformat(),
+        "feed": feed,
+        "forms": list(forms),
+        "macro_series": normalized_series,
+        "market_batch_size": market_batch_size,
+        "maximum_filings_per_issuer": maximum_filings_per_issuer,
+    }
+    request_path = run_directory / "request.json"
+    if manifest_path.exists():
+        if not resume:
+            raise FileExistsError(
+                f"Authenticated checkpoint already exists at {run_directory}; use resume=True"
+            )
+        manifest = verify_authenticated_bundle(run_directory)
+        _assert_completed_request(run_directory, manifest, request)
+        return run_directory  # A finalized checkpoint is immutable, even on resume.
+    if run_directory.exists() and any(run_directory.iterdir()):
+        if not resume:
+            raise FileExistsError(
+                f"Interrupted checkpoint already exists at {run_directory}; use resume=True"
+            )
+        if not request_path.exists():
+            raise ValueError(
+                "Interrupted checkpoint has no request contract; start a new checkpoint"
+            )
+        if _read_json(request_path) != request:
+            raise ValueError("Resume request differs from the checkpoint's original request")
+    else:
+        _write_json(request_path, request)
+
     sec_directory = run_directory / "sec"
     filing_directory = sec_directory / "filings"
     market_directory = run_directory / "market"
@@ -281,11 +316,9 @@ async def refresh_authenticated_to_disk(
 
     asset_paths: dict[str, Path] = {}
     requested_universe_path = run_directory / "requested-universe.json"
-    _write_json(
-        requested_universe_path,
-        [member.model_dump(mode="json") for member in members],
-    )
+    _write_json(requested_universe_path, requested_universe)
     asset_paths["requested_universe"] = requested_universe_path
+    asset_paths["request"] = request_path
 
     filing_index: list[dict[str, Any]] = []
     research_members: list[UniverseMember] = []
@@ -294,11 +327,12 @@ async def refresh_authenticated_to_disk(
     for member_index, member in enumerate(members, start=1):
         submissions_path = sec_directory / f"CIK{member.cik}-submissions.json.gz"
         facts_path = sec_directory / f"CIK{member.cik}-companyfacts.json.gz"
-        if resume and submissions_path.exists():
+        if resume and _has_verified_sidecar(submissions_path):
             submissions = _read_json(submissions_path)
         else:
             submissions = await sec.complete_submissions(member.cik, start)
             _write_json(submissions_path, submissions)
+            _write_sidecar_hash(submissions_path)
         asset_paths[f"submissions_{member.cik}"] = submissions_path
         records = periodic_filing_records(
             submissions,
@@ -322,11 +356,12 @@ async def refresh_authenticated_to_disk(
             }
         )
         research_members.append(research_member)
-        if resume and facts_path.exists():
+        if resume and _has_verified_sidecar(facts_path):
             facts = _read_json(facts_path)
         else:
             facts = await sec.company_facts(member.cik)
             _write_json(facts_path, facts)
+            _write_sidecar_hash(facts_path)
         asset_paths[f"companyfacts_{member.cik}"] = facts_path
         xbrl_concept_count += len(facts.get("facts", {}).get("us-gaap", {}))
         filing_record_count += len(records)
@@ -368,7 +403,7 @@ async def refresh_authenticated_to_disk(
 
     symbols = sorted({member.symbol for member in research_members} | {"SPY"})
     bars_path = market_directory / "daily-bars.ndjson"
-    if not (resume and bars_path.exists()):
+    if not (resume and _has_verified_sidecar(bars_path)):
         temporary_bars = bars_path.with_suffix(".ndjson.tmp")
         with temporary_bars.open("wb") as stream:
             for offset in range(0, len(symbols), market_batch_size):
@@ -389,12 +424,13 @@ async def refresh_authenticated_to_disk(
                         f"{len(symbols):,} symbols"
                     )
         temporary_bars.replace(bars_path)
+        _write_sidecar_hash(bars_path)
     asset_paths["bars"] = bars_path
     daily_bar_count = _count_nonempty_lines(bars_path)
 
     actions_path = market_directory / "corporate-actions.json.gz"
     corporate_actions: dict[str, Any]
-    if resume and actions_path.exists():
+    if resume and _has_verified_sidecar(actions_path):
         corporate_actions = _read_json(actions_path)
     else:
         corporate_actions = {}
@@ -409,13 +445,11 @@ async def refresh_authenticated_to_disk(
                     f"{min(offset + market_batch_size, len(symbols)):,}/{len(symbols):,} symbols"
                 )
         _write_json(actions_path, corporate_actions)
+        _write_sidecar_hash(actions_path)
     asset_paths["corporate_actions"] = actions_path
 
-    normalized_series = sorted(
-        {series.strip().upper() for series in macro_series if series.strip()}
-    )
     macro_path = macro_directory / "observations.json.gz"
-    if resume and macro_path.exists():
+    if resume and _has_verified_sidecar(macro_path):
         macro_values = _read_json(macro_path)
     else:
         macro_payloads = await asyncio.gather(
@@ -431,6 +465,7 @@ async def refresh_authenticated_to_disk(
         )
         macro_values = dict(zip(normalized_series, macro_payloads, strict=True))
         _write_json(macro_path, macro_values)
+        _write_sidecar_hash(macro_path)
     if progress:
         progress(f"Macro series {len(normalized_series):,}/{len(normalized_series):,}")
     asset_paths["macro"] = macro_path
@@ -466,6 +501,7 @@ async def refresh_authenticated_to_disk(
             "market_adjustment": "split",
             "forms": list(forms),
             "macro_series": normalized_series,
+            "market_batch_size": market_batch_size,
             "maximum_filings_per_issuer": maximum_filings_per_issuer,
             "assets": {
                 name: str(path.relative_to(run_directory))
@@ -492,19 +528,19 @@ async def _download_filing_record(
     document_path = issuer_directory / f"{accession}.html.gz"
     temporary_path = document_path.with_name(document_path.name + ".tmp")
     error: str | None = None
-    reusable = resume and document_path.exists() and _is_complete_gzip(document_path)
-    if document_path.exists() and not reusable:
-        document_path.unlink()
-    if not reusable:
+    available = resume and _has_verified_sidecar(document_path)
+    if not available:
         try:
             html = await sec.filing_html(member.cik, accession, primary_document)
             with gzip.open(temporary_path, "wt", encoding="utf-8", compresslevel=6) as stream:
                 stream.write(html)
             temporary_path.replace(document_path)
+            _write_sidecar_hash(document_path)
+            available = True
         except Exception as caught:  # network failures belong in the attrition audit
             temporary_path.unlink(missing_ok=True)
             error = f"{type(caught).__name__}: {caught}"[:500]
-    if document_path.exists():
+    if available:
         relative_path = str(document_path.relative_to(run_directory))
         document_hash = sha256_file(document_path)
         byte_count = document_path.stat().st_size
@@ -529,14 +565,58 @@ async def _download_filing_record(
     }
 
 
-def _is_complete_gzip(path: Path) -> bool:
-    try:
-        with gzip.open(path, "rb") as stream:
-            while stream.read(1024 * 1024):
-                pass
-    except (OSError, EOFError):
+def _assert_completed_request(
+    root: Path, manifest: DatasetManifest, request: dict[str, Any]
+) -> None:
+    """Keep old completed checkpoints usable while refusing changed requests."""
+    request_path = root / "request.json"
+    if request_path.exists():
+        if _read_json(request_path) != request:
+            raise ValueError("Resume request differs from the finalized checkpoint")
+        return
+    configuration = manifest.configuration
+    assets = configuration.get("assets")
+    if not isinstance(assets, dict) or not isinstance(assets.get("requested_universe"), str):
+        raise ValueError("Finalized checkpoint has no requested-universe identity")
+    if _read_json(root / assets["requested_universe"]) != request["universe"]:
+        raise ValueError("Resume universe differs from the finalized checkpoint")
+    for field in (
+        "start",
+        "end",
+        "as_of",
+        "feed",
+        "forms",
+        "macro_series",
+        "maximum_filings_per_issuer",
+    ):
+        if configuration.get(field) != request[field]:
+            raise ValueError(f"Resume {field} differs from the finalized checkpoint")
+
+
+def _sidecar_path(path: Path) -> Path:
+    return path.with_name(path.name + ".sha256")
+
+
+def _has_verified_sidecar(path: Path) -> bool:
+    sidecar = _sidecar_path(path)
+    if not path.is_file() or not sidecar.is_file():
         return False
-    return True
+    try:
+        expected = sidecar.read_text(encoding="ascii").strip()
+    except (OSError, UnicodeError):
+        return False
+    return (
+        len(expected) == 64
+        and all(character in "0123456789abcdef" for character in expected)
+        and sha256_file(path) == expected
+    )
+
+
+def _write_sidecar_hash(path: Path) -> None:
+    sidecar = _sidecar_path(path)
+    temporary = sidecar.with_name(sidecar.name + ".tmp")
+    temporary.write_text(sha256_file(path) + "\n", encoding="ascii")
+    temporary.replace(sidecar)
 
 
 def verify_authenticated_bundle(path: str | Path) -> DatasetManifest:

@@ -18,6 +18,26 @@ Run `edgar-moe build-universe`. Inspect `data/interim/security-mapping-review.js
 
 Run `edgar-moe refresh-data --universe config/universe.research.csv --as-of YYYY-MM-DD --config config/authenticated-free.yaml --resume`. The command can take hours for a broad universe because EDGAR requests are deliberately paced. Large SEC JSON and filing documents are gzip-compressed, and each completed issuer is resumable. It must finish with a verified manifest and zero unexplained file-hash failures.
 
+Resume is bound to `request.json` (universe, dates, feed, forms, macro series,
+batch size, and filing cap). An already finalized checkpoint is verified and
+returned without rewriting its manifest; a different request is rejected.
+Interrupted checkpoints reuse only assets whose adjacent `.sha256` sidecar
+matches. Damaged or sidecar-less source payloads are re-fetched using the
+original request, and the new file is atomically published only after the
+provider response succeeds. If the provider is still unavailable, the run
+remains incomplete; a failed filing download is recorded as attrition rather
+than blessing an old document. Older **completed** checkpoints without
+`request.json` remain verifiable against their manifest and requested universe.
+An older **partial** checkpoint without a request contract is intentionally
+not resumed: retain it for diagnosis and start a new checkpoint location.
+
+To see the local I/O cost of the integrity check without using private data,
+run `uv run python scripts/benchmark_refresh_resume_integrity.py --size-mib 16
+--samples 5`. On the maintainer's 2026-09-24 laptop, counting 376,832 synthetic
+rows in a 16.96 MB cache took a 23.045 ms median; hash verification plus the
+same count took 28.698 ms (five samples). This is a synthetic local-file
+microbenchmark, not a network benchmark or production SLA.
+
 Review:
 
 - filing download failure count and reasons;
