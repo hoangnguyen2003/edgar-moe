@@ -4,11 +4,11 @@ import { GateDiagram } from "../components/GateDiagram";
 import { MetricCard } from "../components/MetricCard";
 import { PageDirectory } from "../components/PageDirectory";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { Takeaway } from "../components/Takeaway";
 import rankIcInterval from "../data/locked-rank-ic-interval.json";
 import { latestSignalsQuery, summaryQuery } from "../lib/queries";
 import { averageWeights, EXPERTS, type ExpertKey } from "../lib/experts";
 import { count, decimal, percent, shortDate } from "../lib/format";
+import { intervalLayout } from "../lib/interval";
 import { navigation } from "../lib/navigation";
 import { Link } from "../lib/router";
 
@@ -50,6 +50,7 @@ export function OverviewPage() {
     && data.metadata.locked_test_hash === rankIcInterval.locked_test_hash
     && test.rank_ic != null
     && Math.abs(test.rank_ic - rankIcInterval.rank_ic) < 1e-12;
+  const sharpeInterval = intervalLayout(portfolio.sharpe_ci_low, portfolio.sharpe, portfolio.sharpe_ci_high);
   const answer = hasFrozenInterval && portfolio.annualized_return != null && portfolio.annualized_return < 0
     ? {
         title: "Not convincingly, and not profitably.",
@@ -65,7 +66,13 @@ export function OverviewPage() {
             EDGAR-MoE reads each company's 10-K and 10-Q filings (the text, the financial statements, and the
             market backdrop) and scores how its stock should do over the next 20 trading days compared with the market.
           </p>
-          {answer && <Takeaway label="Short answer" title={answer.title}>{answer.detail}</Takeaway>}
+          {answer && (
+            <section className="hero__answer" aria-label="Short answer">
+              <p className="hero__answer-label">Short answer</p>
+              <p className="hero__answer-title"><mark>{answer.title}</mark></p>
+              <p className="hero__answer-detail">{answer.detail}</p>
+            </section>
+          )}
           <div className="actions">
             <Link className="button button--primary" to="/portfolio">See the backtest <ArrowRight size={17} aria-hidden="true" /></Link>
             <Link className="button button--secondary" to="/methodology">How it works</Link>
@@ -87,10 +94,24 @@ export function OverviewPage() {
 
       <section className="figures" aria-label="Headline results">
         <MetricCard label="Filings analyzed" value={count(data.summary.events)} detail={`From ${count(data.summary.issuers)} companies`} />
-        <MetricCard label="Ranking skill" info="rankIc" value={decimal(test.rank_ic, 3)} detail={hasFrozenInterval
-          ? `95% two-month calendar-block interval ${decimal(rankIcInterval.ci_low, 3)} to ${decimal(rankIcInterval.ci_high, 3)}; includes zero`
-          : "Rank IC on the final test; 0 is random"} />
-        <MetricCard label="Sharpe ratio" info="sharpe" value={decimal(portfolio.sharpe)} detail="After 0.10% trading costs; below 0 lost money" />
+        <MetricCard
+          label="Ranking skill"
+          info="rankIc"
+          value={decimal(test.rank_ic, 3)}
+          interval={hasFrozenInterval ? { low: rankIcInterval.ci_low, point: test.rank_ic, high: rankIcInterval.ci_high } : undefined}
+          detail={hasFrozenInterval
+            ? `95% two-month calendar-block interval ${decimal(rankIcInterval.ci_low, 3)} to ${decimal(rankIcInterval.ci_high, 3)}; includes zero`
+            : "Rank IC on the final test; 0 is random"}
+        />
+        <MetricCard
+          label="Sharpe ratio"
+          info="sharpe"
+          value={decimal(portfolio.sharpe)}
+          interval={sharpeInterval ? { low: portfolio.sharpe_ci_low, point: portfolio.sharpe, high: portfolio.sharpe_ci_high } : undefined}
+          detail={sharpeInterval
+            ? `After 0.10% trading costs; 95% interval ${decimal(portfolio.sharpe_ci_low)} to ${decimal(portfolio.sharpe_ci_high)}${sharpeInterval.zero > sharpeInterval.low && sharpeInterval.zero < sharpeInterval.high ? " includes zero" : ""}`
+            : "After 0.10% trading costs; below 0 lost money"}
+        />
         <MetricCard label="Worst drop" info="drawdown" value={percent(portfolio.maximum_drawdown)} detail="Largest fall from a peak in the backtest" />
       </section>
       {hasFrozenInterval && <p className="panel__note">

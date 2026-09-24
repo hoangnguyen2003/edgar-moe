@@ -116,8 +116,8 @@ a { color: inherit; }
 ul, ol { margin: 0; padding: 0; list-style: none; }
 h1, h2, h3 { font-family: var(--serif); font-weight: 500; text-wrap: balance; }
 /* Headings break into even lines; prose avoids a lone last word. */
-p, li, dd, .page-header__lede, .takeaway__detail { text-wrap: pretty; }
-.takeaway__title, .next-page strong { text-wrap: balance; }
+p, li, dd, .page-header__lede { text-wrap: pretty; }
+.hero__answer-title, .next-page strong { text-wrap: balance; }
 /* Links are underlined, never by colour alone, with an offset that clears descenders. */
 a { text-decoration-thickness: from-font; text-underline-offset: .18em; }
 /* Links in running text: a quiet underline that firms up on hover, the same
@@ -183,7 +183,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header__answer + .page-header__lede { margin-top: 10px; font-size: 16px; }
 /* The answer's key fact carries a low highlighter band in the lime that marks
    "the answer" and "where you are" everywhere on the site. */
-.page-header__answer mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%) no-repeat 0 0 / 100% 100%; color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: mark-sweep .7s cubic-bezier(.3, .7, .2, 1) .2s both; }
+:is(.page-header__answer, .hero__answer-title) mark { padding: 0 .06em; background: linear-gradient(transparent 60%, var(--mark) 60%) no-repeat 0 0 / 100% 100%; color: inherit; -webkit-box-decoration-break: clone; box-decoration-break: clone; animation: mark-sweep .7s cubic-bezier(.3, .7, .2, 1) .2s both; }
 /* The highlighter draws in, left to right, once the answer is on the page. */
 @keyframes mark-sweep { from { background-size: 0 100%; } }
 .page-header__stamp { margin: 8px 0 0; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
@@ -197,12 +197,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 .page-header + .content-grid > .panel { border-top: 0; }
 
 /* The page's answer, before its evidence. */
-.takeaway { margin: 0 0 24px; padding: 18px 22px 20px; background: var(--highlight-soft); border-left: 4px solid var(--ink); }
-.takeaway__label { margin: 0; color: var(--ink-2); font: 700 13px var(--sans); letter-spacing: .02em; }
-.takeaway__title { margin: 4px 0 0; color: var(--ink); font: 500 clamp(22px, 2.2vw, 28px)/1.25 var(--serif); letter-spacing: -.01em; }
-.takeaway__detail { max-width: 72ch; margin-top: 8px; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
-.takeaway__detail p { margin: 0; }
-.takeaway__detail .param-list { margin-top: 12px; }
 
 /* Definitions open on click or tap, never on hover alone. */
 .infotip { position: relative; display: inline-flex; vertical-align: middle; }
@@ -272,13 +266,25 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 /* Only as wide as its number, so the wash that marks a change hugs the digits. */
 .figure__value { justify-self: start; margin-inline: -.1em; padding-inline: .1em; border-radius: 2px; }
 .figure__detail { display: block; color: var(--ink-2); font-size: var(--t-small); line-height: 1.45; }
+/* A figure's 95% interval as a mark: the bar is the interval, the dot the
+   estimate, the tick zero. The bar opens outward from the estimate, once. */
+.interval-glyph { position: relative; display: block; height: 4px; margin: 8px 0 12px; background: var(--paper-2); }
+.interval-glyph__range { position: absolute; top: 0; bottom: 0; background: var(--series); transform-origin: var(--from, 50%) 50%; animation: interval-open .7s cubic-bezier(.3, .7, .2, 1) .3s both; }
+.interval-glyph__zero { position: absolute; top: -5px; width: 1px; height: 14px; margin-left: -.5px; background: var(--ink); }
+.interval-glyph__point { position: absolute; top: -3px; width: 10px; height: 10px; margin-left: -5px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 2px var(--paper); }
+@keyframes interval-open { from { transform: scaleX(0); } }
 
 /* ---------- Overview ---------- */
 .page--overview { padding-top: 44px; }
 .hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: clamp(28px, 4vw, 56px); align-items: start; margin-bottom: 32px; }
 .hero h1 { margin: 0; font: 500 clamp(40px, 5.2vw, 66px)/1.04 var(--serif-display); letter-spacing: -.028em; }
 .hero__lede { max-width: 60ch; margin: 18px 0 22px; color: var(--ink-2); font-size: 18px; line-height: 1.6; }
-.hero .takeaway { margin: 0; }
+/* The Overview answers its question the way every page does, in a serif line
+   under the highlighter band, only larger; not in a box of its own. */
+.hero__answer { padding-top: 18px; border-top: 1px solid var(--ink); }
+.hero__answer-label { margin: 0; color: var(--ink-3); font: var(--eyebrow); letter-spacing: var(--eyebrow-tracking); text-transform: uppercase; }
+.hero__answer-title { margin: 10px 0 0; color: var(--ink); font: 500 clamp(27px, 2.7vw, 35px)/1.2 var(--serif); letter-spacing: -.015em; }
+.hero__answer-detail { max-width: 60ch; margin: 12px 0 0; color: var(--ink-2); font-size: 16px; line-height: 1.6; }
 .hero__meta { margin: 18px 0 0; color: var(--ink-2); font-size: 14px; }
 .hero__figure { box-shadow: none; }
 .fair-test { margin-bottom: 40px; }
@@ -809,7 +815,6 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
   .page, .page--overview { padding: 24px var(--gutter) 32px; }
   .page-header, .page-header--aside { grid-template-columns: minmax(0, 1fr); gap: 18px; margin-bottom: 20px; padding-bottom: 20px; }
   .page-header__lede { font-size: 16px; }
-  .takeaway { padding: 16px 16px 18px; }
   .hero__lede { font-size: 17px; }
   .actions .button { flex: 1 1 auto; }
   .control, .segmented { width: 100%; }
@@ -906,7 +911,7 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 }
 
 @media (forced-colors: active) {
-  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .gate__stream { forced-color-adjust: none; }
+  .ic-bar i, .diverging-bar b, .expert-bars__track b, .expert-mix__bar span, .expert-swatch, .interval__range, .interval__point, .interval__zero, .interval-glyph__range, .interval-glyph__point, .interval-glyph__zero, .gate__stream { forced-color-adjust: none; }
   .site-nav a.active, .segmented button[aria-pressed="true"] { outline: 2px solid CanvasText; outline-offset: -2px; }
 }
 

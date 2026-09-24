@@ -2,20 +2,26 @@ import { type ReactNode, useEffect, useRef } from "react";
 import type { GlossaryKey } from "../lib/glossary";
 import { matchesMedia, REDUCED_MOTION } from "../lib/useMediaQuery";
 import { InfoLabel } from "./InfoTip";
+import { IntervalGlyph } from "./IntervalGlyph";
 
-/** A key figure with a plain-language reading beneath it and, optionally, a definition. */
+/**
+ * A key figure with a plain-language reading beneath it and, optionally, a
+ * definition and its 95% interval drawn as a mark above the reading.
+ */
 export function MetricCard({
   label,
   value,
   detail,
   info,
   adornment,
+  interval,
 }: {
   label: string;
   value: string;
   detail?: string;
   info?: GlossaryKey;
   adornment?: ReactNode;
+  interval?: { low: number | null | undefined; point: number | null | undefined; high: number | null | undefined };
 }) {
   const valueRef = useRef<HTMLElement>(null);
   const shown = useRef(value);
@@ -33,7 +39,9 @@ export function MetricCard({
     <article className="figure">
       <span className="figure__label"><InfoLabel text={label} term={info} /></span>
       <strong ref={valueRef} className="figure__value">{adornment}{value}</strong>
-      {detail && <small className="figure__detail">{detail}</small>}
+      {interval
+        ? <div className="figure__detail"><IntervalGlyph {...interval} />{detail}</div>
+        : detail && <small className="figure__detail">{detail}</small>}
     </article>
   );
 }

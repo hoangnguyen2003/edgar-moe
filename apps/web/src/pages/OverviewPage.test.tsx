@@ -10,7 +10,9 @@ const summary = {
     locked_test_hash: "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987" },
   summary: { events: 5961, issuers: 421, development_events: 1647, validation_events: 2305, test_events: 1794 },
   predictive_metrics: { locked_test: { rank_ic: 0.03162415620680004 } },
-  portfolio_scenarios: [{ cost_bps: 10, annualized_return: -0.0328, sharpe: -0.63, maximum_drawdown: -0.1205 }],
+  portfolio_scenarios: [{
+    cost_bps: 10, annualized_return: -0.0328, sharpe: -0.63, sharpe_ci_low: -2.3132, sharpe_ci_high: 0.945, maximum_drawdown: -0.1205,
+  }],
 };
 
 const signals = [
@@ -37,6 +39,11 @@ describe("Overview", () => {
     expect(answer).toHaveTextContent("Not convincingly, and not profitably.");
     expect(answer).toHaveTextContent("ranking skill was 0.032, too small to tell from luck: its 95% interval includes zero");
     expect(answer).toHaveTextContent("lost 3.3% a year after trading costs");
+    // The answer wears the highlighter every page uses for its answer, not a box of its own.
+    expect(within(answer).getByText("Not convincingly, and not profitably.").tagName).toBe("MARK");
+    // Both headline uncertainties are drawn as well as stated.
+    expect(await screen.findByText(/After 0\.10% trading costs; 95% interval −2\.31 to 0\.94 includes zero/)).toBeInTheDocument();
+    expect(document.querySelectorAll(".figures .interval-glyph")).toHaveLength(2);
     expect(await screen.findByText(/95% two-month calendar-block interval −0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Read the dated method and caveats" })).toHaveAttribute(
       "href", "https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md",
