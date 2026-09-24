@@ -6,6 +6,7 @@ import { CopyValue } from "../components/CopyValue";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
+import { Tag } from "../components/Tag";
 import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/QueryState";
 import { governanceQuery } from "../lib/queries";
 import { humanize, remainingNeed, shortDate } from "../lib/format";
@@ -103,7 +104,7 @@ function FrozenIdentity({ identity }: { identity: GovernanceResponse["frozen_v1"
           <div className="panel__title"><h2>Frozen model fingerprints</h2><InfoTip term="fingerprint" /></div>
           <p>If a single byte of the published data or the model's selection changed, these codes would change too.</p>
         </div>
-        <span className="badge badge--frozen">Frozen v1</span>
+        <Tag tone="stamp">Frozen v1</Tag>
       </header>
       <dl className="governance-facts">
         <div><dt>Data through</dt><dd>{shortDate(identity.as_of)}</dd></div>
@@ -154,8 +155,8 @@ function PublicBoundary({ data }: { data: GovernanceResponse }) {
 function BoundaryRow({ label, value, safe }: { label: string; value: string; safe: boolean }) {
   return (
     <div className="governance-boundary-row">
-      <span>{label}</span>
-      <strong className={safe ? "positive" : "pending-label"}>{value}</strong>
+      <span className="governance-boundary-row__label">{label}</span>
+      <Tag tone={safe ? "good" : "warning"} quiet={safe}>{value}</Tag>
     </div>
   );
 }
@@ -165,7 +166,7 @@ function ControlRow({ control }: { control: GovernanceControl }) {
   return (
     <div className={`governance-control ${enforced ? "" : "governance-control--pending"}`}>
       <div><strong>{CONTROL_LABELS[control.key] ?? humanize(control.key)}</strong><span>{control.summary}</span></div>
-      <small>{enforced ? "Enforced" : "Needs operator evidence"}</small>
+      <Tag tone={enforced ? "good" : "warning"}>{enforced ? "Enforced" : "Needs operator evidence"}</Tag>
     </div>
   );
 }

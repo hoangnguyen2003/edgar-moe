@@ -46,17 +46,17 @@ const pageData: Record<string, (client: QueryClient, search: string) => Promise<
     const pageSize = matchesMedia(COMPACT_LAYOUT) ? EVENTS_COMPACT_PAGE_SIZE : EVENTS_PAGE_SIZE;
     return client.prefetchInfiniteQuery(eventsQuery(view.direction, view.query.trim(), pageSize));
   },
-  // Live tracking asks for its records only once the registry says it is connected.
-  "/forward": async (client) => {
-    const status = await client.fetchQuery(forwardStatusQuery).catch(() => null);
-    if (!status?.available) return;
-    await Promise.all([
-      client.prefetchQuery(forwardPerformanceQuery),
-      client.prefetchQuery(forwardRunsQuery),
-      client.prefetchQuery(forwardForecastsQuery),
-      client.prefetchQuery(forwardQualityQuery),
-    ]);
-  },
+  // Live tracking shows its records only once the registry says it is connected,
+  // but asks for them alongside the status rather than after it: waiting cost a
+  // round trip on every visit, and without a registry the API answers these with
+  // empty lists, so asking early wastes nothing that matters.
+  "/forward": (client) => Promise.all([
+    client.prefetchQuery(forwardStatusQuery),
+    client.prefetchQuery(forwardPerformanceQuery),
+    client.prefetchQuery(forwardRunsQuery),
+    client.prefetchQuery(forwardForecastsQuery),
+    client.prefetchQuery(forwardQualityQuery),
+  ]),
   "/governance": (client) => client.prefetchQuery(governanceQuery),
   "/methodology": (client) => client.prefetchQuery(methodologyQuery),
   "/architecture": (client) => client.prefetchQuery(governanceQuery),

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Activity, CheckCircle2, CircleDashed, Clock3, LockKeyhole, TriangleAlert } from "lucide-react";
 import { type ReactNode, useId, useState } from "react";
 import { RunnerHealthBanner, RunnerStatus } from "../components/RunnerStatus";
+import { Tag } from "../components/Tag";
 import { InfoTip } from "../components/InfoTip";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
@@ -302,7 +303,13 @@ function RunLedger({ rows }: { rows: Awaited<ReturnType<typeof api.forwardRuns>>
     <div className="forward-list">
       {rows.slice(0, 8).map((run) => (
         <div key={run.run_id}>
-          <span className={`run-status run-status--${run.status}`}>{run.status}</span>
+          <Tag
+            tone={run.status === "succeeded" ? "good" : run.status === "running" ? "warning" : "critical"}
+            quiet={run.status === "succeeded"}
+            className="run-status"
+          >
+            {run.status}
+          </Tag>
           <div><strong>{run.run_type}</strong><small>{dateTime(run.started_at)}</small></div>
           <code title="Code version">{run.code_revision.slice(0, 8)}</code>
         </div>
@@ -329,7 +336,7 @@ function QualityList({ rows }: { rows: ForwardQualityRecord[] }) {
               <strong>{checkName(check.name)}</strong>
               <small>{[reading, dateTime(check.created_at)].filter(Boolean).join(" · ")}</small>
             </div>
-            {(tone === "failed" || tone === "warning") && <span className={`quality-state quality-state--${tone}`}>{tone}</span>}
+            {(tone === "failed" || tone === "warning") && <Tag tone={tone === "failed" ? "critical" : "warning"} className="quality-state">{tone}</Tag>}
           </div>
         );
       })}

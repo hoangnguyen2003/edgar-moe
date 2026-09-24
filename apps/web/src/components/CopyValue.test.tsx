@@ -20,6 +20,8 @@ describe("CopyValue", () => {
 
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("copied to the clipboard"));
     expect(writeText).toHaveBeenCalledWith(FINGERPRINT);
+    // Seen as well as announced: the icon turns to a check in the good tone.
+    expect(screen.getByRole("button")).toHaveClass("is-copied");
   });
 
   it("renders nothing where the clipboard is unavailable", () => {
@@ -40,5 +42,8 @@ describe("CopyValue", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.queryByText(/copied to the clipboard/)).not.toBeInTheDocument();
+    // A blocked copy is visible, and says what to do instead.
+    expect(screen.getByRole("button")).toHaveClass("is-blocked");
+    expect(screen.getByRole("status")).toHaveTextContent("Copying was blocked; select the snapshot fingerprint instead");
   });
 });

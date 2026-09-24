@@ -1,0 +1,1 @@
+import{B as e}from"./PageHeader-ChCo2USL.js";var t=e();function n({tone:e,quiet:n=!1,className:r,children:i}){return(0,t.jsx)(`span`,{className:[`tag`,`tag--${e}`,n&&`tag--quiet`,r].filter(Boolean).join(` `),children:i})}export{n as t};

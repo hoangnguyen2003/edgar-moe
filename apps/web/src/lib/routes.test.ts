@@ -21,16 +21,19 @@ describe("route preparation", () => {
     expect(keys(single)).toEqual([["equity", 10], ["experiments"], ["summary"]]);
   });
 
-  it("asks for Live tracking's records only once the registry says it is connected", async () => {
+  it("asks for Live tracking's records alongside its status, not a round trip later", async () => {
     const client = new QueryClient();
-    const status = vi.spyOn(client, "fetchQuery").mockResolvedValue({ available: false } as never);
-    const single = vi.spyOn(client, "prefetchQuery").mockResolvedValue();
+    let settleStatus: () => void = () => {};
+    const single = vi.spyOn(client, "prefetchQuery").mockImplementation(async (options) => {
+      // The status answers last; every record request must already be on its way.
+      if ((options as { queryKey: unknown[] }).queryKey[0] === "forward-status") await new Promise<void>((resolve) => { settleStatus = resolve; });
+    });
 
-    await prepareRoute(client, "/forward");
-    expect(single).not.toHaveBeenCalled();
+    const prepared = prepareRoute(client, "/forward");
+    await Promise.resolve();
 
-    status.mockResolvedValue({ available: true } as never);
-    await prepareRoute(client, "/forward");
-    expect(keys(single)).toEqual([["forward-performance"], ["forward-runs"], ["forward-forecasts"], ["forward-quality"]]);
+    expect(keys(single)).toEqual([["forward-status"], ["forward-performance"], ["forward-runs"], ["forward-forecasts"], ["forward-quality"]]);
+    settleStatus();
+    await prepared;
   });
 });

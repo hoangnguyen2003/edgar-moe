@@ -64,7 +64,7 @@ export function PortfolioPage() {
       2% yearly fee for borrowing shares. Pick a trading cost to compare.
     </PageHeader>
   );
-  if (curve.isPending) return <div className="page">{header(null)}<LoadingState label="Repricing the backtest" skeleton={["chart", "figures"]} /></div>;
+  if (curve.isPending) return <div className="page">{header(null)}<LoadingState label="Repricing the backtest" skeleton={["chart", "figures:5"]} /></div>;
   if (curve.isError) return <div className="page">{header()}<ErrorState error={curve.error} onRetry={() => void curve.refetch()} /></div>;
   const data = curve.data;
   const { metrics } = data;
