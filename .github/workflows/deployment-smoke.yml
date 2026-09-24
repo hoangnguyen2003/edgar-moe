@@ -45,9 +45,15 @@ jobs:
             ${{ github.event_name == 'workflow_dispatch' && inputs.deployment_url ||
             vars.EDGAR_MOE_PUBLIC_DEPLOYMENT_URL ||
             github.event.deployment_status.target_url }}
-          EXPECTED_COMMIT_SHA: ${{ github.event_name == 'workflow_dispatch' && inputs.expected_commit_sha || '' }}
+          EXPECTED_COMMIT_SHA: >-
+            ${{ github.event_name == 'deployment_status' && github.event.deployment.sha ||
+            inputs.expected_commit_sha }}
         run: |
           mkdir -p reports/deployment-smoke
+          if [[ "$GITHUB_EVENT_NAME" == "deployment_status" && -z "$EXPECTED_COMMIT_SHA" ]]; then
+            echo "Production deployment event omitted its commit SHA." >&2
+            exit 1
+          fi
           smoke_args=(
             "$DEPLOYMENT_URL"
             --expect-lock config/public_snapshot.lock.json
