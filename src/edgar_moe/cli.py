@@ -1183,11 +1183,22 @@ def forward_diagnostic_history_review(
             help="Stable follow-up reason; repeat for each reason when decision requires follow-up.",
         ),
     ] = None,
+    confirm_reviewed: Annotated[
+        bool,
+        typer.Option(
+            "--confirm-reviewed",
+            help="Required attestation that counts, maturity, coverage, and metrics were reviewed.",
+        ),
+    ] = False,
     acknowledge_limitations: Annotated[
         bool,
         typer.Option(
             "--acknowledge-limitations",
-            help="Required self-attestation of the research-only and immutable-v1 boundaries.",
+            help=(
+                "Required attestation: collection status is not performance readiness, snapshot "
+                "independence is unknown, this is not the official 20-session test, v1 stays "
+                "frozen, and promotion/retraining are not authorized."
+            ),
         ),
     ] = False,
 ) -> None:
@@ -1204,12 +1215,16 @@ def forward_diagnostic_history_review(
 
     if not acknowledge_limitations:
         raise typer.BadParameter("--acknowledge-limitations is required to record a review")
+    if not confirm_reviewed:
+        raise typer.BadParameter("--confirm-reviewed is required to record a review")
     try:
         history_payload = read_forward_diagnostic_history(history)
         review = build_forward_diagnostic_history_review(
             history_payload,
             reviewer_id=reviewer_id,
             decision=decision,
+            summary_reviewed=confirm_reviewed,
+            limitations_acknowledged=acknowledge_limitations,
             reason_codes=reason_code or (),
             reviewed_at=datetime.now(UTC),
         )

@@ -83,11 +83,15 @@ def _review(
     *,
     decision: str = "acknowledged",
     reason_codes: tuple[str, ...] = (),
+    summary_reviewed: bool = True,
+    limitations_acknowledged: bool = True,
 ) -> dict[str, object]:
     return build_forward_diagnostic_history_review(
         _history() if history is None else history,
         reviewer_id="hoangnguyen2003",
         decision=decision,
+        summary_reviewed=summary_reviewed,
+        limitations_acknowledged=limitations_acknowledged,
         reason_codes=reason_codes,
         reviewed_at=datetime(2026, 9, 24, 2, 0, tzinfo=UTC),
     )
@@ -166,6 +170,8 @@ def test_review_rejects_identity_injection_and_free_form_reasons(
             _history(),
             reviewer_id=reviewer_id,
             decision=decision,
+            summary_reviewed=True,
+            limitations_acknowledged=True,
             reason_codes=reason_codes,
             reviewed_at="2026-09-24T02:00:00Z",
         )
@@ -177,6 +183,8 @@ def test_review_rejects_naive_timestamp_and_unknown_data_fields() -> None:
             _history(),
             reviewer_id="reviewer",
             decision="acknowledged",
+            summary_reviewed=True,
+            limitations_acknowledged=True,
             reviewed_at="2026-09-24T02:00:00",
         )
 
@@ -255,9 +263,13 @@ def test_cli_creates_verifies_and_refuses_to_replace_review(tmp_path: Path) -> N
         "acknowledged",
         "--output",
         str(review_path),
+        "--confirm-reviewed",
         "--acknowledge-limitations",
     ]
 
+    missing_review_confirmation = runner.invoke(
+        cli.app, [argument for argument in arguments if argument != "--confirm-reviewed"]
+    )
     created = runner.invoke(cli.app, arguments)
     verified = runner.invoke(
         cli.app,
@@ -270,11 +282,30 @@ def test_cli_creates_verifies_and_refuses_to_replace_review(tmp_path: Path) -> N
     )
     repeated = runner.invoke(cli.app, arguments)
 
+    assert missing_review_confirmation.exit_code == 2
+    assert "--confirm-reviewed is required" in missing_review_confirmation.output
     assert created.exit_code == 0, created.output
     assert "self-attested" in created.output
     assert verified.exit_code == 0, verified.output
     assert "source history matched" in verified.output
     assert repeated.exit_code == 2
+
+
+@pytest.mark.parametrize(
+    ("summary_reviewed", "limitations_acknowledged", "message"),
+    [
+        (False, True, "counts, maturity, coverage, and metrics"),
+        (True, False, "research-only boundaries"),
+    ],
+)
+def test_review_builder_requires_both_explicit_attestations(
+    summary_reviewed: bool, limitations_acknowledged: bool, message: str
+) -> None:
+    with pytest.raises(DiagnosticHistoryReviewError, match=message):
+        _review(
+            summary_reviewed=summary_reviewed,
+            limitations_acknowledged=limitations_acknowledged,
+        )
 
 
 @pytest.mark.parametrize("history_version", [1, 2, 3])

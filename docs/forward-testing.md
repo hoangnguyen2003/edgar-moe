@@ -672,7 +672,9 @@ the snapshot count, unassessed independence, and non-promotion status explicitly
 The source history remains immutable and keeps `human_review_status` as
 `not_recorded`. After reviewing the history's counts, maturity, coverage, metrics,
 and limitations, a maintainer may create a separate, content-addressed
-self-attestation:
+self-attestation. The CLI requires separate confirmations that the summary was
+reviewed and that its research-only limitations are understood; it does not
+infer either acknowledgement from the review decision:
 
 The review/source separation is recorded in
 [ADR 0028](adr/0028-forward-history-review-attestations.md).
@@ -682,6 +684,7 @@ uv run edgar-moe forward-diagnostic-history-review \
   --history /path/to/forward-diagnostic-history.json \
   --reviewer-id maintainer \
   --decision acknowledged \
+  --confirm-reviewed \
   --acknowledge-limitations \
   --output /private/path/history-review.json
 

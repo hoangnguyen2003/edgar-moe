@@ -97,6 +97,8 @@ def build_forward_diagnostic_history_review(
     *,
     reviewer_id: str,
     decision: str,
+    summary_reviewed: bool,
+    limitations_acknowledged: bool,
     reason_codes: Sequence[str] = (),
     reviewed_at: datetime | str | None = None,
 ) -> dict[str, Any]:
@@ -117,6 +119,14 @@ def build_forward_diagnostic_history_review(
         )
     if not isinstance(decision, str) or decision not in _DECISIONS:
         raise DiagnosticHistoryReviewError("decision must be acknowledged or follow_up_required")
+    if summary_reviewed is not True:
+        raise DiagnosticHistoryReviewError(
+            "summary_reviewed must explicitly confirm the counts, maturity, coverage, and metrics"
+        )
+    if limitations_acknowledged is not True:
+        raise DiagnosticHistoryReviewError(
+            "limitations_acknowledged must explicitly confirm the research-only boundaries"
+        )
     if history["status"] != "ready" and decision == "acknowledged":
         raise DiagnosticHistoryReviewError("non-ready history requires follow_up_required")
     normalized_reasons = _normalize_reason_codes(reason_codes)
@@ -148,7 +158,14 @@ def build_forward_diagnostic_history_review(
         "reviewed_at": timestamp.isoformat(),
         "decision": decision,
         "reason_codes": normalized_reasons,
-        "acknowledgements": {field: True for field in sorted(_ACKNOWLEDGEMENT_FIELDS)},
+        "acknowledgements": {
+            field: (
+                summary_reviewed
+                if field == "counts_maturity_coverage_and_metrics_reviewed"
+                else limitations_acknowledged
+            )
+            for field in sorted(_ACKNOWLEDGEMENT_FIELDS)
+        },
         "disclaimer": _DISCLAIMER,
     }
     payload["review_sha256"] = _content_hash(payload)
