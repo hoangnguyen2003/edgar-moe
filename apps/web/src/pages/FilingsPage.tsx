@@ -12,27 +12,32 @@ import type { EventRecord } from "../lib/types";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { COMPACT_LAYOUT, REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
 
+// The side-by-side list scrolls on its own, so it can hold a long page; on
+// phones the list is part of the page, so it loads fewer at a time.
 const PAGE_SIZE = 100;
+const COMPACT_PAGE_SIZE = 25;
 const NAVIGATION_KEYS = new Set(["ArrowDown", "ArrowUp", "Home", "End"]);
+const SIGNALS = new Set(["long", "neutral", "short"]);
 
-function eventParams(direction: string, search: string, cursor: string | null) {
-  const params = new URLSearchParams({ limit: String(PAGE_SIZE) });
+function eventParams(direction: string, search: string, cursor: string | null, pageSize: number) {
+  const params = new URLSearchParams({ limit: String(pageSize) });
   if (direction) params.set("direction", direction);
   if (search) params.set("q", search);
   if (cursor) params.set("cursor", cursor);
   return params;
 }
 
-/** Links such as /filings?q=MU&event=… (from the signals page) open on that filing. */
+/** Links such as /filings?q=MU&event=… (from the signals page, or a refreshed view) open on that filing. */
 function linkedFiling() {
   const params = new URLSearchParams(window.location.search);
-  return { query: params.get("q") ?? "", eventId: params.get("event") };
+  const signal = params.get("signal") ?? "";
+  return { query: params.get("q") ?? "", direction: SIGNALS.has(signal) ? signal : "", eventId: params.get("event") };
 }
 
 export function FilingsPage() {
   const [linked] = useState(linkedFiling);
   const [query, setQuery] = useState(linked.query);
-  const [direction, setDirection] = useState("");
+  const [direction, setDirection] = useState(linked.direction);
   const [selectedId, setSelectedId] = useState<string | null>(linked.eventId);
   const searchRef = useRef<HTMLInputElement>(null);
   // "/" jumps to search, as on most tools a reader already uses; it never
@@ -55,9 +60,20 @@ export function FilingsPage() {
   const detailRef = useRef<HTMLElement>(null);
   // Search runs server-side so it covers every indexed event, not just one page.
   const search = useDebouncedValue(query.trim(), 250);
+  const pageSize = compact ? COMPACT_PAGE_SIZE : PAGE_SIZE;
+  // The address follows the view, so a refresh or a shared link opens the same
+  // search, filter and filing. Replacing the entry keeps Back meaning "previous page".
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set("q", search);
+    if (direction) params.set("signal", direction);
+    if (selectedId) params.set("event", selectedId);
+    const next = `${window.location.pathname}${params.toString() ? `?${params}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`) window.history.replaceState(window.history.state, "", next);
+  }, [search, direction, selectedId]);
   const events = useInfiniteQuery({
-    queryKey: ["events", direction, search],
-    queryFn: ({ pageParam }) => api.events(eventParams(direction, search, pageParam)),
+    queryKey: ["events", direction, search, pageSize],
+    queryFn: ({ pageParam }) => api.events(eventParams(direction, search, pageParam, pageSize)),
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.next_cursor,
     placeholderData: keepPreviousData,

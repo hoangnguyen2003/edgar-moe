@@ -1,7 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { EventRecord } from "../lib/types";
+import { COMPACT_LAYOUT } from "../lib/useMediaQuery";
 import { FilingsPage } from "./FilingsPage";
 
 function event(ticker: string, companyName: string, index: number): EventRecord {
@@ -111,6 +112,63 @@ describe("Filing explorer", () => {
     expect(screen.getByRole("button", { name: /American Airlines Q3/ })).toHaveAttribute("aria-pressed", "true");
     const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
     expect(requested.every((url) => url.searchParams.get("q") === "AAL")).toBe(true);
+  });
+
+  it("keeps the address in step with the view, without adding history entries", async () => {
+    window.history.replaceState({}, "", "/filings");
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = new URL(String(input), "https://terminal.example");
+      if (url.searchParams.get("q") === "AAL") return page([event("AAL", "American Airlines", 2)], 1, null);
+      return page([event("NVDA", "NVIDIA", 1), event("AAL", "American Airlines", 2)], 2, null);
+    }));
+    const entries = window.history.length;
+
+    renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: /American Airlines/ }));
+    expect(window.location.search).toBe("?event=event-2");
+
+    fireEvent.change(screen.getByRole("combobox", { name: /Signal/ }), { target: { value: "long" } });
+    fireEvent.change(screen.getByPlaceholderText("Search by ticker or company"), { target: { value: "AAL" } });
+
+    // Search is debounced; allow for a slow machine.
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get("q")).toBe("AAL"), { timeout: 3000 });
+    expect(Object.fromEntries(new URLSearchParams(window.location.search))).toEqual({ q: "AAL", signal: "long", event: "event-2" });
+    expect(window.location.pathname).toBe("/filings");
+    expect(window.history.length).toBe(entries);
+  });
+
+  it("opens on the search, filter and filing in the address, ignoring a filter it doesn't know", async () => {
+    window.history.replaceState({}, "", "/filings?signal=short&event=event-2");
+    const fetchMock = vi.fn<(input: RequestInfo | URL) => Promise<Response>>(
+      () => page([event("NVDA", "NVIDIA", 1), event("AAL", "American Airlines", 2)], 2, null),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { unmount } = renderPage();
+
+    expect(await screen.findByRole("heading", { name: "American Airlines" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /Signal/ })).toHaveValue("short");
+    const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
+    expect(requested.every((url) => url.searchParams.get("direction") === "short")).toBe(true);
+
+    unmount();
+    window.history.replaceState({}, "", "/filings?signal=everything");
+    renderPage();
+    expect(await screen.findByRole("combobox", { name: /Signal/ })).toHaveValue("");
+  });
+
+  it("loads fewer filings at a time on phones, where the list is part of the page", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({
+      matches: query === COMPACT_LAYOUT, media: query, addEventListener: () => {}, removeEventListener: () => {},
+    }));
+    const fetchMock = vi.fn<(input: RequestInfo | URL) => Promise<Response>>(() => page([event("NVDA", "NVIDIA", 1)], 1, null));
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderPage();
+
+    expect(await screen.findByText("NVDA")).toBeInTheDocument();
+    const limits = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example").searchParams.get("limit"));
+    expect(limits).toEqual(["25"]);
   });
 
   it("jumps to search on slash, but never while the reader is typing elsewhere", async () => {

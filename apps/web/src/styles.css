@@ -755,7 +755,8 @@ main { flex: 1; min-width: 0; }
   .panel { padding: var(--s4) 0 0; }
   .panel h2 { font-size: 21px; }
   .explorer { grid-template-columns: minmax(0, 1fr); }
-  .event-table { max-height: min(60vh, 520px); }
+  /* One scrolling page: a box that scrolls inside the page traps a thumb. */
+  .event-table { max-height: none; overflow: visible; }
   .filter-bar { flex-wrap: wrap; }
   .search-field { min-width: 100%; }
   .select-field { flex: 1; }
