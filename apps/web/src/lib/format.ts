@@ -131,6 +131,14 @@ export function dateTime(value: string | null | undefined): string {
   }).format(new Date(value));
 }
 
+/**
+ * The safeguards not enforced in code, with the verb agreeing:
+ * 3 of 4 -> "the remaining one needs", 2 of 4 -> "the remaining 2 need".
+ */
+export function remainingNeed(count: number): string {
+  return count === 1 ? "the remaining one needs" : `the remaining ${count} need`;
+}
+
 /** "authenticated_locked" -> "Authenticated locked". */
 export function humanize(value: string): string {
   const words = value.replaceAll("_", " ").trim();

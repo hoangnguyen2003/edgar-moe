@@ -12,6 +12,7 @@ import {
   marketDay,
   monthYear,
   percent,
+  remainingNeed,
   runPosition,
   shortDate,
   signedDecimal,
@@ -114,6 +115,11 @@ describe("format helpers", () => {
     expect(checkReading("missed_before_entry", 0, null)).toBe("0 missed forecasts");
     expect(checkReading("a_check_nobody_has_seen", 1.5, 2)).toBe("1.50 · needs at least 2.00");
     expect(checkReading("point_in_time_availability", null, 0)).toBe("");
+  });
+
+  it("makes the safeguards still needing evidence agree with their verb", () => {
+    expect(remainingNeed(1)).toBe("the remaining one needs");
+    expect(remainingNeed(2)).toBe("the remaining 2 need");
   });
 
   it("shows basis points as percentages", () => {
