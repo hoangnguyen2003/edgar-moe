@@ -200,6 +200,7 @@ export interface ForwardStatusResponse {
   health_message: string | null;
   latest_run_at: string | null;
   latest_run_status: "running" | "succeeded" | "failed" | null;
+  latest_cycle_forecast_status: "running" | "succeeded" | "failed" | null;
   latest_failed_run_at: string | null;
   age_seconds: number | null;
   stale_after_seconds: number;

@@ -425,29 +425,35 @@ class ForwardRegistry:
                 .limit(1)
             )
             latest_run = session.scalar(
-                select(RunRecord).order_by(RunRecord.started_at.desc()).limit(1)
+                select(RunRecord)
+                .order_by(RunRecord.started_at.desc(), RunRecord.run_id.desc())
+                .limit(1)
             )
+            cycle_forecast = _latest_cycle_forecast(session, latest_run)
             latest_failed = session.scalar(
                 select(RunRecord)
                 .where(RunRecord.status == "failed")
                 .order_by(RunRecord.finished_at.desc())
                 .limit(1)
             )
-            latest_quality_rows = (
-                session.execute(
+            # A scheduled cycle forecasts and then settles. Its settlement run
+            # must not erase the forecast's point-in-time or schedule warnings.
+            # If a check name repeats, the later run's result is authoritative.
+            quality_by_name: dict[str, str] = {}
+            quality_runs = [run for run in (cycle_forecast, latest_run) if run is not None]
+            for run_id in dict.fromkeys(run.run_id for run in quality_runs):
+                for row in session.execute(
                     select(DataQualityRecord.status, DataQualityRecord.name).where(
-                        DataQualityRecord.run_id == latest_run.run_id
+                        DataQualityRecord.run_id == run_id
                     )
-                ).all()
-                if latest_run is not None
-                else []
-            )
-            quality_failures = sum(row.status == "failed" for row in latest_quality_rows)
-            quality_warnings = sum(row.status == "warning" for row in latest_quality_rows)
+                ):
+                    quality_by_name[row.name] = row.status
+            quality_failures = sum(status == "failed" for status in quality_by_name.values())
+            quality_warnings = sum(status == "warning" for status in quality_by_name.values())
             # Naming the checks that warned lets a reader, and the alert
             # classifier, tell an expected condition from a new problem.
             quality_warning_names = sorted(
-                {row.name for row in latest_quality_rows if row.status == "warning"}
+                name for name, status in quality_by_name.items() if status == "warning"
             )
             age_seconds = (
                 max(0, int((observed_at - _as_utc(latest.finished_at)).total_seconds()))
@@ -461,9 +467,12 @@ class ForwardRegistry:
             elif latest_run is not None and latest_run.status == "failed":
                 health_status = "degraded"
                 health_message = "The latest forward run failed; inspect its run details."
+            elif cycle_forecast is not None and cycle_forecast.status == "failed":
+                health_status = "degraded"
+                health_message = "The latest cycle's forecast run failed; inspect its run details."
             elif quality_failures:
                 health_status = "degraded"
-                health_message = f"The latest run has {quality_failures} failed quality gate(s)."
+                health_message = f"The latest cycle has {quality_failures} failed quality gate(s)."
             elif age_seconds is not None and age_seconds > stale_after_seconds:
                 health_status = "degraded"
                 health_message = (
@@ -471,7 +480,7 @@ class ForwardRegistry:
                 )
             elif quality_warnings:
                 health_status = "warning"
-                health_message = f"The latest run has {quality_warnings} quality warning(s)."
+                health_message = f"The latest cycle has {quality_warnings} quality warning(s)."
             else:
                 health_status = "ok"
                 health_message = "Forward runner is healthy and within its freshness window."
@@ -487,6 +496,9 @@ class ForwardRegistry:
                 "health_message": health_message,
                 "latest_run_at": _iso(latest_run.started_at) if latest_run else None,
                 "latest_run_status": latest_run.status if latest_run else None,
+                "latest_cycle_forecast_status": (
+                    cycle_forecast.status if cycle_forecast is not None else None
+                ),
                 "latest_failed_run_at": _iso(latest_failed.finished_at) if latest_failed else None,
                 "age_seconds": age_seconds,
                 "stale_after_seconds": stale_after_seconds,
@@ -775,6 +787,39 @@ def _payload_hash(payload: dict[str, Any]) -> str:
 def _stable_id(prefix: str, *parts: str) -> str:
     digest = hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
     return f"{prefix}-{digest[:32]}"
+
+
+def _latest_cycle_forecast(session: Session, latest_run: RunRecord | None) -> RunRecord | None:
+    """Pair a settlement with only its same-day, same-identity preceding forecast.
+
+    A previous day's warning must not carry into a new cycle just because a
+    dataset was reused. Independent backfill/verification runs retain their own
+    quality scope.
+    """
+    if latest_run is None:
+        return None
+    if latest_run.run_type == "forecast":
+        return latest_run
+    if (
+        latest_run.run_type != "settlement"
+        or latest_run.dataset_id is None
+        or latest_run.model_id is None
+    ):
+        return None
+    start = _as_utc(latest_run.as_of).replace(hour=0, minute=0, second=0, microsecond=0)
+    return session.scalar(
+        select(RunRecord)
+        .where(
+            RunRecord.run_type == "forecast",
+            RunRecord.dataset_id == latest_run.dataset_id,
+            RunRecord.model_id == latest_run.model_id,
+            RunRecord.as_of >= start,
+            RunRecord.as_of < start + timedelta(days=1),
+            RunRecord.started_at <= latest_run.started_at,
+        )
+        .order_by(RunRecord.started_at.desc(), RunRecord.run_id.desc())
+        .limit(1)
+    )
 
 
 def _new_id(prefix: str) -> str:
