@@ -43,3 +43,13 @@ complexity. Before adoption it must match Python outputs on golden fixtures,
 missing/duplicate data, date boundaries, and randomized property tests, and
 ship as an optional, versioned package with a pure-Python fallback. Until that
 evidence exists, Python/NumPy/Postgres/Go remain the simpler architecture.
+
+An initial **phase-specific** measurement on 2026-09-25 sampled a private
+authenticated v2 dataset build during uncached FinBERT CPU encoding on macOS
+(`sample <build-pid> 3 -file <private-output-path>`). The 3-second call graph
+included PyTorch linear/addmm and Apple's `libBLAS` kernels; physical footprint
+was reported as 2.8G, peaking at 2.9G in that sample. This is neither an
+end-to-end profile nor a measured Python-vs-C++ comparison, and it does not
+establish the 30%/2×/20% decision gates above. It gives no reason to replace
+already-native tensor kernels with a custom C++ module. The raw profile stays
+local; it is not part of the public research artifact.
