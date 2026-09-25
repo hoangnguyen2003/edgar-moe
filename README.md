@@ -390,6 +390,12 @@ portfolio scenarios, gated on return coverage. It does not publish results or
 score locked-period rows; see the [research runbook](docs/research-runbook.md) and
 [13-role evidence map](docs/worldquant-role-evidence.md). No v2 empirical result
 is claimed until that separate study has been run and reviewed.
+For a paired development-only XBRL reconstruction from the same source checkpoint,
+build a **new** legacy-policy dataset and a duration-aware dataset under the same
+runtime; neither replaces frozen v1. `scripts/compare_xbrl_policy_inputs.py`
+retains a private, pre-test-only attribution audit. If text/runtime or other
+inputs differ, it marks the comparison
+`confounded`; it never turns the known v1 locked outcome into new test evidence.
 The [Research page](apps/web/src/pages/ResearchPage.tsx) now serves the frozen
 v1 uncertainty and negative cost-aware result through a hash-locked evidence
 catalog, while v2 remains explicitly pending. The [review procedure](docs/research-runbook.md#reviewed-aggregate-publication-boundary)

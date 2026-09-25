@@ -96,6 +96,55 @@ protocol, source manifest, configuration, code commit, and any universe changes
 before selecting a model. In particular, do not infer that the negative v1
 locked result has been repaired by the new feature definition.
 
+A paired **development-only** XBRL-policy reconstruction may read the same
+unchanged authenticated source checkpoint as frozen v1. Build **two new**
+datasets under the same pinned runtime: a legacy-policy reconstruction and a
+duration-aware candidate. Never point the builder at the frozen v1 processed
+directory. The legacy reconstruction is not the frozen v1 model or a rerun of
+its locked test; using the old v1 feature array directly would confound XBRL
+with any FinBERT runtime change. These new datasets are not new source
+observations or independent tests because the v1 locked outcome is already
+known. For example, after verifying the private checkpoint:
+
+```bash
+HF_HOME=data/cache/huggingface uv run edgar-moe build-dataset \
+  --checkpoint data/raw/authenticated/2026-07-31 \
+  --config config/authenticated-free.yaml \
+  --output-dir data/processed/paired-legacy-finbert \
+  --embedding-cache data/artifacts/embedding-cache-finbert \
+  --embedder finbert --device cpu
+HF_HOME=data/cache/huggingface uv run edgar-moe build-dataset \
+  --checkpoint data/raw/authenticated/2026-07-31 \
+  --config config/authenticated-v2.yaml \
+  --output-dir data/processed/v2-finbert \
+  --embedding-cache data/artifacts/embedding-cache-finbert \
+  --embedder finbert --device cpu
+```
+
+Before interpreting any model difference, run the private, aggregate-only
+input-attribution audit:
+
+```bash
+uv run python scripts/compare_xbrl_policy_inputs.py \
+  --baseline-dataset data/processed/paired-legacy-finbert/<legacy-rebuild-id> \
+  --candidate-dataset data/processed/v2-finbert/<v2-dataset-id> \
+  --config config/authenticated-v2.yaml \
+  --output data/artifacts/v2-reviews/<v2-dataset-id>/policy-delta.json
+uv run python scripts/verify_xbrl_policy_inputs.py \
+  --report data/artifacts/v2-reviews/<v2-dataset-id>/policy-delta.json
+```
+
+The audit checks the same source and pre-test event set, timing, targets, and
+exact text/market/regime parity. It reports pre-test fundamental differences
+without releasing row identifiers or values, and pins both verified processed
+manifests by SHA-256. A `confounded` result means the
+change cannot be attributed to XBRL alone (for example, FinBERT runtime
+changes); still describe v2 as a separate study, not a clean policy ablation.
+The loader reads the full target array, but the audit indexes only events whose
+entry **and horizon** precede the 2025 test boundary. A genuinely new
+confirmation needs a precommitted, later holdout and a
+fresh checkpoint, not repeated analysis of the known v1 locked window.
+
 After `build-dataset --config config/authenticated-v2.yaml` and
 `walk-forward-study --config config/authenticated-v2.yaml` have produced a
 separate v2 dataset and selection, run:
