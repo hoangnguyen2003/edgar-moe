@@ -30,6 +30,14 @@ and cost context. The terminal publication boundary admits only reviewed
 aggregates; it currently reports v2 as pending. Neither path touches the
 frozen v1 locked result or forward registry.
 
+The [paired XBRL outcome audit](../src/edgar_moe/modeling/policy_outcome.py)
+and [runbook](research-runbook.md) now compare new legacy-policy and
+duration-aware reconstructions on the same pre-test OOF events, with a
+hash-pinned input audit, unchanged negative controls, fixed-model comparisons,
+and calendar-block intervals. Its output remains private pending interpretation
+and license review. This improves research reproducibility for the quantitative
+and AI roles without converting development-fold results into a résumé claim.
+
 ## Native-code decision gate
 
 C++ is **deferred**, not quietly claimed. Profile a representative authenticated

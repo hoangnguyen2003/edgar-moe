@@ -148,6 +148,45 @@ entry **and horizon** precede the 2025 test boundary. A genuinely new
 confirmation needs a precommitted, later holdout and a
 fresh checkpoint, not repeated analysis of the known v1 locked window.
 
+To measure whether that isolated input change improves **development-fold**
+models, run the full default `walk-forward-study` command once for each new
+dataset, with the same revised protocol, seed, candidate roster, and current
+runtime. Do not cap candidates or epochs, and send both outputs and Markdown
+reports to ignored `data/artifacts/` paths rather than the tracked report.
+Then compare the hash-verified selections and OOF archives:
+
+```bash
+uv run edgar-moe walk-forward-study \
+  --dataset-dir data/processed/paired-legacy-finbert/<legacy-rebuild-id> \
+  --config config/authenticated-free.yaml \
+  --output-dir data/artifacts/walk-forward-legacy-paired \
+  --report-output data/artifacts/v2-reviews/<v2-dataset-id>/legacy-walk-forward-report.md
+uv run edgar-moe walk-forward-study \
+  --dataset-dir data/processed/v2-finbert/<v2-dataset-id> \
+  --config config/authenticated-v2.yaml \
+  --output-dir data/artifacts/walk-forward-v2 \
+  --report-output data/artifacts/v2-reviews/<v2-dataset-id>/walk-forward-report.md
+uv run python scripts/review_paired_xbrl_outcomes.py \
+  --baseline-dataset data/processed/paired-legacy-finbert/<legacy-rebuild-id> \
+  --candidate-dataset data/processed/v2-finbert/<v2-dataset-id> \
+  --baseline-selection data/artifacts/walk-forward-legacy-paired/<legacy-rebuild-id> \
+  --candidate-selection data/artifacts/walk-forward-v2/<v2-dataset-id> \
+  --input-audit data/artifacts/v2-reviews/<v2-dataset-id>/policy-delta.json \
+  --output data/artifacts/v2-reviews/<v2-dataset-id>/policy-outcome.json
+uv run python scripts/verify_paired_xbrl_outcomes.py \
+  --report data/artifacts/v2-reviews/<v2-dataset-id>/policy-outcome.json
+```
+
+The paired review recomputes saved fold metrics; aligns OOF scores by event ID;
+requires unchanged text-only and market-only negative controls; and reports
+fixed-model rank-IC differences with two-month calendar-block intervals. It
+reads no locked-period labels or predictions; fold construction also avoids
+indexing targets whose horizons cross into the locked period. The fixed roster includes a
+configured MoE, not a post hoc winner alone. Interpret all intervals as
+descriptive: the v1 outcome was known before this reconstruction, the same
+development folds selected each champion, and several models were compared.
+Keep the report private and do not infer alpha from any positive interval.
+
 After `build-dataset --config config/authenticated-v2.yaml` and
 `walk-forward-study --config config/authenticated-v2.yaml` have produced a
 separate v2 dataset and selection, run:

@@ -93,6 +93,8 @@ jobs:
           uv run edgar-moe v2-pretest-review --help
           uv run python scripts/compare_xbrl_policy_inputs.py --help
           uv run python scripts/verify_xbrl_policy_inputs.py --help
+          uv run python scripts/review_paired_xbrl_outcomes.py --help
+          uv run python scripts/verify_paired_xbrl_outcomes.py --help
       - name: Check research drift history command is runnable
         run: uv run edgar-moe research-drift-history --help
       - name: Check research drift history verifier is runnable
