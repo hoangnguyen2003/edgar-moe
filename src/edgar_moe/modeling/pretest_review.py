@@ -184,7 +184,8 @@ def review_v2_pretest(
         },
         "interpretation": (
             "Development-era paired comparisons only; candidate selection used these same "
-            "folds. No independent rank-skill, tradable-alpha, or LLM-value claim is supported."
+            "folds, and the frozen v1 outcome was known before this v2 design. "
+            "No independent rank-skill, tradable-alpha, or LLM-value claim is supported."
         ),
     }
 

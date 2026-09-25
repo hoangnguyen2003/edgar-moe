@@ -102,7 +102,8 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
         ),
         "approval_reference": approval_reference,
         "interpretation": (
-            "Development-fold comparisons are conditional on model selection. "
+            "Development-fold comparisons are conditional on model selection, and the "
+            "frozen v1 outcome was known before v2 was designed. "
             "No independent v2 ranking-skill or tradable-alpha claim is supported."
         ),
     }
