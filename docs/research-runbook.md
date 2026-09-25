@@ -100,7 +100,10 @@ A paired **development-only** XBRL-policy reconstruction may read the same
 unchanged authenticated source checkpoint as frozen v1. Build **two new**
 datasets under the same pinned runtime: a legacy-policy reconstruction and a
 duration-aware candidate. Never point the builder at the frozen v1 processed
-directory. The legacy reconstruction is not the frozen v1 model or a rerun of
+directory. Dataset saving refuses an existing dataset-ID directory; if a build
+stops during persistence, inspect any incomplete directory and its hashes
+before choosing a new output root. Do not delete or overwrite a frozen result.
+The legacy reconstruction is not the frozen v1 model or a rerun of
 its locked test; using the old v1 feature array directly would confound XBRL
 with any FinBERT runtime change. These new datasets are not new source
 observations or independent tests because the v1 locked outcome is already
