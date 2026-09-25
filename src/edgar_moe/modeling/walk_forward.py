@@ -95,7 +95,9 @@ def make_walk_forward_folds(
     accepted = pd.to_datetime(dataset.events["accepted_at"], utc=True)
     horizon = pd.to_datetime(dataset.events["horizon_at"], utc=True)
     test_start = pd.Timestamp(config.evaluation.test_start, tz="UTC")
-    pretest = (accepted < test_start).to_numpy()
+    # A pre-boundary filing can mature after the locked period begins. Do not
+    # even index its target while constructing development folds.
+    pretest = ((accepted < test_start) & (horizon < test_start)).to_numpy()
     finite_target = np.zeros(len(dataset.events), dtype=bool)
     pretest_indices = np.flatnonzero(pretest)
     finite_target[pretest_indices] = np.isfinite(dataset.target[pretest_indices])
