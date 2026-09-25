@@ -36,8 +36,9 @@ from edgar_moe.modeling.walk_forward import (
 )
 from edgar_moe.settings import ResearchConfig
 
-# Fixed before inspecting this paired outcome report. Text and market are
-# negative controls; the configured MoE is not either study's selected winner.
+# Deterministic roster for reproducibility, codified after exploratory
+# inspection of this development study. It is not preregistered. Text and
+# market are negative controls; the configured MoE is not a selected winner.
 FIXED_MODELS = (
     "Elastic Net",
     "Gradient-Boosted Tabular",
@@ -208,7 +209,8 @@ def review_policy_outcomes(
         "locked_test_predictions": 0,
         "interpretation": (
             "Development-fold policy comparisons only; frozen v1 was known before either "
-            "reconstruction, and both champions were selected on these same folds. "
+            "reconstruction, this comparison roster was codified after exploratory "
+            "inspection, and both champions were selected on these same folds. "
             "Intervals are descriptive, not independent tests or alpha evidence."
         ),
     }
@@ -468,7 +470,8 @@ def verify_policy_outcome_report(report: dict[str, Any]) -> None:
         raise ValueError("policy-outcome interval exceeds bootstrap budget")
     if not isinstance(report.get("interpretation"), str) or report["interpretation"] != (
         "Development-fold policy comparisons only; frozen v1 was known before either "
-        "reconstruction, and both champions were selected on these same folds. "
+        "reconstruction, this comparison roster was codified after exploratory "
+        "inspection, and both champions were selected on these same folds. "
         "Intervals are descriptive, not independent tests or alpha evidence."
     ):
         raise ValueError("policy-outcome interpretation is invalid")

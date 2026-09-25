@@ -183,8 +183,10 @@ fixed-model rank-IC differences with two-month calendar-block intervals. It
 reads no locked-period labels or predictions; fold construction also avoids
 indexing targets whose horizons cross into the locked period. The fixed roster includes a
 configured MoE, not a post hoc winner alone. Interpret all intervals as
-descriptive: the v1 outcome was known before this reconstruction, the same
-development folds selected each champion, and several models were compared.
+descriptive: the v1 outcome was known before this reconstruction, this fixed
+roster was codified after exploratory inspection rather than preregistered,
+the same development folds selected each champion, and several models were
+compared.
 Keep the report private and do not infer alpha from any positive interval.
 
 After `build-dataset --config config/authenticated-v2.yaml` and
