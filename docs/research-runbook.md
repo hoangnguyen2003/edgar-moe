@@ -230,8 +230,13 @@ v2 or change the v1 snapshot.
 
 After checking the private report's source/data/selection identities, full
 five-baseline roster, interval readiness, sample sizes, cost panel (or reason
-for unavailability), data licenses, and absence of locked-test predictions,
+for unavailability), data rights, and absence of locked-test predictions,
 the maintainer may stage only allowlisted aggregates:
+
+The data-rights check is currently unresolved ([issue #280](https://github.com/hoangnguyen2003/edgar-moe/issues/280));
+do **not** run the publication command or treat self-attestation as provider
+permission until that gate is resolved. The research code and private reports
+remain useful for methodology review, but no v2 public-result claim is approved.
 
 ```bash
 uv run python scripts/publish_v2_research_evidence.py \
