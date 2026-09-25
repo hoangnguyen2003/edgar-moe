@@ -5,6 +5,7 @@ import numpy as np
 import orjson
 import pandas as pd
 import pandas_market_calendars as mcal
+import pytest
 
 from edgar_moe.data.refresh import UniverseMember, refresh_authenticated_to_disk
 from edgar_moe.features.dataset import (
@@ -192,6 +193,12 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     )
     saved = dataset.save(tmp_path / "processed")
     restored = ResearchDataset.load(saved)
+    original_manifest = (saved / "manifest.json").read_bytes()
+    original_features = (saved / "features.npz").read_bytes()
+    with pytest.raises(FileExistsError):
+        dataset.save(tmp_path / "processed")
+    assert (saved / "manifest.json").read_bytes() == original_manifest
+    assert (saved / "features.npz").read_bytes() == original_features
 
     assert len(dataset.events) == 3
     assert np.isfinite(dataset.target).all()

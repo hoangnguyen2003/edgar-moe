@@ -87,8 +87,13 @@ class ResearchDataset:
     provenance: dict[str, str] = field(default_factory=dict)
 
     def save(self, output_root: str | Path) -> Path:
+        """Write a new dataset identity, refusing to replace existing evidence.
+
+        A repeated build must use a distinct dataset identity or be inspected
+        explicitly; otherwise it could silently rewrite a frozen research input.
+        """
         output = Path(output_root) / self.dataset_id
-        output.mkdir(parents=True, exist_ok=True)
+        output.mkdir(parents=True, exist_ok=False)
         events_path = output / "events.parquet"
         returns_path = output / "daily-returns.parquet"
         availability_path = output / "availability.parquet"
