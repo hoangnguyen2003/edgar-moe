@@ -270,7 +270,10 @@ Evidence is never erased to make a retry look clean.
     lifetime, and health, freshness, and forward status are never cached.
     Asserted in [`test_cache_policy.py`](../tests/unit/test_cache_policy.py).
 - **Capacity:** `edgar-moe capacity-baseline` records latency, storage, and
-  runtime, and marks provider quotas as unobserved rather than guessing.
+  runtime, and marks provider quotas as unobserved rather than guessing. The
+  [synthetic read-path benchmark](../scripts/benchmark_forward_read_path.py)
+  isolates the cold calendar-interval CPU cost; [ADR 0030](adr/0030-forward-interval-read-path.md)
+  records the optimization and why this local SQLite result is not a hosted SLO.
 
 ### Runbooks
 

@@ -6,11 +6,17 @@ from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
+from edgar_moe.forward.metrics import _spearman
 from edgar_moe.forward.uncertainty import (
+    BOOTSTRAP_SAMPLES,
+    BOOTSTRAP_SEED,
     MAXIMUM_PAIRS,
     MINIMUM_NONEMPTY_MONTHS,
     _bootstrap,
+    _ordered_tie_groups,
+    _percentile,
     _resample_month_indices,
+    _weighted_spearman,
     clustered_rank_ic_interval,
 )
 
@@ -48,6 +54,52 @@ def test_resampling_keeps_every_filing_in_a_month_together() -> None:
     chosen = _resample_month_indices(blocks, random.Random(11))
     for left, right in ((0, 1), (2, 3), (4, 5), (6, 7), (8, 9)):
         assert chosen.count(left) == chosen.count(right)
+
+
+def test_weighted_bootstrap_rank_ic_matches_expanded_spearman_with_ties() -> None:
+    rng = random.Random(20260926)
+    for _ in range(200):
+        scores = tuple(float(rng.randrange(5)) for _ in range(24))
+        labels = tuple(float(rng.randrange(7)) for _ in range(24))
+        weights = [rng.randrange(4) for _ in scores]
+        expanded_scores = [
+            score for score, weight in zip(scores, weights, strict=True) for _ in range(weight)
+        ]
+        expanded_labels = [
+            label for label, weight in zip(labels, weights, strict=True) for _ in range(weight)
+        ]
+        expected = _spearman(expanded_scores, expanded_labels)
+        actual = _weighted_spearman(
+            _ordered_tie_groups(scores), _ordered_tie_groups(labels), weights
+        )
+        if expected is None:
+            assert actual is None
+        else:
+            assert actual == pytest.approx(expected, abs=1e-12)
+
+
+def test_optimized_interval_matches_expanded_resampling() -> None:
+    scores, labels, _ = cohort()
+    tied_scores = tuple(round(value, 1) for value in scores)
+    tied_labels = tuple(round(value, 1) for value in labels)
+    months = tuple(2025 * 12 + month for month in range(12) for _ in range(10))
+    blocks = [tuple(range(month * 10, (month + 1) * 10)) for month in range(12)]
+    rng = random.Random(BOOTSTRAP_SEED)
+    reference = []
+    for _ in range(BOOTSTRAP_SAMPLES):
+        chosen = _resample_month_indices(blocks, rng)
+        value = _spearman(
+            [tied_scores[index] for index in chosen],
+            [tied_labels[index] for index in chosen],
+        )
+        if value is not None:
+            reference.append(max(-1.0, min(1.0, value)))
+    reference.sort()
+    _bootstrap.cache_clear()
+    low, high, valid = _bootstrap(tied_scores, tied_labels, months)
+    assert valid == len(reference)
+    assert low == pytest.approx(_percentile(reference, 0.025), abs=1e-12)
+    assert high == pytest.approx(_percentile(reference, 0.975), abs=1e-12)
 
 
 def test_months_are_utc_and_empty_calendar_months_keep_their_positions() -> None:

@@ -1,7 +1,7 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. All 29 records are accepted. When a decision changes,
+the decision is verified. All 30 records are accepted. When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
 decisions in the overall design.
@@ -23,6 +23,7 @@ decisions in the overall design.
 | [0027](0027-clustered-forward-rank-ic-uncertainty.md) | Withhold live ranking intervals until time clusters accrue, then use a bounded calendar moving-block bootstrap without changing the pooled point estimate. | 2026-09-23 |
 | [0028](0028-forward-history-review-attestations.md) | Bind self-attested forward-history reviews to immutable history hashes; never mutate the diagnostic source or imply reviewer authentication. | 2026-09-24 |
 | [0029](0029-authenticated-checkpoint-resume-integrity.md) | Pin partial refreshes to the original request, verify reusable source assets, and leave finalized checkpoints immutable. | 2026-09-24 |
+| [0030](0030-forward-interval-read-path.md) | Profile the synthetic forward read path and pre-sort tie groups once per cold interval calculation, retaining the original bootstrap and evidence gates. | 2026-09-26 |
 
 ## Operations and delivery
 

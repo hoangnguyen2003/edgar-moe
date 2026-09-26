@@ -94,17 +94,85 @@ def _bootstrap(
         tuple(index for index, month in enumerate(months) if month == period)
         for period in range(first, last + 1)
     ]
+    # Resampling duplicates whole months, but does not change the ordering of
+    # *distinct* score or label values. Sort/tie-group each vector once rather
+    # than sorting the expanded observations for every bootstrap draw.
+    score_groups = _ordered_tie_groups(scores)
+    label_groups = _ordered_tie_groups(labels)
     rng = random.Random(BOOTSTRAP_SEED)
     replicates: list[float] = []
     for _ in range(BOOTSTRAP_SAMPLES):
         chosen = _resample_month_indices(blocks, rng)
-        result = _spearman([scores[index] for index in chosen], [labels[index] for index in chosen])
+        multiplicities = [0] * len(scores)
+        for index in chosen:
+            multiplicities[index] += 1
+        result = _weighted_spearman(score_groups, label_groups, multiplicities)
         if result is not None:
             replicates.append(max(-1.0, min(1.0, result)))
     if len(replicates) < int(BOOTSTRAP_SAMPLES * 0.95):
         return None, None, len(replicates)
     replicates.sort()
     return _percentile(replicates, 0.025), _percentile(replicates, 0.975), len(replicates)
+
+
+def _ordered_tie_groups(values: tuple[float, ...]) -> list[tuple[int, ...]]:
+    ordered = sorted(range(len(values)), key=values.__getitem__)
+    groups: list[tuple[int, ...]] = []
+    cursor = 0
+    while cursor < len(ordered):
+        end = cursor + 1
+        while end < len(ordered) and values[ordered[end]] == values[ordered[cursor]]:
+            end += 1
+        groups.append(tuple(ordered[cursor:end]))
+        cursor = end
+    return groups
+
+
+def _weighted_ranks(groups: list[tuple[int, ...]], multiplicities: list[int]) -> list[float]:
+    ranks = [0.0] * len(multiplicities)
+    preceding = 0
+    for group in groups:
+        if len(group) == 1:
+            index = group[0]
+            size = multiplicities[index]
+            if size:
+                ranks[index] = (2 * preceding + size + 1) / 2.0
+                preceding += size
+            continue
+        size = sum(multiplicities[index] for index in group)
+        if size:
+            average = (2 * preceding + size + 1) / 2.0
+            for index in group:
+                ranks[index] = average
+            preceding += size
+    return ranks
+
+
+def _weighted_spearman(
+    score_groups: list[tuple[int, ...]],
+    label_groups: list[tuple[int, ...]],
+    multiplicities: list[int],
+) -> float | None:
+    count = sum(multiplicities)
+    if count < 2:
+        return None
+    score_ranks = _weighted_ranks(score_groups, multiplicities)
+    label_ranks = _weighted_ranks(label_groups, multiplicities)
+    mean = (count + 1) / 2.0
+    numerator = sum(
+        weight * (score - mean) * (label - mean)
+        for score, label, weight in zip(score_ranks, label_ranks, multiplicities, strict=True)
+    )
+    score_scale = sum(
+        weight * (score - mean) ** 2
+        for score, weight in zip(score_ranks, multiplicities, strict=True)
+    )
+    label_scale = sum(
+        weight * (label - mean) ** 2
+        for label, weight in zip(label_ranks, multiplicities, strict=True)
+    )
+    denominator = math.sqrt(score_scale * label_scale)
+    return numerator / denominator if denominator else None
 
 
 def _resample_month_indices(blocks: list[tuple[int, ...]], rng: random.Random) -> list[int]:

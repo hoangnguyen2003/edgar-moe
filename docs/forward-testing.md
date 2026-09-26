@@ -818,6 +818,16 @@ provider API calls unless the optional repository variable
 `EDGAR_MOE_CAPACITY_API_URL` is configured. The hosted-runner observation is
 useful for trend comparison but is not a load test or a provider-quota claim.
 
+For an isolated, credential-free read-path check, run
+`.venv/bin/python scripts/benchmark_forward_read_path.py --rows 1200 --samples 20`.
+It creates and destroys a synthetic SQLite registry, exercises the public
+FastAPI read routes sequentially, and reports warm p50/p95/p99 plus an
+explicitly cold interval probe. Its [retained baseline and decision](adr/0030-forward-interval-read-path.md)
+are useful for local regression investigation, not hosted latency or an SLO.
+If the cold interval regresses, compare the same row/settlement count and
+Python/runtime on an otherwise idle host, run the uncertainty parity tests,
+and inspect DB/network separately before changing the statistical method.
+
 The optional notifier maps these conditions to `failed_run`, `stale_runner`,
 `registry_unavailable`, `quality_failure`, and `quality_warning` events. Use
 `uv run python scripts/notify_forward_alert.py --dry-run` with a saved context
