@@ -5,12 +5,19 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from time import perf_counter_ns
 from typing import Protocol, cast
 
 import orjson
 
 from .contracts import CopilotAnswer
-from .evaluation import EvaluationCorpus, EvaluationSuite, answer_report, evaluate_reports
+from .evaluation import (
+    EvaluationCorpus,
+    EvaluationInputError,
+    EvaluationSuite,
+    answer_report,
+    evaluate_reports,
+)
 
 
 class CopilotRunner(Protocol):
@@ -63,17 +70,38 @@ class BenchmarkRun:
     suite: EvaluationSuite
     failures: tuple[BenchmarkFailure, ...]
     usage: BenchmarkUsage | None = None
+    case_duration_us: tuple[tuple[str, int], ...] = ()
+    snapshot_sha256: str | None = None
+    selected_case_ids: tuple[str, ...] = ()
 
-    def as_dict(self, *, provider: str, model: str) -> dict[str, object]:
+    def as_dict(
+        self,
+        *,
+        provider: str,
+        model: str,
+        provider_contacted: bool = True,
+        comparison_context: Mapping[str, object] | None = None,
+    ) -> dict[str, object]:
         report = self.suite.as_dict()
-        report["benchmark"] = {
-            "provider_contacted": True,
+        metadata: dict[str, object] = {
+            "provider_contacted": provider_contacted,
             "provider": provider,
             "model": model,
-            "selected_case_ids": [case.case_id for case in self.suite.cases]
-            + list(self.suite.missing_case_ids),
-            "provider_failures": [failure.as_dict() for failure in self.failures],
+            "selected_case_ids": list(self.selected_case_ids)
+            if self.selected_case_ids
+            else [case.case_id for case in self.suite.cases] + list(self.suite.missing_case_ids),
+            "snapshot_sha256": self.snapshot_sha256,
+            "case_duration_us": [
+                {"case_id": case_id, "duration_us": elapsed}
+                for case_id, elapsed in self.case_duration_us
+            ],
         }
+        metadata["provider_failures" if provider_contacted else "runner_failures"] = [
+            failure.as_dict() for failure in self.failures
+        ]
+        if comparison_context is not None:
+            metadata["comparison_context"] = dict(comparison_context)
+        report["benchmark"] = metadata
         if self.usage is not None:
             report["usage"] = self.usage.as_dict()
         return report
@@ -86,18 +114,63 @@ def run_benchmark(
 ) -> BenchmarkRun:
     """Run each selected case and write only private individual envelopes."""
     output_dir.mkdir(parents=True, exist_ok=True)
+    if any(output_dir.iterdir()):
+        raise FileExistsError(
+            "benchmark output directory is not empty; use a fresh private directory"
+        )
     reports: list[dict[str, object]] = []
     failures: list[BenchmarkFailure] = []
+    durations: list[tuple[str, int]] = []
     for case in corpus.cases:
+        started = perf_counter_ns()
         try:
             report = answer_report(runner.ask(case.question), case_id=case.case_id)
             _write_json(output_dir / f"{case.case_id}.json", report)
             reports.append(report)
         except Exception as error:
             failures.append(BenchmarkFailure(case.case_id, type(error).__name__))
+        finally:
+            durations.append((case.case_id, max(0, (perf_counter_ns() - started) // 1_000)))
     suite = evaluate_reports(tuple(reports), corpus)
     usage = _aggregate_usage(tuple(reports))
-    return BenchmarkRun(suite=suite, failures=tuple(failures), usage=usage)
+    return BenchmarkRun(
+        suite=suite,
+        failures=tuple(failures),
+        usage=usage,
+        case_duration_us=tuple(durations),
+        snapshot_sha256=_common_snapshot_sha256(tuple(reports)),
+        selected_case_ids=tuple(case.case_id for case in corpus.cases),
+    )
+
+
+def select_evaluation_cases(
+    corpus: EvaluationCorpus, case_ids: tuple[str, ...]
+) -> EvaluationCorpus:
+    """Apply the same exact-id selection policy to provider and baseline arms."""
+    known_ids = {case.case_id for case in corpus.cases}
+    unknown = sorted(set(case_ids) - known_ids)
+    if unknown:
+        raise EvaluationInputError(f"unknown evaluation case id: {', '.join(unknown)}")
+    if len(set(case_ids)) != len(case_ids):
+        raise EvaluationInputError("--case values must not contain duplicates")
+    return EvaluationCorpus(
+        corpus_id=corpus.corpus_id,
+        cases=tuple(case for case in corpus.cases if not case_ids or case.case_id in case_ids),
+        sha256=corpus.sha256,
+    )
+
+
+def _common_snapshot_sha256(reports: tuple[dict[str, object], ...]) -> str | None:
+    digests: set[str] = set()
+    for report in reports:
+        identity = report.get("frozen_identity")
+        if not isinstance(identity, Mapping):
+            return None
+        digest = identity.get("sha256")
+        if not isinstance(digest, str):
+            return None
+        digests.add(digest)
+    return next(iter(digests)) if len(digests) == 1 else None
 
 
 def write_benchmark_report(path: Path, report: dict[str, object]) -> None:
