@@ -68,6 +68,26 @@ def _write_private(path: Path, report: dict) -> None:
     path.write_bytes(orjson.dumps(report))
 
 
+def _write_rights_review(path: Path, report: dict) -> None:
+    path.write_bytes(
+        orjson.dumps(
+            {
+                "schema_version": 1,
+                "dataset_id": report["dataset_id"],
+                "source_manifest_sha256": report["source_manifest_sha256"],
+                "scope": "public_derived_aggregates_only",
+                "sources": {
+                    source: {
+                        "decision": "approved_for_derived_aggregate_publication",
+                        "reference": "review/fixture-001",
+                    }
+                    for source in ("sec_edgar", "alpaca_market_data", "fred_alfred_macro")
+                },
+            }
+        )
+    )
+
+
 def test_pending_catalog_is_locked_to_frozen_snapshot() -> None:
     repo = SnapshotRepository(
         "data/demo/snapshot.json", lock_path="config/public_snapshot.lock.json"
@@ -102,11 +122,18 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
     catalog = tmp_path / "catalog.json"
     lock = tmp_path / "catalog.sha256"
     report_path = tmp_path / "private-review.json"
+    rights_path = tmp_path / "rights-review.json"
     catalog.write_bytes(CATALOG_PATH.read_bytes())
     lock.write_bytes(LOCK_PATH.read_bytes())
-    _write_private(report_path, _private_report())
+    report = _private_report()
+    _write_private(report_path, report)
+    _write_rights_review(rights_path, report)
     staged = stage_reviewed_catalog(
-        report_path, "review/issue-271", catalog_path=catalog, lock_path=lock
+        report_path,
+        "review/issue-271",
+        rights_review_path=rights_path,
+        catalog_path=catalog,
+        lock_path=lock,
     )
     assert staged == hashlib.sha256(catalog.read_bytes()).hexdigest()
     public = catalog.read_text(encoding="utf-8")
@@ -117,7 +144,11 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
     verify(catalog, lock)
     with pytest.raises(ValueError, match="refusing overwrite"):
         stage_reviewed_catalog(
-            report_path, "review/issue-271", catalog_path=catalog, lock_path=lock
+            report_path,
+            "review/issue-271",
+            rights_review_path=rights_path,
+            catalog_path=catalog,
+            lock_path=lock,
         )
 
 
@@ -127,6 +158,7 @@ def test_reviewed_publication_preserves_cost_definition_and_complete_roster(
     catalog = tmp_path / "catalog.json"
     lock = tmp_path / "catalog.sha256"
     report_path = tmp_path / "private-review.json"
+    rights_path = tmp_path / "rights-review.json"
     catalog.write_bytes(CATALOG_PATH.read_bytes())
     lock.write_bytes(LOCK_PATH.read_bytes())
     report = _private_report()
@@ -149,7 +181,14 @@ def test_reviewed_publication_preserves_cost_definition_and_complete_roster(
         orjson.dumps(report, option=orjson.OPT_SORT_KEYS)
     ).hexdigest()
     _write_private(report_path, report)
-    stage_reviewed_catalog(report_path, "review/issue-271", catalog_path=catalog, lock_path=lock)
+    _write_rights_review(rights_path, report)
+    stage_reviewed_catalog(
+        report_path,
+        "review/issue-271",
+        rights_review_path=rights_path,
+        catalog_path=catalog,
+        lock_path=lock,
+    )
     reviewed, _ = load_public_catalog(catalog, lock)
     assert reviewed.duration_aware_v2.status == "reviewed_pretest"
     assert len(reviewed.duration_aware_v2.cost_scenarios) == 6
@@ -157,11 +196,48 @@ def test_reviewed_publication_preserves_cost_definition_and_complete_roster(
     verify(catalog, lock)
 
 
+@pytest.mark.parametrize(
+    "mutation", ["missing", "wrong_dataset", "wrong_manifest", "missing_source", "pending_source"]
+)
+def test_publication_requires_source_bound_rights_review(tmp_path: Path, mutation: str) -> None:
+    catalog = tmp_path / "catalog.json"
+    lock = tmp_path / "catalog.sha256"
+    report_path = tmp_path / "private-review.json"
+    rights_path = tmp_path / "rights-review.json"
+    catalog.write_bytes(CATALOG_PATH.read_bytes())
+    lock.write_bytes(LOCK_PATH.read_bytes())
+    report = _private_report()
+    _write_private(report_path, report)
+    if mutation != "missing":
+        _write_rights_review(rights_path, report)
+        rights = orjson.loads(rights_path.read_bytes())
+        if mutation == "wrong_dataset":
+            rights["dataset_id"] = "other-dataset"
+        elif mutation == "wrong_manifest":
+            rights["source_manifest_sha256"] = "f" * 64
+        elif mutation == "missing_source":
+            del rights["sources"]["fred_alfred_macro"]
+        else:
+            rights["sources"]["alpaca_market_data"]["decision"] = "pending"
+        rights_path.write_bytes(orjson.dumps(rights))
+    with pytest.raises(ValueError, match="source-rights review"):
+        stage_reviewed_catalog(
+            report_path,
+            "review/issue-271",
+            rights_review_path=rights_path,
+            catalog_path=catalog,
+            lock_path=lock,
+        )
+    assert catalog.read_bytes() == CATALOG_PATH.read_bytes()
+    assert lock.read_bytes() == LOCK_PATH.read_bytes()
+
+
 @pytest.mark.parametrize("mutation", ["hash", "locked", "uncertainty", "roster"])
 def test_publication_rejects_untrusted_reports(tmp_path: Path, mutation: str) -> None:
     catalog = tmp_path / "catalog.json"
     lock = tmp_path / "catalog.sha256"
     report_path = tmp_path / "private-review.json"
+    rights_path = tmp_path / "rights-review.json"
     catalog.write_bytes(CATALOG_PATH.read_bytes())
     lock.write_bytes(LOCK_PATH.read_bytes())
     report = _private_report()
@@ -179,9 +255,14 @@ def test_publication_rejects_untrusted_reports(tmp_path: Path, mutation: str) ->
             orjson.dumps(report, option=orjson.OPT_SORT_KEYS)
         ).hexdigest()
     _write_private(report_path, report)
+    _write_rights_review(rights_path, report)
     with pytest.raises(ValueError):
         stage_reviewed_catalog(
-            report_path, "review/issue-271", catalog_path=catalog, lock_path=lock
+            report_path,
+            "review/issue-271",
+            rights_review_path=rights_path,
+            catalog_path=catalog,
+            lock_path=lock,
         )
     assert catalog.read_bytes() == CATALOG_PATH.read_bytes()
     assert lock.read_bytes() == LOCK_PATH.read_bytes()

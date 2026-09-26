@@ -228,29 +228,42 @@ sample count, calendar-block rank-IC interval spanning zero, and negative
 **separate** pretest report. A successful pipeline run alone must not publish
 v2 or change the v1 snapshot.
 
-After checking the private report's source/data/selection identities, full
-five-baseline roster, interval readiness, sample sizes, cost panel (or reason
-for unavailability), data rights, and absence of locked-test predictions,
-the maintainer may stage only allowlisted aggregates:
-
 The data-rights check is currently unresolved ([issue #280](https://github.com/hoangnguyen2003/edgar-moe/issues/280));
 do **not** run the publication command or treat self-attestation as provider
 permission until that gate is resolved. The research code and private reports
 remain useful for methodology review, but no v2 public-result claim is approved.
 
+Only after a source-by-source permitted-use review or an approved replacement
+dataset, check the private report's source/data/selection identities, full
+five-baseline roster, interval readiness, sample sizes, cost panel (or reason
+for unavailability), and absence of locked-test predictions. In the same PR,
+add a reviewed `config/v2-publication-rights.json` record scoped to the exact
+report dataset ID and source-manifest SHA-256. It must name `sec_edgar`,
+`alpaca_market_data`, and `fred_alfred_macro`, each with a traceable review
+reference and `approved_for_derived_aggregate_publication` decision; its
+scope is `public_derived_aggregates_only`. If a replacement dataset changes
+the source families, update the validator and tests in that review PR. The
+publisher fails closed if the record is absent, incomplete, or mismatched.
+This record is an auditable maintainer assertion, not provider permission or
+a legal determination.
+
+Then stage only allowlisted aggregates:
+
 ```bash
 uv run python scripts/publish_v2_research_evidence.py \
   --private-review data/artifacts/v2-reviews/<dataset-id>/pretest-review.json \
+  --rights-review config/v2-publication-rights.json \
   --approval-reference review/issue-<number>
 uv run python scripts/verify_research_evidence_catalog.py
 ```
 
-`--approval-reference` is an auditable self-attestation, **not** an access
-control or substitute for PR review. The publisher refuses a bad private
-report hash, locked-test predictions, a non-duration-aware policy, or an
-already-reviewed catalog; it strips row-level/private report fields. Review
-the staged JSON and SHA-256 lock in a PR, run Python/frontend tests and CI,
-then squash-merge. Never commit the private report, events, OOF scores,
+`--approval-reference` and the rights record are auditable self-attestations,
+**not** access control or substitutes for provider/PR review. The publisher
+refuses a bad private report hash, locked-test predictions, a non-duration-aware
+policy, an incomplete source-rights record, or an already-reviewed catalog;
+it strips row-level/private report fields. Review the staged JSON, SHA-256 lock,
+and rights record in a PR, run Python/frontend tests and CI, then squash-merge.
+Never commit the private report, events, OOF scores,
 returns, credentials, or checkpoint files. The build verifies the catalog
 against its hash lock and v1 companion report; the API independently
 validates the lock and frozen snapshot identity at request time and returns
