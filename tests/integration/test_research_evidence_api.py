@@ -23,9 +23,16 @@ def test_research_evidence_api_serves_frozen_v1_and_pending_v2() -> None:
         assert payload["schema_version"] == 1
         assert payload["frozen_v1"]["locked_rank_ic_interval_95"]["low"] < 0
         assert payload["frozen_v1"]["portfolio_10bps_sharpe"] < 0
+        assert payload["frozen_v1"]["candidate_universe"]["status"] == (
+            "retrospective_test_period_screen"
+        )
+        assert "future information" in payload["frozen_v1"]["candidate_universe"]["interpretation"]
         assert payload["duration_aware_v2"] == {
             "status": "pending_review",
-            "reason": "No separately reviewed duration-aware v2 aggregate is published.",
+            "reason": (
+                "No separately reviewed duration-aware v2 aggregate is published; "
+                "historical candidate membership and source rights remain unresolved."
+            ),
         }
         assert "private_event_rows" not in response.text
     finally:

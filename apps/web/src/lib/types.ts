@@ -55,6 +55,13 @@ export interface ResearchEvidenceResponse {
       source_sha256: string;
     };
     portfolio_10bps_sharpe: number;
+    candidate_universe: {
+      status: "retrospective_test_period_screen";
+      screen_as_of: string;
+      first_validation_start: string;
+      locked_test_start: string;
+      interpretation: string;
+    };
     interpretation: string;
   };
   duration_aware_v2: {
@@ -66,6 +73,7 @@ export interface ResearchEvidenceResponse {
     source_manifest_sha256: string;
     selection_sha256: string;
     review_sha256: string;
+    candidate_universe_status: "historical_membership_unverified";
     oof_events: number;
     champion_name: string;
     champion_weighted_rank_ic: number;

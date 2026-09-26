@@ -51,6 +51,16 @@ class RankICInterval(BaseModel):
     source_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
+class FrozenUniverseSelectionEvidence(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["retrospective_test_period_screen"]
+    screen_as_of: date
+    first_validation_start: date
+    locked_test_start: date
+    interpretation: str
+
+
 class FrozenResearchEvidence(BaseModel):
     model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
@@ -66,6 +76,7 @@ class FrozenResearchEvidence(BaseModel):
     locked_rank_ic: float
     locked_rank_ic_interval_95: RankICInterval
     portfolio_10bps_sharpe: float
+    candidate_universe: FrozenUniverseSelectionEvidence
     interpretation: str
 
 
@@ -103,6 +114,7 @@ class V2ReviewedEvidence(BaseModel):
     source_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     selection_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     review_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    candidate_universe_status: Literal["historical_membership_unverified"]
     oof_events: int = Field(ge=1)
     champion_name: str
     champion_weighted_rank_ic: float
