@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "date": "2026-09-26",
+  "scope": "synthetic_in_process_fastapi_sqlite_sequential",
+  "environment": {
+    "platform": "macOS-27.0-arm64-arm-64bit",
+    "python": "3.12.13",
+    "forecasts": 1200,
+    "settled_pairs": 900,
+    "nonempty_calendar_months": 12,
+    "warm_samples_per_route": 20,
+    "cold_interval_samples": 5
+  },
+  "before": {
+    "algorithm": "sort expanded score and label arrays for every resample",
+    "performance_cold_interval_p50_ms": 465.449,
+    "performance_cold_interval_p95_ms": 468.657,
+    "performance_warm_p50_ms": 3.526,
+    "performance_cold_interval_errors": 0
+  },
+  "after": {
+    "algorithm": "pre-sort tie groups and compute multiplicity-weighted ranks",
+    "performance_cold_interval_p50_ms": 262.567,
+    "performance_cold_interval_p95_ms": 265.16,
+    "performance_warm_p50_ms": 3.5,
+    "performance_cold_interval_errors": 0
+  },
+  "relative_cold_p50_reduction_percent": 43.59,
+  "method": "Two separate local process runs of scripts/benchmark_forward_read_path.py --rows 1200 --samples 20; the cold probe explicitly clears the bounded bootstrap cache before each of five requests.",
+  "limitations": [
+    "This is not a controlled paired CPU benchmark; scheduler and thermal variance were not estimated.",
+    "No hosted network, Postgres query plan, edge cache, serverless cold start, concurrency, or production SLO is measured.",
+    "Synthetic scores and labels are not model or investment performance evidence."
+  ]
+}
