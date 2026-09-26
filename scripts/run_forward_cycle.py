@@ -11,7 +11,6 @@ from edgar_moe.forward.failure_context import safe_exception_message
 from edgar_moe.forward.operations import (
     find_processed_dataset,
     rolling_source_start,
-    seed_filing_documents,
     source_cutoff,
     update_filing_cache,
     validate_cutoff,
@@ -69,12 +68,6 @@ def main() -> None:
     if executable is None:
         raise RuntimeError("edgar-moe executable is unavailable; run through `uv run`")
 
-    seeded = seed_filing_documents(
-        raw_root=args.raw_root,
-        filing_cache=args.filing_cache,
-        cutoff=cutoff,
-    )
-    print(f"Prepared {seeded:,} cached filing document(s) for cutoff {cutoff}.")
     checkpoint = args.raw_root / cutoff
     _run(
         executable,
@@ -91,6 +84,8 @@ def main() -> None:
         cutoff,
         "--config",
         str(args.research_config),
+        "--filing-cache",
+        str(args.filing_cache),
         "--resume",
     )
     cached = update_filing_cache(checkpoint=checkpoint, filing_cache=args.filing_cache)

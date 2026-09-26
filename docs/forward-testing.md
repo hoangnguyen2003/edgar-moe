@@ -282,7 +282,18 @@ only.
 The job restores a bounded cache containing immutable filing bodies, FinBERT
 embeddings, and Hugging Face weights. Submissions, XBRL facts, daily bars,
 corporate actions, and ALFRED vintages are downloaded fresh on every cycle. The
-reviewed 1.6 MB inference artifact and locked-result binding live under
+`refresh-data --filing-cache` path writes or verifies the dated request contract
+before it hard-links cached filings into that checkpoint. A seed failure can
+therefore resume against the same request, while an unidentified preexisting
+partial checkpoint still fails closed. This ordering repairs the 2026-09-26
+forward-cycle failure where the runner seeded files first and then tripped the
+request-contract guard. That failed run stopped during refresh, before forecast
+or settlement; the code fix is not evidence of a successful subsequent cycle.
+Do not trigger a new provider-backed cycle solely to demonstrate the repair
+while the [source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
+is unresolved.
+
+The reviewed 1.6 MB inference artifact and locked-result binding live under
 `ops/frozen/` and are SHA-256 verified before use; processed training data is not
 committed. A new empty registry must therefore be bootstrapped once from the
 trusted machine so its immutable training-dataset identity is registered.

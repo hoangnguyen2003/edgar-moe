@@ -221,6 +221,13 @@ def refresh_data(
     maximum_filings_per_issuer: Annotated[
         int | None, typer.Option(min=1, help="Optional connectivity-run cap per issuer.")
     ] = None,
+    filing_cache: Annotated[
+        Path | None,
+        typer.Option(
+            "--filing-cache",
+            help="Optional immutable filing cache, seeded only after the request contract is written.",
+        ),
+    ] = None,
     resume: Annotated[bool, typer.Option(help="Resume an incomplete dated checkpoint.")] = False,
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
@@ -229,6 +236,7 @@ def refresh_data(
     from edgar_moe.data.fred import FredClient
     from edgar_moe.data.refresh import load_universe_csv, refresh_authenticated_to_disk
     from edgar_moe.data.sec import SecClient
+    from edgar_moe.forward.operations import seed_filing_documents
     from edgar_moe.settings import ResearchConfig
 
     settings = runtime_settings()
@@ -243,6 +251,15 @@ def refresh_data(
     end_date = date.fromisoformat(end) if end else as_of_date
     start_date = date.fromisoformat(start)
     series = [item.strip() for item in macro_series.split(",") if item.strip()]
+
+    def seed_cached_filings() -> int:
+        if filing_cache is None:
+            raise RuntimeError("filing cache was not configured")
+        return seed_filing_documents(
+            raw_root=output_dir,
+            filing_cache=filing_cache,
+            cutoff=as_of_date.isoformat(),
+        )
 
     async def run() -> Path:
         async with (
@@ -270,6 +287,7 @@ def refresh_data(
                 maximum_filings_per_issuer=maximum_filings_per_issuer,
                 resume=resume,
                 progress=typer.echo,
+                seed_filings=seed_cached_filings if filing_cache is not None else None,
             )
 
     destination = asyncio.run(run())

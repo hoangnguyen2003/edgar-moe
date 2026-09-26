@@ -30,6 +30,11 @@ than blessing an old document. Older **completed** checkpoints without
 `request.json` remain verifiable against their manifest and requested universe.
 An older **partial** checkpoint without a request contract is intentionally
 not resumed: retain it for diagnosis and start a new checkpoint location.
+For the scheduled forward cycle, `refresh-data --filing-cache` seeds verified
+cached filing bodies only after that request contract is written. Do not seed
+files manually into a new dated checkpoint first: a nonempty directory without
+`request.json` is intentionally refused. A failed seed can be retried with the
+same request and `--resume`; a different request needs a new checkpoint.
 
 To see the local I/O cost of the integrity check without using private data,
 run `uv run python scripts/benchmark_refresh_resume_integrity.py --size-mib 16

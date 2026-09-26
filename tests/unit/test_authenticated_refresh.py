@@ -1,4 +1,7 @@
+import gzip
+import hashlib
 from datetime import date
+from pathlib import Path
 
 import orjson
 import pytest
@@ -12,6 +15,7 @@ from edgar_moe.data.refresh import (
     verify_authenticated_bundle,
     write_authenticated_bundle,
 )
+from edgar_moe.forward.operations import seed_filing_documents
 
 
 class FakeSec:
@@ -132,6 +136,96 @@ async def test_streaming_refresh_downloads_filings_and_verifies_hashes(tmp_path)
     assert manifest.row_counts["corporate_actions"] == 2
     assert filing_index[0]["status"] == "ok"
     assert (destination / filing_index[0]["localPath"]).exists()
+
+
+async def test_forward_cache_seeds_only_after_request_contract_and_avoids_refetch(
+    tmp_path: Path,
+) -> None:
+    raw_root = tmp_path / "raw"
+    cache = tmp_path / "cache"
+    cached = cache / "CIK0000000001" / "0000000001-25-000001.html.gz"
+    cached.parent.mkdir(parents=True)
+    cached.write_bytes(gzip.compress(b"<html>Invented cached filing</html>"))
+    cached.with_name(cached.name + ".sha256").write_text(
+        hashlib.sha256(cached.read_bytes()).hexdigest() + "\n", encoding="ascii"
+    )
+    contract = raw_root / "2025-12-31" / "request.json"
+    seed_count = 0
+
+    def seed() -> int:
+        nonlocal seed_count
+        assert orjson.loads(contract.read_bytes())["as_of"] == "2025-12-31"
+        seed_count += 1
+        return seed_filing_documents(raw_root=raw_root, filing_cache=cache, cutoff="2025-12-31")
+
+    class NoFilingFetchSec(StreamingFakeSec):
+        async def filing_html(self, cik: str, accession: str, primary_document: str) -> str:
+            raise AssertionError("verified cached filing must not be fetched again")
+
+    options = {
+        "output_root": raw_root,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+        "resume": True,
+        "seed_filings": seed,
+    }
+    destination = await refresh_authenticated_to_disk(
+        NoFilingFetchSec(),
+        FakeMarket(),
+        FakeMacro(),
+        [UniverseMember(cik="1", symbol="TEST")],
+        **options,
+    )
+    filing_index = orjson.loads((destination / "sec" / "filing-index.json").read_bytes())
+    assert seed_count == 1
+    assert filing_index[0]["status"] == "ok"
+    assert (destination / filing_index[0]["localPath"]).read_bytes() == cached.read_bytes()
+    verify_authenticated_bundle(destination)
+
+    def fail_if_reseeded() -> int:
+        raise AssertionError("a completed checkpoint must not be reseeded")
+
+    await refresh_authenticated_to_disk(
+        NoFilingFetchSec(),
+        FakeMarket(),
+        FakeMacro(),
+        [UniverseMember(cik="1", symbol="TEST")],
+        **{**options, "seed_filings": fail_if_reseeded},
+    )
+
+
+async def test_failed_seed_preserves_contract_for_same_request_resume(tmp_path: Path) -> None:
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    options = {
+        "output_root": tmp_path,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+        "resume": True,
+    }
+    request_path = tmp_path / "2025-12-31" / "request.json"
+
+    def interrupted_seed() -> int:
+        assert request_path.is_file()
+        raise RuntimeError("injected cache interruption")
+
+    with pytest.raises(RuntimeError, match="injected cache interruption"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            seed_filings=interrupted_seed,
+            **options,
+        )
+    assert request_path.is_file()
+    resumed = await refresh_authenticated_to_disk(
+        StreamingFakeSec(), FakeMarket(), FakeMacro(), members, seed_filings=lambda: 0, **options
+    )
+    verify_authenticated_bundle(resumed)
 
 
 class EligibilitySec(StreamingFakeSec):
