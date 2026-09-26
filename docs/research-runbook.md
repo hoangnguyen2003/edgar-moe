@@ -14,6 +14,19 @@ Copy `.env.example` to `.env`, then provide Alpaca paper/data credentials, a FRE
 
 Run `edgar-moe build-universe`. Inspect `data/interim/security-mapping-review.json`, correct or exclude questionable mappings, and keep the reviewed `config/universe.csv` with the experiment definition. Then run `edgar-moe screen-universe --as-of YYYY-MM-DD` to produce the dated free-tier candidate set. Inactive Alpaca assets are included in matching, but free sources still cannot guarantee a perfect historical identifier master; disclose this limitation.
 
+The screen now rejects market bars after its declared cutoff and records SHA-256
+identities for both broad and screened CSVs. For a new v2 checkpoint, run
+`edgar-moe verify-universe-screen --checkpoint data/raw/authenticated/<as-of> --config config/authenticated-v2.yaml`
+before interpreting development-fold scores. This offline check requires the
+screen cutoff to precede the **first** walk-forward validation year and binds
+the screened CSV to the checkpoint's requested universe. Old audits without
+file identities fail closed; do not backfill them by guessing. The check still
+cannot prove that the broad SEC-to-Alpaca security master existed at the
+historical cutoff or independently timestamp when the screen was run. A
+current master screened against old bars remains subject
+to retrospective membership/survivorship bias. Keep such v2 results as
+development diagnostics, not point-in-time or independent alpha evidence.
+
 ## 3. Build immutable inputs
 
 Run `edgar-moe refresh-data --universe config/universe.research.csv --as-of YYYY-MM-DD --config config/authenticated-free.yaml --resume`. The command can take hours for a broad universe because EDGAR requests are deliberately paced. Large SEC JSON and filing documents are gzip-compressed, and each completed issuer is resumable. It must finish with a verified manifest and zero unexplained file-hash failures.

@@ -1,3 +1,7 @@
+from datetime import date
+
+import pytest
+
 from edgar_moe.data.refresh import UniverseMember
 from edgar_moe.data.universe import is_probable_fund, screen_liquid_universe
 
@@ -37,3 +41,15 @@ def test_probable_fund_filter_does_not_exclude_operating_trusts() -> None:
     assert is_probable_fund("SPDR S&P 500 ETF TRUST")
     assert is_probable_fund("INVESCO QQQ TRUST, SERIES 1")
     assert not is_probable_fund("Digital Realty Trust, Inc.")
+
+
+def test_screen_rejects_bars_after_declared_cutoff() -> None:
+    with pytest.raises(ValueError, match="beyond the declared cutoff"):
+        screen_liquid_universe(
+            [UniverseMember(cik="1", symbol="AAA")],
+            {"AAA": [{"t": "2023-01-02T00:00:00Z", "c": 10, "v": 100}]},
+            candidate_count=1,
+            minimum_sessions=1,
+            minimum_price=1,
+            as_of=date(2022, 12, 31),
+        )

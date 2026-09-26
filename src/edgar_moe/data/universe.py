@@ -4,6 +4,7 @@ import math
 import re
 from collections import Counter
 from collections.abc import Sequence
+from datetime import date
 from statistics import median
 from typing import Any
 
@@ -37,6 +38,7 @@ def screen_liquid_universe(
     candidate_count: int,
     minimum_sessions: int,
     minimum_price: float,
+    as_of: date | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
     """Rank a tractable candidate set by trailing observed dollar volume."""
     if candidate_count < 1 or minimum_sessions < 1 or minimum_price <= 0:
@@ -49,6 +51,14 @@ def screen_liquid_universe(
             continue
         observations: list[tuple[str, float, float]] = []
         for row in bars.get(member.symbol, []):
+            timestamp = str(row.get("t", row.get("timestamp", "")))
+            if as_of is not None and timestamp:
+                try:
+                    observed_date = date.fromisoformat(timestamp[:10])
+                except ValueError as exc:
+                    raise ValueError("Screen bar has an invalid date") from exc
+                if observed_date > as_of:
+                    raise ValueError("Screen bars extend beyond the declared cutoff")
             try:
                 raw_close = row.get("c", row.get("close"))
                 raw_volume = row.get("v", row.get("volume"))
@@ -56,7 +66,6 @@ def screen_liquid_universe(
                     continue
                 close = float(raw_close)
                 volume = float(raw_volume)
-                timestamp = str(row.get("t", row.get("timestamp", "")))
             except (TypeError, ValueError):
                 continue
             if (

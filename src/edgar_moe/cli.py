@@ -315,6 +315,7 @@ def screen_universe(
     """Create a free-tier research candidate set using trailing IEX liquidity."""
     from edgar_moe.data.alpaca import AlpacaDataClient
     from edgar_moe.data.refresh import load_universe_csv
+    from edgar_moe.data.storage import sha256_file
     from edgar_moe.data.universe import screen_liquid_universe
 
     settings = runtime_settings()
@@ -347,6 +348,7 @@ def screen_universe(
         candidate_count=candidate_count,
         minimum_sessions=minimum_sessions,
         minimum_price=minimum_price,
+        as_of=cutoff,
     )
     if len(selected) < candidate_count:
         raise typer.BadParameter(
@@ -372,9 +374,12 @@ def screen_universe(
         writer.writerows(selected)
     temporary_output.replace(output)
     audit = {
+        "schema_version": 2,
         "as_of": cutoff.isoformat(),
         "lookback_start": start.isoformat(),
         "source_universe": str(source),
+        "source_sha256": sha256_file(source),
+        "screened_universe_sha256": sha256_file(output),
         "source_members": len(members),
         "candidate_count": candidate_count,
         "minimum_sessions": minimum_sessions,
@@ -387,6 +392,36 @@ def screen_universe(
     typer.echo(
         f"Wrote {len(selected):,} liquidity-ranked candidates to {output}; audit: {audit_output}"
     )
+
+
+@app.command("verify-universe-screen")
+def verify_universe_screen(
+    checkpoint: Annotated[Path, typer.Option(help="Authenticated research checkpoint.")],
+    audit: Annotated[Path, typer.Option(help="Version-2 screen audit JSON.")] = Path(
+        "data/interim/universe-screen.json"
+    ),
+    source: Annotated[Path, typer.Option(help="Broad-universe CSV used for screening.")] = Path(
+        "config/universe.csv"
+    ),
+    screened: Annotated[Path, typer.Option(help="Screened candidate-universe CSV.")] = Path(
+        "config/universe.research.csv"
+    ),
+    config_path: Annotated[Path, typer.Option("--config")] = Path("config/authenticated-v2.yaml"),
+) -> None:
+    """Check screen-to-checkpoint identity without claiming historical membership."""
+    from edgar_moe.data.screen_audit import verify_screen_trace
+    from edgar_moe.settings import ResearchConfig
+
+    config = ResearchConfig.from_yaml(config_path)
+    first_year = min(config.evaluation.walk_forward_years)
+    result = verify_screen_trace(
+        audit,
+        source,
+        screened,
+        checkpoint,
+        first_validation_start=date(first_year, 1, 1),
+    )
+    typer.echo(orjson.dumps(result, option=orjson.OPT_INDENT_2).decode())
 
 
 @app.command("build-dataset")
