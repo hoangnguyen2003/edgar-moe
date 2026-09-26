@@ -1,7 +1,8 @@
 """Stage an explicitly reviewed, aggregate-only v2 catalog update for a PR.
 
-The approval reference is a maintainer self-attestation, not authenticated
-authorization. The resulting catalog and lock still require normal code review.
+The approval and source-rights records are maintainer self-attestations, not
+provider permission or authenticated authorization. The resulting catalog,
+lock, and rights record still require normal code review.
 Never run this on an unreviewed private pretest report.
 """
 
@@ -26,6 +27,51 @@ from edgar_moe.api.research_evidence import (
 )
 
 _APPROVAL = re.compile(r"^[A-Za-z0-9._/#-]{8,80}$")
+_SHA256 = re.compile(r"^[a-f0-9]{64}$")
+_SOURCES = frozenset({"sec_edgar", "alpaca_market_data", "fred_alfred_macro"})
+_RIGHTS_DECISION = "approved_for_derived_aggregate_publication"
+
+
+def validate_source_rights_review(path: Path, report: dict[str, Any]) -> None:
+    """Require a source-by-source review bound to this exact private dataset.
+
+    This prevents accidental publication after a methodological review alone;
+    it cannot establish that a provider actually granted the stated rights.
+    """
+    try:
+        review = orjson.loads(path.read_bytes())
+    except FileNotFoundError as exc:
+        raise ValueError("source-rights review record is required") from exc
+    if not isinstance(review, dict) or set(review) != {
+        "schema_version",
+        "dataset_id",
+        "source_manifest_sha256",
+        "scope",
+        "sources",
+    }:
+        raise ValueError("source-rights review schema is invalid")
+    manifest_hash = review["source_manifest_sha256"]
+    if (
+        review["schema_version"] != 1
+        or review["scope"] != "public_derived_aggregates_only"
+        or review["dataset_id"] != report.get("dataset_id")
+        or not isinstance(manifest_hash, str)
+        or not _SHA256.fullmatch(manifest_hash)
+        or manifest_hash != report.get("source_manifest_sha256")
+    ):
+        raise ValueError("source-rights review does not match this report and scope")
+    sources = review["sources"]
+    if not isinstance(sources, dict) or set(sources) != _SOURCES:
+        raise ValueError("source-rights review must cover every source family")
+    for source, decision in sources.items():
+        if (
+            not isinstance(decision, dict)
+            or set(decision) != {"decision", "reference"}
+            or decision["decision"] != _RIGHTS_DECISION
+            or not isinstance(decision["reference"], str)
+            or not _APPROVAL.fullmatch(decision["reference"])
+        ):
+            raise ValueError(f"source-rights review is incomplete for {source}")
 
 
 def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[str, Any]:
@@ -115,6 +161,7 @@ def stage_reviewed_catalog(
     report_path: Path,
     approval_reference: str,
     *,
+    rights_review_path: Path,
     catalog_path: Path = CATALOG_PATH,
     lock_path: Path = LOCK_PATH,
 ) -> str:
@@ -125,6 +172,7 @@ def stage_reviewed_catalog(
     if not isinstance(report, dict):
         raise ValueError("private report must be a JSON object")
     public = reviewed_aggregate(report, approval_reference)
+    validate_source_rights_review(rights_review_path, report)
     payload = catalog.model_dump(mode="json")
     payload["duration_aware_v2"] = public
     PublicCatalog.model_validate(payload)
@@ -152,12 +200,14 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--private-review", required=True, type=Path)
     parser.add_argument("--approval-reference", required=True)
+    parser.add_argument("--rights-review", required=True, type=Path)
     parser.add_argument("--catalog", type=Path, default=CATALOG_PATH)
     parser.add_argument("--lock", type=Path, default=LOCK_PATH)
     args = parser.parse_args()
     digest = stage_reviewed_catalog(
         args.private_review,
         args.approval_reference,
+        rights_review_path=args.rights_review,
         catalog_path=args.catalog,
         lock_path=args.lock,
     )
