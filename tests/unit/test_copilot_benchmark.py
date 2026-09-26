@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
 from edgar_moe.copilot.contracts import (
     Citation,
@@ -183,3 +185,46 @@ def test_benchmark_does_not_write_an_unverified_answer_envelope(tmp_path: Path) 
         "error_type": CopilotVerificationError.__name__,
     }
     assert list(tmp_path.iterdir()) == []
+
+
+def test_benchmark_refuses_to_overwrite_a_private_prior_run(tmp_path: Path) -> None:
+    existing = tmp_path / "summary.json"
+    existing.write_text("private prior answer", encoding="utf-8")
+
+    class ShouldNotRun:
+        def ask(self, question: str) -> CopilotAnswer:
+            raise AssertionError("runner must not be called before the output preflight")
+
+    with pytest.raises(FileExistsError, match="not empty"):
+        run_benchmark(_corpus(), ShouldNotRun(), tmp_path)
+    assert existing.read_text(encoding="utf-8") == "private prior answer"
+
+
+def test_selected_case_order_survives_a_middle_provider_failure(tmp_path: Path) -> None:
+    corpus = EvaluationCorpus(
+        corpus_id="ordered-corpus",
+        cases=tuple(
+            EvaluationCase(
+                case_id=case_id,
+                question=case_id,
+                expected_evidence_status="grounded",
+                required_tools=("get_study_summary",),
+                required_sources=("snapshot:test",),
+                min_citations=1,
+            )
+            for case_id in ("first", "middle", "last")
+        ),
+        sha256="e" * 64,
+    )
+
+    class FailMiddle(FakeRunner):
+        def ask(self, question: str) -> CopilotAnswer:
+            if question == "middle":
+                raise RuntimeError("private provider failure")
+            return super().ask(question)
+
+    aggregate = run_benchmark(corpus, FailMiddle(), tmp_path).as_dict(
+        provider="test-provider", model="test-model"
+    )
+    assert aggregate["benchmark"]["selected_case_ids"] == ["first", "middle", "last"]
+    assert aggregate["missing_case_ids"] == ["middle"]

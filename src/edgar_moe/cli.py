@@ -2052,9 +2052,13 @@ def research_copilot_benchmark(
         ResearchCopilot,
         normalize_copilot_profile,
     )
-    from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
+    from edgar_moe.copilot.benchmark import (
+        run_benchmark,
+        select_evaluation_cases,
+        write_benchmark_report,
+    )
+    from edgar_moe.copilot.contracts import content_hash
     from edgar_moe.copilot.evaluation import (
-        EvaluationCorpus,
         EvaluationInputError,
         load_evaluation_corpus,
     )
@@ -2063,24 +2067,7 @@ def research_copilot_benchmark(
 
     try:
         evaluation_corpus = load_evaluation_corpus(corpus)
-        requested_case_ids = tuple(case_ids or ())
-        unknown_case_ids = sorted(
-            set(requested_case_ids) - {case.case_id for case in evaluation_corpus.cases}
-        )
-        if unknown_case_ids:
-            raise EvaluationInputError(f"unknown evaluation case id: {', '.join(unknown_case_ids)}")
-        if len(set(requested_case_ids)) != len(requested_case_ids):
-            raise EvaluationInputError("--case values must not contain duplicates")
-        selected_cases = tuple(
-            case
-            for case in evaluation_corpus.cases
-            if not requested_case_ids or case.case_id in requested_case_ids
-        )
-        selected_corpus = EvaluationCorpus(
-            corpus_id=evaluation_corpus.corpus_id,
-            cases=selected_cases,
-            sha256=evaluation_corpus.sha256,
-        )
+        selected_corpus = select_evaluation_cases(evaluation_corpus, tuple(case_ids or ()))
     except (EvaluationInputError, OSError, json.JSONDecodeError) as error:
         raise typer.BadParameter(str(error)) from error
 
@@ -2157,18 +2144,154 @@ def research_copilot_benchmark(
             ),
             profile=resolved_profile,
         )
-        benchmark = run_benchmark(selected_corpus, copilot, output_dir)
+        try:
+            benchmark = run_benchmark(selected_corpus, copilot, output_dir)
+        except FileExistsError as error:
+            raise typer.BadParameter(str(error), param_hint="--output-dir") from error
     finally:
         if registry_database is not None:
             registry_database.dispose()
 
-    aggregate = benchmark.as_dict(provider=provider.provider_name, model=provider.model)
+    aggregate = benchmark.as_dict(
+        provider=provider.provider_name,
+        model=provider.model,
+        comparison_context={
+            "registry_configured": bool(resolved_database_url),
+            "diagnostic_configured": diagnostic_path is not None,
+            "diagnostic_history_configured": diagnostic_history_path is not None,
+            "tool_contract_sha256": content_hash(
+                [tool.as_provider_schema() for tool in toolset.definitions()]
+            ),
+        },
+    )
     summary_path = output_dir / "evaluation.json"
     write_benchmark_report(summary_path, aggregate)
     typer.echo(f"Wrote private copilot benchmark to {output_dir}")
     typer.echo(orjson.dumps(aggregate, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
     if benchmark.failures or benchmark.suite.pass_rate < fail_under or not benchmark.suite.complete:
         raise typer.Exit(code=1)
+
+
+@app.command("research-copilot-baseline")
+def research_copilot_baseline(
+    corpus: Annotated[
+        Path,
+        typer.Option("--corpus", help="Reviewed evaluation corpus JSON."),
+    ] = Path("config/copilot_eval_cases.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="Private baseline envelopes and aggregate score."),
+    ] = Path("/tmp/edgar-moe-copilot-baseline"),
+    case_ids: Annotated[
+        list[str] | None,
+        typer.Option("--case", help="Run only this case id; repeat for multiple cases."),
+    ] = None,
+    snapshot: Annotated[
+        Path,
+        typer.Option(
+            "--snapshot", help="Read-only snapshot JSON; public snapshot is lock-verified."
+        ),
+    ] = Path("data/demo/snapshot.json"),
+    fail_under: Annotated[
+        float,
+        typer.Option(min=0.0, max=1.0, help="Minimum structural pass rate."),
+    ] = 1.0,
+    plan_only: Annotated[
+        bool,
+        typer.Option("--plan-only", help="List selected cases without reading a snapshot."),
+    ] = False,
+) -> None:
+    """Run a fixed, credential-free comparison arm over the copilot corpus.
+
+    This is an evidence-navigation baseline, not a language model or a human
+    usefulness score. Keep the individual answer envelopes private.
+    """
+    from edgar_moe.copilot.baseline import DeterministicEvidenceBaseline
+    from edgar_moe.copilot.benchmark import (
+        run_benchmark,
+        select_evaluation_cases,
+        write_benchmark_report,
+    )
+    from edgar_moe.copilot.contracts import content_hash
+    from edgar_moe.copilot.evaluation import EvaluationInputError, load_evaluation_corpus
+    from edgar_moe.copilot.tools import ReadOnlyToolset
+
+    try:
+        selected_corpus = select_evaluation_cases(
+            load_evaluation_corpus(corpus), tuple(case_ids or ())
+        )
+    except (EvaluationInputError, OSError, json.JSONDecodeError) as error:
+        raise typer.BadParameter(str(error)) from error
+    if plan_only:
+        typer.echo(
+            orjson.dumps(
+                {
+                    "schema_version": 1,
+                    "corpus_id": selected_corpus.corpus_id,
+                    "corpus_sha256": selected_corpus.sha256,
+                    "case_ids": [case.case_id for case in selected_corpus.cases],
+                    "provider_contacted": False,
+                    "research_only": True,
+                },
+                option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS,
+            ).decode()
+        )
+        return
+
+    repository = _copilot_snapshot_repository(runtime_settings(), snapshot)
+    baseline = DeterministicEvidenceBaseline(ReadOnlyToolset(repository))
+    try:
+        benchmark = run_benchmark(selected_corpus, baseline, output_dir)
+    except FileExistsError as error:
+        raise typer.BadParameter(str(error), param_hint="--output-dir") from error
+    aggregate = benchmark.as_dict(
+        provider="none",
+        model="deterministic-evidence-navigation-v1",
+        provider_contacted=False,
+        comparison_context={
+            "registry_configured": False,
+            "diagnostic_configured": False,
+            "diagnostic_history_configured": False,
+            "tool_contract_sha256": content_hash(
+                [tool.as_provider_schema() for tool in baseline.toolset.definitions()]
+            ),
+        },
+    )
+    write_benchmark_report(output_dir / "evaluation.json", aggregate)
+    typer.echo(f"Wrote private deterministic baseline to {output_dir}")
+    typer.echo(orjson.dumps(aggregate, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
+    if benchmark.failures or benchmark.suite.pass_rate < fail_under or not benchmark.suite.complete:
+        raise typer.Exit(code=1)
+
+
+@app.command("research-copilot-compare")
+def research_copilot_compare(
+    baseline: Annotated[
+        Path,
+        typer.Option("--baseline", help="Private deterministic-baseline evaluation JSON."),
+    ],
+    copilot: Annotated[
+        Path,
+        typer.Option("--copilot", help="Private provider-copilot evaluation JSON."),
+    ],
+    output: Annotated[
+        Path,
+        typer.Option("--output", help="Private structural comparison output JSON."),
+    ] = Path("/tmp/edgar-moe-copilot-comparison.json"),
+) -> None:
+    """Compare matched structural scores and latency without provider calls."""
+    from edgar_moe.copilot.benchmark import write_benchmark_report
+    from edgar_moe.copilot.paired import PairedBenchmarkError, compare_benchmarks
+
+    try:
+        left = orjson.loads(baseline.read_bytes())
+        right = orjson.loads(copilot.read_bytes())
+        report = compare_benchmarks(left, right)
+    except (OSError, orjson.JSONDecodeError, PairedBenchmarkError) as error:
+        raise typer.BadParameter(str(error)) from error
+    write_benchmark_report(output, report)
+    typer.echo(f"Wrote private structural comparison to {output}")
+    typer.echo(orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
 
 
 @app.command("research-copilot-review")

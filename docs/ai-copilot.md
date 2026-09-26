@@ -358,6 +358,49 @@ provider error is recorded only by case id and coarse exception type; the
 benchmark exits non-zero unless every selected case succeeds and meets the
 requested pass rate.
 
+### Deterministic control arm and paired comparison
+
+The credential-free `research-copilot-baseline` uses a fixed keyword router
+over the same read-only evidence tools and reviewed corpus. It returns direct
+structured evidence, refuses trade requests, and abstains when no route
+matches. This is a deliberately simple evidence-navigation control, not an
+LLM or a substitute for human task review. Run it into a **separate private
+directory** so its case envelopes cannot replace provider answers. Both
+benchmark commands reject a non-empty output directory before any case runs;
+use a fresh path for each run:
+
+```bash
+uv run edgar-moe research-copilot-baseline --plan-only
+uv run edgar-moe research-copilot-baseline \
+  --output-dir /tmp/edgar-moe-copilot-baseline
+```
+
+The fixed router passes the four existing corpus cases structurally, which
+shows that this small corpus alone cannot establish incremental LLM value.
+It does not establish prose usefulness, factual correctness, or a latency SLA.
+Both benchmark arms now retain local per-case microsecond durations, the
+content hash of the snapshot they read, and their read-only tool context.
+Once a provider run is permitted, compare only runs with the same corpus,
+selected case IDs, snapshot hash, and tool context (the current baseline has
+no forward registry or diagnostic files configured):
+
+```bash
+uv run edgar-moe research-copilot-compare \
+  --baseline /tmp/edgar-moe-copilot-baseline/evaluation.json \
+  --copilot /tmp/edgar-moe-copilot-benchmark/evaluation.json \
+  --output /tmp/edgar-moe-copilot-comparison.json
+```
+
+The comparator emits only structural pass categories, per-case local durations,
+aggregate latency summaries, and reported token/request counters. It refuses
+mismatched identities or tool contexts, missing timings, or embedded answer text. These are not
+price estimates, and latency comparisons require matched host/network
+conditions. A blinded, held-out human task review is still needed to test
+whether the LLM adds useful synthesis over direct navigation. Do not send
+source-derived context to a provider or publish a provider comparison while
+the [source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
+is unresolved; no provider run is performed by the baseline or comparator.
+
 ## Human-review history
 
 Structural evaluation does not establish that generated prose is useful. After
