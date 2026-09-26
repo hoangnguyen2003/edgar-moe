@@ -12,19 +12,26 @@ This runbook separates software verification from empirical research. Completing
 
 Copy `.env.example` to `.env`, then provide Alpaca paper/data credentials, a FRED API key, and a SEC user agent containing your real contact email. Do not commit `.env`.
 
-Run `edgar-moe build-universe`. Inspect `data/interim/security-mapping-review.json`, correct or exclude questionable mappings, and keep the reviewed `config/universe.csv` with the experiment definition. Then run `edgar-moe screen-universe --as-of YYYY-MM-DD` to produce the dated free-tier candidate set. Inactive Alpaca assets are included in matching, but free sources still cannot guarantee a perfect historical identifier master; disclose this limitation.
+Run `edgar-moe build-universe`. Inspect `data/interim/security-mapping-review.json` and the new `data/interim/security-master-capture.json`. The latter records when the SEC-to-Alpaca mapping was observed locally and hashes both the broad CSV and mapping review; it is a self-recorded timestamp, **not** evidence of historical membership or independent time attestation. If you correct or exclude questionable mappings, update the review and run `edgar-moe record-universe-capture` after the edits; never backdate the observation time. Keep the reviewed `config/universe.csv`, review, and capture file together with the private experiment artifacts. Run `edgar-moe screen-universe --as-of YYYY-MM-DD` to produce the dated free-tier candidate set. Inactive Alpaca assets are included in matching, but the live source still cannot guarantee a historically complete identifier master.
 
-The screen now rejects market bars after its declared cutoff and records SHA-256
-identities for both broad and screened CSVs. For a new v2 checkpoint, run
+The screen rejects market bars after its declared cutoff and its version-3 audit
+records hashes of both CSVs and the master-capture record, plus the actual
+screen generation time. A backdated screen can still be created as a diagnostic,
+but the verifier will **reject** it if the master was observed after the screen
+cutoff, the screen was generated before that New York day finished, or it was
+generated on/after the first validation period. For a new v2 checkpoint, run
 `edgar-moe verify-universe-screen --checkpoint data/raw/authenticated/<as-of> --config config/authenticated-v2.yaml`
 before interpreting development-fold scores. This offline check requires the
 screen cutoff to precede the **first** walk-forward validation year and binds
-the screened CSV to the checkpoint's requested universe. Old audits without
-file identities fail closed; do not backfill them by guessing. The check still
-cannot prove that the broad SEC-to-Alpaca security master existed at the
-historical cutoff or independently timestamp when the screen was run. A
-current master screened against old bars remains subject
-to retrospective membership/survivorship bias. Keep such v2 results as
+the screened CSV to the checkpoint's requested universe. After building a
+processed dataset, rerun with `--dataset-dir data/processed/<dataset-id>` to
+hash-check its assets and bind its source-manifest digest to that same checkpoint.
+Old version-2 audits lack actual observation times and fail closed; do not
+backfill them by guessing. Even a passing version-3 trace cannot prove that
+the broad SEC-to-Alpaca master has complete historical membership or that the
+local timestamps were independently witnessed. A current master screened
+against old bars remains subject to retrospective membership/survivorship bias.
+Keep such v2 results as
 development diagnostics, not point-in-time or independent alpha evidence.
 
 ## 3. Build immutable inputs

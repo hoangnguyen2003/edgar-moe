@@ -127,10 +127,14 @@ def build_universe(
     review_output: Annotated[Path, typer.Option()] = Path(
         "data/interim/security-mapping-review.json"
     ),
+    capture_output: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-master-capture.json"
+    ),
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/default.yaml"),
 ) -> None:
     """Build a reviewed SEC-to-Alpaca security master including inactive assets."""
     from edgar_moe.data.alpaca import AlpacaDataClient
+    from edgar_moe.data.screen_audit import record_source_capture
     from edgar_moe.data.sec import SecClient
     from edgar_moe.data.security_master import build_security_master
     from edgar_moe.settings import ResearchConfig
@@ -197,10 +201,27 @@ def build_universe(
     review_output.write_bytes(
         orjson.dumps(review_rows, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
     )
+    record_source_capture(output, review_output, capture_output)
     typer.echo(
         f"Wrote {len(confident_rows):,} confident mappings to {output}; "
-        f"review evidence for {len(review_rows):,} mappings is at {review_output}."
+        f"review evidence for {len(review_rows):,} mappings is at {review_output}; "
+        f"capture record is at {capture_output}."
     )
+
+
+@app.command("record-universe-capture")
+def record_universe_capture(
+    source: Annotated[Path, typer.Option()] = Path("config/universe.csv"),
+    mapping_review: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-mapping-review.json"
+    ),
+    output: Annotated[Path, typer.Option()] = Path("data/interim/security-master-capture.json"),
+) -> None:
+    """Timestamp reviewed local mappings now, without asserting historical membership."""
+    from edgar_moe.data.screen_audit import record_source_capture
+
+    record_source_capture(source, mapping_review, output)
+    typer.echo(f"Recorded self-attested source-master capture at {output}.")
 
 
 @app.command("refresh-data")
@@ -304,6 +325,12 @@ def screen_universe(
     ),
     output: Annotated[Path, typer.Option()] = Path("config/universe.research.csv"),
     audit_output: Annotated[Path, typer.Option()] = Path("data/interim/universe-screen.json"),
+    source_capture: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-master-capture.json"
+    ),
+    mapping_review: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-mapping-review.json"
+    ),
     as_of: Annotated[str | None, typer.Option(help="Screen cutoff (YYYY-MM-DD).")] = None,
     lookback_days: Annotated[int, typer.Option(min=60)] = 120,
     candidate_count: Annotated[int, typer.Option(min=50)] = 500,
@@ -315,12 +342,15 @@ def screen_universe(
     """Create a free-tier research candidate set using trailing IEX liquidity."""
     from edgar_moe.data.alpaca import AlpacaDataClient
     from edgar_moe.data.refresh import load_universe_csv
+    from edgar_moe.data.screen_audit import verify_source_capture
     from edgar_moe.data.storage import sha256_file
     from edgar_moe.data.universe import screen_liquid_universe
 
     settings = runtime_settings()
     _require_source_configuration(settings, needs_fred=False)
+    input_hashes = {path: sha256_file(path) for path in (source, source_capture, mapping_review)}
     members = load_universe_csv(source)
+    verify_source_capture(source_capture, source, mapping_review)
     cutoff = (
         date.fromisoformat(as_of)
         if as_of
@@ -342,6 +372,8 @@ def screen_universe(
         return combined
 
     bars = asyncio.run(run())
+    if any(sha256_file(path) != digest for path, digest in input_hashes.items()):
+        raise ValueError("Source-master inputs changed while fetching screen bars")
     selected, exclusions = screen_liquid_universe(
         members,
         bars,
@@ -374,11 +406,13 @@ def screen_universe(
         writer.writerows(selected)
     temporary_output.replace(output)
     audit = {
-        "schema_version": 2,
+        "schema_version": 3,
         "as_of": cutoff.isoformat(),
         "lookback_start": start.isoformat(),
+        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "source_universe": str(source),
-        "source_sha256": sha256_file(source),
+        "source_sha256": input_hashes[source],
+        "source_capture_sha256": input_hashes[source_capture],
         "screened_universe_sha256": sha256_file(output),
         "source_members": len(members),
         "candidate_count": candidate_count,
@@ -397,8 +431,14 @@ def screen_universe(
 @app.command("verify-universe-screen")
 def verify_universe_screen(
     checkpoint: Annotated[Path, typer.Option(help="Authenticated research checkpoint.")],
-    audit: Annotated[Path, typer.Option(help="Version-2 screen audit JSON.")] = Path(
+    audit: Annotated[Path, typer.Option(help="Version-3 screen audit JSON.")] = Path(
         "data/interim/universe-screen.json"
+    ),
+    source_capture: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-master-capture.json"
+    ),
+    mapping_review: Annotated[Path, typer.Option()] = Path(
+        "data/interim/security-mapping-review.json"
     ),
     source: Annotated[Path, typer.Option(help="Broad-universe CSV used for screening.")] = Path(
         "config/universe.csv"
@@ -406,6 +446,9 @@ def verify_universe_screen(
     screened: Annotated[Path, typer.Option(help="Screened candidate-universe CSV.")] = Path(
         "config/universe.research.csv"
     ),
+    dataset_dir: Annotated[
+        Path | None, typer.Option(help="Optional processed dataset to bind to the checkpoint.")
+    ] = None,
     config_path: Annotated[Path, typer.Option("--config")] = Path("config/authenticated-v2.yaml"),
 ) -> None:
     """Check screen-to-checkpoint identity without claiming historical membership."""
@@ -420,6 +463,9 @@ def verify_universe_screen(
         screened,
         checkpoint,
         first_validation_start=date(first_year, 1, 1),
+        source_capture_path=source_capture,
+        mapping_review_path=mapping_review,
+        processed_dataset_dir=dataset_dir,
     )
     typer.echo(orjson.dumps(result, option=orjson.OPT_INDENT_2).decode())
 
