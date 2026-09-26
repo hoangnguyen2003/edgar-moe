@@ -61,7 +61,6 @@ def test_prewarm_builds_dataset_without_forecast_or_registry_writes(
     monkeypatch.setattr(_MODULE, "validate_cutoff", lambda cutoff: cutoff)
     monkeypatch.setattr(_MODULE, "rolling_source_start", lambda cutoff, **kwargs: "2024-09-23")
     monkeypatch.setattr(_MODULE.shutil, "which", lambda command: "/bin/edgar-moe")
-    monkeypatch.setattr(_MODULE, "seed_filing_documents", lambda **kwargs: 2)
     monkeypatch.setattr(_MODULE, "update_filing_cache", lambda **kwargs: 1)
     monkeypatch.setattr(_MODULE, "find_processed_dataset", lambda **kwargs: dataset)
     monkeypatch.setattr(_MODULE, "_run", lambda executable, *args: commands.append(args))
@@ -69,6 +68,8 @@ def test_prewarm_builds_dataset_without_forecast_or_registry_writes(
     _MODULE.main()
 
     assert [command[0] for command in commands] == ["refresh-data", "build-dataset"]
+    assert "--filing-cache" in commands[0]
+    assert commands[0][commands[0].index("--filing-cache") + 1] == "data/cache/forward-filings"
     assert "--embedding-cache" in commands[1]
     result = json.loads(capsys.readouterr().out.splitlines()[-1])
     assert result == {

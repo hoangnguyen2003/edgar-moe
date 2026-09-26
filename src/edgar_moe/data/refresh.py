@@ -255,6 +255,7 @@ async def refresh_authenticated_to_disk(
     maximum_filings_per_issuer: int | None = None,
     resume: bool = False,
     progress: Callable[[str], None] | None = None,
+    seed_filings: Callable[[], int] | None = None,
 ) -> Path:
     """Stream a resumable authenticated input checkpoint directly to disk."""
     if not members:
@@ -306,6 +307,13 @@ async def refresh_authenticated_to_disk(
             raise ValueError("Resume request differs from the checkpoint's original request")
     else:
         _write_json(request_path, request)
+
+    # A forward-cycle cache may populate the checkpoint only after the request
+    # contract exists. If seeding fails halfway, the same request can resume.
+    if seed_filings is not None:
+        seeded = seed_filings()
+        if progress is not None:
+            progress(f"Prepared {seeded:,} cached filing document(s) for cutoff {as_of}.")
 
     sec_directory = run_directory / "sec"
     filing_directory = sec_directory / "filings"
