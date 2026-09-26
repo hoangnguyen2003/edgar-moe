@@ -1,7 +1,13 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "frozen_v1": {
     "dataset_id": "research-2026-07-31-3553e7ad78dd",
+    "candidate_universe": {
+      "status": "retrospective_test_period_screen",
+      "screen_as_of": "2026-07-31",
+      "first_validation_start": "2023-01-01",
+      "locked_test_start": "2025-01-01"
+    },
     "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
     "locked_test_hash": "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987",
     "rank_ic_interval_95": {

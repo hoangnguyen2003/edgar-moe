@@ -8,6 +8,7 @@ loaded by this module.
 from __future__ import annotations
 
 import hashlib
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -16,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from edgar_moe.api.models import (
     FrozenResearchEvidence,
+    FrozenUniverseSelectionEvidence,
     RankICInterval,
     ResearchEvidenceResponse,
     V2PendingEvidence,
@@ -40,6 +42,25 @@ class CatalogIntegrityError(ValueError):
     """The public research catalog is absent, malformed, or not reviewed."""
 
 
+class FrozenUniverseSelectionCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["retrospective_test_period_screen"]
+    screen_as_of: date
+    first_validation_start: date
+    locked_test_start: date
+
+    @model_validator(mode="after")
+    def validate_chronology(self) -> FrozenUniverseSelectionCatalog:
+        if (
+            self.first_validation_start != date(2023, 1, 1)
+            or self.locked_test_start != date(2025, 1, 1)
+            or self.screen_as_of != date(2026, 7, 31)
+        ):
+            raise ValueError("frozen universe screen chronology is invalid")
+        return self
+
+
 class FrozenV1Catalog(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -47,12 +68,13 @@ class FrozenV1Catalog(BaseModel):
     selection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     locked_test_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
     rank_ic_interval_95: RankICInterval
+    candidate_universe: FrozenUniverseSelectionCatalog
 
 
 class PublicCatalog(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1]
+    schema_version: Literal[2]
     frozen_v1: FrozenV1Catalog
     duration_aware_v2: V2PendingEvidence | V2ReviewedEvidence
 
@@ -127,6 +149,7 @@ def build_research_evidence(
     if (
         identity["selection_hash"] != recorded.selection_hash
         or identity["locked_test_hash"] != recorded.locked_test_hash
+        or identity["as_of"] != recorded.candidate_universe.screen_as_of.isoformat()
     ):
         raise CatalogIntegrityError("research catalog and frozen snapshot identities differ")
     summary = repo.summary()
@@ -153,6 +176,15 @@ def build_research_evidence(
         locked_rank_ic=float(test_metrics["rank_ic"]),
         locked_rank_ic_interval_95=interval,
         portfolio_10bps_sharpe=float(ten_bps["sharpe"]),
+        candidate_universe=FrozenUniverseSelectionEvidence(
+            **recorded.candidate_universe.model_dump(),
+            interpretation=(
+                "The candidate list was screened using liquidity through the final "
+                "locked-test date, after the 2023–2024 validation folds. Universe "
+                "selection therefore used future information; this is not a fully "
+                "point-in-time historical evaluation."
+            ),
+        ),
         interpretation=(
             "The locked rank-IC interval includes zero and the 10 bps cost-aware "
             "Sharpe is negative; positive skill or tradable alpha is not established."
@@ -162,7 +194,10 @@ def build_research_evidence(
     if isinstance(v2, V2PendingEvidence):
         v2 = V2PendingEvidence(
             status="pending_review",
-            reason="No separately reviewed duration-aware v2 aggregate is published.",
+            reason=(
+                "No separately reviewed duration-aware v2 aggregate is published; "
+                "historical candidate membership and source rights remain unresolved."
+            ),
         )
     return ResearchEvidenceResponse(
         schema_version=1,

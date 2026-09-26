@@ -132,6 +132,7 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
         "source_manifest_sha256": report["source_manifest_sha256"],
         "selection_sha256": report["selection_sha256"],
         "review_sha256": recorded_hash,
+        "candidate_universe_status": "historical_membership_unverified",
         "oof_events": report["oof_events"],
         "champion_name": champion["name"],
         "champion_weighted_rank_ic": champion["weighted_rank_ic"],
@@ -149,7 +150,8 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
         "approval_reference": approval_reference,
         "interpretation": (
             "Development-fold comparisons are conditional on model selection, and the "
-            "frozen v1 outcome was known before v2 was designed. "
+            "frozen v1 outcome was known before v2 was designed. Historical "
+            "candidate-universe membership is not verified. "
             "No independent v2 ranking-skill or tradable-alpha claim is supported."
         ),
     }

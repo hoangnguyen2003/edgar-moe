@@ -96,6 +96,9 @@ def test_pending_catalog_is_locked_to_frozen_snapshot() -> None:
     assert result.frozen_v1.locked_test_events > 0
     assert result.frozen_v1.locked_rank_ic_interval_95.low < 0
     assert result.frozen_v1.portfolio_10bps_sharpe < 0
+    assert result.frozen_v1.candidate_universe.status == "retrospective_test_period_screen"
+    assert result.frozen_v1.candidate_universe.screen_as_of.isoformat() == "2026-07-31"
+    assert "future information" in result.frozen_v1.candidate_universe.interpretation
     assert result.duration_aware_v2.status == "pending_review"
     assert "oof_events" not in result.duration_aware_v2.model_dump()
     verify()
@@ -111,6 +114,46 @@ def test_tampering_and_unknown_public_fields_fail_closed(tmp_path: Path) -> None
         load_public_catalog(catalog, lock)
     payload = orjson.loads(CATALOG_PATH.read_bytes())
     payload["duration_aware_v2"]["private_event_rows"] = [{"ticker": "SECRET"}]
+    raw = orjson.dumps(payload)
+    catalog.write_bytes(raw)
+    lock.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
+    with pytest.raises(CatalogIntegrityError, match="schema is invalid"):
+        load_public_catalog(catalog, lock)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing", "wrong_status", "before_validation", "wrong_validation", "wrong_locked"],
+)
+def test_frozen_universe_disclosure_cannot_be_silently_dropped(
+    tmp_path: Path, mutation: str
+) -> None:
+    catalog = tmp_path / "catalog.json"
+    lock = tmp_path / "catalog.sha256"
+    payload = orjson.loads(CATALOG_PATH.read_bytes())
+    universe = payload["frozen_v1"]["candidate_universe"]
+    if mutation == "missing":
+        del payload["frozen_v1"]["candidate_universe"]
+    elif mutation == "wrong_status":
+        universe["status"] = "point_in_time_verified"
+    elif mutation == "before_validation":
+        universe["screen_as_of"] = "2022-12-31"
+    elif mutation == "wrong_validation":
+        universe["first_validation_start"] = "2022-01-01"
+    else:
+        universe["locked_test_start"] = "2024-01-01"
+    raw = orjson.dumps(payload)
+    catalog.write_bytes(raw)
+    lock.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
+    with pytest.raises(CatalogIntegrityError, match="schema is invalid"):
+        load_public_catalog(catalog, lock)
+
+
+def test_frozen_universe_screen_date_cannot_move_past_snapshot(tmp_path: Path) -> None:
+    catalog = tmp_path / "catalog.json"
+    lock = tmp_path / "catalog.sha256"
+    payload = orjson.loads(CATALOG_PATH.read_bytes())
+    payload["frozen_v1"]["candidate_universe"]["screen_as_of"] = "2026-08-01"
     raw = orjson.dumps(payload)
     catalog.write_bytes(raw)
     lock.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
@@ -141,6 +184,9 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
     assert "private_event_rows" not in public
     reviewed, _ = load_public_catalog(catalog, lock)
     assert reviewed.duration_aware_v2.status == "reviewed_pretest"
+    assert reviewed.duration_aware_v2.candidate_universe_status == (
+        "historical_membership_unverified"
+    )
     verify(catalog, lock)
     with pytest.raises(ValueError, match="refusing overwrite"):
         stage_reviewed_catalog(

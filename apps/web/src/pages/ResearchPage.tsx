@@ -122,11 +122,12 @@ function EvidencePanel({ evidence, loading, error, retry }: {
             <p><strong>{evidence.frozen_v1.locked_test_events.toLocaleString()}</strong> locked-test events; rank IC <strong>{signedDecimal(evidence.frozen_v1.locked_rank_ic, 3)}</strong>.</p>
             <p>95% calendar-month block interval: <strong>{signedDecimal(evidence.frozen_v1.locked_rank_ic_interval_95.low, 3)} to {signedDecimal(evidence.frozen_v1.locked_rank_ic_interval_95.high, 3)}</strong> ({evidence.frozen_v1.locked_rank_ic_interval_95.calendar_months} months; {evidence.frozen_v1.locked_rank_ic_interval_95.resamples.toLocaleString()} resamples).</p>
             <p>10 bps cost-aware Sharpe: <strong>{signedDecimal(evidence.frozen_v1.portfolio_10bps_sharpe, 3)}</strong>. {evidence.frozen_v1.interpretation}</p>
+            <p role="note"><strong>Universe-selection limitation:</strong> {evidence.frozen_v1.candidate_universe.interpretation} Screen cutoff: {evidence.frozen_v1.candidate_universe.screen_as_of}; first validation: {evidence.frozen_v1.candidate_universe.first_validation_start}; locked test began: {evidence.frozen_v1.candidate_universe.locked_test_start}.</p>
           </div>
           <div>
             <h3>Duration-aware v2 · development</h3>
             {evidence.duration_aware_v2.status === "pending_review" ? (
-              <p role="status">Pending review. No v2 comparison or cost-aware result is published yet.</p>
+              <p role="status">Pending review. No v2 comparison or cost-aware result is published yet. {evidence.duration_aware_v2.reason}</p>
             ) : <ReviewedV2 evidence={evidence.duration_aware_v2} />}
           </div>
         </div>
@@ -142,6 +143,7 @@ function ReviewedV2({ evidence }: {
   return <>
     <p>{evidence.oof_events.toLocaleString()} out-of-fold development events. Selected {evidence.champion_name}: weighted rank IC {signedDecimal(evidence.champion_weighted_rank_ic, 3)}.</p>
     <p>Paired calendar-month block intervals within each fold: {evidence.block_months} months, {evidence.bootstrap_resamples.toLocaleString()} resamples. These intervals are conditional on model selection.</p>
+    <p role="note"><strong>Universe-selection limitation:</strong> Historical candidate membership is unverified; these development results are not a fully point-in-time validation.</p>
     <p>{evidence.interpretation}</p>
     <div className="table-scroll">
       <table className="evidence-table">

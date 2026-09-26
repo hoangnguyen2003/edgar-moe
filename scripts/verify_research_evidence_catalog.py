@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -49,13 +50,37 @@ def verify(
         {"schema_version", "frozen_v1", "duration_aware_v2"},
         "research catalog",
     )
-    if catalog["schema_version"] != 1:
+    if catalog["schema_version"] != 2:
         raise ValueError("unsupported research catalog schema")
     frozen = _object(
         catalog["frozen_v1"],
-        {"dataset_id", "selection_hash", "locked_test_hash", "rank_ic_interval_95"},
+        {
+            "dataset_id",
+            "selection_hash",
+            "locked_test_hash",
+            "rank_ic_interval_95",
+            "candidate_universe",
+        },
         "frozen research evidence",
     )
+    universe = _object(
+        frozen["candidate_universe"],
+        {"status", "screen_as_of", "first_validation_start", "locked_test_start"},
+        "frozen candidate universe",
+    )
+    try:
+        screen_as_of = date.fromisoformat(universe["screen_as_of"])
+        first_validation = date.fromisoformat(universe["first_validation_start"])
+        locked_start = date.fromisoformat(universe["locked_test_start"])
+    except (TypeError, ValueError) as error:
+        raise ValueError("frozen candidate-universe dates are invalid") from error
+    if (
+        universe["status"] != "retrospective_test_period_screen"
+        or first_validation != date(2023, 1, 1)
+        or locked_start != date(2025, 1, 1)
+        or screen_as_of != date(2026, 7, 31)
+    ):
+        raise ValueError("frozen candidate-universe chronology is invalid")
     interval = _object(
         frozen["rank_ic_interval_95"],
         {"low", "high", "method", "calendar_months", "resamples", "source_sha256"},
@@ -67,6 +92,7 @@ def verify(
     metadata = snapshot["metadata"]
     if (
         metadata["data_mode"] != "authenticated_locked_test"
+        or metadata["as_of"] != universe["screen_as_of"]
         or metadata["selection_hash"] != frozen["selection_hash"]
         or metadata["locked_test_hash"] != frozen["locked_test_hash"]
         or not interval["low"] <= 0 <= interval["high"]
@@ -92,6 +118,7 @@ def verify(
                 "source_manifest_sha256",
                 "selection_sha256",
                 "review_sha256",
+                "candidate_universe_status",
                 "oof_events",
                 "champion_name",
                 "champion_weighted_rank_ic",
@@ -107,6 +134,8 @@ def verify(
             },
             "reviewed v2 evidence",
         )
+        if v2["candidate_universe_status"] != "historical_membership_unverified":
+            raise ValueError("reviewed v2 candidate-universe status is invalid")
         if not isinstance(v2["comparisons"], list) or len(v2["comparisons"]) != len(COMPARATORS):
             raise ValueError("reviewed v2 comparator roster is invalid")
         baselines = set()

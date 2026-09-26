@@ -41,6 +41,13 @@ const pendingEvidence: ResearchEvidenceResponse = {
     locked_rank_ic: 0.031624,
     locked_rank_ic_interval_95: { low: -0.0114, high: 0.0702, method: "two_calendar_month_moving_block", calendar_months: 24, resamples: 1000, source_sha256: "e".repeat(64) },
     portfolio_10bps_sharpe: -0.632,
+    candidate_universe: {
+      status: "retrospective_test_period_screen",
+      screen_as_of: "2026-07-31",
+      first_validation_start: "2023-01-01",
+      locked_test_start: "2025-01-01",
+      interpretation: "The candidate list used locked-test-period liquidity; this is not a fully point-in-time historical evaluation.",
+    },
     interpretation: "Positive skill or tradable alpha is not established.",
   },
   duration_aware_v2: { status: "pending_review", reason: "No reviewed v2 aggregate." },
@@ -75,6 +82,9 @@ describe("Reviewed research evidence", () => {
     const panel = await screen.findByRole("region", { name: "Evidence and uncertainty" });
     expect(panel).toHaveTextContent("−0.011 to +0.070");
     expect(panel).toHaveTextContent("10 bps cost-aware Sharpe");
+    expect(panel).toHaveTextContent("Universe-selection limitation");
+    expect(panel).toHaveTextContent("locked-test-period liquidity");
+    expect(panel).toHaveTextContent("2026-07-31");
     expect(panel).toHaveTextContent("Pending review. No v2 comparison");
     expect(panel).not.toHaveTextContent("v2 beat");
   });
@@ -91,6 +101,7 @@ describe("Reviewed research evidence", () => {
       duration_aware_v2: {
         status: "reviewed_pretest", dataset_id: "v2", source_manifest_sha256: "f".repeat(64), selection_sha256: "1".repeat(64),
         review_sha256: "2".repeat(64), oof_events: 100, champion_name: "Example model", champion_weighted_rank_ic: 0.02,
+        candidate_universe_status: "historical_membership_unverified",
         uncertainty_method: "paired_calendar_month_moving_block_within_fold", block_months: 2, bootstrap_resamples: 1000,
         comparisons: [{ baseline: "Elastic Net", rank_ic_delta: 0.01, interval_status: "ready", interval_low: -0.02, interval_high: 0.04 }],
         portfolio_status: "development_only", cost_scenarios: [{ model: "Example model", cost_bps: 10, sharpe: -0.2, annualized_return: -0.03 }],
@@ -101,6 +112,7 @@ describe("Reviewed research evidence", () => {
     renderPage(reviewed);
     const panel = await screen.findByRole("region", { name: "Evidence and uncertainty" });
     expect(panel).toHaveTextContent("Conditional on selection; not independent evidence.");
+    expect(panel).toHaveTextContent("Historical candidate membership is unverified");
     expect(within(panel).getByRole("table", { name: /Development-fold rank IC difference/ })).toHaveTextContent("Elastic Net");
     expect(within(panel).getByRole("table", { name: /Development-fold cost scenarios/ })).toHaveTextContent("10 bps");
   });

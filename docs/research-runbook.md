@@ -242,7 +242,18 @@ pretest report exist; never rerun or reinterpret the frozen v1 locked test.
 The public Research page calls the read-only `GET /api/v1/research-evidence`
 contract. It always identifies frozen v1 with its selection/snapshot hashes,
 sample count, calendar-block rank-IC interval spanning zero, and negative
-10 bps Sharpe. V2 is explicitly `pending_review` until an operator reviews a
+10 bps Sharpe. The API also carries a structured
+`candidate_universe.status=retrospective_test_period_screen` for frozen v1:
+the recorded liquidity screen was dated 2026-07-31, inside the locked test and
+after both validation years. The page displays this next to the numerical
+result. The internal content-addressed catalog is schema version 2, while the
+additive read-only API response remains schema version 1. Catalog, snapshot,
+and chronology checks prevent that caveat from being silently removed or
+labeled point-in-time. This is a disclosure of a
+known defect, not a repair of the frozen study. A future reviewed v2 aggregate
+is also labeled `historical_membership_unverified` until a separate
+historically valid source-master audit addresses [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292).
+V2 is explicitly `pending_review` until an operator reviews a
 **separate** pretest report. A successful pipeline run alone must not publish
 v2 or change the v1 snapshot.
 
