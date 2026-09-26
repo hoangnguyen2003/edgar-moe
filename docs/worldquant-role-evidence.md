@@ -32,10 +32,14 @@ frozen v1 locked result or forward registry.
 
 The [candidate-screen verifier](../src/edgar_moe/data/screen_audit.py) now
 binds a dated, hash-pinned liquidity screen to the exact requested checkpoint
-universe and requires its cutoff before the first validation year. This closes
-one traceability gap for the research roles, but not historical security-master
-membership: today's SEC-to-Alpaca mapping can still introduce survivorship
-bias, so the verifier explicitly withholds a full point-in-time claim.
+universe and requires its cutoff before the first validation year. It also
+records when the reviewed master and screen were actually observed, rejects a
+retrospective observation, and can hash-check the processed dataset derived
+from that checkpoint ([ADR 0031](adr/0031-universe-observation-chronology.md)).
+This closes a traceability gap for the research roles, but not historical
+security-master membership: today's SEC-to-Alpaca mapping can still introduce
+survivorship bias, so the verifier explicitly withholds a full point-in-time
+claim.
 
 The [paired XBRL outcome audit](../src/edgar_moe/modeling/policy_outcome.py)
 and [runbook](research-runbook.md) now compare new legacy-policy and

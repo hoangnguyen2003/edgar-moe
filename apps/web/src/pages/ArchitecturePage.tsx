@@ -18,10 +18,10 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
     id: "research",
     title: "Research study",
     zone: "Finished and frozen",
-    summary: "Run once, offline, then locked so the results cannot be tuned afterwards.",
+    summary: "The original result is preserved, including its retrospective candidate-universe limitation.",
     steps: [
-      { title: "Collect data", detail: "SEC filings, financial statements, prices, and macro data, as known at the time" },
-      { title: "Build the dataset", detail: "Every input is time-stamped; anything from after a filing fails the build" },
+      { title: "Collect data", detail: "SEC filings, financial statements, prices, and macro data; historical candidate membership remains unverified" },
+      { title: "Build the dataset", detail: "Feature availability is checked against filing times; the retrospective universe screen is disclosed separately" },
       { title: "Compare 33 models", detail: "Chosen on 2023–2024 data only" },
       { title: "Freeze, then test once", detail: "Fingerprinted first, then scored once on 2025–2026" },
       { title: "Publish a snapshot", detail: "The results file is pinned by a SHA-256 lock" },
@@ -191,7 +191,7 @@ export function ArchitecturePage() {
         <header>
           <div>
             <h2 id="decisions-title">Key design decisions</h2>
-            <p>Eight of the 30 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
+            <p>Eight of the 31 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
           </div>
           <a className="button button--secondary button--small" href={`${REPOSITORY}/blob/main/docs/adr/README.md`}>
             All decisions <ArrowUpRight size={14} aria-hidden="true" />
