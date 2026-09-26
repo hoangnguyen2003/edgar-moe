@@ -30,6 +30,13 @@ and cost context. The terminal publication boundary admits only reviewed
 aggregates; it currently reports v2 as pending. Neither path touches the
 frozen v1 locked result or forward registry.
 
+The [candidate-screen verifier](../src/edgar_moe/data/screen_audit.py) now
+binds a dated, hash-pinned liquidity screen to the exact requested checkpoint
+universe and requires its cutoff before the first validation year. This closes
+one traceability gap for the research roles, but not historical security-master
+membership: today's SEC-to-Alpaca mapping can still introduce survivorship
+bias, so the verifier explicitly withholds a full point-in-time claim.
+
 The [paired XBRL outcome audit](../src/edgar_moe/modeling/policy_outcome.py)
 and [runbook](research-runbook.md) now compare new legacy-policy and
 duration-aware reconstructions on the same pre-test OOF events, with a
