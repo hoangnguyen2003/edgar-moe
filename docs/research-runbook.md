@@ -247,6 +247,23 @@ publisher fails closed if the record is absent, incomplete, or mismatched.
 This record is an auditable maintainer assertion, not provider permission or
 a legal determination.
 
+The future record has this shape; the references below are examples, **not**
+current approvals, and no such file is committed while issue #280 is open:
+
+```json
+{
+  "schema_version": 1,
+  "dataset_id": "reviewed-dataset-id",
+  "source_manifest_sha256": "<64-character report source-manifest SHA-256>",
+  "scope": "public_derived_aggregates_only",
+  "sources": {
+    "sec_edgar": {"decision": "approved_for_derived_aggregate_publication", "reference": "review/issue-123"},
+    "alpaca_market_data": {"decision": "approved_for_derived_aggregate_publication", "reference": "review/issue-123"},
+    "fred_alfred_macro": {"decision": "approved_for_derived_aggregate_publication", "reference": "review/issue-123"}
+  }
+}
+```
+
 Then stage only allowlisted aggregates:
 
 ```bash
