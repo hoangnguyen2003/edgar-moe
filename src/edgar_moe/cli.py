@@ -2294,6 +2294,81 @@ def research_copilot_compare(
     typer.echo(orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS).decode())
 
 
+@app.command("research-copilot-mask-review")
+def research_copilot_mask_review(
+    baseline_dir: Annotated[
+        Path,
+        typer.Option("--baseline-dir", help="Private deterministic-baseline benchmark directory."),
+    ],
+    copilot_dir: Annotated[
+        Path, typer.Option("--copilot-dir", help="Private provider-copilot benchmark directory.")
+    ],
+    corpus: Annotated[
+        Path, typer.Option("--corpus", help="Held-out reviewed case corpus JSON.")
+    ] = Path("config/copilot_holdout_cases.json"),
+    output_dir: Annotated[
+        Path,
+        typer.Option("--output-dir", help="New private directory for packet and sealed A/B key."),
+    ] = Path("/tmp/edgar-moe-copilot-masked-review"),
+) -> None:
+    """Prepare a private label-masked A/B packet from complete matched benchmarks."""
+    from edgar_moe.copilot.blind_review import (
+        MaskedReviewError,
+        prepare_masked_review,
+        write_private_json,
+    )
+    from edgar_moe.copilot.evaluation import EvaluationInputError, load_evaluation_corpus
+    from edgar_moe.copilot.paired import PairedBenchmarkError
+    from edgar_moe.copilot.verification import CopilotVerificationError
+
+    try:
+        packet, key = prepare_masked_review(
+            baseline_dir, copilot_dir, load_evaluation_corpus(corpus)
+        )
+        output_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
+        write_private_json(output_dir / "packet.json", packet)
+        write_private_json(output_dir / "mapping.json", key)
+    except (
+        MaskedReviewError,
+        EvaluationInputError,
+        PairedBenchmarkError,
+        CopilotVerificationError,
+        FileExistsError,
+        OSError,
+    ) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Wrote private reviewer packet and sealed mapping to {output_dir}")
+    typer.echo(f"Packet SHA-256: {key['packet_sha256']}")
+
+
+@app.command("research-copilot-score-masked-review")
+def research_copilot_score_masked_review(
+    packet: Annotated[Path, typer.Option("--packet", help="Private A/B reviewer packet JSON.")],
+    mapping: Annotated[Path, typer.Option("--mapping", help="Sealed private A/B mapping JSON.")],
+    review: Annotated[Path, typer.Option("--review", help="Completed private rubric JSON.")],
+    output: Annotated[
+        Path, typer.Option("--output", help="New private safe-score report JSON.")
+    ] = Path("/tmp/edgar-moe-copilot-masked-score.json"),
+) -> None:
+    """Score a complete sealed human review without printing answer text."""
+    from edgar_moe.copilot.blind_review import (
+        MaskedReviewError,
+        read_private_json,
+        score_masked_review,
+        write_private_json,
+    )
+
+    try:
+        result = score_masked_review(
+            read_private_json(packet), read_private_json(mapping), read_private_json(review)
+        )
+        write_private_json(output, result)
+    except (MaskedReviewError, FileExistsError, OSError) as error:
+        raise typer.BadParameter(str(error)) from error
+    typer.echo(f"Wrote private masked-review score to {output}")
+    typer.echo(f"Reviewed {result['case_count']} cases; paired quality: {result['paired_quality']}")
+
+
 @app.command("research-copilot-review")
 def research_copilot_review(
     benchmark: Annotated[

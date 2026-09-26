@@ -401,6 +401,64 @@ source-derived context to a provider or publish a provider comparison while
 the [source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
 is unresolved; no provider run is performed by the baseline or comparator.
 
+### Held-out, label-masked task review
+
+The separate [eight-case held-out corpus](../config/copilot_holdout_cases.json)
+was authored after the four-case development/control evaluation. Its reviewed
+content hash is
+`a3c988f5a7c14d8d770f640c7c57608c50b6cb0c963e162a0ce159ad902f1678`.
+Do not tune either arm to these questions after seeing the results. This is a
+publicly inspectable holdout, not an independent external test set. The
+automated structural score is not a human judgment.
+
+Once source rights permit provider use, run *both* benchmark commands with
+`--corpus config/copilot_holdout_cases.json`, the same snapshot and read-only
+tool context, and fresh **private** output directories. Do not compare a
+four-case development run against the eight-case holdout. The following
+commands make no provider calls themselves:
+
+```bash
+uv run edgar-moe research-copilot-mask-review \
+  --baseline-dir /tmp/holdout-baseline \
+  --copilot-dir /tmp/holdout-copilot \
+  --output-dir /tmp/holdout-masked-review
+```
+
+The command rejects incomplete or mismatched benchmark arms and verifies each
+saved answer envelope, case question, snapshot identity, provider metadata,
+and answer hash. It creates `packet.json` and `mapping.json` in a new
+owner-only directory, with owner-only files; it never prints answer text. Give
+the reviewer **only** `packet.json`. Keep `mapping.json` sealed until the
+reviewer has recorded and finalized all ratings. A/B order is randomly
+balanced, but answer style can still disclose the arm, so this is label
+masking rather than guaranteed blinding.
+
+The reviewer creates a private JSON file with `schema_version: 1`,
+`packet_sha256` from the packet-preparation output, `corpus_sha256` from the
+packet, a short pseudonymous `reviewer` ID, timezone-aware `reviewed_at`, and
+one entry per packet case. Each entry has `case_id`, `A`, and `B`; both ratings
+must give `task_completion`, `factuality`, `citations`, and `safety` as `pass`
+or `fail`, plus integer `usefulness` from 1 to 5. Score the two answers
+independently against the question and visible citations; record the rubric
+before viewing the mapping. No answer text belongs in the review JSON.
+
+```bash
+uv run edgar-moe research-copilot-score-masked-review \
+  --packet /tmp/holdout-masked-review/packet.json \
+  --mapping /tmp/holdout-masked-review/mapping.json \
+  --review /tmp/holdout-review.json \
+  --output /tmp/holdout-score.json
+```
+
+The scorer requires complete case coverage, exact schemas, and a matching
+packet hash; it refuses overwrites and emits only rubric counts, paired
+quality outcomes, and per-case numeric judgments. The packet, mapping, raw
+review, and score stay private; do not commit or publish them without a
+separate disclosure/rights review. The hashes detect local mismatches, not
+malicious alteration or independent provenance. One reviewer's descriptive
+scores cannot establish general LLM value or investment efficacy. The actual
+provider run and human assessment remain pending while issue #280 is open.
+
 ## Human-review history
 
 Structural evaluation does not establish that generated prose is useful. After
