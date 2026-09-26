@@ -55,6 +55,23 @@ ratios, and each dataset records it in its identity and provenance
 - Split-adjusted daily bars exclude dividend total return and cannot model intraday slippage.
 - Public snapshots contain derived values only and are not a redistribution of raw market data. The deployed bundle exposes `data-provenance.json`, which records the source families plus the content-addressed snapshot identity; the manifest keeps redistribution review explicitly pending.
 
+## Source-rights review gate
+
+The project does not interpret a derived metric as automatically cleared for
+publication. As checked on 2026-09-25, [Alpaca's redistribution answer](https://alpaca.markets/support/redistribute-alpaca-api)
+says Alpaca API data cannot be redistributed. The current [FRED Services terms](https://fred.stlouisfed.org/legal/terms/)
+include a broad restriction on using FRED content for software or ML development
+and training; they also direct users to check third-party series rights. These
+pages do not by themselves settle the status of this project's past usage or
+its derived aggregates. This is a rights-review question, not a legal opinion.
+
+Keep the new v2 pre-test reports private and the public v2 catalog at
+`pending_review` until [issue #280](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
+records a source-by-source permitted-use determination or a replacement-data
+study with a new identity. Review the existing v1-derived public snapshot under
+the same gate. Do not attach credentials, raw source payloads, bars, embeddings,
+or private predictions to that issue or to a release PR.
+
 ## Public snapshot and synthetic fixture
 
 `data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; `public/data-provenance.json` publishes the same identity without raw data, and CI plus the Vercel build reject drift between those records. The `edgar-moe demo` command generates an explicitly marked `synthetic_fixture` for software verification, by default at `data/interim/synthetic-snapshot.json`; it refuses to overwrite any snapshot that is not itself a synthetic fixture, including the frozen public snapshot.
