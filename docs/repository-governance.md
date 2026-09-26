@@ -41,7 +41,7 @@ of them.
 rollback, architecture impact, and research-integrity notes.
 `.github/workflows/pr-policy.yml` rejects branches without a descriptive
 approved prefix. The approved prefixes are `feat/`, `fix/`, `chore/`, `docs/`,
-`research/`, `refactor/`, `test/`, `security/`, and `ops/`. Dependabot is
+`research/`, `refactor/`, `perf/`, `test/`, `security/`, and `ops/`. Dependabot is
 allowed to use its standard branch prefix.
 
 After a successful merge, delete the head branch and start new work from the
