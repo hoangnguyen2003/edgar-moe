@@ -119,7 +119,9 @@ def _seed(registry: ForwardRegistry, *, rows: int, settled_percent: int) -> int:
         )
         labels = []
         for offset in range(0, rows, 100):
-            for item in registry.list_forecasts(limit=min(100, rows - offset), offset=offset)["items"]:
+            for item in registry.list_forecasts(limit=min(100, rows - offset), offset=offset)[
+                "items"
+            ]:
                 number = int(item["event_id"].rsplit("-", 1)[1])
                 if number % per_month >= settled_per_month:
                     continue
@@ -167,9 +169,7 @@ def _measure(
     }
 
 
-def measure(
-    *, rows: int = 240, settled_percent: int = 75, samples: int = 20
-) -> dict[str, object]:
+def measure(*, rows: int = 240, settled_percent: int = 75, samples: int = 20) -> dict[str, object]:
     if rows < 120 or rows > 5000 or rows % 12:
         raise ValueError("rows must be a multiple of 12 between 120 and 5000")
     if not 0 <= settled_percent <= 100:
@@ -196,8 +196,7 @@ def measure(
                     if client.get(path).status_code != 200:
                         raise RuntimeError(f"synthetic read failed: {path}")
                 results = {
-                    name: _measure(client, path, samples=samples)
-                    for name, path in paths.items()
+                    name: _measure(client, path, samples=samples) for name, path in paths.items()
                 }
                 results["performance_cold_interval"] = _measure(
                     client, "/api/v1/forward/performance", samples=5, cold_interval=True
