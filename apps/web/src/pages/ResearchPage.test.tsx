@@ -103,6 +103,7 @@ describe("Reviewed research evidence", () => {
         review_sha256: "2".repeat(64), oof_events: 100, champion_name: "Example model", champion_weighted_rank_ic: 0.02,
         candidate_universe_status: "historical_membership_unverified",
         uncertainty_method: "paired_calendar_month_moving_block_within_fold", block_months: 2, bootstrap_resamples: 1000,
+        simultaneous_method: "studentized_max_absolute_deviation_across_five_comparators",
         comparisons: [{ baseline: "Elastic Net", rank_ic_delta: 0.01, interval_status: "ready", interval_low: -0.02, interval_high: 0.04 }],
         portfolio_status: "development_only", cost_scenarios: [{ model: "Example model", cost_bps: 10, sharpe: -0.2, annualized_return: -0.03 }],
         cost_definition: "10/25/50 bps per unit of one-sided turnover plus configured short borrow",
@@ -113,7 +114,10 @@ describe("Reviewed research evidence", () => {
     const panel = await screen.findByRole("region", { name: "Evidence and uncertainty" });
     expect(panel).toHaveTextContent("Conditional on selection; not independent evidence.");
     expect(panel).toHaveTextContent("Historical candidate membership is unverified");
+    expect(panel).toHaveTextContent("Five-comparator simultaneous 95% intervals");
+    expect(panel).toHaveTextContent("conditional on development-fold model selection");
     expect(within(panel).getByRole("table", { name: /Development-fold rank IC difference/ })).toHaveTextContent("Elastic Net");
+    expect(within(panel).getByRole("columnheader", { name: "Simultaneous 95% interval" })).toBeInTheDocument();
     expect(within(panel).getByRole("table", { name: /Development-fold cost scenarios/ })).toHaveTextContent("10 bps");
   });
 });

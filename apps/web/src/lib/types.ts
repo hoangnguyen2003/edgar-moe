@@ -78,6 +78,7 @@ export interface ResearchEvidenceResponse {
     champion_name: string;
     champion_weighted_rank_ic: number;
     uncertainty_method: "paired_calendar_month_moving_block_within_fold";
+    simultaneous_method: "studentized_max_absolute_deviation_across_five_comparators";
     block_months: number;
     bootstrap_resamples: number;
     comparisons: Array<{

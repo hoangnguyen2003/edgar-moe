@@ -190,6 +190,10 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
         "historical_membership_unverified"
     )
     assert reviewed.duration_aware_v2.comparisons[0].interval_low == -0.03
+    assert (
+        reviewed.duration_aware_v2.simultaneous_method
+        == "studentized_max_absolute_deviation_across_five_comparators"
+    )
     assert "simultaneous" in reviewed.duration_aware_v2.interpretation
     verify(catalog, lock)
     with pytest.raises(ValueError, match="refusing overwrite"):
@@ -200,6 +204,40 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
             catalog_path=catalog,
             lock_path=lock,
         )
+
+
+@pytest.mark.parametrize("mutation", ["missing", "wrong_method"])
+def test_reviewed_simultaneous_method_fails_closed(tmp_path: Path, mutation: str) -> None:
+    catalog = tmp_path / "catalog.json"
+    lock = tmp_path / "catalog.sha256"
+    report_path = tmp_path / "private-review.json"
+    rights_path = tmp_path / "rights-review.json"
+    catalog.write_bytes(CATALOG_PATH.read_bytes())
+    lock.write_bytes(LOCK_PATH.read_bytes())
+    report = _private_report()
+    _write_private(report_path, report)
+    _write_rights_review(rights_path, report)
+    stage_reviewed_catalog(
+        report_path,
+        "review/issue-271",
+        rights_review_path=rights_path,
+        catalog_path=catalog,
+        lock_path=lock,
+    )
+    payload = orjson.loads(catalog.read_bytes())
+    if mutation == "missing":
+        del payload["duration_aware_v2"]["simultaneous_method"]
+    else:
+        payload["duration_aware_v2"]["simultaneous_method"] = "unadjusted_paired_interval"
+    raw = orjson.dumps(payload)
+    catalog.write_bytes(raw)
+    lock.write_text(hashlib.sha256(raw).hexdigest() + "\n", encoding="ascii")
+    with pytest.raises(CatalogIntegrityError, match="schema is invalid"):
+        load_public_catalog(catalog, lock)
+    with pytest.raises(
+        ValueError, match="reviewed v2 (evidence schema|uncertainty method) is invalid"
+    ):
+        verify(catalog, lock)
 
 
 def test_reviewed_publication_preserves_cost_definition_and_complete_roster(
