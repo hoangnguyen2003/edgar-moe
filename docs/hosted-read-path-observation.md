@@ -83,7 +83,7 @@ local ignored directory and summarize them, for example:
 gh run list --workflow hosted-read-observation.yml --limit 14
 gh run download <run-id> --dir data/artifacts/hosted-read-observations/<run-id>
 python3 -m scripts.summarize_hosted_read_observations \
-  data/artifacts/hosted-read-observations/*/*.json \
+  data/artifacts/hosted-read-observations/*/*/*.json \
   --output data/artifacts/hosted-read-observations/seven-day-summary.json
 ```
 
@@ -97,3 +97,14 @@ separate a warm origin from a serverless cold start or an idle Postgres resume;
 that requires provider evidence. No hosted p95/p99 threshold or capacity/SLO
 claim should be set from this sparse sample alone. Stop or reduce collection
 if failures, quota impact, or unexpected traffic appear.
+
+The [first workflow observation](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/36328346856)
+completed on 2026-09-27 at 15:07 UTC against commit
+`46e0d86fe643af0e991283f9c5653b8fdd532583`. All 32 measured requests returned
+HTTP 200 and passed their probe checks; the forward registry was available in
+all eight samples and reported a quality warning. The eight health samples
+matched the expected commit. Successful p50 timings were 83.772 ms for summary
+(8 HIT), 87.040 ms for forecast page (8 HIT), 279.067 ms for health (8 MISS),
+and 297.635 ms for forward status (8 MISS). These are one day's observations
+from a GitHub runner. The downloaded artifact passed the summary parser, which
+correctly returned `seven_day_coverage: false` and exit status 1.
