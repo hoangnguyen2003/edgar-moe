@@ -15,6 +15,9 @@ credentials, rejected redirects, capped response reads at 1 MiB, and retained
 only response-status/cache categories and aggregate timing. It can also pin
 each health sample to an expected serving commit. Its 10-second
 `urllib` timeout is a socket-operation timeout, not a hard end-to-end deadline.
+The initial table predates schema v2; its cache categories were observed but
+its percentile column pooled them. The current probe keeps cache-separated
+successful percentiles and bounded per-request evidence without bodies.
 The [failure-injection tests](../tests/unit/test_hosted_read_path_benchmark.py)
 exercise malformed responses, transport/HTTP errors, degraded semantic status,
 unsafe origins, and request-budget bounds.
@@ -59,3 +62,38 @@ uv run python scripts/benchmark_hosted_read_path.py https://edgar-moe.vercel.app
 Choose a new output path for each run; the script refuses overwrite. Reports
 under `data/artifacts/` are ignored by Git. Review route/cache mix, all error
 counts, health status, and the limited sample size before comparing runs.
+
+## Daily, low-rate collection
+
+The [daily GitHub Actions observer](../.github/workflows/hosted-read-observation.yml)
+also supports manual dispatch. It makes one warmup plus eight measured GETs per
+route: **36 requests total**, sequential, with at least 500 ms between requests.
+It targets only the public production origin, uses no secrets or writer DB
+credential, rejects redirects, caps bodies at 1 MiB, and pins every health
+sample to the workflow's main commit. A degraded result fails the job but the
+redacted JSON is uploaded for diagnosis. Artifacts are retained for 30 days;
+on a public repository, assume anyone can inspect them. GitHub schedules can
+run late or be skipped, so inspect the date coverage rather than assuming a
+daily sample exists. No paid service or keep-warm loop is introduced.
+
+After seven actual consecutive UTC dates, download the JSON artifacts to a
+local ignored directory and summarize them, for example:
+
+```bash
+gh run list --workflow hosted-read-observation.yml --limit 14
+gh run download <run-id> --dir data/artifacts/hosted-read-observations/<run-id>
+python3 -m scripts.summarize_hosted_read_observations \
+  data/artifacts/hosted-read-observations/*/*.json \
+  --output data/artifacts/hosted-read-observations/seven-day-summary.json
+```
+
+Download each relevant run ID separately. The [summarizer](../scripts/summarize_hosted_read_observations.py)
+fails its CLI until there are seven **consecutive UTC dates**, rejects mixed
+origins and unpinned/malformed reports, counts errors separately, and pools
+successful timings by observed edge-cache category. It records commit cohorts
+but does not pretend different deployments are equivalent. A full week has
+**not yet been observed**. Even after it has, a client-side `MISS` cannot
+separate a warm origin from a serverless cold start or an idle Postgres resume;
+that requires provider evidence. No hosted p95/p99 threshold or capacity/SLO
+claim should be set from this sparse sample alone. Stop or reduce collection
+if failures, quota impact, or unexpected traffic appear.

@@ -276,7 +276,11 @@ Evidence is never erased to make a retry look clean.
   records the optimization and why this local SQLite result is not a hosted SLO.
   A separate [bounded hosted observation](hosted-read-path-observation.md)
   records actual client latency, errors, and edge-cache mix without attributing
-  network outliers to a particular layer or claiming an SLO.
+  network outliers to a particular layer or claiming an SLO. A secret-free,
+  [low-rate daily observer](../.github/workflows/hosted-read-observation.yml)
+  retains sanitized per-request evidence so a seven-day distribution can be
+  assessed once seven consecutive UTC dates actually exist; serverless and
+  database timing remain unobserved.
 
 ### Runbooks
 

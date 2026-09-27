@@ -87,6 +87,26 @@ def test_probe_never_sends_credentials_or_retains_body() -> None:
     assert "Authorization" not in opener.request.headers
 
 
+def test_probe_never_retains_untrusted_semantic_strings() -> None:
+    secret = "PRIVATE_TEXT_MUST_NOT_APPEAR"
+    observed = benchmark._probe(
+        _Opener(_Response(json.dumps({"status": secret, "snapshot_loaded": True}).encode())),
+        "https://example.test/api/v1/health",
+        timeout_seconds=2,
+        route="health",
+    )
+    assert observed["result"] != "ok"
+    assert secret not in json.dumps(observed)
+    observed = benchmark._probe(
+        _Opener(_Response(json.dumps({"health_status": secret, "available": [secret]}).encode())),
+        "https://example.test/api/v1/forward/status",
+        timeout_seconds=2,
+        route="forward_status",
+    )
+    assert observed["result"] == "contract_error"
+    assert secret not in json.dumps(observed)
+
+
 @pytest.mark.parametrize(
     ("result", "expected"),
     [
@@ -140,8 +160,42 @@ def test_bounded_round_robin_report_counts_failures_separately(
     assert report["status"] == "degraded"
     assert report["traffic"]["concurrency"] == 1
     assert report["results"]["health"]["successful_latency_ms"]["p95"] == 10
+    assert report["schema_version"] == 2
+    assert report["results"]["health"]["successful_latency_by_edge_cache_ms"] == {
+        "MISS": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
+    }
+    assert len(report["sample_observations"]["health"]) == 5
     assert report["results"]["forecasts_page"]["result_counts"] == {"http_error": 1, "ok": 4}
     assert report["results"]["forecasts_page"]["http_status_counts"] == {"200": 4, "503": 1}
+
+
+def test_successful_latency_is_split_by_observed_edge_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_probe(_opener: object, _url: str, *, timeout_seconds: float, route: str) -> dict:
+        nonlocal calls
+        calls += 1
+        cache = "HIT" if (calls // len(benchmark.ROUTES)) % 2 else "MISS"
+        return {
+            "result": "ok",
+            "http_status": 200,
+            "latency_ms": 5.0 if cache == "HIT" else 50.0,
+            "edge_cache": cache,
+            "semantic_status": "ok",
+            "registry_available": True,
+            "served_commit_sha": "a" * 40 if route == "health" else None,
+        }
+
+    monkeypatch.setattr(benchmark, "_probe", fake_probe)
+    monkeypatch.setattr(benchmark.time, "sleep", lambda _seconds: None)
+    report = benchmark.measure("https://example.test", samples_per_route=5, pause_ms=200)
+    health = report["results"]["health"]
+    assert health["successful_latency_ms"]["p50"] == 5.0
+    assert health["successful_latency_by_edge_cache_ms"]["HIT"]["p50"] == 5.0
+    assert health["successful_latency_by_edge_cache_ms"]["MISS"]["p50"] == 50.0
+    assert len(report["sample_observations"]["health"]) == 5
 
 
 def test_forward_quality_warning_is_visible_without_calling_it_an_outage(
