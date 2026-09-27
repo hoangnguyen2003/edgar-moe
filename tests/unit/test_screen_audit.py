@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -74,7 +74,8 @@ def _fixture(
     audit.write_bytes(
         orjson.dumps(
             {
-                "schema_version": 3,
+                "schema_version": 4,
+                "purpose": "research_screen",
                 "as_of": "2022-12-30",
                 "lookback_start": "2022-09-01",
                 "generated_at_utc": "2022-12-31T12:00:00Z",
@@ -138,9 +139,25 @@ def test_source_capture_rejects_ambiguous_or_mismatched_security_id(tmp_path: Pa
         screen_audit.record_source_capture(source, review, capture)
 
 
+def test_screen_observation_uses_new_york_cutoff_boundary() -> None:
+    cutoff = date(2022, 12, 30)
+    generated = datetime(2022, 12, 31, 12, tzinfo=UTC)
+    screen_audit.verify_screen_observation_window(
+        datetime(2022, 12, 31, 4, 59, tzinfo=UTC), cutoff, generated
+    )
+    with pytest.raises(ValueError, match="observed after the screen cutoff"):
+        screen_audit.verify_screen_observation_window(
+            datetime(2022, 12, 31, 5, tzinfo=UTC), cutoff, generated
+        )
+
+
 @pytest.mark.parametrize("change_during_fetch", [False, True])
+@pytest.mark.parametrize("diagnostic", [False, True])
 def test_screen_command_pins_inputs_before_fetching(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, change_during_fetch: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    change_during_fetch: bool,
+    diagnostic: bool,
 ) -> None:
     source, review, capture = (
         tmp_path / name for name in ("source.csv", "review.json", "capture.json")
@@ -148,6 +165,11 @@ def test_screen_command_pins_inputs_before_fetching(
     source.write_text("cik,symbol\n" + "".join(f"{i},A{i}\n" for i in range(1, 51)))
     review.write_bytes(orjson.dumps([{"cik": str(i), "symbol": f"A{i}"} for i in range(1, 51)]))
     screen_audit.record_source_capture(source, review, capture)
+    if not diagnostic:
+        # Synthetic historical capture only; a real CLI capture cannot be backdated.
+        payload = orjson.loads(capture.read_bytes())
+        payload["observed_at_utc"] = "2022-12-29T12:00:00Z"
+        capture.write_bytes(orjson.dumps(payload))
     monkeypatch.setattr(
         cli,
         "runtime_settings",
@@ -195,6 +217,7 @@ def test_screen_command_pins_inputs_before_fetching(
             "50",
             "--minimum-sessions",
             "20",
+            *(["--allow-retrospective-diagnostic"] if diagnostic else []),
         ],
     )
     if change_during_fetch:
@@ -204,10 +227,95 @@ def test_screen_command_pins_inputs_before_fetching(
     else:
         assert result.exit_code == 0, result.output
         payload = orjson.loads(audit.read_bytes())
-        assert payload["schema_version"] == 3
+        assert payload["schema_version"] == 4
+        assert payload["purpose"] == (
+            "retrospective_diagnostic" if diagnostic else "research_screen"
+        )
         assert payload["source_capture_sha256"] == sha256_file(capture)
         assert payload["source_sha256"] == sha256_file(source)
         assert payload["generated_at_utc"].endswith("Z")
+
+
+@pytest.mark.parametrize("cutoff", ["2022-12-30", "future"])
+def test_screen_command_rejects_bad_chronology_before_provider_access(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cutoff: str
+) -> None:
+    _, source, _, _, capture, review = _fixture(tmp_path, monkeypatch)
+    payload = orjson.loads(capture.read_bytes())
+    payload["observed_at_utc"] = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    capture.write_bytes(orjson.dumps(payload))
+    monkeypatch.setattr(cli, "runtime_settings", lambda: pytest.fail("credentials read too early"))
+    monkeypatch.setattr(
+        alpaca,
+        "AlpacaDataClient",
+        lambda *_args: pytest.fail("market provider called before chronology preflight"),
+    )
+    if cutoff == "future":
+        cutoff = (datetime.now(UTC).date() + timedelta(days=2)).isoformat()
+    output, audit = tmp_path / "new-screen.csv", tmp_path / "new-audit.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "screen-universe",
+            "--source",
+            str(source),
+            "--source-capture",
+            str(capture),
+            "--mapping-review",
+            str(review),
+            "--output",
+            str(output),
+            "--audit-output",
+            str(audit),
+            "--as-of",
+            cutoff,
+        ],
+    )
+    assert result.exit_code != 0
+    expected = "screen cutoff" if cutoff == "2022-12-30" else "cutoff date completed"
+    assert expected in str(result.exception)
+    assert not output.exists() and not audit.exists()
+
+
+def test_screen_trace_rejects_explicit_diagnostic(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit, source, screened, checkpoint, capture, review = _fixture(tmp_path, monkeypatch)
+    payload = orjson.loads(audit.read_bytes())
+    payload["purpose"] = "retrospective_diagnostic"
+    audit.write_bytes(orjson.dumps(payload))
+    with pytest.raises(ValueError, match="Retrospective diagnostics"):
+        screen_audit.verify_screen_trace(
+            audit,
+            source,
+            screened,
+            checkpoint,
+            first_validation_start=date(2023, 1, 1),
+            source_capture_path=capture,
+            mapping_review_path=review,
+        )
+
+
+def test_diagnostic_cannot_overwrite_default_research_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _, source, _, _, capture, review = _fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(cli, "runtime_settings", lambda: pytest.fail("credentials read too early"))
+    result = CliRunner().invoke(
+        app,
+        [
+            "screen-universe",
+            "--source",
+            str(source),
+            "--source-capture",
+            str(capture),
+            "--mapping-review",
+            str(review),
+            "--allow-retrospective-diagnostic",
+        ],
+    )
+    assert result.exit_code != 0
+    assert "Retrospective diagnostics require separate --output" in result.output
 
 
 def test_screen_trace_binds_screen_to_checkpoint_without_overclaiming(
@@ -302,6 +410,7 @@ def test_screen_trace_rejects_selected_mapping_outside_source_even_with_matching
         "tampered_csv",
         "wrong_checkpoint",
         "old_audit",
+        "legacy_audit",
         "late_master",
         "late_generation",
         "early_generation",
@@ -346,6 +455,8 @@ def test_screen_trace_fails_closed(
             payload["generated_at_utc"] = "2026-09-27T12:00:00Z"
         elif mutation == "early_generation":
             payload["generated_at_utc"] = "2022-12-31T02:00:00Z"  # Still Dec 30 in New York.
+        elif mutation == "legacy_audit":
+            payload["schema_version"] = 3
         else:
             payload.pop("schema_version")
         audit.write_bytes(orjson.dumps(payload))

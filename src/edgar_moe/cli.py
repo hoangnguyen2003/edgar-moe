@@ -338,25 +338,43 @@ def screen_universe(
     minimum_price: Annotated[float, typer.Option(min=0.01)] = 5.0,
     feed: Annotated[str, typer.Option()] = "iex",
     batch_size: Annotated[int, typer.Option(min=1, max=500)] = 200,
+    allow_retrospective_diagnostic: Annotated[
+        bool,
+        typer.Option(
+            help="Explicitly create a non-reviewable diagnostic with retrospective master/timing."
+        ),
+    ] = False,
 ) -> None:
     """Create a free-tier research candidate set using trailing IEX liquidity."""
     from edgar_moe.data.alpaca import AlpacaDataClient
     from edgar_moe.data.refresh import load_universe_csv
-    from edgar_moe.data.screen_audit import verify_source_capture
+    from edgar_moe.data.screen_audit import (
+        verify_screen_observation_window,
+        verify_source_capture,
+    )
     from edgar_moe.data.storage import sha256_file
     from edgar_moe.data.universe import screen_liquid_universe
 
-    settings = runtime_settings()
-    _require_source_configuration(settings, needs_fred=False)
+    if allow_retrospective_diagnostic and (
+        output.resolve() == Path("config/universe.research.csv").resolve()
+        or audit_output.resolve() == Path("data/interim/universe-screen.json").resolve()
+    ):
+        raise typer.BadParameter(
+            "Retrospective diagnostics require separate --output and --audit-output paths"
+        )
     input_hashes = {path: sha256_file(path) for path in (source, source_capture, mapping_review)}
     members = load_universe_csv(source)
-    verify_source_capture(source_capture, source, mapping_review)
+    observed = verify_source_capture(source_capture, source, mapping_review)
     cutoff = (
         date.fromisoformat(as_of)
         if as_of
         else datetime.now(ZoneInfo("America/New_York")).date() - timedelta(days=1)
     )
     start = cutoff - timedelta(days=lookback_days)
+    if not allow_retrospective_diagnostic:
+        verify_screen_observation_window(observed, cutoff, datetime.now(UTC))
+    settings = runtime_settings()
+    _require_source_configuration(settings, needs_fred=False)
 
     async def run() -> dict[str, list[dict[str, Any]]]:
         combined: dict[str, list[dict[str, Any]]] = {}
@@ -386,6 +404,9 @@ def screen_universe(
         raise typer.BadParameter(
             f"Only {len(selected)} symbols passed the screen; requested {candidate_count}"
         )
+    generated = datetime.now(UTC)
+    if not allow_retrospective_diagnostic:
+        verify_screen_observation_window(observed, cutoff, generated)
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary_output = output.with_suffix(output.suffix + ".tmp")
     fieldnames = [
@@ -406,10 +427,13 @@ def screen_universe(
         writer.writerows(selected)
     temporary_output.replace(output)
     audit = {
-        "schema_version": 3,
+        "schema_version": 4,
+        "purpose": (
+            "retrospective_diagnostic" if allow_retrospective_diagnostic else "research_screen"
+        ),
         "as_of": cutoff.isoformat(),
         "lookback_start": start.isoformat(),
-        "generated_at_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        "generated_at_utc": generated.isoformat().replace("+00:00", "Z"),
         "source_universe": str(source),
         "source_sha256": input_hashes[source],
         "source_capture_sha256": input_hashes[source_capture],
@@ -431,7 +455,7 @@ def screen_universe(
 @app.command("verify-universe-screen")
 def verify_universe_screen(
     checkpoint: Annotated[Path, typer.Option(help="Authenticated research checkpoint.")],
-    audit: Annotated[Path, typer.Option(help="Version-3 screen audit JSON.")] = Path(
+    audit: Annotated[Path, typer.Option(help="Version-4 research screen audit JSON.")] = Path(
         "data/interim/universe-screen.json"
     ),
     source_capture: Annotated[Path, typer.Option()] = Path(

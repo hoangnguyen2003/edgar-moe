@@ -14,20 +14,30 @@ Copy `.env.example` to `.env`, then provide Alpaca paper/data credentials, a FRE
 
 Run `edgar-moe build-universe`. Inspect `data/interim/security-mapping-review.json` and the new `data/interim/security-master-capture.json`. The latter records when the SEC-to-Alpaca mapping was observed locally and hashes both the broad CSV and mapping review; it is a self-recorded timestamp, **not** evidence of historical membership or independent time attestation. If you correct or exclude questionable mappings, update the review and run `edgar-moe record-universe-capture` after the edits; never backdate the observation time. Keep the reviewed `config/universe.csv`, review, and capture file together with the private experiment artifacts. Run `edgar-moe screen-universe --as-of YYYY-MM-DD` to produce the dated free-tier candidate set. Inactive Alpaca assets are included in matching, but the live source still cannot guarantee a historically complete identifier master.
 
-The screen rejects market bars after its declared cutoff and its version-3 audit
-records hashes of both CSVs and the master-capture record, plus the actual
-screen generation time. A backdated screen can still be created as a diagnostic,
-but the verifier will **reject** it if the master was observed after the screen
-cutoff, the screen was generated before that New York day finished, or it was
-generated on/after the first validation period. For a new v2 checkpoint, run
+A master first captured now cannot produce a reviewable screen before the
+2023–2024 v2 development folds. Do not change its timestamp to make one pass.
+This command supports new prospective study windows; the historical v2 gap
+requires a reviewed archived master and a fresh study under [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292).
+For a new prospective cutoff, capture the master before that New York day ends,
+then screen only after the day ends. The default screen cutoff is the previous
+New York day, so a master first captured after that cutoff is not eligible.
+
+The screen rejects market bars after its declared cutoff. Before reading data
+credentials or contacting Alpaca, it also rejects a master observed after the
+screen cutoff or a cutoff whose New York day has not finished. Its version-4
+audit records hashes of both CSVs and the master-capture record, the screen
+generation time, and a `research_screen` purpose. A retrospective screen is
+possible only with `--allow-retrospective-diagnostic` **and separate** `--output`
+and `--audit-output` paths; its audit says `retrospective_diagnostic`, and the
+research verifier always rejects it. For a new v2 checkpoint, run
 `edgar-moe verify-universe-screen --checkpoint data/raw/authenticated/<as-of> --config config/authenticated-v2.yaml`
 before interpreting development-fold scores. This offline check requires the
 screen cutoff to precede the **first** walk-forward validation year and binds
 the screened CSV to the checkpoint's requested universe. After building a
 processed dataset, rerun with `--dataset-dir data/processed/<dataset-id>` to
 hash-check its assets and bind its source-manifest digest to that same checkpoint.
-Old version-2 audits lack actual observation times and fail closed; do not
-backfill them by guessing. Even a passing version-3 trace cannot prove that
+Older audits lack the explicit purpose and fail closed; do not backfill them by
+guessing. Even a passing version-4 trace cannot prove that
 the broad SEC-to-Alpaca master has complete historical membership or that the
 local timestamps were independently witnessed. A current master screened
 against old bars remains subject to retrospective membership/survivorship bias.
