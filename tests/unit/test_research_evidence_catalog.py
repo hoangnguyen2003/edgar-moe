@@ -40,6 +40,7 @@ def _private_report() -> dict:
                 "baseline": name,
                 "champion_minus_baseline_rank_ic": 0.01,
                 "delta_interval_95": {"status": "ready", "low": -0.02, "high": 0.04},
+                "simultaneous_interval_95": {"status": "ready", "low": -0.03, "high": 0.05},
             }
             for name in (
                 "Elastic Net",
@@ -52,6 +53,7 @@ def _private_report() -> dict:
         "portfolio": {"status": "unavailable_return_calendar"},
         "uncertainty": {
             "method": "paired_calendar_month_moving_block_within_fold",
+            "simultaneous_method": "studentized_max_absolute_deviation_across_five_comparators",
             "conditional_on_selection": True,
             "block_months": 2,
             "resamples": 1000,
@@ -187,6 +189,8 @@ def test_reviewed_publication_allowlists_aggregates_and_refuses_overwrite(tmp_pa
     assert reviewed.duration_aware_v2.candidate_universe_status == (
         "historical_membership_unverified"
     )
+    assert reviewed.duration_aware_v2.comparisons[0].interval_low == -0.03
+    assert "simultaneous" in reviewed.duration_aware_v2.interpretation
     verify(catalog, lock)
     with pytest.raises(ValueError, match="refusing overwrite"):
         stage_reviewed_catalog(
@@ -278,7 +282,7 @@ def test_publication_requires_source_bound_rights_review(tmp_path: Path, mutatio
     assert lock.read_bytes() == LOCK_PATH.read_bytes()
 
 
-@pytest.mark.parametrize("mutation", ["hash", "locked", "uncertainty", "roster"])
+@pytest.mark.parametrize("mutation", ["hash", "locked", "uncertainty", "simultaneous", "roster"])
 def test_publication_rejects_untrusted_reports(tmp_path: Path, mutation: str) -> None:
     catalog = tmp_path / "catalog.json"
     lock = tmp_path / "catalog.sha256"
@@ -293,6 +297,8 @@ def test_publication_rejects_untrusted_reports(tmp_path: Path, mutation: str) ->
         report["locked_test_predictions"] = 1
     elif mutation == "uncertainty":
         report["uncertainty"]["conditional_on_selection"] = False
+    elif mutation == "simultaneous":
+        del report["comparisons"][0]["simultaneous_interval_95"]
     else:
         report["comparisons"].pop()
     if mutation != "hash":

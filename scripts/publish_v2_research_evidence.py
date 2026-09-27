@@ -91,9 +91,19 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
     ):
         raise ValueError("report is not a duration-aware, pretest-only v2 review")
     champion = report["champion"]
+    uncertainty = report["uncertainty"]
+    if (
+        uncertainty.get("method") != "paired_calendar_month_moving_block_within_fold"
+        or uncertainty.get("simultaneous_method")
+        != "studentized_max_absolute_deviation_across_five_comparators"
+        or uncertainty.get("conditional_on_selection") is not True
+    ):
+        raise ValueError("v2 uncertainty method or selection caveat is invalid")
     comparisons = []
     for item in report["comparisons"]:
-        interval = item["delta_interval_95"]
+        interval = item.get("simultaneous_interval_95")
+        if not isinstance(interval, dict) or interval.get("status") != "ready":
+            raise ValueError("five-comparator simultaneous interval is unavailable")
         comparisons.append(
             {
                 "baseline": item["baseline"],
@@ -104,12 +114,6 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
             }
         )
     portfolio = report["portfolio"]
-    uncertainty = report["uncertainty"]
-    if (
-        uncertainty.get("method") != "paired_calendar_month_moving_block_within_fold"
-        or uncertainty.get("conditional_on_selection") is not True
-    ):
-        raise ValueError("v2 uncertainty method or selection caveat is invalid")
     scenarios = []
     if portfolio["status"] == "development_only":
         if portfolio.get("cost_definition") != (
@@ -149,7 +153,8 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
         ),
         "approval_reference": approval_reference,
         "interpretation": (
-            "Development-fold comparisons are conditional on model selection, and the "
+            "Five-comparator simultaneous 95% development-fold intervals are conditional "
+            "on model selection, and the "
             "frozen v1 outcome was known before v2 was designed. Historical "
             "candidate-universe membership is not verified. "
             "No independent v2 ranking-skill or tradable-alpha claim is supported."

@@ -136,8 +136,10 @@ def review_v2_pretest(
     champion_name = str(champion["name"])
     champion_score = scores[:, names.index(champion_name)]
     comparisons = []
+    bootstrap_draws: list[list[float]] = []
     for baseline_name in SIMPLE_COMPARATORS:
         baseline_score = scores[:, names.index(baseline_name)]
+        draws: list[float] = []
         delta, interval = _paired_delta_interval(
             dataset,
             folds,
@@ -146,7 +148,9 @@ def review_v2_pretest(
             samples=bootstrap_samples,
             block_months=block_months,
             seed=seed,
+            draws_out=draws,
         )
+        bootstrap_draws.append(draws)
         comparisons.append(
             {
                 "baseline": baseline_name,
@@ -155,7 +159,11 @@ def review_v2_pretest(
                 "delta_interval_95": interval,
             }
         )
+    simultaneous = _simultaneous_rank_ic_intervals(comparisons, bootstrap_draws, bootstrap_samples)
+    for comparison, interval in zip(comparisons, simultaneous, strict=True):
+        comparison["simultaneous_interval_95"] = interval
     portfolio = _portfolio_cost_review(dataset, indices, names, scores, champion_name, config)
+    hypotheses = _development_hypotheses(champion_name, comparisons, portfolio)
     return {
         "schema_version": 1,
         "status": "pretest_development_only",
@@ -174,9 +182,11 @@ def review_v2_pretest(
             **metrics[champion_name],
         },
         "comparisons": comparisons,
+        "hypotheses": hypotheses,
         "portfolio": portfolio,
         "uncertainty": {
             "method": "paired_calendar_month_moving_block_within_fold",
+            "simultaneous_method": "studentized_max_absolute_deviation_across_five_comparators",
             "block_months": block_months,
             "resamples": bootstrap_samples,
             "seed": seed,
@@ -185,6 +195,8 @@ def review_v2_pretest(
         "interpretation": (
             "Development-era paired comparisons only; candidate selection used these same "
             "folds, and the frozen v1 outcome was known before this v2 design. "
+            "The five-comparator simultaneous intervals control the descriptive "
+            "comparison family, not selection bias or retrospective universe membership. "
             "No independent rank-skill, tradable-alpha, or LLM-value claim is supported."
         ),
     }
@@ -322,6 +334,7 @@ def _paired_delta_interval(
     samples: int,
     block_months: int,
     seed: int,
+    draws_out: list[float] | None = None,
 ) -> tuple[float, dict[str, Any]]:
     prepared: list[tuple[np.ndarray, np.ndarray, np.ndarray, list[np.ndarray]]] = []
     point_deltas: list[float] = []
@@ -377,6 +390,8 @@ def _paired_delta_interval(
             "valid_resamples": len(draws),
             **unavailable,
         }
+    if draws_out is not None:
+        draws_out.extend(draws)
     low, high = np.quantile(draws, [0.025, 0.975])
     return point, {
         "status": "ready",
@@ -385,6 +400,81 @@ def _paired_delta_interval(
         "valid_resamples": len(draws),
         "calendar_months_per_fold": months_per_fold,
     }
+
+
+def _simultaneous_rank_ic_intervals(
+    comparisons: list[dict[str, Any]], bootstrap_draws: list[list[float]], samples: int
+) -> list[dict[str, Any]]:
+    """Use common calendar resamples and a studentized maximum across comparators.
+
+    Each paired comparison restarts the same seeded block sampler; any invalid
+    draw makes the joint interval unavailable rather than misaligning columns.
+    """
+    if (
+        samples < 2
+        or len(comparisons) != len(SIMPLE_COMPARATORS)
+        or len(bootstrap_draws) != len(comparisons)
+        or any(len(draws) != samples for draws in bootstrap_draws)
+    ):
+        return [{"status": "unavailable_incomplete_common_resamples"} for _ in comparisons]
+    matrix = np.asarray(bootstrap_draws, dtype=np.float64).T
+    points = np.asarray(
+        [item["champion_minus_baseline_rank_ic"] for item in comparisons], dtype=np.float64
+    )
+    scales = np.std(matrix, axis=0, ddof=1)
+    if (
+        not np.isfinite(matrix).all()
+        or not np.isfinite(points).all()
+        or not np.isfinite(scales).all()
+        or not (scales > 0).all()
+    ):
+        return [{"status": "unavailable_degenerate_resamples"} for _ in comparisons]
+    critical = float(np.quantile(np.max(np.abs((matrix - points) / scales), axis=1), 0.95))
+    if not math.isfinite(critical):
+        return [{"status": "unavailable_degenerate_resamples"} for _ in comparisons]
+    return [
+        {
+            "status": "ready",
+            "low": float(point - critical * scale),
+            "high": float(point + critical * scale),
+            "critical_value": critical,
+            "valid_resamples": samples,
+        }
+        for point, scale in zip(points, scales, strict=True)
+    ]
+
+
+def _development_hypotheses(
+    champion_name: str, comparisons: list[dict[str, Any]], portfolio: dict[str, Any]
+) -> list[dict[str, str]]:
+    fundamental = next(
+        item for item in comparisons if item["baseline"] == "Fundamental-Only Expert"
+    )
+    interval = fundamental["simultaneous_interval_95"]
+    if "MoE" not in champion_name:
+        rank_status = "not_applicable_non_moe_champion"
+    elif interval["status"] != "ready":
+        rank_status = "unavailable"
+    elif interval["low"] > 0:
+        rank_status = "positive_development_only"
+    else:
+        rank_status = "incremental_value_not_established"
+
+    cost_status = "unavailable"
+    if "MoE" in champion_name and portfolio["status"] == "development_only":
+        for model in portfolio["models"]:
+            if model["model"] == champion_name:
+                for scenario in model["scenarios"]:
+                    if scenario["cost_bps"] == 10 and scenario.get("sharpe") is not None:
+                        cost_status = (
+                            "positive_development_point_estimate"
+                            if scenario["sharpe"] > 0
+                            else "nonpositive_development_point_estimate"
+                        )
+    return [
+        {"id": "moe_rank_ic_over_fundamental", "status": rank_status},
+        {"id": "moe_net_sharpe_above_zero_at_10bps", "status": cost_status},
+    ]
 
 
 def _rank_ic(target: np.ndarray, score: np.ndarray, *, strict: bool = True) -> float:

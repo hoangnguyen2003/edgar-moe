@@ -25,10 +25,12 @@ public-project improvement or a qualification the project cannot establish.
 | [Software Engineer Intern](https://www.worldquant.com/career-listing/?id=4652485006): Python, algorithms, tests, quant-data interest | [Quick start](../README.md#quick-start), [unit tests](../tests/unit), [CI](../.github/workflows/ci.yml) | Reviewers need a small credential-free route from setup to a checked result | Proposed one-command synthetic fixture walkthrough in [research runbook](research-runbook.md); current enrollment is not demonstrated by this repository |
 
 The separate pre-test-only v2 review path verifies duration-aware dataset and
-selection identities, recomputes paired comparisons, and retains uncertainty
-and cost context. The terminal publication boundary admits only reviewed
-aggregates; it currently reports v2 as pending. Neither path touches the
-frozen v1 locked result or forward registry.
+selection identities, recomputes paired comparisons, and retains both
+five-comparator simultaneous uncertainty and cost context. Its explicit MoE
+hypotheses remain development-only; the private analysis does not establish
+incremental skill or a positive 10 bps net return. The terminal publication
+boundary admits only reviewed aggregates; it currently reports v2 as pending.
+Neither path touches the frozen v1 locked result or forward registry.
 
 The [candidate-screen verifier](../src/edgar_moe/data/screen_audit.py) now
 binds a dated, hash-pinned liquidity screen to the exact requested checkpoint
