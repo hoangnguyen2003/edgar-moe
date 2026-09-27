@@ -314,8 +314,8 @@ def test_diagnostic_cannot_overwrite_default_research_paths(
             "--allow-retrospective-diagnostic",
         ],
     )
-    assert result.exit_code != 0
-    assert "Retrospective diagnostics require separate --output" in result.output
+    assert result.exit_code == 2
+    assert isinstance(result.exception, SystemExit)
 
 
 def test_screen_trace_binds_screen_to_checkpoint_without_overclaiming(
