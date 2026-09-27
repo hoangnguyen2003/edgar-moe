@@ -93,6 +93,19 @@ def _verify_review_roster(source_path: Path, review_path: Path) -> None:
             raise ValueError("Broad universe security ID differs from its mapping review")
 
 
+def verify_screen_observation_window(observed: datetime, cutoff: date, generated: datetime) -> None:
+    """Reject a screen whose master or execution time cannot precede research use."""
+    ny_cutoff_end = datetime.combine(
+        cutoff + timedelta(days=1), time.min, tzinfo=ZoneInfo("America/New_York")
+    ).astimezone(UTC)
+    if observed >= ny_cutoff_end:
+        raise ValueError("Source master was observed after the screen cutoff")
+    if generated < ny_cutoff_end:
+        raise ValueError("Screen ran before the New York cutoff date completed")
+    if generated < observed:
+        raise ValueError("Screen generation precedes source-master observation")
+
+
 def verify_screen_trace(
     audit_path: Path,
     source_path: Path,
@@ -106,8 +119,10 @@ def verify_screen_trace(
 ) -> dict[str, Any]:
     """Fail closed on missing, changed, or retrospective candidate-screen evidence."""
     audit = orjson.loads(audit_path.read_bytes())
-    if not isinstance(audit, dict) or audit.get("schema_version") != 3:
-        raise ValueError("A version-3 candidate-screen audit is required")
+    if not isinstance(audit, dict) or audit.get("schema_version") != 4:
+        raise ValueError("A version-4 candidate-screen audit is required")
+    if audit.get("purpose") != "research_screen":
+        raise ValueError("Retrospective diagnostics cannot verify a research screen")
     try:
         cutoff = date.fromisoformat(audit["as_of"])
         lookback = date.fromisoformat(audit["lookback_start"])
@@ -119,15 +134,9 @@ def verify_screen_trace(
     if audit.get("source_capture_sha256") != sha256_file(source_capture_path):
         raise ValueError("Source-master capture differs from the screen audit")
     generated = _utc_observation(audit.get("generated_at_utc"), "screen generation")
-    if observed.date() > cutoff or generated.date() >= first_validation_start:
-        raise ValueError("Source master or screen was observed after the research cutoff")
-    ny_cutoff_end = datetime.combine(
-        cutoff + timedelta(days=1), time.min, tzinfo=ZoneInfo("America/New_York")
-    ).astimezone(UTC)
-    if generated < ny_cutoff_end:
-        raise ValueError("Screen was generated before the New York cutoff date completed")
-    if generated < observed:
-        raise ValueError("Screen generation precedes source-master observation")
+    verify_screen_observation_window(observed, cutoff, generated)
+    if generated.date() >= first_validation_start:
+        raise ValueError("Screen was generated after the first validation period began")
     if audit.get("source_sha256") != sha256_file(source_path):
         raise ValueError("Broad-universe CSV differs from its screen audit")
     if audit.get("screened_universe_sha256") != sha256_file(screened_path):

@@ -38,6 +38,9 @@ universe and requires its cutoff before the first validation year. It also
 records when the reviewed master and screen were actually observed, rejects a
 retrospective observation, and can hash-check the processed dataset derived
 from that checkpoint ([ADR 0031](adr/0031-universe-observation-chronology.md)).
+The screen command checks master/cutoff chronology before provider access; an
+explicit retrospective diagnostic uses separate output paths and cannot pass
+the research verifier ([ADR 0032](adr/0032-universe-screen-preflight.md)).
 This closes a traceability gap for the research roles, but not historical
 security-master membership: today's SEC-to-Alpaca mapping can still introduce
 survivorship bias, so the verifier explicitly withholds a full point-in-time
