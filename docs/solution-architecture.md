@@ -274,6 +274,9 @@ Evidence is never erased to make a retry look clean.
   [synthetic read-path benchmark](../scripts/benchmark_forward_read_path.py)
   isolates the cold calendar-interval CPU cost; [ADR 0030](adr/0030-forward-interval-read-path.md)
   records the optimization and why this local SQLite result is not a hosted SLO.
+  A separate [bounded hosted observation](hosted-read-path-observation.md)
+  records actual client latency, errors, and edge-cache mix without attributing
+  network outliers to a particular layer or claiming an SLO.
 
 ### Runbooks
 

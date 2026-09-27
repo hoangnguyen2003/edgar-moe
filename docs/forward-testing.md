@@ -828,6 +828,17 @@ If the cold interval regresses, compare the same row/settlement count and
 Python/runtime on an otherwise idle host, run the uncertainty parity tests,
 and inspect DB/network separately before changing the statistical method.
 
+For a bounded hosted read-only observation, use
+[`benchmark_hosted_read_path.py`](../scripts/benchmark_hosted_read_path.py) only
+after the [deployment smoke check](../scripts/smoke_deployment.py) verifies the
+serving identity. It samples four fixed public GET routes sequentially,
+reports HTTP/semantic errors and cache mix separately from successful latency,
+and refuses to retain response bodies. Its [2026-09-27 observation](hosted-read-path-observation.md)
+includes multi-second outliers despite some edge hits; it does not establish
+an SLO, concurrency capacity, or a Postgres bottleneck. Keep each output in a
+new ignored `data/artifacts/` path and do not run a high-rate load test against
+the free production deployment.
+
 The optional notifier maps these conditions to `failed_run`, `stale_runner`,
 `registry_unavailable`, `quality_failure`, and `quality_warning` events. Use
 `uv run python scripts/notify_forward_alert.py --dry-run` with a saved context
