@@ -17,7 +17,9 @@ from edgar_moe.data.storage import sha256_file
 from edgar_moe.features.dataset import ResearchDataset
 from edgar_moe.modeling.pretest_review import (
     SIMPLE_COMPARATORS,
+    _development_hypotheses,
     _portfolio_cost_review,
+    _simultaneous_rank_ic_intervals,
     review_v2_pretest,
 )
 from edgar_moe.modeling.walk_forward import PROTOCOL_REVISIONS, make_walk_forward_folds
@@ -156,8 +158,74 @@ def test_v2_review_compares_paired_pretest_scores_without_opening_locked_period(
     assert review["oof_events"] > 30
     assert len(review["comparisons"]) == len(SIMPLE_COMPARATORS)
     assert all(item["delta_interval_95"]["status"] == "ready" for item in review["comparisons"])
+    assert all(
+        item["simultaneous_interval_95"]["status"] == "ready" for item in review["comparisons"]
+    )
+    assert review["uncertainty"]["simultaneous_method"] == (
+        "studentized_max_absolute_deviation_across_five_comparators"
+    )
+    fundamental = next(
+        item for item in review["comparisons"] if item["baseline"] == "Fundamental-Only Expert"
+    )
+    expected_status = (
+        "positive_development_only"
+        if fundamental["simultaneous_interval_95"]["low"] > 0
+        else "incremental_value_not_established"
+    )
+    assert review["hypotheses"][0] == {
+        "id": "moe_rank_ic_over_fundamental",
+        "status": expected_status,
+    }
     assert review["uncertainty"]["conditional_on_selection"] is True
     assert review["portfolio"]["status"] == "unavailable_return_calendar"
+    assert review["hypotheses"][1]["status"] == "unavailable"
+
+
+def test_simultaneous_interval_responds_to_another_comparator_and_incomplete_draws() -> None:
+    comparisons = [
+        {"baseline": name, "champion_minus_baseline_rank_ic": 0.0} for name in SIMPLE_COMPARATORS
+    ]
+    shared = [[-0.2, -0.1, 0.1, 0.2] for _ in SIMPLE_COMPARATORS]
+    first = _simultaneous_rank_ic_intervals(comparisons, shared, 4)
+    assert all(item["status"] == "ready" for item in first)
+    changed = [list(draws) for draws in shared]
+    changed[-1] = [-0.6, -0.1, 0.1, 0.2]
+    second = _simultaneous_rank_ic_intervals(comparisons, changed, 4)
+    assert second[0]["critical_value"] >= first[0]["critical_value"]
+    assert second[0]["low"] <= first[0]["low"]
+    assert _simultaneous_rank_ic_intervals(comparisons, changed[:-1], 4)[0]["status"] == (
+        "unavailable_incomplete_common_resamples"
+    )
+    nonfinite = [list(draws) for draws in shared]
+    nonfinite[0][0] = float("nan")
+    assert _simultaneous_rank_ic_intervals(comparisons, nonfinite, 4)[0]["status"] == (
+        "unavailable_degenerate_resamples"
+    )
+    inconsistent = [dict(item) for item in comparisons]
+    inconsistent[0]["champion_minus_baseline_rank_ic"] = 0.1
+    constant = [[0.0] * 4 for _ in SIMPLE_COMPARATORS]
+    assert _simultaneous_rank_ic_intervals(inconsistent, constant, 4)[0]["status"] == (
+        "unavailable_degenerate_resamples"
+    )
+
+
+def test_development_hypotheses_keep_cost_point_estimate_conditional() -> None:
+    comparisons = [
+        {"baseline": name, "simultaneous_interval_95": {"status": "ready", "low": -0.01}}
+        for name in SIMPLE_COMPARATORS
+    ]
+    portfolio = {
+        "status": "development_only",
+        "models": [{"model": "Candidate MoE", "scenarios": [{"cost_bps": 10, "sharpe": -0.2}]}],
+    }
+    hypotheses = _development_hypotheses("Candidate MoE", comparisons, portfolio)
+    assert hypotheses == [
+        {"id": "moe_rank_ic_over_fundamental", "status": "incremental_value_not_established"},
+        {
+            "id": "moe_net_sharpe_above_zero_at_10bps",
+            "status": "nonpositive_development_point_estimate",
+        },
+    ]
 
 
 def test_v2_portfolio_review_requires_complete_returns_and_charges_costs(tmp_path: Path) -> None:

@@ -226,17 +226,25 @@ uv run edgar-moe v2-pretest-review \
 
 This command verifies dataset/selection/OOF hashes and revised protocol
 identities, recalculates each model's saved fold metrics, and reports paired
-calendar-month-block rank-IC differences against five simpler models. Its
-intervals are **conditional on the same development-fold selection**; they are
-not independent significance tests. A separate pre-locked OOF portfolio check
+calendar-month-block rank-IC differences against five simpler models. It retains
+each unadjusted paired interval for audit, but evaluates incremental MoE rank IC
+using a 95% studentized max-deviation interval across all five comparators on
+common calendar resamples. The familywise intervals are **conditional on the
+same development-fold selection**; they do not correct selection bias, the
+retrospective universe, or the known v1 outcome. The private report records
+explicit development-only hypotheses for MoE rank IC over the fundamental
+baseline and positive 10 bps net Sharpe. Neither is an independent significance
+test. A separate pre-locked OOF portfolio check
 shows 10/25/50 bps transaction-cost scenarios and short-borrow cost for the
 champion and fundamental baseline only if the active security-day return panel
 passes a completeness gate. Otherwise it reports an unavailable reason, not
 zero-filled performance. Events extending into the locked period are excluded
 from that portfolio check. The output defaults to the private ignored
 `data/artifacts/v2-reviews/<dataset-id>/pretest-review.json`, is hash-pinned,
-and refuses overwrite. Keep it private while checking sample sizes, calendar
-coverage, uncertainty, model complexity, cost sensitivity, and data licenses.
+and refuses overwrite. For a revised method, choose a new private `--output-dir`
+and retain both hash-pinned reports rather than rewriting the old result. Keep
+them private while checking sample sizes, calendar coverage, uncertainty, model
+complexity, cost sensitivity, and data licenses.
 
 The dataset loader reads the complete target array, but this command never
 indexes, scores, or evaluates locked-period labels. It does not update the
@@ -271,7 +279,7 @@ remain useful for methodology review, but no v2 public-result claim is approved.
 
 Only after a source-by-source permitted-use review or an approved replacement
 dataset, check the private report's source/data/selection identities, full
-five-baseline roster, interval readiness, sample sizes, cost panel (or reason
+five-baseline roster, simultaneous-interval readiness, sample sizes, cost panel (or reason
 for unavailability), and absence of locked-test predictions. In the same PR,
 add a reviewed `config/v2-publication-rights.json` record scoped to the exact
 report dataset ID and source-manifest SHA-256. It must name `sec_edgar`,
