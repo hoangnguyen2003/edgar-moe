@@ -110,7 +110,9 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
         if not isinstance(payload, dict):
             observation["result"] = "contract_error"
         elif route == "health":
-            observation["semantic_status"] = payload.get("status")
+            observation["semantic_status"] = (
+                payload.get("status") if payload.get("status") == "ok" else "unexpected"
+            )
             commit = payload.get("commit_sha")
             if not isinstance(commit, str) or _COMMIT_SHA.fullmatch(commit) is None:
                 observation["result"] = "contract_error"
@@ -119,9 +121,17 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
             if payload.get("status") != "ok" or payload.get("snapshot_loaded") is not True:
                 observation["result"] = "semantic_degraded"
         else:
-            observation["semantic_status"] = payload.get("health_status")
-            observation["registry_available"] = payload.get("available")
-            if payload.get("health_status") not in {"ok", "warning", "degraded"}:
+            observation["semantic_status"] = (
+                payload.get("health_status")
+                if payload.get("health_status") in ("ok", "warning", "degraded")
+                else "unexpected"
+            )
+            observation["registry_available"] = (
+                payload.get("available")
+                if isinstance(payload.get("available"), bool)
+                else "unexpected"
+            )
+            if payload.get("health_status") not in ("ok", "warning", "degraded"):
                 observation["result"] = "contract_error"
             elif payload.get("available") is not True or payload.get("health_status") == "degraded":
                 observation["result"] = "semantic_degraded"
@@ -175,6 +185,12 @@ def measure(
     results: dict[str, Any] = {}
     for name, items in observations.items():
         successes = [float(item["latency_ms"]) for item in items if item["result"] == "ok"]
+        cache_successes: dict[str, list[float]] = {}
+        for item in items:
+            if item["result"] == "ok" and "edge_cache" in item:
+                cache_successes.setdefault(str(item["edge_cache"]), []).append(
+                    float(item["latency_ms"])
+                )
         results[name] = {
             "requests": len(items),
             "result_counts": dict(sorted(Counter(item["result"] for item in items).items())),
@@ -205,6 +221,16 @@ def measure(
                 if successes
                 else None
             ),
+            "successful_latency_by_edge_cache_ms": {
+                cache: {
+                    "requests": len(durations),
+                    "p50": round(statistics.median(durations), 3),
+                    "p95": round(_percentile(durations, 0.95), 3),
+                    "p99": round(_percentile(durations, 0.99), 3),
+                    "max": round(max(durations), 3),
+                }
+                for cache, durations in sorted(cache_successes.items())
+            },
         }
         if name in {"health", "forward_status"}:
             results[name]["semantic_status_counts"] = dict(
@@ -237,7 +263,7 @@ def measure(
     )
     warning = results["forward_status"]["semantic_status_counts"].get("warning", 0) > 0
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "scope": "hosted_public_api_sequential_read_only_observation",
         "status": "degraded" if not healthy else "warning" if warning else "observed",
         "captured_at": datetime.now(UTC).isoformat(),
@@ -254,11 +280,13 @@ def measure(
         },
         "warmup_result": warmup,
         "results": results,
+        "sample_observations": observations,
         "limitations": [
             "Client-observed latency includes network, edge, serverless, and origin effects; no layer is isolated.",
             "A short sequential sample does not establish concurrency capacity, a seven-day baseline, or an SLO.",
             "Only successful 200 JSON responses enter latency percentiles; all failures are counted separately.",
-            "No provider payload, credentials, or response bodies are retained.",
+            "Samples retain bounded timing, HTTP/cache and semantic categories, and serving commit only; no provider payload, credentials, or response bodies are retained.",
+            "An edge MISS cannot by itself identify a serverless cold start or idle database resume.",
         ],
     }
 

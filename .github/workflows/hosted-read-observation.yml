@@ -1,0 +1,35 @@
+name: Daily hosted read observation
+
+on:
+  workflow_dispatch:
+  schedule:
+    # One small daily sample; GitHub scheduled runs may start late or be skipped.
+    - cron: "23 9 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgar-moe-hosted-read-observation
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Observe bounded public GET read path
+        run: |
+          python3 scripts/benchmark_hosted_read_path.py https://edgar-moe.vercel.app \
+            --expect-commit "$GITHUB_SHA" \
+            --samples-per-route 8 --pause-ms 500 --timeout-seconds 10 \
+            --output hosted-read-observation.json
+      - name: Retain redacted observation even on degradation
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hosted-read-observation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: hosted-read-observation.json
+          if-no-files-found: warn
+          retention-days: 30
