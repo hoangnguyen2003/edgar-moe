@@ -231,8 +231,11 @@ each unadjusted paired interval for audit, but evaluates incremental MoE rank IC
 using a 95% studentized max-deviation interval across all five comparators on
 common calendar resamples. The familywise intervals are **conditional on the
 same development-fold selection**; they do not correct selection bias, the
-retrospective universe, or the known v1 outcome. The private report records
-explicit development-only hypotheses for MoE rank IC over the fundamental
+retrospective universe, or the known v1 outcome. Both the aggregate-only
+publication contract and the Research page explicitly label the published
+bounds as five-comparator simultaneous intervals; an unadjusted paired interval
+cannot silently substitute for them. The private report records explicit
+development-only hypotheses for MoE rank IC over the fundamental
 baseline and positive 10 bps net Sharpe. Neither is an independent significance
 test. A separate pre-locked OOF portfolio check
 shows 10/25/50 bps transaction-cost scenarios and short-borrow cost for the

@@ -123,6 +123,7 @@ def verify(
                 "champion_name",
                 "champion_weighted_rank_ic",
                 "uncertainty_method",
+                "simultaneous_method",
                 "block_months",
                 "bootstrap_resamples",
                 "comparisons",
@@ -136,6 +137,12 @@ def verify(
         )
         if v2["candidate_universe_status"] != "historical_membership_unverified":
             raise ValueError("reviewed v2 candidate-universe status is invalid")
+        if (
+            v2["uncertainty_method"] != "paired_calendar_month_moving_block_within_fold"
+            or v2["simultaneous_method"]
+            != "studentized_max_absolute_deviation_across_five_comparators"
+        ):
+            raise ValueError("reviewed v2 uncertainty method is invalid")
         if not isinstance(v2["comparisons"], list) or len(v2["comparisons"]) != len(COMPARATORS):
             raise ValueError("reviewed v2 comparator roster is invalid")
         baselines = set()

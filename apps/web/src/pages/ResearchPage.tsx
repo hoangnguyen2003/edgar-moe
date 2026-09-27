@@ -142,13 +142,13 @@ function ReviewedV2({ evidence }: {
 }) {
   return <>
     <p>{evidence.oof_events.toLocaleString()} out-of-fold development events. Selected {evidence.champion_name}: weighted rank IC {signedDecimal(evidence.champion_weighted_rank_ic, 3)}.</p>
-    <p>Paired calendar-month block intervals within each fold: {evidence.block_months} months, {evidence.bootstrap_resamples.toLocaleString()} resamples. These intervals are conditional on model selection.</p>
+    <p>Five-comparator simultaneous 95% intervals use paired calendar-month blocks within each fold: {evidence.block_months} months, {evidence.bootstrap_resamples.toLocaleString()} resamples. They account for comparing against five baselines, but remain conditional on development-fold model selection.</p>
     <p role="note"><strong>Universe-selection limitation:</strong> Historical candidate membership is unverified; these development results are not a fully point-in-time validation.</p>
     <p>{evidence.interpretation}</p>
     <div className="table-scroll">
       <table className="evidence-table">
         <caption>Development-fold rank IC difference against simple baselines</caption>
-        <thead><tr><th scope="col">Baseline</th><th scope="col">Difference</th><th scope="col">95% interval</th></tr></thead>
+        <thead><tr><th scope="col">Baseline</th><th scope="col">Difference</th><th scope="col">Simultaneous 95% interval</th></tr></thead>
         <tbody>{evidence.comparisons.map((row) => <tr key={row.baseline}>
           <th scope="row">{row.baseline}</th>
           <td>{signedDecimal(row.rank_ic_delta, 3)}</td>

@@ -141,6 +141,7 @@ def reviewed_aggregate(report: dict[str, Any], approval_reference: str) -> dict[
         "champion_name": champion["name"],
         "champion_weighted_rank_ic": champion["weighted_rank_ic"],
         "uncertainty_method": uncertainty["method"],
+        "simultaneous_method": uncertainty["simultaneous_method"],
         "block_months": uncertainty["block_months"],
         "bootstrap_resamples": uncertainty["resamples"],
         "comparisons": comparisons,

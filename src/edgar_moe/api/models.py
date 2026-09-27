@@ -119,6 +119,7 @@ class V2ReviewedEvidence(BaseModel):
     champion_name: str
     champion_weighted_rank_ic: float
     uncertainty_method: Literal["paired_calendar_month_moving_block_within_fold"]
+    simultaneous_method: Literal["studentized_max_absolute_deviation_across_five_comparators"]
     block_months: int = Field(ge=1)
     bootstrap_resamples: int = Field(ge=100)
     comparisons: list[V2ComparisonEvidence]
