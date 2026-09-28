@@ -300,6 +300,25 @@ unmatched inline symbol is not proof that no symbol exists in another filing
 format. A one-day sample and a seven-day lag guard do **not** establish
 full historical membership, archive immutability, identifier continuity, or
 market-bar rights. Do not use it to promote v2 or replace the publication gate.
+
+For the **separate prospective filer-source experiment**, review the committed
+[`2026 Q3 capture policy`](../config/prospective_sec_filer_cohort_v1.json)
+before its 2026-10-09 through 2026-10-15 UTC capture window. During that window,
+with a private `SEC_USER_AGENT` containing a contact email, run
+`python scripts/capture_prospective_sec_index.py --live --output-dir
+data/artifacts/sec-filer-cohort-2026q3-v1` as one shell command. It makes one
+bounded SEC request, retains the exact index bytes and redacted commitment
+owner-only in ignored `data/artifacts/`, and prints only the commitment. Then
+run `python scripts/capture_prospective_sec_index.py --verify --output-dir
+data/artifacts/sec-filer-cohort-2026q3-v1` offline. Post the printed redacted
+commitment, **not** the raw index, CIK roster, or credentials, to
+[issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292) before
+2026-10-16 00:00 UTC; independently check the GitHub server timestamp and
+the policy's prior merge. Do not recapture into the same directory, edit the
+policy after observing the index, or present the local clock as independent
+proof. If the window or timestamp is missed, this study fails its prospective
+claim and needs a new predeclared study ID/cutoff. Even a verified commitment
+only pins a filing-index source, not tradable-security membership or v2 rights.
 V2 is explicitly `pending_review` until an operator reviews a
 **separate** pretest report. A successful pipeline run alone must not publish
 v2 or change the v1 snapshot.

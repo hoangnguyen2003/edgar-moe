@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "study_id": "sec-filer-cohort-2026q3-v1",
+  "source": "sec-edgar-full-index-master",
+  "year": 2026,
+  "quarter": 3,
+  "eligible_forms": ["10-K", "10-Q"],
+  "capture_not_before": "2026-10-09T00:00:00Z",
+  "capture_before": "2026-10-16T00:00:00Z",
+  "research_cutoff": "2026-10-16T00:00:00Z",
+  "minimum_eligible_rows": 1000
+}
