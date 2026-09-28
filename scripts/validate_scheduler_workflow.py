@@ -11,7 +11,7 @@ from typing import Any, cast
 import yaml
 
 WORKFLOW_NAME = "deploy-forward-scheduler.yml"
-WRANGLER_ACTION = "cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd"
+WRANGLER_ACTION = "cloudflare/wrangler-action@ebbaa1584979971c8614a24965b4405ff95890e0"
 _PINNED_ACTION = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
 _SECRET_EXPRESSION = "${{ secrets."
 
