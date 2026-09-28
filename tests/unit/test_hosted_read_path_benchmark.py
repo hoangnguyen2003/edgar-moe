@@ -16,9 +16,18 @@ from scripts import benchmark_hosted_read_path as benchmark  # noqa: E402
 class _Response:
     status = 200
 
-    def __init__(self, body: bytes, content_type: str = "application/json") -> None:
+    def __init__(
+        self,
+        body: bytes,
+        content_type: str = "application/json",
+        *,
+        edge_cache: str = "MISS",
+        origin_timing: str | None = None,
+    ) -> None:
         self.body = body
-        self.headers = {"Content-Type": content_type, "X-Vercel-Cache": "MISS"}
+        self.headers = {"Content-Type": content_type, "X-Vercel-Cache": edge_cache}
+        if origin_timing is not None:
+            self.headers["X-EDGAR-Read-Timing"] = origin_timing
 
     def __enter__(self) -> _Response:
         return self
@@ -107,6 +116,39 @@ def test_probe_never_retains_untrusted_semantic_strings() -> None:
     assert secret not in json.dumps(observed)
 
 
+def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None:
+    header = "app_header_ms=12.345;worker=first;registry_read_ms=7.890"
+    observed = benchmark._probe(
+        _Opener(_Response(b"{}", origin_timing=header)),
+        "https://example.test/api/v1/forward/forecasts?limit=25",
+        timeout_seconds=2,
+        route="forecasts_page",
+    )
+    assert observed["origin_timing_status"] == "observed"
+    assert observed["worker_state"] == "first"
+    assert observed["app_header_ms"] == 12.345
+    assert observed["registry_read_ms"] == 7.89
+    assert header not in json.dumps(observed)
+
+    cached = benchmark._probe(
+        _Opener(_Response(b"{}", edge_cache="HIT", origin_timing=header)),
+        "https://example.test/api/v1/forward/forecasts?limit=25",
+        timeout_seconds=2,
+        route="forecasts_page",
+    )
+    assert cached["origin_timing_status"] == "edge_or_unknown_ignored"
+    assert "worker_state" not in cached and "app_header_ms" not in cached
+
+    malformed = benchmark._probe(
+        _Opener(_Response(b"{}", origin_timing=header + ";secret=PRIVATE_VALUE")),
+        "https://example.test/api/v1/forward/forecasts?limit=25",
+        timeout_seconds=2,
+        route="forecasts_page",
+    )
+    assert malformed["origin_timing_status"] == "invalid"
+    assert "PRIVATE_VALUE" not in json.dumps(malformed)
+
+
 @pytest.mark.parametrize(
     ("result", "expected"),
     [
@@ -160,7 +202,7 @@ def test_bounded_round_robin_report_counts_failures_separately(
     assert report["status"] == "degraded"
     assert report["traffic"]["concurrency"] == 1
     assert report["results"]["health"]["successful_latency_ms"]["p95"] == 10
-    assert report["schema_version"] == 2
+    assert report["schema_version"] == 3
     assert report["results"]["health"]["successful_latency_by_edge_cache_ms"] == {
         "MISS": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
     }
@@ -196,6 +238,38 @@ def test_successful_latency_is_split_by_observed_edge_cache(
     assert health["successful_latency_by_edge_cache_ms"]["HIT"]["p50"] == 5.0
     assert health["successful_latency_by_edge_cache_ms"]["MISS"]["p50"] == 50.0
     assert len(report["sample_observations"]["health"]) == 5
+
+
+def test_successful_origin_latency_is_split_by_first_and_subsequent_process_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_probe(_opener: object, _url: str, *, timeout_seconds: float, route: str) -> dict:
+        nonlocal calls
+        calls += 1
+        worker = "first" if calls <= len(benchmark.ROUTES) else "subsequent"
+        return {
+            "result": "ok",
+            "http_status": 200,
+            "latency_ms": 80.0 if worker == "first" else 10.0,
+            "edge_cache": "MISS",
+            "origin_timing_status": "observed",
+            "worker_state": worker,
+            "app_header_ms": 40.0 if worker == "first" else 5.0,
+            "semantic_status": "ok",
+            "registry_available": True,
+            "served_commit_sha": "a" * 40 if route == "health" else None,
+        }
+
+    monkeypatch.setattr(benchmark, "_probe", fake_probe)
+    monkeypatch.setattr(benchmark.time, "sleep", lambda _seconds: None)
+    report = benchmark.measure("https://example.test", samples_per_route=5, pause_ms=200)
+    # The first request per route is a warmup and is excluded from measured samples.
+    assert report["warmup_observations"]["health"]["worker_state"] == "first"
+    assert report["results"]["health"]["successful_origin_latency_by_worker_ms"] == {
+        "subsequent": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
+    }
 
 
 def test_forward_quality_warning_is_visible_without_calling_it_an_outage(

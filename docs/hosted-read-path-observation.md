@@ -109,6 +109,34 @@ and 297.635 ms for forward status (8 MISS). These are one day's observations
 from a GitHub runner. The downloaded artifact passed the summary parser, which
 correctly returned `seven_day_coverage: false` and exit status 1.
 
+## Origin-process timing in later observations
+
+The API now emits a bounded `X-EDGAR-Read-Timing` response header with
+`app_header_ms`, a `worker=first|subsequent` marker, and—on the observed
+forward read routes—`registry_read_ms`. These values are numeric or fixed
+labels only: no request, user, row, query, connection, or provider identity is
+exposed. `app_header_ms` measures app request handling until response headers
+are ready, **not** end-to-end client latency or the entire streamed response.
+`registry_read_ms` includes connection acquisition, SQL, and Python work; it
+must not be described as database-only time. `first` means the first request
+handled by that app process, not independently verified Vercel cold start.
+
+Schema-v3 daily observations retain validated timing only on `MISS` or
+`BYPASS` responses. The observer discards the header on `HIT`, `STALE`, or
+unknown edge states because a shared cache can replay an earlier origin
+header. It retains only fixed status labels and bounded numbers, not the raw
+header. The multi-day summarizer accepts both legacy schema-v2 observations
+and schema-v3 observations; legacy samples remain explicitly unattributed.
+Schema v3 retains the four credential-free warmup observations **separately**
+from the 32 measured requests, so a first app-process request is not lost
+just because it occurred during warmup. The multi-day summary also separates
+those two cohorts. This permits separate client-latency distributions for
+first and subsequent observed app-process requests, with their sample counts.
+It does **not**
+isolate network, edge, platform cold-start initialization, or idle database
+resume. Provider-side function and database logs are still required for that
+attribution, and no SLO follows from these sparse samples.
+
 ## Provider-side database plan capture
 
 The [bounded plan tool](../scripts/capture_postgres_read_plans.py) is a manual

@@ -82,3 +82,109 @@ def test_summary_rejects_health_identity_mismatch(tmp_path: Path) -> None:
     path.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(ValueError, match="does not match expected commit"):
         summary.summarize([path])
+
+
+def test_summary_accepts_mixed_v2_v3_without_backfilling_missing_origin_evidence(
+    tmp_path: Path,
+) -> None:
+    old = _report(tmp_path / "old.json", date(2026, 9, 1))
+    newer = _report(tmp_path / "new.json", date(2026, 9, 2))
+    report = json.loads(newer.read_text(encoding="utf-8"))
+    report["schema_version"] = 3
+    for route, items in report["sample_observations"].items():
+        report["sample_observations"][route] = [
+            {**item, "origin_timing_status": "edge_or_unknown_ignored"} for item in items
+        ]
+    report["warmup_observations"] = {
+        route: {**items[0], "origin_timing_status": "edge_or_unknown_ignored"}
+        for route, items in report["sample_observations"].items()
+    }
+    report["warmup_observations"]["forward_status"] = {
+        "result": "ok",
+        "latency_ms": 70.0,
+        "edge_cache": "MISS",
+        "origin_timing_status": "observed",
+        "worker_state": "first",
+        "app_header_ms": 20.0,
+        "registry_read_ms": 12.0,
+    }
+    report["sample_observations"]["forward_status"] = [
+        {
+            "result": "ok",
+            "latency_ms": 10.0,
+            "edge_cache": "MISS",
+            "origin_timing_status": "observed",
+            "worker_state": "subsequent",
+            "app_header_ms": 5.0,
+            "registry_read_ms": 2.0,
+            "raw_header": "PRIVATE_NOT_RETAINED",
+        }
+        for _ in range(5)
+    ]
+    newer.write_text(json.dumps(report), encoding="utf-8")
+
+    result = summary.summarize([old, newer])
+
+    observed = result["results"]["forward_status"]
+    assert observed["origin_timing_status_counts"] == {"legacy_v2": 5, "observed": 5}
+    assert observed["successful_origin_latency_by_worker_ms"]["subsequent"]["requests"] == 5
+    assert observed["observed_registry_read_ms"]["requests"] == 5
+    assert (
+        result["warmup_results"]["forward_status"]["successful_client_latency_by_worker_ms"][
+            "first"
+        ]["requests"]
+        == 1
+    )
+    assert "PRIVATE_NOT_RETAINED" not in json.dumps(result)
+
+
+def test_summary_rejects_cached_or_malformed_origin_evidence(tmp_path: Path) -> None:
+    path = _report(tmp_path / "bad-origin.json", date(2026, 9, 1))
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["schema_version"] = 3
+    for route, items in report["sample_observations"].items():
+        report["sample_observations"][route] = [
+            {**item, "origin_timing_status": "edge_or_unknown_ignored"} for item in items
+        ]
+    report["warmup_observations"] = {
+        route: items[0] for route, items in report["sample_observations"].items()
+    }
+    item = report["sample_observations"]["forward_status"][0]
+    item.update(
+        {
+            "origin_timing_status": "observed",
+            "worker_state": "first",
+            "app_header_ms": 3.0,
+        }
+    )
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="cached timing"):
+        summary.summarize([path])
+
+    item["edge_cache"] = "MISS"
+    item["app_header_ms"] = float("nan")
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match="invalid origin timing metric"):
+        summary.summarize([path])
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("schema_version", True, "schema v2 or v3"),
+        ("status", [], "invalid report status"),
+        ("sample_result", [], "invalid sample"),
+    ],
+)
+def test_summary_rejects_malformed_report_types(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    path = _report(tmp_path / "bad-types.json", date(2026, 9, 1))
+    report = json.loads(path.read_text(encoding="utf-8"))
+    if field == "sample_result":
+        report["sample_observations"]["forward_status"][0]["result"] = value
+    else:
+        report[field] = value
+    path.write_text(json.dumps(report), encoding="utf-8")
+    with pytest.raises(ValueError, match=message):
+        summary.summarize([path])

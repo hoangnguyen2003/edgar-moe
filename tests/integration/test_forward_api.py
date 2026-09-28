@@ -93,14 +93,18 @@ def test_forward_api_contracts(tmp_path: Path) -> None:
     app.dependency_overrides[get_forward_registry] = lambda: registry
     try:
         with TestClient(app) as client:
-            status = client.get("/api/v1/forward/status").json()
+            status_response = client.get("/api/v1/forward/status")
+            assert "registry_read_ms=" in status_response.headers["X-EDGAR-Read-Timing"]
+            status = status_response.json()
             assert status["available"] is True
             assert status["forecast_count"] == 1
             assert status["health_status"] == "ok"
             assert status["latest_run_status"] == "succeeded"
             assert status["latest_quality_failures"] == 0
             assert client.get("/api/v1/forward/runs").json()[0]["run_id"] == "run-1"
-            page = client.get("/api/v1/forward/forecasts?ticker=test").json()
+            page_response = client.get("/api/v1/forward/forecasts?ticker=test")
+            assert "registry_read_ms=" in page_response.headers["X-EDGAR-Read-Timing"]
+            page = page_response.json()
             assert page["total"] == 1
             assert page["items"][0]["entry_at"].endswith("Z")
             assert page["items"][0]["cohort_size"] == 1
