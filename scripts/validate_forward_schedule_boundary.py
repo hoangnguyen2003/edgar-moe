@@ -4,6 +4,8 @@ The Cloudflare scheduler is intentionally dormant until a separate reviewed
 cutover. This contract keeps the existing GitHub schedule and manual dispatch
 available together, so an accidental workflow edit cannot silently remove the
 rollback trigger or change the point-in-time filing window.
+Provider-backed execution is separately held pending issue #280; the trigger
+contract remains intact so the eventual reviewed reopening preserves timing.
 """
 
 from __future__ import annotations
@@ -18,6 +20,15 @@ import yaml
 WORKFLOW = Path(".github/workflows/forward-production.yml")
 EXPECTED_CRON = "17 7 * * 2-6"
 EXPECTED_CONCURRENCY = "edgar-moe-forward-production"
+PROVIDER_HOLD_SCRIPT = (
+    "printf '%s\\n' 'Provider-backed forward cycles are on hold pending source-rights "
+    'issue #280. Reopening requires a reviewed PR after clearance.\' >> "$GITHUB_STEP_SUMMARY"\n'
+    "exit 1\n"
+)
+EXPECTED_CACHE_CONDITION = (
+    "${{ always() && needs.forecast-and-settle.result != 'cancelled' "
+    "&& needs.forecast-and-settle.result != 'skipped' }}"
+)
 
 
 def validate_forward_schedule_boundary(path: Path = WORKFLOW) -> list[str]:
@@ -57,6 +68,43 @@ def validate_forward_schedule_boundary(path: Path = WORKFLOW) -> list[str]:
     jobs = workflow.get("jobs")
     if not isinstance(jobs, dict) or "forecast-and-settle" not in jobs:
         errors.append("forward workflow must define forecast-and-settle")
+    else:
+        errors.extend(_validate_provider_hold(jobs))
+    return errors
+
+
+def _validate_provider_hold(jobs: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    expected_hold = {
+        "name": "Provider use held pending issue 280",
+        "runs-on": "ubuntu-24.04",
+        "timeout-minutes": 1,
+        "permissions": {},
+        "steps": [
+            {
+                "name": "Enforce the documented provider-use hold",
+                "shell": "bash",
+                "run": PROVIDER_HOLD_SCRIPT,
+            }
+        ],
+    }
+    if jobs.get("provider-use-review") != expected_hold:
+        errors.append("provider-use hold must remain unconditional, credential-free, and failing")
+    cycle = jobs.get("forecast-and-settle")
+    if (
+        not isinstance(cycle, dict)
+        or cycle.get("needs") != "provider-use-review"
+        or "if" in cycle
+        or "continue-on-error" in cycle
+    ):
+        errors.append("forward cycle must depend on the provider-use hold without a bypass")
+    cleanup = jobs.get("prune-forward-runtime-caches")
+    if (
+        not isinstance(cleanup, dict)
+        or cleanup.get("needs") != "forecast-and-settle"
+        or cleanup.get("if") != EXPECTED_CACHE_CONDITION
+    ):
+        errors.append("cache cleanup must skip a held forward cycle")
     return errors
 
 

@@ -5,6 +5,16 @@ list of questions for a provider or qualified rights reviewer, not a legal
 opinion or permission to use, train on, store, or publish any source content.
 Keep issue [#280](https://github.com/hoangnguyen2003/edgar-moe/issues/280) open.
 
+The production forward workflow now enforces this hold through a failing,
+credential-free prerequisite job. Scheduled and manual starts stop before the
+forecast/settlement job; cache cleanup is also skipped. The configured cron and
+filing-cutoff semantics remain available for the eventual reopening. This is an
+administrative hold implementing the existing review decision, not a determination
+of provider rights. Existing registry evidence remains readable and its freshness
+will age while ingestion is held. After the required source-use determination,
+reopen the workflow in a separate PR that cites the decision and updates the
+schedule-boundary contract. Only then perform the live verification in #288.
+
 ## Exact research inputs to review
 
 The local authenticated checkpoint manifests dated 2026-07-31 and 2026-08-06

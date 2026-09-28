@@ -2,8 +2,56 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+import yaml
+
 WORKFLOW = Path(".github/workflows/forward-production.yml")
 BOUNDARY_SCRIPT = Path("scripts/validate_forward_schedule_boundary.py")
+
+
+def test_provider_hold_exits_before_runtime(tmp_path: Path) -> None:
+    jobs = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]
+    summary = tmp_path / "summary.md"
+    result = subprocess.run(
+        ["/bin/bash", "-e", "-c", jobs["provider-use-review"]["steps"][0]["run"]],
+        env={"GITHUB_STEP_SUMMARY": str(summary)},
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "issue #280" in summary.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    ("job", "field", "value"),
+    [
+        ("provider-use-review", "continue-on-error", True),
+        ("provider-use-review", "if", "false"),
+        ("provider-use-review", "steps", [{"run": "exit 0"}]),
+        ("provider-use-review", "permissions", {"contents": "read"}),
+        ("forecast-and-settle", "needs", []),
+        ("forecast-and-settle", "if", "always()"),
+        ("forecast-and-settle", "continue-on-error", True),
+        ("prune-forward-runtime-caches", "if", "always()"),
+    ],
+)
+def test_provider_hold_rejects_bypasses(
+    tmp_path: Path, job: str, field: str, value: object
+) -> None:
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    document["jobs"][job][field] = value
+    workflow = tmp_path / WORKFLOW.name
+    workflow.write_text(yaml.safe_dump(document), encoding="utf-8")
+    result = subprocess.run(
+        [sys.executable, str(BOUNDARY_SCRIPT), str(workflow)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "forward schedule boundary contract failed" in result.stderr
 
 
 def test_forward_workflow_validates_secrets_before_installing_runtime() -> None:
