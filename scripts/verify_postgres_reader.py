@@ -52,7 +52,7 @@ def _assert_denied(connection: Connection[Any], statement: sql.Composed, operati
 
 
 def audit_reader_role(database_url: str) -> dict[str, object]:
-    """Return a redacted report after checking the effective reader privileges."""
+    """Return an audit report after checking the effective reader privileges."""
     if not database_url.strip():
         raise ValueError("EDGAR_MOE_REGISTRY_READ_DATABASE_URL is required")
 
@@ -134,6 +134,14 @@ def audit_reader_role(database_url: str) -> dict[str, object]:
         }
 
 
+def redact_reader_identity(report: dict[str, object]) -> dict[str, object]:
+    """Omit provider role/database names from a retained audit artifact."""
+    return {
+        **{key: value for key, value in report.items() if key not in {"role", "database"}},
+        "identity_redacted": True,
+    }
+
+
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify the SELECT-only Postgres role used by the API and auditor."
@@ -142,6 +150,11 @@ def _parse_args() -> argparse.Namespace:
         "--database-url",
         default=os.environ.get("EDGAR_MOE_REGISTRY_READ_DATABASE_URL", ""),
         help="Reader URL; defaults to EDGAR_MOE_REGISTRY_READ_DATABASE_URL.",
+    )
+    parser.add_argument(
+        "--redact-identity",
+        action="store_true",
+        help="Omit role and database names from JSON retained outside the operator environment.",
     )
     return parser.parse_args()
 
@@ -153,6 +166,8 @@ def main() -> int:
     except (ValueError, ReaderRoleAuditError, psycopg.Error) as error:
         print(f"Reader-role audit failed: {_safe_error_message(error)}", file=sys.stderr)
         return 1
+    if args.redact_identity:
+        report = redact_reader_identity(report)
     print(json.dumps(report, indent=2, sort_keys=True))
     return 0
 

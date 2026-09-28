@@ -56,7 +56,7 @@ jobs:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_READ_DATABASE_URL }}
         run: |
           set +e
-          uv run python scripts/verify_postgres_reader.py \
+          uv run python scripts/verify_postgres_reader.py --redact-identity \
             > "$AUDIT_DIR/reader-role.json" \
             2> "$AUDIT_DIR/reader-role.error"
           exit_code=$?

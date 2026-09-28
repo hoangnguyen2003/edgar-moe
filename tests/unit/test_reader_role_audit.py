@@ -54,3 +54,24 @@ def test_reader_audit_redacts_non_driver_error_details() -> None:
     assert "provider.example" not in message
     assert "super-secret" not in message
     assert "<redacted>" in message
+
+
+def test_retained_reader_audit_omits_provider_identity_without_changing_checks() -> None:
+    report = {
+        "status": "passed",
+        "role": "private_reader_role",
+        "database": "private_registry_database",
+        "select_tables": ["forward_runs"],
+        "write_probes": ["UPDATE", "DELETE", "DDL"],
+    }
+
+    retained = _MODULE.redact_reader_identity(report)
+
+    assert retained == {
+        "status": "passed",
+        "identity_redacted": True,
+        "select_tables": ["forward_runs"],
+        "write_probes": ["UPDATE", "DELETE", "DDL"],
+    }
+    assert report["role"] == "private_reader_role"
+    assert report["database"] == "private_registry_database"

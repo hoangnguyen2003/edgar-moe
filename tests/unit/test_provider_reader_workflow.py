@@ -14,6 +14,7 @@ def test_provider_reader_workflow_is_manual_and_read_only() -> None:
     assert "EDGAR_MOE_REGISTRY_READ_DATABASE_URL" in text
     assert "EDGAR_MOE_REGISTRY_DATABASE_URL" not in text
     assert "scripts/verify_postgres_reader.py" in text
+    assert "--redact-identity" in text
     assert "retention-days: 30" in text
 
 
