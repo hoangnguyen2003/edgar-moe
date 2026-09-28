@@ -34,6 +34,11 @@ def _policy(tmp_path: Path) -> dict[str, object]:
                 "capture_before": "2026-10-16T00:00:00Z",
                 "research_cutoff": "2026-10-16T00:00:00Z",
                 "minimum_eligible_rows": 2,
+                "github_attestation": {
+                    "repository": "example/research",
+                    "issue_number": 12,
+                    "author_user_id": 123,
+                },
             }
         ),
         encoding="utf-8",

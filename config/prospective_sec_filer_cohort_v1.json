@@ -8,5 +8,10 @@
   "capture_not_before": "2026-10-09T00:00:00Z",
   "capture_before": "2026-10-16T00:00:00Z",
   "research_cutoff": "2026-10-16T00:00:00Z",
-  "minimum_eligible_rows": 1000
+  "minimum_eligible_rows": 1000,
+  "github_attestation": {
+    "repository": "hoangnguyen2003/edgar-moe",
+    "issue_number": 292,
+    "author_user_id": 108612073
+  }
 }
