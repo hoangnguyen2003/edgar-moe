@@ -24,7 +24,7 @@ def _report(path: Path, day: date, *, origin: str = "https://example.test") -> P
         "captured_at": f"{day.isoformat()}T09:00:00+00:00",
         "traffic": {"samples_per_route": 5, "expected_commit_sha": "a" * 40},
         "status": "observed",
-        "sample_observations": {name: [sample] * 5 for name in summary.ROUTES},
+        "sample_observations": {name: [sample] * 5 for name in summary.LEGACY_ROUTES},
     }
     path.write_text(json.dumps(report), encoding="utf-8")
     return path
@@ -37,6 +37,8 @@ def test_summary_requires_seven_consecutive_utc_days_and_ignores_extra_fields(
     paths = [_report(tmp_path / f"{n}.json", start + timedelta(days=n)) for n in range(7)]
     result = summary.summarize(paths)
     assert result["seven_day_coverage"] is True
+    assert result["all_routes_seven_day_coverage"] is False
+    assert result["results"]["forward_performance"]["requests"] == 0
     assert result["longest_consecutive_utc_days"] == 7
     assert result["results"]["health"]["requests"] == 35
     assert result["results"]["health"]["successful_latency_by_edge_cache_ms"]["HIT"]["p95"] == 12.0
@@ -52,6 +54,13 @@ def test_missing_day_is_not_misreported_as_week(tmp_path: Path) -> None:
     assert result["distinct_utc_days"] == 7
     assert result["longest_consecutive_utc_days"] == 4
     assert result["seven_day_coverage"] is False
+
+
+def test_summary_rejects_duplicate_utc_day_instead_of_overweighting_it(tmp_path: Path) -> None:
+    first = _report(tmp_path / "first.json", date(2026, 9, 1))
+    second = _report(tmp_path / "second.json", date(2026, 9, 1))
+    with pytest.raises(ValueError, match="duplicate UTC observation day"):
+        summary.summarize([first, second])
 
 
 def test_summary_rejects_mixed_origins_and_unpinned_reports(tmp_path: Path) -> None:
@@ -171,7 +180,7 @@ def test_summary_rejects_cached_or_malformed_origin_evidence(tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("schema_version", True, "schema v2 or v3"),
+        ("schema_version", True, "schema v2, v3, or v4"),
         ("status", [], "invalid report status"),
         ("sample_result", [], "invalid sample"),
     ],
@@ -188,3 +197,40 @@ def test_summary_rejects_malformed_report_types(
     path.write_text(json.dumps(report), encoding="utf-8")
     with pytest.raises(ValueError, match=message):
         summary.summarize([path])
+
+
+def test_summary_requires_seven_performance_route_days_not_just_overall_days(
+    tmp_path: Path,
+) -> None:
+    start = date(2026, 9, 1)
+    paths = [_report(tmp_path / "legacy.json", start)]
+    for offset in range(1, 8):
+        path = _report(tmp_path / f"current-{offset}.json", start + timedelta(days=offset))
+        report = json.loads(path.read_text(encoding="utf-8"))
+        report["schema_version"] = 4
+        performance = {
+            "result": "ok",
+            "latency_ms": 12.0,
+            "edge_cache": "HIT",
+            "origin_timing_status": "edge_or_unknown_ignored",
+        }
+        report["sample_observations"] = {
+            route: [{**item, "origin_timing_status": "edge_or_unknown_ignored"} for item in items]
+            for route, items in report["sample_observations"].items()
+        }
+        report["sample_observations"]["forward_performance"] = [performance] * 5
+        report["warmup_observations"] = {
+            route: items[0] for route, items in report["sample_observations"].items()
+        }
+        path.write_text(json.dumps(report), encoding="utf-8")
+        paths.append(path)
+
+    six_route_days = summary.summarize(paths[:-1])
+    assert six_route_days["seven_day_coverage"] is True
+    assert six_route_days["all_routes_seven_day_coverage"] is False
+    assert six_route_days["results"]["forward_performance"]["distinct_utc_days"] == 6
+
+    complete = summary.summarize(paths)
+    assert complete["all_routes_seven_day_coverage"] is True
+    assert complete["results"]["forward_performance"]["requests"] == 35
+    assert complete["results"]["forward_performance"]["reports_with_route"] == 7

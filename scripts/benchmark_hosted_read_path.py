@@ -16,17 +16,18 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
-ROUTES = {
+LEGACY_ROUTES = {
     "health": "/api/v1/health",
     "summary": "/api/v1/summary",
     "forward_status": "/api/v1/forward/status",
     "forecasts_page": "/api/v1/forward/forecasts?limit=25",
 }
+ROUTES = {**LEGACY_ROUTES, "forward_performance": "/api/v1/forward/performance"}
 _MAX_BODY_BYTES = 1024 * 1024
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _ORIGIN_TIMING = re.compile(
@@ -133,7 +134,7 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
     if status != 200 or content_type != "application/json" or len(body) > _MAX_BODY_BYTES:
         observation["result"] = "contract_error"
         return observation
-    if route in {"health", "forward_status"}:
+    if route in {"health", "forward_status", "forward_performance"}:
         try:
             payload = json.loads(body)
         except (ValueError, UnicodeDecodeError):
@@ -152,7 +153,7 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
                 observation["served_commit_sha"] = commit
             if payload.get("status") != "ok" or payload.get("snapshot_loaded") is not True:
                 observation["result"] = "semantic_degraded"
-        else:
+        elif route == "forward_status":
             observation["semantic_status"] = (
                 payload.get("health_status")
                 if payload.get("health_status") in ("ok", "warning", "degraded")
@@ -167,6 +168,24 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
                 observation["result"] = "contract_error"
             elif payload.get("available") is not True or payload.get("health_status") == "degraded":
                 observation["result"] = "semantic_degraded"
+        else:
+            counts = [
+                payload.get(field) for field in ("forecast_count", "matured_count", "pending_count")
+            ]
+            coverage = payload.get("coverage")
+            if (
+                any(
+                    isinstance(value, bool)
+                    or not isinstance(value, int)
+                    or not 0 <= value <= 1_000_000_000
+                    for value in counts
+                )
+                or isinstance(coverage, bool)
+                or not isinstance(coverage, (int, float))
+                or not math.isfinite(coverage)
+                or not 0 <= coverage <= 1
+            ) or cast(int, counts[1]) + cast(int, counts[2]) != cast(int, counts[0]):
+                observation["result"] = "contract_error"
     return observation
 
 
@@ -328,7 +347,7 @@ def measure(
     )
     warning = results["forward_status"]["semantic_status_counts"].get("warning", 0) > 0
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "scope": "hosted_public_api_sequential_read_only_observation",
         "status": "degraded" if not healthy else "warning" if warning else "observed",
         "captured_at": datetime.now(UTC).isoformat(),
