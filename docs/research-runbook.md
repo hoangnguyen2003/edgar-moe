@@ -284,6 +284,18 @@ historically valid source-master audit addresses [issue #292](https://github.com
 The [proposed SEC fixed-universe protocol](adr/0033-sec-fixed-universe-protocol.md)
 defines a possible separate study and its fail-closed evidence gates; it is not
 an approved historical master or a change to the current publication status.
+For a bounded source-feasibility check, `scripts/pilot_sec_archive_coverage.py`
+can inspect one dated SEC daily index and at most 12 exact filing paths. It
+requires an explicitly supplied `SEC_USER_AGENT` with a contact address,
+`--live`, `--index-date`, `--cutoff`, and an owner-only output under ignored
+`data/artifacts/`. For example, after loading the private user agent locally,
+run `python scripts/pilot_sec_archive_coverage.py --live --index-date 2022-06-15
+--cutoff 2022-12-31 --sample-limit 8 --output
+data/artifacts/sec-archive-pilot-2022-06-15.json` (as one shell command).
+The output contains counts and hashes, not CIKs, tickers, company names, paths,
+or filing text. A one-day sample and a seven-day lag guard do **not** establish
+full historical membership, archive immutability, identifier continuity, or
+market-bar rights. Do not use it to promote v2 or replace the publication gate.
 V2 is explicitly `pending_review` until an operator reviews a
 **separate** pretest report. A successful pipeline run alone must not publish
 v2 or change the v1 snapshot.
