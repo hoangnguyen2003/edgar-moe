@@ -281,6 +281,9 @@ labeled point-in-time. This is a disclosure of a
 known defect, not a repair of the frozen study. A future reviewed v2 aggregate
 is also labeled `historical_membership_unverified` until a separate
 historically valid source-master audit addresses [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292).
+The [proposed SEC fixed-universe protocol](adr/0033-sec-fixed-universe-protocol.md)
+defines a possible separate study and its fail-closed evidence gates; it is not
+an approved historical master or a change to the current publication status.
 V2 is explicitly `pending_review` until an operator reviews a
 **separate** pretest report. A successful pipeline run alone must not publish
 v2 or change the v1 snapshot.
