@@ -173,6 +173,47 @@ aggregating 2026-09-28: the summarizer rejects duplicate UTC days. With the
 2026-09-27 v2 report, overall coverage is two days, but performance-route
 coverage is only one day. Neither reaches the seven-day gate.
 
+## Separate controlled-origin diagnostic
+
+The daily observer deliberately keeps its user-like cache mix. For a small,
+separate origin diagnostic, run the
+[`benchmark_controlled_origin` tool](../scripts/benchmark_controlled_origin.py)
+with the exact deployed commit:
+
+```bash
+uv run python -m scripts.benchmark_controlled_origin https://edgar-moe.vercel.app \
+  --expect-commit <current-deployed-40-character-sha> \
+  --output data/artifacts/hosted-read-observations/controlled-origin.json
+```
+
+The default is five round-robin GETs each for status, forecast page, and
+performance, plus health checks before and after: **17 requests total** at
+concurrency one with at least 500 ms between samples. The maximum is 26
+requests. Each forward request uses a fresh opaque `observer_probe` query
+value to seek a distinct edge cache key; the value and all response bodies are
+discarded. The report is created owner-only under the Git-ignored evidence
+directory and refuses overwrite. Only validated `MISS` or `BYPASS` responses
+count as origin evidence. If the cache ignores the query value, any response
+fails, or the pre/post health commit differs, the diagnostic exits degraded.
+Keep this synthetic cohort separate from the daily observer and its seven-day
+summary; it is **not** ordinary visitor traffic or a provider cold-start test.
+
+The first controlled run on 2026-09-28 pinned commit `00ed9503ab76c9da4063a5de429eb8bdc9629cd5`
+before and after, with 5/5 HTTP-valid edge `MISS` responses and validated
+origin timing on each of the three forward routes. All 15 carried
+`worker=subsequent`; none established a cold start. Performance client p50 was
+231.740 ms versus app-header p50 10.801 ms and registry-read p50 9.484 ms.
+Forecast-page client p50 was 241.555 ms, and status client p50 was 239.487 ms.
+At only five samples per route, interpolated p95/p99 figures are unstable and
+the residual client time cannot be assigned to a specific network, edge,
+platform, or database cause. The redacted, owner-only local report is
+`data/artifacts/hosted-read-observations/controlled-origin-2026-09-28-00ed950.json`
+(SHA-256 `94519b01a0e647cdf41defbf7c7d24da0465cc36489ff41c2dea7314e13731c9`).
+No response body, query nonce, provider identity, credential, or private row is
+committed. The report passed the repository redaction scanner. This controlled
+cohort must not be pooled with the same-day cache-HIT-heavy schema-v4 sample
+or compared causally with the local SQLite benchmark.
+
 ## Provider-side database plan capture
 
 The [bounded plan tool](../scripts/capture_postgres_read_plans.py) is a manual
