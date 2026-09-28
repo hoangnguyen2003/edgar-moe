@@ -108,3 +108,24 @@ No provider-backed run, historical master, or revised v2 result is authorized
 by this ADR alone. [Issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292)
 and [source-rights issue #280](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
 remain open.
+
+## Predeclared prospective source capture
+
+The separate `sec-filer-cohort-2026q3-v1` experiment pins the SEC 2026 Q3
+`full-index/master.idx` bytes once, between 2026-10-09 00:00 UTC and
+2026-10-16 00:00 UTC, before its 2026-10-16 research cutoff. The exact
+machine-readable policy is
+[`config/prospective_sec_filer_cohort_v1.json`](../../config/prospective_sec_filer_cohort_v1.json).
+This cutoff and eligible 10-K/10-Q forms are predeclared before the index
+capture; later SEC rebuilds must never replace the pinned bytes. The private
+raw index and a redacted hash/count commitment are produced by
+`scripts/capture_prospective_sec_index.py`. A GitHub issue comment containing
+the commitment must receive an independently checkable GitHub server timestamp
+before cutoff. Local timestamps alone are not independent proof of capture.
+
+This is a **filer-CIK source capture**, not a security universe, a completed
+cohort, or evidence that an issue or symbol was listed at the cutoff. Cover-fact
+extraction, ambiguous-class exclusions, historical identifier continuity,
+rights-cleared bar joins, selection/exclusion manifests, and dataset/checkpoint
+binding remain separate review gates. The existing v2 catalog remains
+`historical_membership_unverified` regardless of this capture's success.
