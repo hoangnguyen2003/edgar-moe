@@ -23,6 +23,7 @@ _ROOT = Path(__file__).resolve().parents[1]
 _POLICY = _ROOT / "config" / "prospective_sec_filer_cohort_v1.json"
 _ARTIFACT_ROOT = _ROOT / "data" / "artifacts"
 _MAX_INDEX_BYTES = 64 * 1024 * 1024
+_MAX_ROSTER_BYTES = 16 * 1024 * 1024
 _EXPECTED_KEYS = {
     "schema_version",
     "study_id",
@@ -111,7 +112,7 @@ def _check_time(policy: dict[str, Any], now: datetime) -> None:
         raise CohortCaptureError("capture is outside the predeclared window")
 
 
-def inspect_index(payload: bytes, policy: dict[str, Any]) -> dict[str, int]:
+def _periodic_rows(payload: bytes, policy: dict[str, Any]) -> list[tuple[str, str, str, str]]:
     if not payload or len(payload) > _MAX_INDEX_BYTES:
         raise CohortCaptureError("SEC index is empty or exceeds the byte bound")
     lines = payload.decode("latin-1").splitlines()
@@ -119,8 +120,7 @@ def inspect_index(payload: bytes, policy: dict[str, Any]) -> dict[str, int]:
     if header_at is None:
         raise CohortCaptureError("SEC index header is missing")
     seen_paths: set[str] = set()
-    ciks: set[str] = set()
-    eligible_rows = 0
+    rows: list[tuple[str, str, str, str]] = []
     quarter_start = (policy["quarter"] - 1) * 3 + 1
     for line in lines[header_at + 1 :]:
         if not line.strip() or set(line.strip()) == {"-"}:
@@ -151,11 +151,35 @@ def inspect_index(payload: bytes, policy: dict[str, Any]) -> dict[str, int]:
         if archive_path in seen_paths:
             raise CohortCaptureError("SEC index repeats a periodic filing path")
         seen_paths.add(archive_path)
-        ciks.add(cik.zfill(10))
-        eligible_rows += 1
-    if eligible_rows < policy["minimum_eligible_rows"]:
+        rows.append((cik.zfill(10), filed_date.isoformat(), form, archive_path))
+    if len(rows) < policy["minimum_eligible_rows"]:
         raise CohortCaptureError("SEC index has too few eligible rows")
-    return {"eligible_filing_rows": eligible_rows, "eligible_filer_ciks": len(ciks)}
+    return sorted(rows)
+
+
+def inspect_index(payload: bytes, policy: dict[str, Any]) -> dict[str, int]:
+    rows = _periodic_rows(payload, policy)
+    return {"eligible_filing_rows": len(rows), "eligible_filer_ciks": len({row[0] for row in rows})}
+
+
+def build_filer_roster(payload: bytes, policy: dict[str, Any]) -> bytes:
+    """Freeze every eligible CIK and accession, without ticker or listing claims."""
+    by_cik: dict[str, list[dict[str, str]]] = {}
+    for cik, filed, form, archive_path in _periodic_rows(payload, policy):
+        by_cik.setdefault(cik, []).append(
+            {"filed_date": filed, "form": form, "archive_path": archive_path}
+        )
+    roster = {
+        "schema_version": 1,
+        "status": "filing_cohort_only_not_tradable_security_membership",
+        "study_id": policy["study_id"],
+        "source_index_sha256": _digest(payload),
+        "filers": [{"cik": cik, "filings": filings} for cik, filings in sorted(by_cik.items())],
+    }
+    encoded = _canonical(roster) + b"\n"
+    if len(encoded) > _MAX_ROSTER_BYTES:
+        raise CohortCaptureError("filer roster exceeds the byte bound")
+    return encoded
 
 
 def build_commitment(
@@ -163,8 +187,9 @@ def build_commitment(
 ) -> dict[str, Any]:
     _check_time(policy, captured_at)
     counts = inspect_index(payload, policy)
+    roster_bytes = build_filer_roster(payload, policy)
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "filing_cohort_source_only_not_tradable_security_membership",
         "study_id": policy["study_id"],
         "source": policy["source"],
@@ -176,6 +201,8 @@ def build_commitment(
         "policy_sha256": _digest(_canonical(policy)),
         "index_sha256": _digest(payload),
         "index_byte_count": len(payload),
+        "filer_roster_sha256": _digest(roster_bytes),
+        "filer_roster_byte_count": len(roster_bytes),
         **counts,
     }
 
@@ -195,13 +222,23 @@ def _write_new(path: Path, payload: bytes) -> None:
 
 
 def save_capture(
-    payload: bytes, commitment: dict[str, Any], directory: Path, *, root: Path = _ARTIFACT_ROOT
+    payload: bytes,
+    commitment: dict[str, Any],
+    directory: Path,
+    policy: dict[str, Any],
+    *,
+    root: Path = _ARTIFACT_ROOT,
 ) -> None:
+    expected = build_commitment(payload, policy, captured_at=_instant(commitment["captured_at"]))
+    if commitment != expected:
+        raise CohortCaptureError("capture commitment does not match source and policy")
+    roster_bytes = build_filer_roster(payload, policy)
     destination = _private_path(directory, root=root)
     if destination.exists():
         raise CohortCaptureError("capture output already exists")
     destination.mkdir(parents=True, mode=0o700)
     _write_new(destination / "master.idx", payload)
+    _write_new(destination / "filer-roster.json", roster_bytes)
     _write_new(
         destination / "commitment.json",
         json.dumps(commitment, indent=2, sort_keys=True).encode() + b"\n",
@@ -213,11 +250,12 @@ def verify_capture(
 ) -> dict[str, Any]:
     destination = _private_path(directory, root=root)
     payload = (destination / "master.idx").read_bytes()
+    roster_bytes = (destination / "filer-roster.json").read_bytes()
     commitment = json.loads((destination / "commitment.json").read_text(encoding="utf-8"))
     if not isinstance(commitment, dict) or "captured_at" not in commitment:
         raise CohortCaptureError("capture commitment is invalid")
     expected = build_commitment(payload, policy, captured_at=_instant(commitment["captured_at"]))
-    if commitment != expected:
+    if commitment != expected or roster_bytes != build_filer_roster(payload, policy):
         raise CohortCaptureError("capture bytes or commitment differ from policy")
     return expected
 
@@ -245,7 +283,7 @@ def main() -> int:
             ) as client:
                 payload = _bounded_get(client, url)
             commitment = build_commitment(payload, policy, captured_at=datetime.now(UTC))
-            save_capture(payload, commitment, args.output_dir)
+            save_capture(payload, commitment, args.output_dir, policy)
     except (
         CohortCaptureError,
         OSError,

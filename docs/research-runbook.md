@@ -307,8 +307,10 @@ before its 2026-10-09 through 2026-10-15 UTC capture window. During that window,
 with a private `SEC_USER_AGENT` containing a contact email, run
 `python scripts/capture_prospective_sec_index.py --live --output-dir
 data/artifacts/sec-filer-cohort-2026q3-v1` as one shell command. It makes one
-bounded SEC request, retains the exact index bytes and redacted commitment
-owner-only in ignored `data/artifacts/`, and prints only the commitment. Then
+bounded SEC request, retains the exact index bytes, the all-eligible-CIK
+filing roster, and redacted commitment owner-only in ignored `data/artifacts/`,
+and prints only the commitment. The public commitment includes separate
+SHA-256 digests for the index bytes and deterministic roster. Then
 run `python scripts/capture_prospective_sec_index.py --verify --output-dir
 data/artifacts/sec-filer-cohort-2026q3-v1` offline. Post the printed redacted
 commitment, **not** the raw index, CIK roster, or credentials, to
