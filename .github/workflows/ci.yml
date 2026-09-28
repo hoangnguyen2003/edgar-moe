@@ -89,6 +89,7 @@ jobs:
       - name: Check hosted read-path observation command is runnable
         run: |
           uv run python scripts/benchmark_hosted_read_path.py --help
+          uv run python -m scripts.benchmark_controlled_origin --help
           uv run python -m scripts.summarize_hosted_read_observations --help
       - name: Check research drift command is runnable
         run: uv run edgar-moe research-drift --help
