@@ -14,6 +14,7 @@ from scripts.pilot_sec_archive_coverage import (
     assess_archive_sample,
     choose_sample,
     classify_cover_facts,
+    inspect_cover_facts,
     parse_daily_master_index,
     run_live,
     write_report,
@@ -111,6 +112,22 @@ def test_cover_parser_classifies_missing_ambiguous_and_context_mismatch() -> Non
     assert classify_cover_facts(_cover("BAD TICKER")) == "unsupported_symbol_format"
 
 
+def test_cover_parser_separates_missing_inline_symbol_from_format_indicators() -> None:
+    xml_only = inspect_cover_facts(
+        b'<dei:TradingSymbol contextRef="legacy">OLD</dei:TradingSymbol>'
+    )
+    assert xml_only.classification == "missing_symbol_fact"
+    assert xml_only.inline_xbrl_tag_present is False
+    assert xml_only.xml_dei_symbol_tag_present is True
+
+    flagged = inspect_cover_facts(
+        b'<ix:nonNumeric name="dei:NoTradingSymbolFlag" contextRef="issuer">true</ix:nonNumeric>'
+    )
+    assert flagged.classification == "missing_symbol_fact"
+    assert flagged.inline_xbrl_tag_present is True
+    assert flagged.no_trading_symbol_flag_tag_present is True
+
+
 def test_report_is_identity_redacted_and_binds_source_bytes() -> None:
     files = {ALPHA_PATH: _cover("AAA"), BETA_PATH: b"<html>no cover facts</html>"}
     captured_at = datetime(2026, 9, 28, 8, 0, tzinfo=UTC)
@@ -128,10 +145,16 @@ def test_report_is_identity_redacted_and_binds_source_bytes() -> None:
         captured_at=captured_at,
     )
     assert report["status"] == "feasibility_only_not_historical_membership_evidence"
+    assert report["schema_version"] == 2
     assert report["sample_count"] == 2
     assert report["cover_fact_classification_counts"] == {
         "missing_symbol_fact": 1,
         "single_symbol_exchange_context": 1,
+    }
+    assert report["format_indicator_counts"] == {
+        "inline_xbrl_tag_present": 1,
+        "xml_dei_symbol_tag_present": 0,
+        "no_trading_symbol_flag_tag_present": 0,
     }
     serialized = json.dumps(report)
     for private_identity in ("Alpha", "Beta", "AAA", "0000000100", "edgar/data/"):

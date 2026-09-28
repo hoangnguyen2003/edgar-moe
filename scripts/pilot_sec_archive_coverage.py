@@ -49,6 +49,14 @@ class IndexRecord:
     path: str
 
 
+@dataclass(frozen=True)
+class CoverInspection:
+    classification: str
+    inline_xbrl_tag_present: bool
+    xml_dei_symbol_tag_present: bool
+    no_trading_symbol_flag_tag_present: bool
+
+
 def parse_daily_master_index(payload: bytes, *, index_date: date) -> list[IndexRecord]:
     """Parse eligible periodic filings without retaining company names."""
     if not payload or len(payload) > _MAX_INDEX_BYTES:
@@ -120,13 +128,24 @@ class _CoverFactParser(HTMLParser):
         self.depth = 0
         self.active: list[tuple[int, str, str, list[str]]] = []
         self.facts: list[tuple[str, str, str]] = []
+        self.inline_xbrl_tag_present = False
+        self.xml_dei_symbol_tag_present = False
+        self.no_trading_symbol_flag_tag_present = False
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() != "ix:nonnumeric":
+        tag_name = tag.lower()
+        if tag_name == "dei:tradingsymbol":
+            self.xml_dei_symbol_tag_present = True
+        if tag_name == "dei:notradingsymbolflag":
+            self.no_trading_symbol_flag_tag_present = True
+        if tag_name != "ix:nonnumeric":
             return
+        self.inline_xbrl_tag_present = True
         self.depth += 1
         attributes = {key.lower(): value or "" for key, value in attrs}
         name = attributes.get("name", "").lower()
+        if name == "dei:notradingsymbolflag":
+            self.no_trading_symbol_flag_tag_present = True
         if name in {"dei:tradingsymbol", "dei:securityexchangename"}:
             self.active.append((self.depth, name, attributes.get("contextref", ""), []))
 
@@ -145,10 +164,10 @@ class _CoverFactParser(HTMLParser):
         self.depth = max(self.depth - 1, 0)
 
 
-def classify_cover_facts(payload: bytes) -> str:
-    """Classify only fact presence/ambiguity; never return a symbol or name."""
+def inspect_cover_facts(payload: bytes) -> CoverInspection:
+    """Classify inline facts and non-identifying format indicators only."""
     if not payload or len(payload) > _MAX_FILING_BYTES:
-        return "empty_or_oversize_filing"
+        return CoverInspection("empty_or_oversize_filing", False, False, False)
     parser = _CoverFactParser()
     parser.feed(payload.decode("latin-1"))
     parser.close()
@@ -161,15 +180,28 @@ def classify_cover_facts(payload: bytes) -> str:
         context for name, context, _value in parser.facts if name == "dei:securityexchangename"
     }
     if not symbols:
-        return "missing_symbol_fact"
-    if len(symbols) != 1:
-        return "ambiguous_symbol_or_class"
-    context, symbol = next(iter(symbols))
-    if not _SYMBOL.fullmatch(symbol):
-        return "unsupported_symbol_format"
-    if not context or context not in exchanges:
-        return "missing_matching_exchange_fact"
-    return "single_symbol_exchange_context"
+        classification = "missing_symbol_fact"
+    elif len(symbols) != 1:
+        classification = "ambiguous_symbol_or_class"
+    else:
+        context, symbol = next(iter(symbols))
+        if not _SYMBOL.fullmatch(symbol):
+            classification = "unsupported_symbol_format"
+        elif not context or context not in exchanges:
+            classification = "missing_matching_exchange_fact"
+        else:
+            classification = "single_symbol_exchange_context"
+    return CoverInspection(
+        classification,
+        parser.inline_xbrl_tag_present,
+        parser.xml_dei_symbol_tag_present,
+        parser.no_trading_symbol_flag_tag_present,
+    )
+
+
+def classify_cover_facts(payload: bytes) -> str:
+    """Classify inline cover-fact presence without returning symbol values."""
+    return inspect_cover_facts(payload).classification
 
 
 def assess_archive_sample(
@@ -185,12 +217,25 @@ def assess_archive_sample(
     records = parse_daily_master_index(index_payload, index_date=index_date)
     sample = choose_sample(records, index_date=index_date, cutoff=cutoff, limit=limit)
     outcomes: Counter[str] = Counter()
+    format_indicators = {
+        "inline_xbrl_tag_present": 0,
+        "xml_dei_symbol_tag_present": 0,
+        "no_trading_symbol_flag_tag_present": 0,
+    }
     bound_inputs: list[tuple[str, str]] = []
     for record in sample:
         filing = fetch_filing(record.path)
         if not isinstance(filing, bytes):
             raise ArchivePilotError("filing fetch did not return bytes")
-        outcomes[classify_cover_facts(filing)] += 1
+        inspection = inspect_cover_facts(filing)
+        outcomes[inspection.classification] += 1
+        format_indicators["inline_xbrl_tag_present"] += int(inspection.inline_xbrl_tag_present)
+        format_indicators["xml_dei_symbol_tag_present"] += int(
+            inspection.xml_dei_symbol_tag_present
+        )
+        format_indicators["no_trading_symbol_flag_tag_present"] += int(
+            inspection.no_trading_symbol_flag_tag_present
+        )
         bound_inputs.append(
             (
                 hashlib.sha256(record.path.encode()).hexdigest(),
@@ -199,7 +244,7 @@ def assess_archive_sample(
         )
     manifest = json.dumps(sorted(bound_inputs), separators=(",", ":")).encode()
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "status": "feasibility_only_not_historical_membership_evidence",
         "captured_at": (captured_at or datetime.now(UTC)).astimezone(UTC).isoformat(),
         "source": "sec_daily_master_index_and_exact_filing_paths",
@@ -214,10 +259,13 @@ def assess_archive_sample(
         "sample_count": len(sample),
         "sample_input_manifest_sha256": hashlib.sha256(manifest).hexdigest(),
         "cover_fact_classification_counts": dict(sorted(outcomes.items())),
+        "format_indicator_counts": format_indicators,
         "limitations": [
             "one daily index is not a broad historical security master",
             "the seven-day lag is a pilot guard, not independent proof of historical archive bytes",
             "a cover-page symbol is not an independently evidenced listing interval",
+            "a missing inline symbol does not prove the filing lacks a symbol in other formats",
+            "format indicators may overlap and are not validated security mappings",
             "this sample does not establish historical market-bar rights or v2 eligibility",
         ],
     }
