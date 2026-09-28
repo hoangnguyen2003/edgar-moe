@@ -292,8 +292,12 @@ requires an explicitly supplied `SEC_USER_AGENT` with a contact address,
 run `python scripts/pilot_sec_archive_coverage.py --live --index-date 2022-06-15
 --cutoff 2022-12-31 --sample-limit 8 --output
 data/artifacts/sec-archive-pilot-2022-06-15.json` (as one shell command).
-The output contains counts and hashes, not CIKs, tickers, company names, paths,
-or filing text. A one-day sample and a seven-day lag guard do **not** establish
+The output contains counts, format indicators, and hashes, not CIKs, tickers,
+company names, paths, or filing text. The format indicators distinguish whether
+inline-XBRL, direct XML DEI symbol tags, or a no-symbol flag were seen. They
+can overlap and do not validate security mappings; an
+unmatched inline symbol is not proof that no symbol exists in another filing
+format. A one-day sample and a seven-day lag guard do **not** establish
 full historical membership, archive immutability, identifier continuity, or
 market-bar rights. Do not use it to promote v2 or replace the publication gate.
 V2 is explicitly `pending_review` until an operator reviews a
