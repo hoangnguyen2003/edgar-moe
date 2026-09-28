@@ -71,7 +71,10 @@ records a source-by-source permitted-use determination or a replacement-data
 study with a new identity. The v2 publisher also requires a source-bound,
 source-by-source review record; it is intentionally absent while this decision
 is unresolved. Such a record is an audit trail, not proof of provider permission.
-Review the existing v1-derived public snapshot under the same gate. Do not
+The [source-rights inventory](source-rights-review.md) identifies the four
+macro series in the local authenticated checkpoint, their noted underlying
+holders, and the derived public fields needing review. Review the existing
+v1-derived public snapshot under the same gate. Do not
 attach credentials, raw source payloads, bars, embeddings, or private
 predictions to that issue or to a release PR.
 
