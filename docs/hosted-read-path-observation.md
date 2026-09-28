@@ -108,3 +108,42 @@ matched the expected commit. Successful p50 timings were 83.772 ms for summary
 and 297.635 ms for forward status (8 MISS). These are one day's observations
 from a GitHub runner. The downloaded artifact passed the summary parser, which
 correctly returned `seven_day_coverage: false` and exit status 1.
+
+## Provider-side database plan capture
+
+The [bounded plan tool](../scripts/capture_postgres_read_plans.py) is a manual
+diagnostic for issue #290, not a deployment step. Run it only with the already
+verified, dedicated **SELECT-only** Postgres reader URL on the provider's direct
+host, or an isolated replica with equivalent grants. Do not supply the writer
+or migration URL. The tool first runs the reader-role privilege audit, then
+sets the session transaction read-only, a 3-second statement timeout, and a
+500-ms lock timeout. Its fixed queries mirror the status count/latest-run,
+forecast page/ticker filter, and settled performance-pair reads. It selects a
+high-frequency ticker for the filter but neither prints nor stores that value.
+The query budget is six EXPLAINs at most; no concurrent load is generated.
+
+After loading `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` from a private secret
+store into the environment, run:
+
+```bash
+uv run python -m scripts.capture_postgres_read_plans \
+  --output data/artifacts/hosted-read-observations/postgres-plans-YYYY-MM-DD.json
+```
+
+Do not paste the URL in an issue, log, or command history. The tool only writes
+under the git-ignored `data/artifacts/` tree, refuses overwrite, creates the
+report with mode `0600`, and emits only allowlisted numeric plan/timing fields
+plus node types. It discards raw plan JSON, SQL parameters, query rows,
+role/database identities, and connection strings. Inspect the local report
+before citing any aggregate in a public issue. Compare table counts with the
+hosted registry and note that a small current dataset is not a scale test.
+CI exercises the capture against a disposable empty Postgres registry to
+validate the safety path; this is **not** a representative hosted plan.
+
+Stop if the reader-role audit fails, a query times out, provider load rises,
+or the captured counts do not represent the workload under review. No plan
+has yet been captured from the hosted provider, and this diagnostic cannot
+attribute client-side tails to a warm origin, serverless cold start, or idle
+database resume. Keep the daily public observer running only while it remains
+low-cost and healthy; wait for seven actual consecutive UTC samples before
+setting any threshold or claiming an SLO.

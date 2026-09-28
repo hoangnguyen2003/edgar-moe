@@ -215,6 +215,12 @@ jobs:
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe
         run: uv run python scripts/verify_postgres_reader.py
+      - name: Exercise redacted read-plan capture with disposable reader
+        env:
+          EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe
+        run: >-
+          uv run python -m scripts.capture_postgres_read_plans
+          --output data/artifacts/ci-read-plans.json
 
   postgres-restore-rehearsal:
     runs-on: ubuntu-24.04
