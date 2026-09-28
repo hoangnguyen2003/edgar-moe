@@ -11,6 +11,7 @@ import pytest
 from scripts.capture_prospective_sec_index import (
     CohortCaptureError,
     build_commitment,
+    build_filer_roster,
     inspect_index,
     load_policy,
     save_capture,
@@ -65,18 +66,29 @@ def test_capture_binds_private_bytes_policy_and_redacted_counts(tmp_path: Path) 
     commitment = build_commitment(payload, policy, captured_at=now)
     assert commitment["eligible_filing_rows"] == 3
     assert commitment["eligible_filer_ciks"] == 2
+    assert commitment["schema_version"] == 2
     assert commitment["status"] == "filing_cohort_source_only_not_tradable_security_membership"
     for private_identity in ("Old Name", "Renamed Later", "Delisted Later", "0000000100"):
         assert private_identity not in json.dumps(commitment)
 
     root = tmp_path / "artifacts"
     destination = root / "capture"
-    save_capture(payload, commitment, destination, root=root)
+    roster = json.loads(build_filer_roster(payload, policy))
+    assert [item["cik"] for item in roster["filers"]] == ["0000000100", "0000000200"]
+    assert len(roster["filers"][0]["filings"]) == 2  # renamed filer is not removed
+    assert len(roster["filers"][1]["filings"]) == 1  # later delisting is not a filter
+    save_capture(payload, commitment, destination, policy, root=root)
     assert verify_capture(destination, policy, root=root) == commitment
     assert (destination / "master.idx").stat().st_mode & 0o777 == 0o600
+    assert (destination / "filer-roster.json").stat().st_mode & 0o777 == 0o600
     assert (destination / "commitment.json").stat().st_mode & 0o777 == 0o600
     with pytest.raises(CohortCaptureError, match="already exists"):
-        save_capture(payload, commitment, destination, root=root)
+        save_capture(payload, commitment, destination, policy, root=root)
+
+    (destination / "filer-roster.json").write_bytes(b"{}\n")
+    with pytest.raises(CohortCaptureError, match="differ"):
+        verify_capture(destination, policy, root=root)
+    (destination / "filer-roster.json").write_bytes(build_filer_roster(payload, policy))
 
     (destination / "master.idx").write_bytes(payload.replace(b"Old Name", b"New Name"))
     with pytest.raises(CohortCaptureError, match="differ"):
@@ -115,10 +127,26 @@ def test_rejects_changed_policy_or_missing_private_bytes(tmp_path: Path) -> None
     commitment = build_commitment(payload, policy, captured_at=datetime(2026, 10, 10, tzinfo=UTC))
     root = tmp_path / "artifacts"
     destination = root / "capture"
-    save_capture(payload, commitment, destination, root=root)
+    save_capture(payload, commitment, destination, policy, root=root)
     changed = {**policy, "study_id": "different-study"}
     with pytest.raises(CohortCaptureError, match="differ"):
         verify_capture(destination, changed, root=root)
     (destination / "master.idx").unlink()
     with pytest.raises(FileNotFoundError):
         verify_capture(destination, policy, root=root)
+
+
+def test_roster_members_are_order_invariant_but_source_binding_changes(tmp_path: Path) -> None:
+    policy = _policy(tmp_path)
+    lines = _index().splitlines()
+    reordered = b"\n".join([*lines[:3], *reversed(lines[3:])]) + b"\n"
+    original_roster = json.loads(build_filer_roster(_index(), policy))
+    reordered_roster = json.loads(build_filer_roster(reordered, policy))
+    assert original_roster["filers"] == reordered_roster["filers"]
+    assert original_roster["source_index_sha256"] != reordered_roster["source_index_sha256"]
+
+    commitment = build_commitment(_index(), policy, captured_at=datetime(2026, 10, 10, tzinfo=UTC))
+    destination = tmp_path / "artifacts" / "capture"
+    with pytest.raises(CohortCaptureError, match="does not match"):
+        save_capture(reordered, commitment, destination, policy, root=tmp_path / "artifacts")
+    assert not destination.exists()
