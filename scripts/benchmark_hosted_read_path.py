@@ -29,6 +29,10 @@ ROUTES = {
 }
 _MAX_BODY_BYTES = 1024 * 1024
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+_ORIGIN_TIMING = re.compile(
+    r"app_header_ms=([0-9]+(?:\.[0-9]{1,3})?);worker=(first|subsequent)"
+    r"(?:;registry_read_ms=([0-9]+(?:\.[0-9]{1,3})?))?\Z"
+)
 
 
 class _RejectRedirect(HTTPRedirectHandler):
@@ -63,6 +67,32 @@ def _percentile(values: list[float], fraction: float) -> float:
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
 
 
+def _origin_timing(header: str | None, edge_cache: str) -> dict[str, Any]:
+    """Retain numeric origin evidence only when the edge served a fresh origin reply."""
+    if edge_cache not in {"MISS", "BYPASS"}:
+        return {"origin_timing_status": "edge_or_unknown_ignored"}
+    if not header:
+        return {"origin_timing_status": "missing"}
+    if (
+        not isinstance(header, str)
+        or len(header) > 128
+        or (match := _ORIGIN_TIMING.fullmatch(header)) is None
+    ):
+        return {"origin_timing_status": "invalid"}
+    app_ms = float(match.group(1))
+    registry_ms = float(match.group(3)) if match.group(3) is not None else None
+    if app_ms > 600_000 or (registry_ms is not None and registry_ms > 600_000):
+        return {"origin_timing_status": "invalid"}
+    result: dict[str, Any] = {
+        "origin_timing_status": "observed",
+        "worker_state": match.group(2),
+        "app_header_ms": app_ms,
+    }
+    if registry_ms is not None:
+        result["registry_read_ms"] = registry_ms
+    return result
+
+
 def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict[str, Any]:
     request = Request(
         url,
@@ -79,6 +109,7 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
             status = int(response.status)
             content_type = response.headers.get("Content-Type", "").split(";", 1)[0].lower()
             cache = response.headers.get("X-Vercel-Cache", "missing").upper()
+            origin_header = response.headers.get("X-EDGAR-Read-Timing")
     except HTTPError as error:
         error.close()
         return {
@@ -98,6 +129,7 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
         "latency_ms": round((time.perf_counter() - started) * 1000, 3),
         "edge_cache": cache if cache in {"HIT", "MISS", "STALE", "BYPASS"} else "other",
     }
+    observation.update(_origin_timing(origin_header, observation["edge_cache"]))
     if status != 200 or content_type != "application/json" or len(body) > _MAX_BODY_BYTES:
         observation["result"] = "contract_error"
         return observation
@@ -158,6 +190,7 @@ def measure(
         raise ValueError("expected_commit_sha must be a lowercase 40-character Git SHA")
     opener = build_opener(_RejectRedirect())
     warmup: dict[str, str] = {}
+    warmup_observations: dict[str, dict[str, Any]] = {}
     observations: dict[str, list[dict[str, Any]]] = {name: [] for name in ROUTES}
     for name, path in ROUTES.items():
         item = _probe(opener, base + path, timeout_seconds=timeout_seconds, route=name)
@@ -169,6 +202,7 @@ def measure(
         ):
             item["result"] = "identity_mismatch"
         warmup[name] = item["result"]
+        warmup_observations[name] = item
         time.sleep(pause_ms / 1000)
     for _ in range(samples_per_route):
         for name, path in ROUTES.items():
@@ -211,6 +245,15 @@ def measure(
                     Counter(item["edge_cache"] for item in items if "edge_cache" in item).items()
                 )
             ),
+            "origin_timing_status_counts": dict(
+                sorted(
+                    Counter(
+                        item["origin_timing_status"]
+                        for item in items
+                        if "origin_timing_status" in item
+                    ).items()
+                )
+            ),
             "successful_latency_ms": (
                 {
                     "p50": round(statistics.median(successes), 3),
@@ -230,6 +273,28 @@ def measure(
                     "max": round(max(durations), 3),
                 }
                 for cache, durations in sorted(cache_successes.items())
+            },
+            "successful_origin_latency_by_worker_ms": {
+                worker: {
+                    "requests": len(durations),
+                    "p50": round(statistics.median(durations), 3),
+                    "p95": round(_percentile(durations, 0.95), 3),
+                    "p99": round(_percentile(durations, 0.99), 3),
+                    "max": round(max(durations), 3),
+                }
+                for worker, durations in sorted(
+                    {
+                        state: [
+                            float(item["latency_ms"])
+                            for item in items
+                            if item["result"] == "ok"
+                            and item.get("origin_timing_status") == "observed"
+                            and item.get("worker_state") == state
+                        ]
+                        for state in ("first", "subsequent")
+                    }.items()
+                )
+                if durations
             },
         }
         if name in {"health", "forward_status"}:
@@ -263,7 +328,7 @@ def measure(
     )
     warning = results["forward_status"]["semantic_status_counts"].get("warning", 0) > 0
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "scope": "hosted_public_api_sequential_read_only_observation",
         "status": "degraded" if not healthy else "warning" if warning else "observed",
         "captured_at": datetime.now(UTC).isoformat(),
@@ -279,6 +344,7 @@ def measure(
             "max_response_bytes": _MAX_BODY_BYTES,
         },
         "warmup_result": warmup,
+        "warmup_observations": warmup_observations,
         "results": results,
         "sample_observations": observations,
         "limitations": [
@@ -286,7 +352,8 @@ def measure(
             "A short sequential sample does not establish concurrency capacity, a seven-day baseline, or an SLO.",
             "Only successful 200 JSON responses enter latency percentiles; all failures are counted separately.",
             "Samples retain bounded timing, HTTP/cache and semantic categories, and serving commit only; no provider payload, credentials, or response bodies are retained.",
-            "An edge MISS cannot by itself identify a serverless cold start or idle database resume.",
+            "Origin timing is used only on edge MISS/BYPASS; cached responses can replay old timing headers.",
+            "The first app-process request marker is not proof of a platform cold start. Registry-read time includes connection, SQL, and Python work; it cannot isolate idle database resume.",
         ],
     }
 

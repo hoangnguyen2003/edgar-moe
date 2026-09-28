@@ -5,6 +5,8 @@ import re
 from collections.abc import Awaitable, Callable, MutableMapping
 from datetime import date
 from pathlib import Path
+from threading import Lock
+from time import perf_counter
 from typing import Annotated
 from uuid import uuid4
 
@@ -47,6 +49,23 @@ from edgar_moe.settings import RuntimeSettings, runtime_settings
 
 settings = runtime_settings()
 _GIT_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+_first_app_request_seen = False
+_first_app_request_lock = Lock()
+
+
+def _worker_request_state() -> str:
+    """Mark only the first request this app process handles as cold.
+
+    This is an origin-process observation, not proof of a platform cold start.
+    A cached edge response can replay the header and must not be classified as
+    a fresh origin request by a client observer.
+    """
+    global _first_app_request_seen
+    with _first_app_request_lock:
+        if not _first_app_request_seen:
+            _first_app_request_seen = True
+            return "first"
+    return "subsequent"
 
 
 def _served_commit_sha() -> str | None:
@@ -136,7 +155,19 @@ async def security_headers(
     request: Request,
     call_next: Callable[[Request], Awaitable[StarletteResponse]],
 ) -> StarletteResponse:
+    started = perf_counter()
+    worker_state = _worker_request_state()
     response = await call_next(request)
+    app_header_ms = (perf_counter() - started) * 1000
+    # Fixed numeric fields only. Registry duration includes query execution,
+    # connection acquisition, and Python calculation; it is not database-only
+    # time. Shared caches may replay this header, so observers use it only on
+    # responses that the edge reports as MISS or BYPASS.
+    registry_read_ms = getattr(request.state, "registry_read_ms", None)
+    timing = f"app_header_ms={app_header_ms:.3f};worker={worker_state}"
+    if isinstance(registry_read_ms, (int, float)) and not isinstance(registry_read_ms, bool):
+        timing += f";registry_read_ms={registry_read_ms:.3f}"
+    response.headers["X-EDGAR-Read-Timing"] = timing
     request_id = request.headers.get("x-request-id", "")
     valid_request_id = (
         request_id
@@ -233,13 +264,16 @@ def _cache_live(response: Response, seconds: int = 60) -> None:
     )
 
 
-def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusResponse:
+def _forward_status_response(
+    registry: ForwardRegistry | None, *, request: Request | None = None
+) -> ForwardStatusResponse:
     if registry is None:
         return ForwardStatusResponse(
             configured=False,
             available=False,
             message="Forward registry is not configured in this deployment.",
         )
+    started = perf_counter()
     try:
         payload = registry.status()
     except SQLAlchemyError:
@@ -248,6 +282,9 @@ def _forward_status_response(registry: ForwardRegistry | None) -> ForwardStatusR
             available=False,
             message="Forward registry is configured but currently unavailable.",
         )
+    finally:
+        if request is not None:
+            request.state.registry_read_ms = (perf_counter() - started) * 1000
     return ForwardStatusResponse(
         **payload,
         available=True,
@@ -493,6 +530,7 @@ def governance(
     tags=["forward testing"],
 )
 def forward_status(
+    request: Request,
     response: Response,
     registry: ForwardRegistryDependency,
 ) -> ForwardStatusResponse:
@@ -502,7 +540,7 @@ def forward_status(
     freshness window. Never cached, so an outage is visible immediately.
     """
     response.headers["Cache-Control"] = "no-store"
-    return _forward_status_response(registry)
+    return _forward_status_response(registry, request=request)
 
 
 @app.get(
@@ -535,6 +573,7 @@ def forward_runs(
     tags=["forward testing"],
 )
 def forward_forecasts(
+    request: Request,
     response: Response,
     registry: ForwardRegistryDependency,
     ticker: str | None = Query(default=None, min_length=1, max_length=32),
@@ -552,6 +591,7 @@ def forward_forecasts(
     _cache_live(response)
     if registry is None:
         return ForwardForecastPage(items=[], total=0, offset=offset, limit=limit)
+    started = perf_counter()
     try:
         payload = registry.list_forecasts(
             ticker=ticker,
@@ -561,6 +601,8 @@ def forward_forecasts(
         )
     except SQLAlchemyError as error:
         raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
+    finally:
+        request.state.registry_read_ms = (perf_counter() - started) * 1000
     return ForwardForecastPage.model_validate(payload)
 
 
@@ -570,6 +612,7 @@ def forward_forecasts(
     tags=["forward testing"],
 )
 def forward_performance(
+    request: Request,
     response: Response,
     registry: ForwardRegistryDependency,
     model_id: str | None = Query(default=None, min_length=1, max_length=160),
@@ -614,10 +657,14 @@ def forward_performance(
             mae=None,
             directional_accuracy=None,
         )
+    started = perf_counter()
     try:
-        return ForwardPerformanceResponse.model_validate(registry.performance(model_id=model_id))
+        payload = registry.performance(model_id=model_id)
     except SQLAlchemyError as error:
         raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
+    finally:
+        request.state.registry_read_ms = (perf_counter() - started) * 1000
+    return ForwardPerformanceResponse.model_validate(payload)
 
 
 @app.get(
