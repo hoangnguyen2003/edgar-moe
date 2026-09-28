@@ -138,6 +138,10 @@ jobs:
         run: |
           uv run python scripts/verify_research_evidence_catalog.py
           uv run python scripts/publish_v2_research_evidence.py --help
+      - name: Check prospective SEC evidence commands are runnable
+        run: |
+          uv run python scripts/capture_prospective_sec_index.py --help
+          uv run python -m scripts.verify_prospective_sec_attestation --help
       - name: Verify frozen v1 runtime bundle identity
         run: uv run python scripts/validate_frozen_runtime.py
       - name: Check frozen runtime compatibility audit tools are runnable

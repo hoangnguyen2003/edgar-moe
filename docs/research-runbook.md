@@ -312,11 +312,30 @@ filing roster, and redacted commitment owner-only in ignored `data/artifacts/`,
 and prints only the commitment. The public commitment includes separate
 SHA-256 digests for the index bytes and deterministic roster. Then
 run `python scripts/capture_prospective_sec_index.py --verify --output-dir
-data/artifacts/sec-filer-cohort-2026q3-v1` offline. Post the printed redacted
-commitment, **not** the raw index, CIK roster, or credentials, to
-[issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292) before
-2026-10-16 00:00 UTC; independently check the GitHub server timestamp and
-the policy's prior merge. Do not recapture into the same directory, edit the
+data/artifacts/sec-filer-cohort-2026q3-v1` offline. Before 2026-10-16 00:00 UTC,
+post only the redacted commitment JSON from the designated account to
+[issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292):
+
+```sh
+gh issue comment 292 --repo hoangnguyen2003/edgar-moe --body-file data/artifacts/sec-filer-cohort-2026q3-v1/commitment.json
+```
+
+Use the numeric ID after `#issuecomment-` in the returned link to verify it
+(replace `COMMENT_ID` below):
+
+```sh
+python -m scripts.verify_prospective_sec_attestation --live --capture-dir data/artifacts/sec-filer-cohort-2026q3-v1 --comment-id COMMENT_ID --output data/artifacts/sec-filer-cohort-2026q3-v1/github-attestation.json
+```
+
+The verifier first recomputes the private capture and roster, then makes one
+anonymous GitHub API GET. It checks the exact issue/comment URL, designated
+stable author ID, matching commitment JSON, and a server timestamp within the
+capture window and before cutoff. It rejects comments whose reported update
+time differs from creation time. The retained report contains only hashes and
+allowlisted metadata. Do not edit the posted comment; use a new report filename
+when rechecking. This observes current GitHub metadata at second precision,
+not a signed timestamp or a complete edit-history audit. Policy predeclaration
+still requires review of the policy's prior merge. Do not recapture into the same directory, edit the
 policy after observing the index, or present the local clock as independent
 proof. If the window or timestamp is missed, this study fails its prospective
 claim and needs a new predeclared study ID/cutoff. Even a verified commitment

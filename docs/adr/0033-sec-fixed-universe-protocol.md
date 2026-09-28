@@ -125,6 +125,14 @@ the source and roster commitment must receive an independently checkable GitHub
 server timestamp before cutoff. Later renames and delistings cannot remove a
 CIK from the frozen roster; accession paths and filed dates are retained
 privately. Local timestamps alone are not independent proof of capture.
+The policy also pins issue #292 and the designated author's stable GitHub user
+ID before capture. `python -m scripts.verify_prospective_sec_attestation`
+recomputes the local evidence and observes the comment through the GitHub API,
+checking its identity, exact JSON commitment, and creation/update timestamps.
+A report proves only what the current API response says at observation time;
+it is not a signed timestamp or an exhaustive edit-history audit. The policy's
+prior merge remains part of the review, and a later comment edit fails a new
+verification when GitHub reports a changed update timestamp.
 
 This is a **filer-CIK source capture**, not a security universe, a completed
 cohort, independent proof that the SEC index is complete, or evidence that an

@@ -35,6 +35,7 @@ _EXPECTED_KEYS = {
     "capture_before",
     "research_cutoff",
     "minimum_eligible_rows",
+    "github_attestation",
 }
 _HEADER = {
     "CIK|Company Name|Form Type|Date Filed|File Name",
@@ -67,6 +68,8 @@ def _digest(payload: bytes) -> str:
 
 
 def _instant(value: str) -> datetime:
+    if not isinstance(value, str):
+        raise CohortCaptureError("policy timestamp is invalid")
     try:
         result = datetime.fromisoformat(value.replace("Z", "+00:00"))
     except ValueError as error:
@@ -94,6 +97,21 @@ def load_policy(path: Path = _POLICY) -> dict[str, Any]:
         raise CohortCaptureError("capture policy has invalid quarter")
     if not isinstance(value["minimum_eligible_rows"], int) or value["minimum_eligible_rows"] < 1:
         raise CohortCaptureError("capture policy has invalid row floor")
+    attestation = value["github_attestation"]
+    if (
+        not isinstance(attestation, dict)
+        or set(attestation) != {"repository", "issue_number", "author_user_id"}
+        or not isinstance(attestation["repository"], str)
+        or re.fullmatch(
+            r"[A-Za-z0-9][A-Za-z0-9_-]*/[A-Za-z0-9][A-Za-z0-9_.-]*", attestation["repository"]
+        )
+        is None
+        or any(
+            type(attestation[key]) is not int or attestation[key] <= 0
+            for key in ("issue_number", "author_user_id")
+        )
+    ):
+        raise CohortCaptureError("capture policy has invalid GitHub attestation target")
     start = _instant(value["capture_not_before"])
     end = _instant(value["capture_before"])
     cutoff = _instant(value["research_cutoff"])
