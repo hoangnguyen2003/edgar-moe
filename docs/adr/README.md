@@ -1,7 +1,8 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. Records 0001–0032 are accepted; 0033 is proposed.
+the decision is verified. All 33 records are cataloged: 0001–0032 are accepted;
+0033 is proposed.
 When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
