@@ -26,7 +26,20 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  provider-use-review:
+    name: Provider use held pending issue 280
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Enforce the documented provider-use hold
+        shell: bash
+        run: |
+          printf '%s\n' 'Provider-backed forward cycles are on hold pending source-rights issue #280. Reopening requires a reviewed PR after clearance.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
   forecast-and-settle:
+    needs: provider-use-review
     runs-on: ubuntu-24.04
     # The inner compute deadline leaves a full hour to persist resumable caches.
     timeout-minutes: 360
@@ -334,7 +347,8 @@ jobs:
     name: Prune old forward runtime caches
     # Cache maintenance must not hide a completed forecast cycle, but it must
     # still run after a failed cycle when a resumable cache was written.
-    if: ${{ always() && needs.forecast-and-settle.result != 'cancelled' }}
+    # A provider-use hold skips the cycle entirely and must not prune caches.
+    if: ${{ always() && needs.forecast-and-settle.result != 'cancelled' && needs.forecast-and-settle.result != 'skipped' }}
     needs: forecast-and-settle
     runs-on: ubuntu-24.04
     timeout-minutes: 10
