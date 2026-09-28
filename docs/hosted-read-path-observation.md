@@ -162,6 +162,17 @@ performance route itself has seven consecutive dates. Only then should a
 separate descriptive comparison include p50/p95/p99, error rates, sample
 counts, cache mix, and workload sizes—never a pooled or causal speedup claim.
 
+The [first schema-v4 observation](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/36372646067)
+completed on 2026-09-28 against `b6bf2ca524dcce0e7fe9863515c4f779ef57376a`.
+All 40 measured GETs passed their response contracts. The eight measured
+performance requests were edge `HIT` (client p50 29.941 ms, p95 94.554 ms,
+p99 113.736 ms); those values **do not** measure origin performance. Its one
+performance warmup was an edge `MISS`, not an origin-latency distribution.
+Choose this v4 report, rather than the earlier same-day v3 report, when
+aggregating 2026-09-28: the summarizer rejects duplicate UTC days. With the
+2026-09-27 v2 report, overall coverage is two days, but performance-route
+coverage is only one day. Neither reaches the seven-day gate.
+
 ## Provider-side database plan capture
 
 The [bounded plan tool](../scripts/capture_postgres_read_plans.py) is a manual
@@ -193,10 +204,35 @@ hosted registry and note that a small current dataset is not a scale test.
 CI exercises the capture against a disposable empty Postgres registry to
 validate the safety path; this is **not** a representative hosted plan.
 
+A first hosted capture on 2026-09-28 passed the effective SELECT-only role
+audit and used the provider's direct Postgres host. The report remains local,
+owner-only, and git-ignored at
+`data/artifacts/hosted-read-observations/postgres-plans-2026-09-28.json`;
+its SHA-256 is
+`4de8caf142319dc9b4dd8feb7bda91d58b3d4895ba917840b3087bcc9e47bce3`.
+The table counts—77 runs, 49 forecasts, 24 labels—matched the public API's
+77/49/24 forward status at capture time. One `EXPLAIN ANALYZE` sample per
+fixed query produced these redacted execution times:
+
+| Read shape | Execution time, ms |
+| --- | ---: |
+| Status forecast count | 0.057 |
+| Status latest successful run | 0.105 |
+| Status latest run | 0.086 |
+| Forecast page | 0.206 |
+| Forecast ticker filter | 1.598 |
+| Settled performance pairs | 0.096 |
+
+No nonzero write blocks were retained. The private report contains no raw
+rows, ticker, SQL parameters, connection URL, role/database identity, or raw
+plan JSON. At 49 forecasts, these plans describe the **current small hosted
+cohort**, not representative volume or future index behavior. They are
+provider-side query samples, not end-to-end API timings; they neither explain
+client tails nor establish cold-start, idle-database-resume, or SLO behavior.
+
 Stop if the reader-role audit fails, a query times out, provider load rises,
-or the captured counts do not represent the workload under review. No plan
-has yet been captured from the hosted provider, and this diagnostic cannot
-attribute client-side tails to a warm origin, serverless cold start, or idle
-database resume. Keep the daily public observer running only while it remains
-low-cost and healthy; wait for seven actual consecutive UTC samples before
-setting any threshold or claiming an SLO.
+or the captured counts do not represent the workload under review. A larger,
+representative-volume plan remains outstanding. Keep the daily public observer
+running only while it remains low-cost and healthy; wait for seven actual
+consecutive UTC dates per current route before setting a threshold or
+claiming an SLO.
