@@ -15,7 +15,12 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from scripts.benchmark_hosted_read_path import ROUTES, _percentile, normalize_origin
+from scripts.benchmark_hosted_read_path import (
+    LEGACY_ROUTES,
+    ROUTES,
+    _percentile,
+    normalize_origin,
+)
 
 
 def _latency(values: list[float]) -> dict[str, float | int] | None:
@@ -95,7 +100,7 @@ def _safe_sample(
         if schema_version == 2
         else item.get("origin_timing_status", "missing"),
     }
-    if schema_version == 3:
+    if schema_version >= 3:
         timing_status = safe_item["origin_timing_status"]
         if not isinstance(timing_status, str) or timing_status not in {
             "observed",
@@ -139,18 +144,23 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
     statuses: Counter[str] = Counter()
     items_by_route: dict[str, list[dict[str, Any]]] = {name: [] for name in ROUTES}
     warmups_by_route: dict[str, list[dict[str, Any]]] = {name: [] for name in ROUTES}
+    route_days: dict[str, set[date]] = {name: set() for name in ROUTES}
+    route_reports: Counter[str] = Counter()
     for path in paths:
         report = json.loads(path.read_text(encoding="utf-8"))
         schema_version = report.get("schema_version") if isinstance(report, dict) else None
         if (
             isinstance(schema_version, bool)
             or not isinstance(schema_version, int)
-            or schema_version not in {2, 3}
+            or schema_version not in {2, 3, 4}
         ):
-            raise ValueError(f"{path}: expected hosted observation schema v2 or v3")
+            raise ValueError(f"{path}: expected hosted observation schema v2, v3, or v4")
         if report.get("scope") != "hosted_public_api_sequential_read_only_observation":
             raise ValueError(f"{path}: unexpected observation scope")
-        days.add(_day(report.get("captured_at")))
+        captured_day = _day(report.get("captured_at"))
+        if captured_day in days:
+            raise ValueError(f"{path}: duplicate UTC observation day; select one report per day")
+        days.add(captured_day)
         origin = report.get("origin")
         if not isinstance(origin, str):
             raise ValueError(f"{path}: missing origin")
@@ -174,13 +184,17 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         if not isinstance(status, str) or status not in {"observed", "warning", "degraded"}:
             raise ValueError(f"{path}: invalid report status")
         statuses[status] += 1
-        if set(samples) != set(ROUTES):
+        expected_routes = LEGACY_ROUTES if schema_version in {2, 3} else ROUTES
+        if set(samples) != set(expected_routes):
             raise ValueError(f"{path}: route set changed")
-        if schema_version == 3:
+        for route in expected_routes:
+            route_days[route].add(captured_day)
+            route_reports[route] += 1
+        if schema_version >= 3:
             warmups = report.get("warmup_observations")
-            if not isinstance(warmups, dict) or set(warmups) != set(ROUTES):
-                raise ValueError(f"{path}: missing schema-v3 warmup observations")
-            for route in ROUTES:
+            if not isinstance(warmups, dict) or set(warmups) != set(expected_routes):
+                raise ValueError(f"{path}: missing warmup observations")
+            for route in expected_routes:
                 warmups_by_route[route].append(
                     _safe_sample(
                         warmups[route],
@@ -190,7 +204,7 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
                         schema_version=schema_version,
                     )
                 )
-        for route in ROUTES:
+        for route in expected_routes:
             route_items = samples[route]
             if not isinstance(route_items, list) or len(route_items) != count:
                 raise ValueError(f"{path}: missing bounded samples for {route}")
@@ -211,6 +225,10 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         successful = [item for item in items if item["result"] == "ok"]
         caches = sorted({str(item["edge_cache"]) for item in successful})
         results[route] = {
+            "reports_with_route": route_reports[route],
+            "distinct_utc_days": len(route_days[route]),
+            "longest_consecutive_utc_days": _longest_run(route_days[route]),
+            "seven_day_coverage": _longest_run(route_days[route]) >= 7,
             "requests": len(items),
             "result_counts": dict(sorted(Counter(item["result"] for item in items).items())),
             "successful_latency_ms": _latency([item["latency_ms"] for item in successful]),
@@ -282,13 +300,16 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         }
     longest = _longest_run(days)
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "scope": "multi_day_hosted_public_api_client_observation",
         "origin": next(iter(origins)),
         "input_reports": len(paths),
         "distinct_utc_days": len(days),
         "longest_consecutive_utc_days": longest,
         "seven_day_coverage": longest >= 7,
+        "all_routes_seven_day_coverage": all(
+            result["seven_day_coverage"] for result in results.values()
+        ),
         "first_utc_day": min(days).isoformat(),
         "last_utc_day": max(days).isoformat(),
         "expected_commit_report_counts": dict(sorted(commits.items())),
@@ -298,6 +319,7 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         "limitations": [
             "Daily samples are sequential and low-rate; coverage does not establish an SLO or concurrency capacity.",
             "One warmup per route is reported separately from measured requests; warmups from legacy v2 reports are unavailable.",
+            "Legacy v2/v3 reports predate the performance route; overall day coverage is not complete route coverage.",
             "First/subsequent app-process markers on edge MISS/BYPASS can separate those samples, but do not prove platform cold starts or idle database resume.",
             "Registry-read duration includes connection acquisition, SQL, and Python computation; it is not database-only timing.",
             "Legacy v2 observations have no origin timing, and mixed serving commits are not performance-equivalent cohorts.",
@@ -317,9 +339,9 @@ def main() -> int:
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print(
-        f"Summarized {summary['input_reports']} observations; seven-day coverage: {summary['seven_day_coverage']}"
+        f"Summarized {summary['input_reports']} observations; all-route seven-day coverage: {summary['all_routes_seven_day_coverage']}"
     )
-    return 0 if summary["seven_day_coverage"] else 1
+    return 0 if summary["all_routes_seven_day_coverage"] else 1
 
 
 if __name__ == "__main__":

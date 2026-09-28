@@ -174,6 +174,29 @@ def test_probe_classifies_degradation_and_failure_without_body(
     assert "body" not in observed
 
 
+def test_performance_probe_validates_bounded_aggregate_contract_without_retaining_body() -> None:
+    valid = benchmark._probe(
+        _Opener(
+            _Response(b'{"forecast_count":3,"matured_count":2,"pending_count":1,"coverage":0.666}')
+        ),
+        "https://example.test/api/v1/forward/performance",
+        timeout_seconds=2,
+        route="forward_performance",
+    )
+    assert valid["result"] == "ok"
+    assert "forecast_count" not in valid and "body" not in valid
+
+    invalid = benchmark._probe(
+        _Opener(
+            _Response(b'{"forecast_count":3,"matured_count":2,"pending_count":2,"coverage":0.5}')
+        ),
+        "https://example.test/api/v1/forward/performance",
+        timeout_seconds=2,
+        route="forward_performance",
+    )
+    assert invalid["result"] == "contract_error"
+
+
 def test_bounded_round_robin_report_counts_failures_separately(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -182,7 +205,10 @@ def test_bounded_round_robin_report_counts_failures_separately(
     def fake_probe(_opener: object, _url: str, *, timeout_seconds: float, route: str) -> dict:
         assert timeout_seconds == 2
         calls.append(route)
-        if len(calls) > len(benchmark.ROUTES) and route == "forecasts_page" and len(calls) == 8:
+        first_forecast_sample = (
+            len(benchmark.ROUTES) + list(benchmark.ROUTES).index("forecasts_page") + 1
+        )
+        if route == "forecasts_page" and len(calls) == first_forecast_sample:
             return {"result": "http_error", "http_status": 503, "latency_ms": 4.0}
         return {
             "result": "ok",
@@ -202,7 +228,8 @@ def test_bounded_round_robin_report_counts_failures_separately(
     assert report["status"] == "degraded"
     assert report["traffic"]["concurrency"] == 1
     assert report["results"]["health"]["successful_latency_ms"]["p95"] == 10
-    assert report["schema_version"] == 3
+    assert report["schema_version"] == 4
+    assert report["results"]["forward_performance"]["requests"] == 5
     assert report["results"]["health"]["successful_latency_by_edge_cache_ms"] == {
         "MISS": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
     }

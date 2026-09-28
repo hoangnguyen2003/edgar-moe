@@ -66,8 +66,10 @@ counts, health status, and the limited sample size before comparing runs.
 ## Daily, low-rate collection
 
 The [daily GitHub Actions observer](../.github/workflows/hosted-read-observation.yml)
-also supports manual dispatch. It makes one warmup plus eight measured GETs per
-route: **36 requests total**, sequential, with at least 500 ms between requests.
+also supports manual dispatch. The current schema-v4 probe adds the forward
+performance endpoint to the original four routes. It makes one warmup plus
+eight measured GETs per route: **45 requests total**, sequential, with at least
+500 ms between requests.
 It targets only the public production origin, uses no secrets or writer DB
 credential, rejects redirects, caps bodies at 1 MiB, and pins every health
 sample to the workflow's main commit. A degraded result fails the job but the
@@ -88,8 +90,11 @@ python3 -m scripts.summarize_hosted_read_observations \
 ```
 
 Download each relevant run ID separately. The [summarizer](../scripts/summarize_hosted_read_observations.py)
-fails its CLI until there are seven **consecutive UTC dates**, rejects mixed
-origins and unpinned/malformed reports, counts errors separately, and pools
+fails its CLI until every current route has seven **consecutive UTC dates**,
+rejects mixed
+origins, duplicate UTC dates, and unpinned/malformed reports; choose one
+representative run per date so manually repeated days are not overweighted.
+It counts errors separately and pools
 successful timings by observed edge-cache category. It records commit cohorts
 but does not pretend different deployments are equivalent. A full week has
 **not yet been observed**. Even after it has, a client-side `MISS` cannot
@@ -108,6 +113,15 @@ matched the expected commit. Successful p50 timings were 83.772 ms for summary
 and 297.635 ms for forward status (8 MISS). These are one day's observations
 from a GitHub runner. The downloaded artifact passed the summary parser, which
 correctly returned `seven_day_coverage: false` and exit status 1.
+
+The [2026-09-28 observation](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/36371185708)
+used schema v3 on commit `9ccb35f1c01dfdc8238042028e5312d46a2ec030`.
+All 32 measured GETs passed the HTTP/JSON contract; eight forward-status
+responses were edge MISS and retained validated origin timing. The other
+cached measured routes discarded replayable timing headers. Forward status
+still reported a quality warning. The mixed v2/v3 summary covers two
+consecutive UTC dates, not seven. No `worker=first` request was observed, so
+there is no first-process latency cohort or cold-start conclusion.
 
 ## Origin-process timing in later observations
 
@@ -136,6 +150,17 @@ It does **not**
 isolate network, edge, platform cold-start initialization, or idle database
 resume. Provider-side function and database logs are still required for that
 attribution, and no SLO follows from these sparse samples.
+
+Schema v4 adds `/api/v1/forward/performance` with a minimal numeric response
+contract while retaining no performance body or metric values. This is the
+hosted route corresponding to the local synthetic performance benchmark,
+though different dataset size, database, cache, network, and runtime make
+their latency distributions **non-equivalent**. Older v2/v3 reports do not
+contain that route. The summary accepts all three versions and reports
+coverage per route; seven overall dates cannot pass its CLI unless the new
+performance route itself has seven consecutive dates. Only then should a
+separate descriptive comparison include p50/p95/p99, error rates, sample
+counts, cache mix, and workload sizes—never a pooled or causal speedup claim.
 
 ## Provider-side database plan capture
 
