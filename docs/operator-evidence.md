@@ -106,6 +106,10 @@ redaction, and artifact upload do not receive that credential. A missing Actions
 secret produces a redacted `not_run` artifact and cannot be treated as a passed
 hosted-role audit; a URL configured only in Vercel does not configure GitHub
 Actions.
+The verifier runs the same effective-grant and rolled-back write/DDL probes,
+but the retained workflow report uses `--redact-identity` so it does not
+publish the provider role or database name. A local pass without the Actions
+artifact is useful diagnostic evidence, not completion of this provider check.
 
 The read-only R2 audit credentials are exposed only to its prerequisite check
 and independent Go auditor. Checkout, dependency/tool setup, hashing,
