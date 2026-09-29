@@ -36,33 +36,36 @@ class ReadOnlyToolset:
             ToolDefinition(
                 name="get_frozen_identity",
                 description=(
-                    "Read the content-addressed identity and research-only status of the frozen v1 "
-                    "snapshot. Use this before making claims about the locked study."
+                    "Read the content-addressed identity of the currently published synthetic "
+                    "demonstration. Historical v1 evidence is withheld; do not infer it from this "
+                    "fixture."
                 ),
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
             ToolDefinition(
                 name="get_study_summary",
                 description=(
-                    "Read the frozen study summary, predictive metrics, and cost scenarios. "
-                    "Do not treat these derived results as investment advice."
+                    "Read generated demonstration values for software verification only. They are "
+                    "not real-world market or filing evidence and are not investment advice."
                 ),
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
             ToolDefinition(
                 name="get_methodology",
-                description="Read the frozen study target, split, model, portfolio, costs, and limitations.",
+                description=(
+                    "Read the synthetic demonstration target, split, model, costs, and limitations."
+                ),
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
             ToolDefinition(
                 name="get_experiment_results",
-                description="Read the model-selection experiment table from the frozen snapshot.",
+                description="Read the generated model-selection table from the synthetic fixture.",
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
             ToolDefinition(
                 name="search_filing_events",
                 description=(
-                    "Read a bounded page of derived filing events from the frozen snapshot. "
+                    "Read a bounded page of generated filing-like events from the synthetic fixture. "
                     "Filter by ticker or direction when the question asks about examples."
                 ),
                 parameters={
@@ -78,8 +81,8 @@ class ReadOnlyToolset:
             ToolDefinition(
                 name="get_filing_event",
                 description=(
-                    "Read one derived filing event by SEC accession number. This does not fetch raw "
-                    "filing text or any external URL."
+                    "Read one generated filing-like event by its fixture identifier. This does not "
+                    "fetch raw filing text or any external URL."
                 ),
                 parameters={
                     "type": "object",
@@ -96,8 +99,8 @@ class ReadOnlyToolset:
             ToolDefinition(
                 name="get_governance_status",
                 description=(
-                    "Read frozen-v1 governance controls and the optional append-only forward registry "
-                    "status. Never infer provider evidence that is marked pending."
+                    "Read current synthetic-demo governance controls and the optional append-only "
+                    "forward registry status. Never infer provider evidence that is marked pending."
                 ),
                 parameters={"type": "object", "properties": {}, "additionalProperties": False},
             ),
@@ -148,7 +151,7 @@ class ReadOnlyToolset:
                 name,
                 payload,
                 source="snapshot:data/demo/snapshot.json",
-                label="Frozen v1 snapshot identity",
+                label="Published synthetic snapshot identity",
                 fields=("sha256", "data_mode", "as_of", "selection_hash", "locked_test_hash"),
             )
         if name == "get_study_summary":
@@ -157,7 +160,7 @@ class ReadOnlyToolset:
                 name,
                 payload,
                 source="snapshot:data/demo/snapshot.json",
-                label="Frozen study summary and cost scenarios",
+                label="Synthetic demonstration summary and cost scenarios",
                 fields=("metadata", "summary", "predictive_metrics", "portfolio_scenarios"),
             )
         if name == "get_methodology":
@@ -166,7 +169,7 @@ class ReadOnlyToolset:
                 name,
                 payload,
                 source="snapshot:data/demo/snapshot.json",
-                label="Frozen study methodology",
+                label="Synthetic demonstration methodology",
                 fields=("target", "split", "model", "portfolio", "costs", "limitations"),
             )
         if name == "get_experiment_results":
@@ -175,7 +178,7 @@ class ReadOnlyToolset:
                 name,
                 payload,
                 source="snapshot:data/demo/snapshot.json",
-                label="Frozen model-selection experiments",
+                label="Synthetic demonstration model-selection experiments",
                 fields=("experiments",),
             )
         if name == "search_filing_events":
@@ -211,7 +214,7 @@ class ReadOnlyToolset:
                 payload,
                 source="api:/api/v1/governance",
                 label="Frozen-v1 governance and forward status",
-                fields=("frozen_v1", "public_data", "controls", "forward_status"),
+                fields=("published_snapshot", "public_data", "controls", "forward_status"),
             )
         if name == "get_forward_diagnostic":
             if self.diagnostic_path is None:
@@ -314,22 +317,23 @@ class ReadOnlyToolset:
         )
 
     def _governance_status(self) -> dict[str, object]:
-        frozen_identity = self.repository.frozen_identity()
+        published_identity = self.repository.published_identity()
         forward_status = _forward_status(self.registry)
         return {
-            "schema_version": 1,
-            "frozen_v1": frozen_identity,
+            "schema_version": 2,
+            "published_snapshot": published_identity,
             "public_data": {
                 "raw_sources_public": False,
-                "derived_output_public": True,
-                "redistribution_status": "operator_review_required",
+                "current_output_mode": "synthetic_fixture",
+                "historical_v1_served_by_application": False,
+                "redistribution_status": "historical_v1_review_required",
             },
             "controls": [
                 {
-                    "key": "frozen_v1_identity",
+                    "key": "published_snapshot_identity",
                     "status": "enforced",
                     "owner": "repository",
-                    "summary": "Model, selection, locked result, and snapshot identity remain content-addressed.",
+                    "summary": "The current public snapshot is a content-addressed synthetic fixture; frozen-v1 output is withheld.",
                 },
                 {
                     "key": "pre_entry_forecasts",

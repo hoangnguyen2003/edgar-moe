@@ -133,12 +133,19 @@ def verify_copilot_answer_report(report: Mapping[str, Any]) -> None:
 def _verify_frozen_identity(value: object) -> None:
     identity = _exact_mapping(value, _IDENTITY_KEYS, "frozen_identity")
     _safe_relative_path(identity["path"], "frozen_identity.path")
-    for key in ("sha256", "selection_hash", "locked_test_hash"):
-        _digest(identity[key], f"frozen_identity.{key}")
+    _digest(identity["sha256"], "frozen_identity.sha256")
     for key in ("data_mode", "as_of"):
         _non_empty_string(identity[key], f"frozen_identity.{key}")
     if identity["research_only"] is not True:
         raise CopilotVerificationError("frozen_identity research_only must be true")
+    if identity["data_mode"] == "synthetic_fixture":
+        if identity["selection_hash"] is not None or identity["locked_test_hash"] is not None:
+            raise CopilotVerificationError("synthetic frozen_identity must not carry v1 hashes")
+    elif identity["data_mode"] == "authenticated_locked_test":
+        for key in ("selection_hash", "locked_test_hash"):
+            _digest(identity[key], f"frozen_identity.{key}")
+    else:
+        raise CopilotVerificationError("frozen_identity data_mode is unsupported")
 
 
 def _verify_citations(value: object) -> list[dict[str, Any]]:

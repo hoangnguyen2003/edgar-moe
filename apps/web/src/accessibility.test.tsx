@@ -7,11 +7,11 @@ import { navigation } from "./lib/navigation";
 import { RouterProvider } from "./lib/router";
 
 const event = (ticker: string, direction: "long" | "short" | "neutral", rank: number) => ({
-  accession_number: `0000000000-26-${ticker}`,
+  accession_number: `DEMO-26-${ticker}`,
   event_id: `event-${ticker}`,
   security_id: `security-${ticker}`,
-  ticker,
-  company_name: `${ticker} Inc`,
+  ticker: `EX${ticker}`,
+  company_name: `Example ${ticker}`,
   form: "10-Q",
   accepted_at: "2026-06-24T22:59:46Z",
   entry_date: "2026-06-25",
@@ -26,7 +26,7 @@ const event = (ticker: string, direction: "long" | "short" | "neutral", rank: nu
     { feature: "market_moe_expert", contribution: 0.001 },
   ],
   realized_abnormal_return: 0.012,
-  filing_url: "https://www.sec.gov/example",
+  filing_url: "https://example.test/filing",
 });
 
 const signals = [event("MU", "long", 0.99), event("CASY", "neutral", 0.5), event("TTWO", "short", 0.04)];
@@ -36,17 +36,17 @@ const FIXTURES: Record<string, unknown> = {
   "/api/v1/summary": {
     metadata: {
       project: "EDGAR-MoE", version: "0.1.0", generated_at: "2026-08-06T04:35:16Z", as_of: "2026-07-31",
-      data_mode: "authenticated_locked_test", research_only: true, disclaimer: "Research only.",
+      data_mode: "synthetic_fixture", research_only: true, disclaimer: "Synthetic software demo only.",
     },
     summary: {
-      title: "Test", thesis: "Test thesis.", universe: "Test universe", horizon_sessions: 20, events: 5961,
-      issuers: 421, development_events: 1647, validation_events: 2305, test_events: 1794, latest_signal_count: 3,
+      title: "Synthetic demo", thesis: "Generated software fixture.", universe: "Synthetic universe", horizon_sessions: 20, events: 24,
+      issuers: 6, development_events: 8, validation_events: 8, test_events: 8, latest_signal_count: 3,
     },
     predictive_metrics: {
-      validation: { rank_ic: 0.063, rmse: 0.076, mae: 0.054 },
-      locked_test: { rank_ic: 0.032, rmse: 0.092, mae: 0.066 },
+      validation: { rank_ic: 0.024, rmse: 0.083, mae: 0.061 },
+      locked_test: { rank_ic: -0.013, rmse: 0.104, mae: 0.077 },
     },
-    portfolio_scenarios: [{ cost_bps: 10, annualized_return: -0.033, sharpe: -0.63, maximum_drawdown: -0.121 }],
+    portfolio_scenarios: [{ cost_bps: 10, annualized_return: 0.004, sharpe: 0.08, maximum_drawdown: -0.052 }],
   },
   "/api/v1/experiments": [
     { name: "Fundamental-Only Expert", family: "fundamental", validation_rmse: 0.07606, validation_rank_ic: 0.081, selected: false },
@@ -68,62 +68,27 @@ const FIXTURES: Record<string, unknown> = {
   "/api/v1/events": { items: signals, next_cursor: null, total: 3 },
   "/api/v1/latest-signals": signals,
   "/api/v1/freshness": {
-    status: "authenticated_locked", last_successful_update: "2026-08-06T04:35:16Z", next_scheduled_update: null, message: "",
+    status: "synthetic_fixture", last_successful_update: null, next_scheduled_update: null, message: "Synthetic software fixture; not market data.",
   },
   "/api/v1/forward/status": {
-    configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 1, matured_count: 0,
-    pending_count: 1, latest_successful_run_at: "2026-09-22T12:45:05Z", health_status: "ok",
-    health_message: "Forward runner is healthy and within its freshness window.", latest_run_at: "2026-09-22T12:45:05Z",
-    latest_run_status: "succeeded", latest_failed_run_at: null, age_seconds: 3600, stale_after_seconds: 345600,
-    running_run_count: 0, latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+    public_visibility: "withheld_review",
+    message: "Prospective forecasts and outcomes are withheld from the public application pending source-rights review. The registry remains private.",
   },
-  "/api/v1/forward/performance": {
-    model_id: "edgar-moe-frozen-v1", forecast_count: 1, matured_count: 0, pending_count: 1, coverage: 0,
-    rank_ic: null, rmse: null, mae: null, directional_accuracy: null,
-  },
-  "/api/v1/forward/runs": [
-    {
-      run_id: "run-1", run_type: "forecast", status: "succeeded", dataset_id: "dataset-1", model_id: "edgar-moe-frozen-v1",
-      as_of: "2026-09-22", code_revision: "715bd7983d494a3e", result_counts: {}, error_message: null,
-      started_at: "2026-09-22T12:40:00Z", finished_at: "2026-09-22T12:45:05Z",
-    },
-  ],
-  "/api/v1/forward/forecasts": {
-    items: [
-      {
-        forecast_id: "forecast-1", run_id: "run-1", model_id: "edgar-moe-frozen-v1", event_id: "event-KR",
-        accession_number: "0000000000-26-000001", ticker: "KR", company_name: "Kroger Co", form: "10-Q",
-        accepted_at: "2026-09-18T21:00:00Z", entry_at: "2026-09-21T13:30:00Z", entry_date: "2026-09-21",
-        horizon_at: "2026-10-19T20:00:00Z", forecast_as_of: "2026-09-19T12:06:26Z", score: -0.0009, rank: 1,
-        cohort_size: 1, fundamental_score: null, expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 },
-        realized_abnormal_return: null, label_recorded_at: null,
-      },
-    ],
-    total: 1, offset: 0, limit: 50,
-  },
-  "/api/v1/forward/data-quality": [
-    {
-      check_id: "check-1", run_id: "run-1", name: "pre_open_schedule_margin", status: "passed", observed_value: 3600,
-      threshold: 5400, details: {}, created_at: "2026-09-22T12:45:05Z",
-    },
-  ],
   "/api/v1/governance": {
-    schema_version: 1,
-    frozen_v1: {
-      path: "data/demo/snapshot.json", sha256: "a".repeat(64), data_mode: "authenticated_locked_test", as_of: "2026-07-31",
-      selection_hash: "b".repeat(64), locked_test_hash: "c".repeat(64), research_only: true,
+    schema_version: 2,
+    published_snapshot: {
+      path: "data/demo/snapshot.json", sha256: "a".repeat(64), data_mode: "synthetic_fixture", as_of: "2026-07-31",
+      selection_hash: null, locked_test_hash: null, research_only: true,
     },
-    public_data: { raw_sources_public: false, derived_output_public: true, redistribution_status: "operator_review_required" },
+    public_data: { raw_sources_public: false, current_output_mode: "synthetic_fixture", historical_v1_served_by_application: false, prospective_outputs_served_by_application: false, redistribution_status: "historical_v1_review_required" },
     controls: [
-      { key: "frozen_v1_identity", status: "enforced", owner: "repository", summary: "Identity is content-addressed." },
+      { key: "published_snapshot_identity", status: "enforced", owner: "repository", summary: "Identity is content-addressed." },
+      { key: "prospective_publication", status: "withheld_review", owner: "repository", summary: "Withheld pending review." },
       { key: "provider_operations", status: "pending_operator_evidence", owner: "operator", summary: "Needs a drill." },
     ],
     forward_status: {
-      configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 1, matured_count: 0,
-      pending_count: 1, latest_successful_run_at: "2026-09-22T12:45:05Z", health_status: "ok",
-      health_message: "Forward runner is healthy and within its freshness window.", latest_run_at: null,
-      latest_run_status: null, latest_failed_run_at: null, age_seconds: null, stale_after_seconds: 345600,
-      running_run_count: 0, latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
+      public_visibility: "withheld_review",
+      message: "Prospective forecasts and outcomes are withheld from the public application pending source-rights review. The registry remains private.",
     },
   },
   "/api/v1/methodology": {
@@ -166,8 +131,9 @@ describe("Accessibility", () => {
 
       await screen.findByRole("heading", { level: 1 });
       await waitFor(() => expect(document.querySelector(".query-state")).toBeNull());
-      // Scan the loaded page, not a spinner: each route renders dozens of elements from its data.
-      expect(screen.getByRole("main").querySelectorAll("*").length).toBeGreaterThan(40);
+      // The review-held forward page is intentionally concise; other routes render larger data views.
+      const minimumContentNodes = route === "/forward" ? 20 : 40;
+      expect(screen.getByRole("main").querySelectorAll("*").length).toBeGreaterThan(minimumContentNodes);
 
       expect(await violations(document.body)).toEqual([]);
     },

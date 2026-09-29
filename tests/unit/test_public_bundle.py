@@ -40,12 +40,12 @@ def write_bundle(root: Path, *, main: str = "") -> None:
                 "schema_version": 1,
                 "snapshot": {
                     "path": "data/demo/snapshot.json",
-                    "data_mode": "authenticated_locked_test",
+                    "data_mode": "synthetic_fixture",
                     "raw_sources_public": False,
                     "derived_output_public": True,
                     "sha256": "a" * 64,
-                    "selection_hash": "b" * 64,
-                    "locked_test_hash": "c" * 64,
+                    "selection_hash": None,
+                    "locked_test_hash": None,
                     "research_only": True,
                 },
                 "review": {

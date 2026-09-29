@@ -76,7 +76,7 @@ def fake_urlopen_factory(responses: dict[str, FakeResponse], *, echo_request_id:
 
 def complete_responses() -> dict[str, FakeResponse]:
     base = "https://terminal.example"
-    return {
+    responses = {
         f"{base}/": FakeResponse(f"{base}/", "<html></html>", "text/html; charset=utf-8"),
         f"{base}/robots.txt": FakeResponse(
             f"{base}/robots.txt", "User-agent: *\nDisallow: /api/\n"
@@ -92,7 +92,16 @@ def complete_responses() -> dict[str, FakeResponse]:
             f"{base}/data-provenance.json",
             json.dumps(
                 {
-                    "snapshot": {"raw_sources_public": False, "derived_output_public": True},
+                    "snapshot": {
+                        "path": "data/demo/snapshot.json",
+                        "data_mode": "synthetic_fixture",
+                        "as_of": "2026-07-31",
+                        "sha256": "a" * 64,
+                        "selection_hash": None,
+                        "locked_test_hash": None,
+                        "raw_sources_public": False,
+                        "derived_output_public": True,
+                    },
                     "review": {
                         "redistribution_status": "operator_review_required",
                         "legal_approval": False,
@@ -113,50 +122,47 @@ def complete_responses() -> dict[str, FakeResponse]:
             f"{base}/api/v1/governance",
             json.dumps(
                 {
-                    "schema_version": 1,
-                    "frozen_v1": {
+                    "schema_version": 2,
+                    "published_snapshot": {
                         "path": "data/demo/snapshot.json",
                         "sha256": "a" * 64,
-                        "data_mode": "authenticated_locked_test",
+                        "data_mode": "synthetic_fixture",
                         "as_of": "2026-07-31",
-                        "selection_hash": "b" * 64,
-                        "locked_test_hash": "c" * 64,
+                        "selection_hash": None,
+                        "locked_test_hash": None,
                         "research_only": True,
                     },
                     "public_data": {
                         "raw_sources_public": False,
-                        "derived_output_public": True,
-                        "redistribution_status": "operator_review_required",
+                        "current_output_mode": "synthetic_fixture",
+                        "historical_v1_served_by_application": False,
+                        "prospective_outputs_served_by_application": False,
+                        "redistribution_status": "historical_v1_review_required",
                     },
                     "controls": [
                         {"status": "enforced", "owner": "repository"},
+                        {"status": "withheld_review", "owner": "repository"},
                         {"status": "pending_operator_evidence", "owner": "operator"},
                     ],
-                    "forward_status": {"configured": False, "available": False},
+                    "forward_status": {
+                        "public_visibility": "withheld_review",
+                        "message": _MODULE._PUBLIC_FORWARD_WITHHELD_DETAIL,
+                    },
                 }
             ),
             "application/json",
         ),
         f"{base}/api/v1/forward/performance": FakeResponse(
             f"{base}/api/v1/forward/performance",
+            json.dumps({"detail": _MODULE._PUBLIC_FORWARD_WITHHELD_DETAIL}),
+            "application/json",
+        ),
+        f"{base}/api/v1/forward/status": FakeResponse(
+            f"{base}/api/v1/forward/status",
             json.dumps(
                 {
-                    "model_id": None,
-                    "forecast_count": 0,
-                    "matured_count": 0,
-                    "pending_count": 0,
-                    "coverage": 0.0,
-                    "rank_ic": None,
-                    "rank_ic_low": None,
-                    "rank_ic_high": None,
-                    "rank_ic_interval_method": None,
-                    "rank_ic_interval_status": None,
-                    "rank_ic_calendar_months": 0,
-                    "rank_ic_block_months": None,
-                    "rank_ic_bootstrap_samples": None,
-                    "rmse": None,
-                    "mae": None,
-                    "directional_accuracy": None,
+                    "public_visibility": "withheld_review",
+                    "message": _MODULE._PUBLIC_FORWARD_WITHHELD_DETAIL,
                 }
             ),
             "application/json",
@@ -167,15 +173,20 @@ def complete_responses() -> dict[str, FakeResponse]:
             "application/json",
         ),
     }
+    withheld = responses[f"{base}/api/v1/forward/performance"]
+    withheld.status = 410
+    withheld.headers["Cache-Control"] = "no-store"
+    responses[f"{base}/api/v1/forward/status"].headers["Cache-Control"] = "no-store"
+    return responses
 
 
 _EXPECTED_IDENTITY = {
     "path": "data/demo/snapshot.json",
-    "data_mode": "authenticated_locked_test",
+    "data_mode": "synthetic_fixture",
     "as_of": "2026-07-31",
     "sha256": "a" * 64,
-    "selection_hash": "b" * 64,
-    "locked_test_hash": "c" * 64,
+    "selection_hash": None,
+    "locked_test_hash": None,
 }
 
 
@@ -224,7 +235,7 @@ def test_smoke_passes_and_redacts_bodies(monkeypatch: pytest.MonkeyPatch) -> Non
     assert all("_body" not in check and "_json" not in check for check in report["checks"])
     assert report["checks"][-1]["snapshot_loaded"] is True
     api_checks = [check for check in report["checks"] if check["path"].startswith("/api/")]
-    assert len(api_checks) == 4
+    assert len(api_checks) == 5
     for check in api_checks:
         request_id = check["request_id"]
         assert isinstance(request_id, str)
@@ -258,7 +269,7 @@ def _replace_performance(responses: dict[str, FakeResponse], payload: dict[str, 
     responses[url] = FakeResponse(url, json.dumps(payload), "application/json")
 
 
-def test_smoke_checks_forward_performance_contract_without_retaining_metrics(
+def test_smoke_rejects_forward_performance_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = complete_responses()
@@ -273,18 +284,14 @@ def test_smoke_checks_forward_performance_contract_without_retaining_metrics(
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
-    assert report["status"] == "passed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["availability"] == "available"
-    assert check["forecast_count"] == 48
-    assert check["matured_count"] == 24
-    assert check["rank_ic_interval_method"] == "calendar_month_moving_block"
-    assert check["rank_ic_interval_status"] == "insufficient_pairs"
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
     assert "rank_ic" not in check
     assert "-0.17928633594429938" not in json.dumps(report)
 
 
-def test_smoke_accepts_ready_interval_only_after_the_minimum_history(
+def test_smoke_rejects_even_a_valid_forward_metric_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = complete_responses()
@@ -305,9 +312,9 @@ def test_smoke_accepts_ready_interval_only_after_the_minimum_history(
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
-    assert report["status"] == "passed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["rank_ic_interval_status"] == "ready"
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
     assert "rank_ic_low" not in check
     assert "rank_ic_high" not in check
 
@@ -315,15 +322,15 @@ def test_smoke_accepts_ready_interval_only_after_the_minimum_history(
 @pytest.mark.parametrize(
     ("field", "value", "error"),
     [
-        ("pending_count", 23, "forward_performance_counts_inconsistent"),
-        ("coverage", 0.6, "forward_performance_coverage_inconsistent"),
+        ("pending_count", 23, "forward_evidence_not_withheld"),
+        ("coverage", 0.6, "forward_evidence_not_withheld"),
         (
             "rank_ic_interval_method",
             "independent_event",
-            "forward_performance_interval_contract_invalid",
+            "forward_evidence_not_withheld",
         ),
-        ("rank_ic_interval_status", "ready", "forward_performance_interval_contract_invalid"),
-        ("rank_ic_low", -0.5, "forward_performance_interval_contract_invalid"),
+        ("rank_ic_interval_status", "ready", "forward_evidence_not_withheld"),
+        ("rank_ic_low", -0.5, "forward_evidence_not_withheld"),
     ],
 )
 def test_smoke_rejects_invalid_forward_performance_contract(
@@ -339,7 +346,7 @@ def test_smoke_rejects_invalid_forward_performance_contract(
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
     assert report["status"] == "failed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
     assert check["error"] == error
     assert "-0.17928633594429938" not in json.dumps(report)
 
@@ -364,8 +371,8 @@ def test_smoke_rejects_misleading_forward_interval_design_or_history(
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
     assert report["status"] == "failed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["error"] == "forward_performance_interval_contract_invalid"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
     assert "rank_ic_low" not in check
     assert "rank_ic_high" not in check
 
@@ -400,9 +407,24 @@ def test_smoke_interval_status_tracks_settled_history(
 
 
 def test_smoke_unconfigured_registry_has_no_interval_design() -> None:
-    responses = complete_responses()
-    payload = json.loads(responses["https://terminal.example/api/v1/forward/performance"]._body)
-    payload["rank_ic_block_months"] = 2
+    payload = {
+        "model_id": None,
+        "forecast_count": 0,
+        "matured_count": 0,
+        "pending_count": 0,
+        "coverage": 0.0,
+        "rank_ic": None,
+        "rank_ic_low": None,
+        "rank_ic_high": None,
+        "rank_ic_interval_method": None,
+        "rank_ic_interval_status": None,
+        "rank_ic_calendar_months": 0,
+        "rank_ic_block_months": 2,
+        "rank_ic_bootstrap_samples": None,
+        "rmse": None,
+        "mae": None,
+        "directional_accuracy": None,
+    }
 
     assert (
         _MODULE._forward_performance_error(payload)
@@ -472,20 +494,14 @@ def test_smoke_requires_interval_fields_in_performance_schema(
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
     assert report["status"] == "failed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["error"] == "forward_performance_response_fields_missing"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
 
 
-def test_smoke_accepts_explicit_registry_unavailable_degraded_mode(
+def test_smoke_rejects_registry_unavailable_instead_of_explicit_withholding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = complete_responses()
-    governance_url = "https://terminal.example/api/v1/governance"
-    governance_payload = json.loads(responses[governance_url]._body)
-    governance_payload["forward_status"] = {"configured": True, "available": False}
-    responses[governance_url] = FakeResponse(
-        governance_url, json.dumps(governance_payload), "application/json"
-    )
     performance_url = "https://terminal.example/api/v1/forward/performance"
     unavailable = FakeResponse(
         performance_url,
@@ -498,24 +514,16 @@ def test_smoke_accepts_explicit_registry_unavailable_degraded_mode(
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
-    assert report["status"] == "passed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["http_status"] == 503
-    assert check["availability"] == "unavailable"
-    assert check["degraded_mode"] == "registry_unavailable"
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
     assert "_json" not in check
 
 
-def test_smoke_accepts_urllib_http_error_for_documented_registry_outage(
+def test_smoke_rejects_urllib_http_error_instead_of_withheld_contract(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     responses = complete_responses()
-    governance_url = "https://terminal.example/api/v1/governance"
-    governance_payload = json.loads(responses[governance_url]._body)
-    governance_payload["forward_status"] = {"configured": True, "available": False}
-    responses[governance_url] = FakeResponse(
-        governance_url, json.dumps(governance_payload), "application/json"
-    )
     performance_url = "https://terminal.example/api/v1/forward/performance"
     performance_response = FakeResponse(
         performance_url,
@@ -543,11 +551,9 @@ def test_smoke_accepts_urllib_http_error_for_documented_registry_outage(
 
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
-    assert report["status"] == "passed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["http_status"] == 503
-    assert check["availability"] == "unavailable"
-    assert check["degraded_mode"] == "registry_unavailable"
+    assert report["status"] == "failed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
 
 
 def test_smoke_rejects_unconfirmed_registry_unavailable_degraded_mode(
@@ -567,8 +573,8 @@ def test_smoke_rejects_unconfirmed_registry_unavailable_degraded_mode(
     report = _MODULE.run_smoke("https://terminal.example", timeout=2.0)
 
     assert report["status"] == "failed"
-    check = next(item for item in report["checks"] if item["name"] == "forward_performance")
-    assert check["error"] == "forward_registry_unavailability_unconfirmed"
+    check = next(item for item in report["checks"] if item["name"] == "forward_evidence_withheld")
+    assert check["error"] == "forward_evidence_not_withheld"
 
 
 @pytest.mark.parametrize(
@@ -750,7 +756,7 @@ def test_repository_lock_is_a_usable_expected_identity() -> None:
     identity = _MODULE.load_expected_identity(lock)
 
     assert identity["path"] == "data/demo/snapshot.json"
-    assert identity["data_mode"] == "authenticated_locked_test"
+    assert identity["data_mode"] == "synthetic_fixture"
 
 
 def test_smoke_rejects_degraded_health_by_default(monkeypatch: pytest.MonkeyPatch) -> None:

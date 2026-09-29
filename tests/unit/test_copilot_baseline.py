@@ -32,8 +32,8 @@ def synthetic_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Itera
                 "metadata": {
                     "data_mode": "synthetic_fixture",
                     "as_of": "2026-01-01",
-                    "selection_hash": "a" * 64,
-                    "locked_test_hash": "b" * 64,
+                    "selection_hash": None,
+                    "locked_test_hash": None,
                     "research_only": True,
                 },
                 "summary": {"description": "Invented software-test fixture"},

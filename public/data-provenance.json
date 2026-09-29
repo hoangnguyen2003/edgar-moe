@@ -2,11 +2,11 @@
   "schema_version": 1,
   "snapshot": {
     "path": "data/demo/snapshot.json",
-    "data_mode": "authenticated_locked_test",
+    "data_mode": "synthetic_fixture",
     "as_of": "2026-07-31",
-    "sha256": "06aa652c638d12400f5e8210778b0d0842dab3c70cfbd59bbb84a67879dab7a5",
-    "selection_hash": "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
-    "locked_test_hash": "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987",
+    "sha256": "425d6e393011e2c073ee873b28db612b027a44436a6ac1575bfd97b943e5bb56",
+    "selection_hash": null,
+    "locked_test_hash": null,
     "research_only": true,
     "raw_sources_public": false,
     "derived_output_public": true
@@ -18,26 +18,12 @@
   },
   "sources": [
     {
-      "id": "sec-edgar",
-      "name": "SEC EDGAR",
-      "role": "Filings, submissions, and company facts",
-      "terms_url": "https://www.sec.gov/edgar",
-      "redistribution_status": "review_required"
-    },
-    {
-      "id": "alpaca-iex",
-      "name": "Alpaca market data (IEX feed)",
-      "role": "Split-adjusted daily bars and corporate actions",
-      "terms_url": "https://alpaca.markets/data",
-      "redistribution_status": "review_required"
-    },
-    {
-      "id": "fred-alfred",
-      "name": "FRED/ALFRED",
-      "role": "Macro observations and initial-release vintages",
-      "terms_url": "https://fred.stlouisfed.org/docs/api/terms_of_use.html",
-      "redistribution_status": "review_required"
+      "id": "synthetic-fixture-generator",
+      "name": "Deterministic synthetic fixture generator",
+      "role": "Generated software-demo values only; not observed market or filing data",
+      "terms_url": "https://github.com/hoangnguyen2003/edgar-moe/blob/main/LICENSE",
+      "redistribution_status": "synthetic_only"
     }
   ],
-  "notice": "This manifest records the public data boundary and review state. It is not legal advice, a license grant, or provider approval."
+  "notice": "The current public application uses synthetic values only and does not serve historical v1 results. Historical reports may remain in repository files, Git history, artifacts, or prior deployments; this is not a full takedown or legal clearance. Source-use and derived-output rights remain under review."
 }

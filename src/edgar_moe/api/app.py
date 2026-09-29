@@ -7,7 +7,7 @@ from datetime import date
 from pathlib import Path
 from threading import Lock
 from time import perf_counter
-from typing import Annotated
+from typing import Annotated, NoReturn
 from uuid import uuid4
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response
@@ -15,7 +15,6 @@ from fastapi import Path as APIPath
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import HTMLResponse
-from sqlalchemy.exc import SQLAlchemyError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response as StarletteResponse
 from starlette.staticfiles import StaticFiles
@@ -26,26 +25,21 @@ from edgar_moe.api.models import (
     EventPage,
     EventRecord,
     ExperimentRecord,
-    ForwardForecastPage,
-    ForwardPerformanceResponse,
-    ForwardQualityRecord,
-    ForwardRunRecord,
-    ForwardStatusResponse,
+    ForwardPublicationPolicyResponse,
     FreshnessResponse,
-    FrozenSnapshotIdentity,
     GovernanceControl,
     GovernanceResponse,
     HealthResponse,
     MethodologyResponse,
     PublicDataBoundary,
+    PublishedSnapshotIdentity,
     ResearchEvidenceResponse,
     SummaryResponse,
+    WithheldResponse,
 )
 from edgar_moe.api.repository import SnapshotNotFoundError, SnapshotRepository
 from edgar_moe.api.research_evidence import CatalogIntegrityError, build_research_evidence
-from edgar_moe.forward.database import RegistryDatabase
-from edgar_moe.forward.registry import ForwardRegistry
-from edgar_moe.settings import RuntimeSettings, runtime_settings
+from edgar_moe.settings import runtime_settings
 
 settings = runtime_settings()
 _GIT_COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
@@ -80,58 +74,19 @@ repository = SnapshotRepository(
 )
 
 
-def _api_registry_database_url(settings: RuntimeSettings) -> str:
-    """Select the API URL without silently exposing a production writer secret.
-
-    A dedicated reader URL is mandatory for a hosted Postgres deployment. The
-    writer URL is retained only for local SQLite development, where it is a
-    file path rather than a network credential.
-    """
-    reader_url = settings.edgar_moe_registry_read_database_url.strip()
-    if reader_url:
-        return reader_url
-
-    writer_url = settings.edgar_moe_registry_database_url.strip()
-    if writer_url.lower().startswith("sqlite"):
-        return writer_url
-    return ""
-
-
-api_registry_database_url = _api_registry_database_url(settings)
-
-
-def _build_api_registry_database(settings: RuntimeSettings) -> RegistryDatabase | None:
-    database_url = _api_registry_database_url(settings)
-    if not database_url:
-        return None
-    return RegistryDatabase(
-        database_url,
-        pool_size=settings.edgar_moe_registry_api_pool_size,
-        max_overflow=settings.edgar_moe_registry_api_max_overflow,
-        pool_timeout=settings.edgar_moe_registry_api_pool_timeout_seconds,
-        read_only=True,
-        statement_timeout_ms=settings.edgar_moe_registry_api_statement_timeout_ms,
-    )
-
-
-forward_database = _build_api_registry_database(settings)
-forward_registry = (
-    ForwardRegistry(forward_database, actor="edgar-moe-api") if forward_database else None
-)
-
 app = FastAPI(
     title="EDGAR-MoE Research API",
     version=__version__,
     description=(
-        "Read-only access to the frozen v1 study and to the registry that records "
-        "new forecasts before their tradable entry time.\n\n"
-        "- **Study routes** serve the reviewed snapshot bundled with this deployment. "
-        "It cannot change while the deployment lives, so answers are cacheable.\n"
-        "- **Forward routes** read the append-only registry, which changes when a run lands.\n"
-        "- Every route is a `GET`, needs no credentials, and runs in a read-only "
-        "database session.\n\n"
-        "Figures are research output. The study's own cost-aware portfolio was not "
-        "profitable, and nothing here is investment advice."
+        "Read-only access to a hash-locked synthetic software demo.\n\n"
+        "- **Demo routes** serve a hash-locked synthetic fixture only while historical "
+        "source-use review is unresolved.\n"
+        "- Historical and prospective research outputs are withheld from the public "
+        "application pending source-rights review.\n"
+        "- Every route is a `GET` and needs no credentials. The public API does not "
+        "connect to the forward registry.\n\n"
+        "This synthetic demo is not profitable, does not represent a live trading strategy, "
+        "and is not investment advice."
     ),
     # FastAPI's built-in docs pages bootstrap with inline script, which the
     # Content-Security-Policy below blocks. Swagger UI is served by the
@@ -209,13 +164,6 @@ def get_repository() -> SnapshotRepository:
 RepositoryDependency = Annotated[SnapshotRepository, Depends(get_repository)]
 
 
-def get_forward_registry() -> ForwardRegistry | None:
-    return forward_registry
-
-
-ForwardRegistryDependency = Annotated[ForwardRegistry | None, Depends(get_forward_registry)]
-
-
 # Vercel's edge caches a function response only when it carries ``s-maxage``.
 # Without one, every visitor invokes the function, and the first visitor after
 # an idle period waits for the function and the database to resume. A new
@@ -223,8 +171,6 @@ ForwardRegistryDependency = Annotated[ForwardRegistry | None, Depends(get_forwar
 # outlive the snapshot it came from, however long its edge lifetime.
 _EDGE_SNAPSHOT_SECONDS = 86_400
 _EDGE_SNAPSHOT_STALE_SECONDS = 604_800
-_EDGE_LIVE_SECONDS = 60
-_EDGE_LIVE_STALE_SECONDS = 300
 
 
 def shared_cacheable(cache_control: str) -> bool:
@@ -253,42 +199,26 @@ def _cache(
     )
 
 
-def _cache_live(response: Response, seconds: int = 60) -> None:
-    """Cache a registry read, which changes when a forward run lands."""
+_FORWARD_REVIEW_DETAIL = (
+    "Prospective forecasts and outcomes are withheld from the public application "
+    "pending source-rights review. The registry remains private."
+)
 
-    _cache(
-        response,
-        seconds,
-        edge_seconds=_EDGE_LIVE_SECONDS,
-        stale_seconds=_EDGE_LIVE_STALE_SECONDS,
+
+def _withheld_forward_status() -> ForwardPublicationPolicyResponse:
+    """Describe the public policy without querying or disclosing registry state."""
+    return ForwardPublicationPolicyResponse(
+        public_visibility="withheld_review",
+        message=_FORWARD_REVIEW_DETAIL,
     )
 
 
-def _forward_status_response(
-    registry: ForwardRegistry | None, *, request: Request | None = None
-) -> ForwardStatusResponse:
-    if registry is None:
-        return ForwardStatusResponse(
-            configured=False,
-            available=False,
-            message="Forward registry is not configured in this deployment.",
-        )
-    started = perf_counter()
-    try:
-        payload = registry.status()
-    except SQLAlchemyError:
-        return ForwardStatusResponse(
-            configured=True,
-            available=False,
-            message="Forward registry is configured but currently unavailable.",
-        )
-    finally:
-        if request is not None:
-            request.state.registry_read_ms = (perf_counter() - started) * 1000
-    return ForwardStatusResponse(
-        **payload,
-        available=True,
-        message="Append-only forward registry is available.",
+def _reject_public_forward_evidence() -> NoReturn:
+    """Keep database-backed derived records outside the synthetic public app."""
+    raise HTTPException(
+        status_code=410,
+        detail=_FORWARD_REVIEW_DETAIL,
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -322,18 +252,21 @@ def health(response: Response, repo: RepositoryDependency) -> HealthResponse:
 
 @app.get("/api/v1/summary", response_model=SummaryResponse, tags=["research"])
 def summary(response: Response, repo: RepositoryDependency) -> SummaryResponse:
-    """Headline figures from the frozen v1 study, with the snapshot's identity.
-
-    Includes the locked-test rank IC and the cost-aware portfolio result, which
-    was negative. The snapshot cannot change while this deployment lives.
-    """
+    """Headline figures from the hash-locked synthetic software demo."""
     _cache(response)
     return SummaryResponse.model_validate(repo.summary())
 
 
 @app.get("/api/v1/research-evidence", response_model=ResearchEvidenceResponse, tags=["research"])
 def research_evidence(response: Response, repo: RepositoryDependency) -> ResearchEvidenceResponse:
-    """Reviewed v1 evidence and the separately identified v2 review state."""
+    """Withhold frozen-v1 aggregates while the public snapshot is synthetic."""
+    response.headers["Cache-Control"] = "no-store"
+    if repo.load().get("metadata", {}).get("data_mode") != "authenticated_locked_test":
+        raise HTTPException(
+            status_code=410,
+            detail="Frozen v1 research evidence is withheld pending source-rights review.",
+            headers={"Cache-Control": "no-store"},
+        )
     try:
         result = build_research_evidence(repo)
     except CatalogIntegrityError as error:
@@ -478,28 +411,29 @@ def freshness(response: Response, repo: RepositoryDependency) -> FreshnessRespon
 def governance(
     response: Response,
     repo: RepositoryDependency,
-    registry: ForwardRegistryDependency,
 ) -> GovernanceResponse:
-    """Expose the immutable-v1 and prospective-evaluation control contract."""
+    """Expose the synthetic public boundary and prospective-evaluation controls."""
     response.headers["Cache-Control"] = "no-store"
     try:
-        frozen_identity = repo.frozen_identity()
+        published_identity = repo.published_identity()
     except (SnapshotNotFoundError, ValueError) as error:
         raise HTTPException(status_code=503, detail="Frozen snapshot unavailable") from error
     return GovernanceResponse(
-        schema_version=1,
-        frozen_v1=FrozenSnapshotIdentity.model_validate(frozen_identity),
+        schema_version=2,
+        published_snapshot=PublishedSnapshotIdentity.model_validate(published_identity),
         public_data=PublicDataBoundary(
             raw_sources_public=False,
-            derived_output_public=True,
-            redistribution_status="operator_review_required",
+            current_output_mode="synthetic_fixture",
+            historical_v1_served_by_application=False,
+            prospective_outputs_served_by_application=False,
+            redistribution_status="historical_v1_review_required",
         ),
         controls=[
             GovernanceControl(
-                key="frozen_v1_identity",
+                key="published_snapshot_identity",
                 status="enforced",
                 owner="repository",
-                summary="Model, selection, locked result, and snapshot identity remain content-addressed.",
+                summary="The current public snapshot is a content-addressed synthetic fixture; frozen-v1 output is withheld.",
             ),
             GovernanceControl(
                 key="pre_entry_forecasts",
@@ -514,184 +448,81 @@ def governance(
                 summary="Outcomes are appended after maturity; the frozen v1 result is not overwritten.",
             ),
             GovernanceControl(
+                key="prospective_publication",
+                status="withheld_review",
+                owner="repository",
+                summary="Database-backed prospective forecasts and outcomes are withheld from the public app while source-rights review remains open.",
+            ),
+            GovernanceControl(
                 key="provider_operations",
                 status="pending_operator_evidence",
                 owner="operator",
                 summary="Provider grants, backups, restore timing, and object-store failure evidence require an external exercise.",
             ),
         ],
-        forward_status=_forward_status_response(registry),
+        forward_status=_withheld_forward_status(),
     )
 
 
 @app.get(
     "/api/v1/forward/status",
-    response_model=ForwardStatusResponse,
+    response_model=ForwardPublicationPolicyResponse,
     tags=["forward testing"],
 )
 def forward_status(
-    request: Request,
     response: Response,
-    registry: ForwardRegistryDependency,
-) -> ForwardStatusResponse:
-    """Whether the forward registry is reachable and the runner is on time.
-
-    Reports counts, the latest run, and whether the runner is inside its
-    freshness window. Never cached, so an outage is visible immediately.
-    """
+) -> ForwardPublicationPolicyResponse:
+    """Report the publication policy without probing the private registry."""
     response.headers["Cache-Control"] = "no-store"
-    return _forward_status_response(registry, request=request)
+    return _withheld_forward_status()
 
 
 @app.get(
     "/api/v1/forward/runs",
-    response_model=list[ForwardRunRecord],
+    status_code=410,
+    response_model=None,
     tags=["forward testing"],
+    responses={410: {"model": WithheldResponse, "description": _FORWARD_REVIEW_DETAIL}},
 )
-def forward_runs(
-    response: Response,
-    registry: ForwardRegistryDependency,
-    limit: int = Query(default=25, ge=1, le=100),
-) -> list[ForwardRunRecord]:
-    """Recent forward runs, newest first, with status and quality-check counts.
-
-    Returns an empty list, not an error, when no registry is configured for
-    this deployment.
-    """
-    _cache_live(response)
-    if registry is None:
-        return []
-    try:
-        return [ForwardRunRecord.model_validate(item) for item in registry.list_runs(limit=limit)]
-    except SQLAlchemyError as error:
-        raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
+def forward_runs() -> NoReturn:
+    """Withheld from public access: database-backed run metadata stays private."""
+    _reject_public_forward_evidence()
 
 
 @app.get(
     "/api/v1/forward/forecasts",
-    response_model=ForwardForecastPage,
+    status_code=410,
+    response_model=None,
     tags=["forward testing"],
+    responses={410: {"model": WithheldResponse, "description": _FORWARD_REVIEW_DETAIL}},
 )
-def forward_forecasts(
-    request: Request,
-    response: Response,
-    registry: ForwardRegistryDependency,
-    ticker: str | None = Query(default=None, min_length=1, max_length=32),
-    model_id: str | None = Query(default=None, min_length=1, max_length=160),
-    limit: int = Query(default=50, ge=1, le=100),
-    # Bounded so an oversized value is a 422 rather than a database overflow.
-    offset: int = Query(default=0, ge=0, le=1_000_000),
-) -> ForwardForecastPage:
-    """Recorded forward forecasts, newest first, each bound to its own run.
-
-    A forecast's rank is its position within that run's batch of candidate
-    filings, and `cohort_size` gives that batch's size, so a run that scored a
-    single filing reads as one filing rather than as a top rank.
-    """
-    _cache_live(response)
-    if registry is None:
-        return ForwardForecastPage(items=[], total=0, offset=offset, limit=limit)
-    started = perf_counter()
-    try:
-        payload = registry.list_forecasts(
-            ticker=ticker,
-            model_id=model_id,
-            limit=limit,
-            offset=offset,
-        )
-    except SQLAlchemyError as error:
-        raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
-    finally:
-        request.state.registry_read_ms = (perf_counter() - started) * 1000
-    return ForwardForecastPage.model_validate(payload)
+def forward_forecasts() -> NoReturn:
+    """Withheld from public access: database-backed forecast records stay private."""
+    _reject_public_forward_evidence()
 
 
 @app.get(
     "/api/v1/forward/performance",
-    response_model=ForwardPerformanceResponse,
+    status_code=410,
+    response_model=None,
     tags=["forward testing"],
+    responses={410: {"model": WithheldResponse, "description": _FORWARD_REVIEW_DETAIL}},
 )
-def forward_performance(
-    request: Request,
-    response: Response,
-    registry: ForwardRegistryDependency,
-    model_id: str | None = Query(default=None, min_length=1, max_length=160),
-) -> ForwardPerformanceResponse:
-    """Scores over the forecasts that have matured.
-
-    Rank IC, RMSE, MAE, and directional accuracy, with the share of recorded
-    forecasts they cover. Early in a forward test the sample is small and these
-    figures move a great deal, so the counts are part of the answer.
-
-    The rank IC is one Spearman correlation pooled over every settled
-    (score, return) pair, not the average of per-run cross-sectional
-    correlations: a run scores one to four filings, too few for a
-    cross-section. It therefore mixes ordering with variation between periods
-    and is not comparable to the locked study's rank IC.
-
-    `rank_ic_low` and `rank_ic_high` are a conditional 95% percentile interval
-    from two-calendar-month moving blocks of filing acceptance times. All
-    filings in a month move together. Bounds remain null until at least 100
-    settled outcomes span 12 distinct calendar months, or when the statistic
-    is undefined or exceeds the reviewed 5,000-pair / 120-month capacity envelope. The
-    method/status/month count fields explain that state; the interval is not
-    proof of skill or a correction for model selection or regime change.
-    """
-    _cache_live(response)
-    if registry is None:
-        return ForwardPerformanceResponse(
-            model_id=model_id,
-            forecast_count=0,
-            matured_count=0,
-            pending_count=0,
-            coverage=0.0,
-            rank_ic=None,
-            rank_ic_low=None,
-            rank_ic_high=None,
-            rank_ic_interval_method=None,
-            rank_ic_interval_status=None,
-            rank_ic_calendar_months=0,
-            rank_ic_block_months=None,
-            rank_ic_bootstrap_samples=None,
-            rmse=None,
-            mae=None,
-            directional_accuracy=None,
-        )
-    started = perf_counter()
-    try:
-        payload = registry.performance(model_id=model_id)
-    except SQLAlchemyError as error:
-        raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
-    finally:
-        request.state.registry_read_ms = (perf_counter() - started) * 1000
-    return ForwardPerformanceResponse.model_validate(payload)
+def forward_performance() -> NoReturn:
+    """Withheld from public access: database-backed performance metrics stay private."""
+    _reject_public_forward_evidence()
 
 
 @app.get(
     "/api/v1/forward/data-quality",
-    response_model=list[ForwardQualityRecord],
+    status_code=410,
+    response_model=None,
     tags=["forward testing"],
+    responses={410: {"model": WithheldResponse, "description": _FORWARD_REVIEW_DETAIL}},
 )
-def forward_data_quality(
-    response: Response,
-    registry: ForwardRegistryDependency,
-    limit: int = Query(default=100, ge=1, le=250),
-) -> list[ForwardQualityRecord]:
-    """The quality checks each run appended to the registry.
-
-    Includes the point-in-time availability audit and the margin between the
-    run and the market open, with the observed value and threshold for each.
-    """
-    _cache_live(response)
-    if registry is None:
-        return []
-    try:
-        return [
-            ForwardQualityRecord.model_validate(item)
-            for item in registry.list_quality_checks(limit=limit)
-        ]
-    except SQLAlchemyError as error:
-        raise HTTPException(status_code=503, detail="Forward registry unavailable") from error
+def forward_data_quality() -> NoReturn:
+    """Withheld from public access: database-backed quality records stay private."""
+    _reject_public_forward_evidence()
 
 
 _SWAGGER_UI_CDN = "https://cdn.jsdelivr.net/npm/swagger-ui-dist@5.33.0"

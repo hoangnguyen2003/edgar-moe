@@ -23,7 +23,7 @@ def test_synthetic_read_benchmark_exercises_only_local_routes() -> None:
     completed = _run("--rows", "120", "--settled-percent", "50", "--samples", "5")
     assert completed.returncode == 0, completed.stderr
     result = json.loads(completed.stdout)
-    assert result["scope"] == "synthetic_in_process_fastapi_sqlite_sequential"
+    assert result["scope"] == "synthetic_private_registry_sqlite_sequential"
     assert result["forecasts"] == 120
     assert result["settled"] == 60
     routes = result["results"]

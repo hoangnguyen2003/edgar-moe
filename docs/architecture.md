@@ -8,7 +8,7 @@
 4. XBRL facts use the SEC filing timestamp, not the fiscal period end.
 5. Model preprocessing is fitted independently inside each training fold.
 6. The locked test is evaluated after the model family, features, costs, and constraints are frozen.
-7. Historical endpoints read a derived snapshot; prospective endpoints read the registry. Neither needs raw licensed market data or training dependencies.
+7. The public application serves only the reviewed, hash-locked synthetic fixture while source-rights review is open. It does not connect to or disclose prospective registry data; private runner and audit tools use the registry separately.
 8. The one-time evaluator requires the exact walk-forward selection hash and refuses locked-artifact overwrites.
 9. A dependency upgrade cannot silently change frozen-v1 inference: the private compatibility audit records the runtime and reproduced scores, and the comparison gate fails closed before a frozen-inference upgrade is accepted ([ADR 0021](adr/0021-frozen-runtime-compatibility-gate.md)).
 
@@ -20,7 +20,7 @@
 - `artifacts`: model states, preprocessors, experiment manifests, and reports.
 - `demo`: small public snapshot consumed by FastAPI and React.
 
-Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Historical research pages use a validated snapshot. The Live tracking page (`/forward`) uses a Postgres registry containing forecast evidence, appended outcomes, and mutable run status. The read-only governance endpoint exposes the frozen-v1 identity, public-data boundary, repository-enforced controls, and current forward status as one machine-readable contract. The public API exposes reads only; the private runner performs writes.
+Each authenticated layer has a JSON manifest recording source identity, configuration, row counts, paths, and SHA-256 digests. Public demo pages use a validated synthetic snapshot. The private forward runner and authorized auditors use a Postgres registry containing forecast evidence, appended outcomes, and run status. The public governance endpoint exposes the synthetic identity and publication hold; its forward-status field is policy only, not registry health. The public API exposes reads only and has no database connection.
 
 ## Failure behavior
 
@@ -32,7 +32,7 @@ Each authenticated layer has a JSON manifest recording source identity, configur
 
 ## Deployment boundary
 
-Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves historical snapshot JSON and prospective registry reads. The Vercel source boundary excludes the research lockfile, private research caches, and operator tree, retaining only the reviewed snapshot-lock validator inputs. The function-level boundary repeats those data exclusions and explicitly includes the derived demo snapshot plus its reviewed lock. `SnapshotRepository` verifies the lock before serving and rechecks it when either file changes, so a local checkout with raw filings or forward artifacts cannot create an oversized or identity-drifting serving bundle. The function therefore installs the core serving dependencies from `pyproject.toml`. The React application performs visualization and filtering but no model inference or order routing. A provider-neutral Docker image packages the same serving boundary for a future container host, including the reviewed lock as a non-secret runtime input; it is non-root, healthchecked, and does not include the private forward runner or source-data credentials.
+Training uses PyTorch and Transformers outside the serving tier. The deployed FastAPI function contains no training stack; it serves only hash-locked synthetic snapshot JSON. Historical research evidence and prospective registry routes are withheld while source-rights review is open, and the function does not connect to Postgres. The Vercel source boundary excludes the research lockfile, private research caches, operator tree, and archived evidence catalog, retaining only the reviewed snapshot-lock validator inputs. The function-level boundary repeats those data exclusions and explicitly includes the derived demo snapshot plus its reviewed lock. `SnapshotRepository` verifies the lock before serving and rechecks it when either file changes, so a local checkout with raw filings or forward artifacts cannot create an oversized or identity-drifting serving bundle. The function therefore installs the core serving dependencies from `pyproject.toml`. The React application performs visualization and filtering but no model inference or order routing. A provider-neutral Docker image packages the same serving boundary for a future container host, including the reviewed lock as a non-secret runtime input; it is non-root, healthchecked, and does not include the private forward runner or source-data credentials.
 
 The operator-run copilot is a separate egress boundary: its provider adapter
 accepts HTTPS for remote providers and loopback HTTP for local runtimes, then
@@ -118,21 +118,14 @@ earliest-event audits are supplementary and must be labeled as such.
 
 ### Trust boundaries and integrity limits
 
-- Browser → API: anonymous public reads. CORS is not authorization. Pagination
-  bounds response sizes, but does not by itself prevent scraping or request floods.
-- API → database: GET-only routes reduce exposure. The API now prefers
-  `EDGAR_MOE_REGISTRY_READ_DATABASE_URL`; local SQLite compatibility falls back to
-  the writer URL, while a missing reader URL never falls back to a hosted Postgres
-  writer. The API reader also uses a bounded per-instance connection pool
-  (`EDGAR_MOE_REGISTRY_API_POOL_SIZE`, `EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW`, and
-  `EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS`) to limit serverless connection
-  fan-out, requests `default_transaction_read_only=on`, and applies the bounded
-  `EDGAR_MOE_REGISTRY_API_STATEMENT_TIMEOUT_MS` Postgres statement timeout.
-  These are defense-in-depth controls; provider/project limits and the deployed
-  role grants still require external verification. The shared database session
-  helper can commit, so the deployed reader role must still be granted
-  SELECT-only privileges and verified before claiming database-enforced least
-  privilege.
+- Browser → API: anonymous public reads of the synthetic fixture and fixed
+  governance/policy responses. CORS is not authorization. Static read paths are
+  bounded, but do not by themselves prevent scraping or request floods.
+- Public API → database: no connection exists. Prospective data routes return a
+  fixed non-cacheable `410` while review is open. Private audit workflows are
+  separate: they use the SELECT-only role, read-only transaction settings, and
+  provider-specific verification; these private controls do not imply public
+  serving authorization.
 - Runner → providers/database/R2: high-trust execution with source and write
   credentials. Workflow permissions are `contents: read`, but job secrets remain
   powerful. Review workflow and dependency changes as privileged code changes.

@@ -225,30 +225,37 @@ class HealthResponse(BaseModel):
     commit_sha: str | None = Field(default=None, pattern=r"^[0-9a-f]{40}$")
 
 
-class FrozenSnapshotIdentity(BaseModel):
+class PublishedSnapshotIdentity(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     path: Literal["data/demo/snapshot.json"]
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    data_mode: Literal["authenticated_locked_test"]
+    data_mode: Literal["synthetic_fixture"]
     as_of: date
-    selection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
-    locked_test_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    selection_hash: None
+    locked_test_hash: None
     research_only: Literal[True]
 
 
 class PublicDataBoundary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     raw_sources_public: Literal[False]
-    derived_output_public: Literal[True]
-    redistribution_status: Literal["operator_review_required"]
+    current_output_mode: Literal["synthetic_fixture"]
+    historical_v1_served_by_application: Literal[False]
+    prospective_outputs_served_by_application: Literal[False]
+    redistribution_status: Literal["historical_v1_review_required"]
 
 
 class GovernanceControl(BaseModel):
     key: str
-    status: Literal["enforced", "pending_operator_evidence"]
+    status: Literal["enforced", "pending_operator_evidence", "withheld_review"]
     owner: Literal["repository", "operator"]
     summary: str
 
 
 class ForwardStatusResponse(BaseModel):
+    public_visibility: Literal["available", "withheld_review"] = "available"
     configured: bool
     available: bool
     model_count: int = 0
@@ -274,12 +281,23 @@ class ForwardStatusResponse(BaseModel):
     message: str
 
 
+class ForwardPublicationPolicyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    public_visibility: Literal["withheld_review"]
+    message: str
+
+
+class WithheldResponse(BaseModel):
+    detail: str
+
+
 class GovernanceResponse(BaseModel):
-    schema_version: Literal[1]
-    frozen_v1: FrozenSnapshotIdentity
+    schema_version: Literal[2]
+    published_snapshot: PublishedSnapshotIdentity
     public_data: PublicDataBoundary
     controls: list[GovernanceControl]
-    forward_status: ForwardStatusResponse
+    forward_status: ForwardPublicationPolicyResponse
 
 
 class ForwardRunRecord(BaseModel):

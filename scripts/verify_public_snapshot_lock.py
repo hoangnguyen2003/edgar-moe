@@ -1,4 +1,4 @@
-"""Verify the content-addressed identity of the immutable public v1 snapshot."""
+"""Verify the content-addressed identity of the current public synthetic demo."""
 
 from __future__ import annotations
 
@@ -75,10 +75,12 @@ def validate_public_snapshot_lock(
         errors.append("public snapshot metadata must be an object")
         return errors
 
-    if metadata.get("data_mode") != "authenticated_locked_test":
-        errors.append("public snapshot data_mode must remain authenticated_locked_test")
+    if metadata.get("data_mode") != "synthetic_fixture":
+        errors.append("public snapshot data_mode must remain synthetic_fixture")
     if metadata.get("research_only") is not True:
         errors.append("public snapshot research_only must remain true")
+    if metadata.get("selection_hash") is not None or metadata.get("locked_test_hash") is not None:
+        errors.append("synthetic public snapshot must not claim frozen-v1 selection/test hashes")
     for field in ("data_mode", "as_of", "selection_hash", "locked_test_hash"):
         if lock.get(field) != metadata.get(field):
             errors.append(f"public snapshot metadata does not match lock field: {field}")
@@ -112,6 +114,8 @@ def _validate_public_provenance(root: Path, lock: dict[str, object], errors: lis
             errors.append(f"public provenance does not match lock field: {field}")
     if snapshot.get("research_only") is not True:
         errors.append("public provenance snapshot research_only must remain true")
+    if snapshot.get("data_mode") != "synthetic_fixture":
+        errors.append("public provenance must identify a synthetic_fixture snapshot")
 
 
 def _sha256_file(path: Path) -> str:

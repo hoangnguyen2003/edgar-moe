@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowUp, ExternalLink, Search, X } from "lucide-react";
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { ExpertBars } from "../components/Experts";
@@ -7,7 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { SignalBadge } from "../components/SignalBadge";
 import { dateTime, featureLabel, filedDate, shortDate, signedDecimal, signedPercent, standing } from "../lib/format";
-import { EVENTS_COMPACT_PAGE_SIZE, EVENTS_PAGE_SIZE, eventsQuery, filingsView } from "../lib/queries";
+import { EVENTS_COMPACT_PAGE_SIZE, EVENTS_PAGE_SIZE, eventsQuery, filingsView, summaryQuery } from "../lib/queries";
 import type { EventRecord } from "../lib/types";
 import { useDebouncedValue } from "../lib/useDebouncedValue";
 import { COMPACT_LAYOUT, REDUCED_MOTION, useMediaQuery } from "../lib/useMediaQuery";
@@ -55,6 +55,8 @@ export function FilingsPage() {
   const search = useDebouncedValue(query.trim(), 250);
   const pageSize = compact ? EVENTS_COMPACT_PAGE_SIZE : EVENTS_PAGE_SIZE;
   const queryClient = useQueryClient();
+  const summary = useQuery(summaryQuery);
+  const demo = summary.data?.metadata?.data_mode === "synthetic_fixture";
   // The address follows the view, so a refresh or a shared link opens the same
   // search, filter and filing. Replacing the entry keeps Back meaning "previous page".
   useEffect(() => {
@@ -67,8 +69,10 @@ export function FilingsPage() {
   }, [search, direction, selectedId]);
   const events = useInfiniteQuery({ ...eventsQuery(direction, search, pageSize), placeholderData: keepPreviousData });
   const header = (
-    <PageHeader title="Filing explorer">
-      Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards.
+    <PageHeader title={demo ? "Synthetic event explorer" : "Filing explorer"}>
+      {demo
+        ? "Search generated example records to exercise the explorer. They are not actual SEC filings, predictions, or realized stock returns."
+        : "Search every scored filing. Select one to see its score, what the model relied on, and how the stock actually did afterwards."}
     </PageHeader>
   );
   if (events.isLoading) return <div className="page">{header}<LoadingState label="Loading filings" skeleton={["rows"]} /></div>;

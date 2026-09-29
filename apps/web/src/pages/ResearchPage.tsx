@@ -3,9 +3,9 @@ import { type ReactNode, useId, useState } from "react";
 import { MetricCard } from "../components/MetricCard";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import { experimentsQuery, researchEvidenceQuery, summaryQuery } from "../lib/queries";
+import { experimentsQuery, summaryQuery } from "../lib/queries";
 import { decimal, signedDecimal, splitModelName } from "../lib/format";
-import type { ExperimentRecord, ResearchEvidenceResponse } from "../lib/types";
+import type { ExperimentRecord } from "../lib/types";
 
 type SortKey = "rank_ic" | "rmse";
 const PREVIEW_ROWS = 10;
@@ -28,15 +28,15 @@ function ranked(rows: ExperimentRecord[], sort: SortKey) {
 export function ResearchPage() {
   const experiments = useQuery(experimentsQuery);
   const summary = useQuery(summaryQuery);
-  const evidence = useQuery(researchEvidenceQuery);
   const header = (answer?: ReactNode) => (
     <PageHeader
       title="Model comparison"
       answer={answer}
-      placeholder="Of 33 candidates, Fundamental-Anchored MoE was chosen: the most consistent across both validation years, not the highest average (#2 of 33)."
+      placeholder="This generated leaderboard exercises the comparison interface; it is not evidence of market performance."
     >
-      Every candidate learned from the same filings and was compared on 2023–2024 validation data; the chosen one was
-      frozen before the final test.
+      {summary.data?.metadata?.data_mode === "synthetic_fixture"
+        ? "The public leaderboard is generated synthetic data for exercising the software only; frozen v1 research results are withheld pending source-rights review."
+        : "Every candidate learned from the same filings and was compared on 2023–2024 validation data; the chosen one was frozen before the final test."}
     </PageHeader>
   );
   if (experiments.isLoading || summary.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the model comparison" skeleton={["figures:3", "rows"]} /></div>;
@@ -44,6 +44,7 @@ export function ResearchPage() {
   const rows = experiments.data!;
   const selected = rows.find((row) => row.selected);
   const selectedName = selected ? splitModelName(selected.name) : null;
+  const demo = summary.data?.metadata?.data_mode === "synthetic_fixture";
   const byRankIc = ranked(rows, "rank_ic");
   const chosen = byRankIc.find((entry) => entry.row.selected);
   // The best of each plainer family, so the comparison below shows its outcome.
@@ -51,23 +52,28 @@ export function ResearchPage() {
   const finalIc = summary.data?.predictive_metrics?.locked_test?.rank_ic;
   return (
     <div className="page">
-      {header(selectedName ? (
+      {demo && <DemoNotice />}
+      {header(demo ? (
+        <>This is a synthetic software fixture. The generated model metrics are not market evidence.</>
+      ) : selectedName ? (
         <>
           Of {rows.length} candidates, <mark>{selectedName.family}</mark> was chosen: the most consistent across both
           validation years, not the highest average (#{chosen?.rank} of {rows.length}).
         </>
       ) : undefined)}
       <section className="figures figures--three" aria-label="Chosen model results">
-        <MetricCard label="Ranking skill, validation" info="rankIc" value={decimal(selected?.validation_rank_ic, 3)} detail="2023–2024; higher is better" />
-        <MetricCard label="Prediction error, validation" info="rmse" value={decimal(selected?.validation_rmse, 5)} detail="2023–2024; lower is better" />
-        <MetricCard label="Ranking skill, final test" info="lockedTest" value={decimal(finalIc, 3)} detail="2025–2026, scored once after freezing" />
+        <MetricCard label={demo ? "Synthetic validation metric" : "Ranking skill, validation"} info="rankIc" value={decimal(selected?.validation_rank_ic, 3)} detail={demo ? "Generated fixture only; not market evidence" : "2023–2024; higher is better"} />
+        <MetricCard label={demo ? "Synthetic prediction error" : "Prediction error, validation"} info="rmse" value={decimal(selected?.validation_rmse, 5)} detail={demo ? "Generated fixture only; not market evidence" : "2023–2024; lower is better"} />
+        <MetricCard label={demo ? "Synthetic test metric" : "Ranking skill, final test"} info="lockedTest" value={decimal(finalIc, 3)} detail={demo ? "Generated fixture only; not an observed market result" : "2025–2026, scored once after freezing"} />
       </section>
-      <EvidencePanel
-        evidence={evidence.data}
-        loading={evidence.isPending}
-        error={evidence.error}
-        retry={() => void evidence.refetch()}
-      />
+      <section className="panel research-evidence" aria-labelledby="research-evidence-heading">
+        <header><div><h2 id="research-evidence-heading">Historical research evidence</h2></div></header>
+        <p role="note">
+          Frozen v1 results are withheld from this application while source-use and redistribution review remains open.
+          The synthetic figures above are generated software fixtures, not observed market results. Related repository
+          reports and prior Git history have not been purged; this is not a legal determination.
+        </p>
+      </section>
       <Leaderboard rows={rows} />
       <article className="panel">
         <header>
@@ -94,79 +100,8 @@ export function ResearchPage() {
           </li>
         </ol>
       </article>
-      {summary.data?.metadata.data_mode === "synthetic_fixture" && <DemoNotice />}
     </div>
   );
-}
-
-function EvidencePanel({ evidence, loading, error, retry }: {
-  evidence?: ResearchEvidenceResponse;
-  loading: boolean;
-  error: Error | null;
-  retry: () => void;
-}) {
-  return (
-    <section className="panel research-evidence" aria-labelledby="research-evidence-heading">
-      <header>
-        <div>
-          <h2 id="research-evidence-heading">Evidence and uncertainty</h2>
-          <p>Frozen v1 results are separate from duration-aware v2 development research.</p>
-        </div>
-      </header>
-      {loading && <p role="status">Loading reviewed research evidence…</p>}
-      {error && <div role="alert"><p>Reviewed evidence is unavailable. The model leaderboard above remains readable, but its provenance cannot be verified here.</p><button type="button" className="text-button" onClick={retry}>Retry evidence</button></div>}
-      {evidence && <>
-        <div className="evidence-grid">
-          <div>
-            <h3>Frozen v1 · locked test</h3>
-            <p><strong>{evidence.frozen_v1.locked_test_events.toLocaleString()}</strong> locked-test events; rank IC <strong>{signedDecimal(evidence.frozen_v1.locked_rank_ic, 3)}</strong>.</p>
-            <p>95% calendar-month block interval: <strong>{signedDecimal(evidence.frozen_v1.locked_rank_ic_interval_95.low, 3)} to {signedDecimal(evidence.frozen_v1.locked_rank_ic_interval_95.high, 3)}</strong> ({evidence.frozen_v1.locked_rank_ic_interval_95.calendar_months} months; {evidence.frozen_v1.locked_rank_ic_interval_95.resamples.toLocaleString()} resamples).</p>
-            <p>10 bps cost-aware Sharpe: <strong>{signedDecimal(evidence.frozen_v1.portfolio_10bps_sharpe, 3)}</strong>. {evidence.frozen_v1.interpretation}</p>
-            <p role="note"><strong>Universe-selection limitation:</strong> {evidence.frozen_v1.candidate_universe.interpretation} Screen cutoff: {evidence.frozen_v1.candidate_universe.screen_as_of}; first validation: {evidence.frozen_v1.candidate_universe.first_validation_start}; locked test began: {evidence.frozen_v1.candidate_universe.locked_test_start}.</p>
-          </div>
-          <div>
-            <h3>Duration-aware v2 · development</h3>
-            {evidence.duration_aware_v2.status === "pending_review" ? (
-              <p role="status">Pending review. No v2 comparison or cost-aware result is published yet. {evidence.duration_aware_v2.reason}</p>
-            ) : <ReviewedV2 evidence={evidence.duration_aware_v2} />}
-          </div>
-        </div>
-        <p className="evidence-provenance">Catalog SHA-256: <code>{evidence.catalog_sha256}</code> · Frozen selection: <code>{evidence.frozen_v1.selection_hash}</code></p>
-      </>}
-    </section>
-  );
-}
-
-function ReviewedV2({ evidence }: {
-  evidence: Extract<ResearchEvidenceResponse["duration_aware_v2"], { status: "reviewed_pretest" }>;
-}) {
-  return <>
-    <p>{evidence.oof_events.toLocaleString()} out-of-fold development events. Selected {evidence.champion_name}: weighted rank IC {signedDecimal(evidence.champion_weighted_rank_ic, 3)}.</p>
-    <p>Five-comparator simultaneous 95% intervals use paired calendar-month blocks within each fold: {evidence.block_months} months, {evidence.bootstrap_resamples.toLocaleString()} resamples. They account for comparing against five baselines, but remain conditional on development-fold model selection.</p>
-    <p role="note"><strong>Universe-selection limitation:</strong> Historical candidate membership is unverified; these development results are not a fully point-in-time validation.</p>
-    <p>{evidence.interpretation}</p>
-    <div className="table-scroll">
-      <table className="evidence-table">
-        <caption>Development-fold rank IC difference against simple baselines</caption>
-        <thead><tr><th scope="col">Baseline</th><th scope="col">Difference</th><th scope="col">Simultaneous 95% interval</th></tr></thead>
-        <tbody>{evidence.comparisons.map((row) => <tr key={row.baseline}>
-          <th scope="row">{row.baseline}</th>
-          <td>{signedDecimal(row.rank_ic_delta, 3)}</td>
-          <td>{row.interval_status === "ready" ? `${signedDecimal(row.interval_low, 3)} to ${signedDecimal(row.interval_high, 3)}` : "Unavailable: insufficient reliable resamples"}</td>
-        </tr>)}</tbody>
-      </table>
-    </div>
-    {evidence.portfolio_status === "development_only" ? <div className="table-scroll">
-      <table className="evidence-table">
-        <caption>Development-fold cost scenarios; {evidence.cost_definition}; not a live or independent trading estimate</caption>
-        <thead><tr><th scope="col">Model</th><th scope="col">Cost</th><th scope="col">Sharpe</th><th scope="col">Annualized return</th></tr></thead>
-        <tbody>{evidence.cost_scenarios.map((row) => <tr key={`${row.model}-${row.cost_bps}`}>
-          <th scope="row">{row.model}</th><td>{row.cost_bps} bps</td><td>{decimal(row.sharpe, 2)}</td><td>{row.annualized_return == null ? "—" : `${decimal(row.annualized_return * 100, 1)}%`}</td>
-        </tr>)}</tbody>
-      </table>
-    </div> : <p>Cost-aware portfolio comparison unavailable: {evidence.portfolio_status.replaceAll("_", " ")}.</p>}
-    <p className="evidence-provenance">Review SHA-256: <code>{evidence.review_sha256}</code> · Approval reference: <code>{evidence.approval_reference}</code></p>
-  </>;
 }
 
 /** Where one model finished on validation ranking skill: "Elastic Net · #32 of 33 · −0.081". */

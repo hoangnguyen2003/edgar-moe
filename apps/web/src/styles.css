@@ -280,6 +280,15 @@ main { flex: 1; min-width: 0; min-height: calc(100vh - var(--topbar-height)); mi
 /* A figure strip after a section's last line needs the same air as under a page header. */
 .panel + .figures { margin-top: var(--s5); }
 .research-evidence { color: var(--ink); }
+.site-disclosure {
+  padding: 0.65rem clamp(1rem, 4vw, 3rem);
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper-2);
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.site-disclosure strong { color: var(--ink); }
 .evidence-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s5); }
 .evidence-grid > div { min-width: 0; }
 .evidence-grid > div + div { border-left: 1px solid var(--rule); padding-left: var(--s5); }

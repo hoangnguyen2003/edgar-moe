@@ -250,15 +250,13 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
     else:
         if snapshot.get("path") != _EXPECTED_SNAPSHOT_PATH:
             errors.append("public provenance snapshot path must be " + _EXPECTED_SNAPSHOT_PATH)
-        if snapshot.get("data_mode") != "authenticated_locked_test":
-            errors.append("public provenance data_mode must remain authenticated_locked_test")
+        if snapshot.get("data_mode") != "synthetic_fixture":
+            errors.append("public provenance data_mode must remain synthetic_fixture")
         if not _SHA256.fullmatch(str(snapshot.get("sha256", ""))):
             errors.append("public provenance snapshot sha256 must be a lowercase SHA-256 digest")
         for field in ("selection_hash", "locked_test_hash"):
-            if not _SHA256.fullmatch(str(snapshot.get(field, ""))):
-                errors.append(
-                    f"public provenance snapshot {field} must be a lowercase SHA-256 digest"
-                )
+            if snapshot.get(field) is not None:
+                errors.append(f"synthetic public provenance must not publish {field}")
         if snapshot.get("research_only") is not True:
             errors.append("public provenance snapshot research_only must remain true")
         if snapshot.get("raw_sources_public") is not False:
@@ -314,10 +312,12 @@ def _validate_provenance_manifest(root: Path, errors: list[str]) -> None:
                 errors.append(f"public provenance source {index} is missing identity fields")
             if not _HTTPS_URL.fullmatch(str(source.get("terms_url", ""))):
                 errors.append(f"public provenance source {index} must have an HTTPS terms_url")
-            if source.get("redistribution_status") not in {"review_required", "approved"}:
-                errors.append(
-                    f"public provenance source {index} redistribution status must be review_required or approved"
-                )
+            if source.get("redistribution_status") not in {
+                "synthetic_only",
+                "review_required",
+                "approved",
+            }:
+                errors.append(f"public provenance source {index} redistribution status is invalid")
 
 
 def _resolve_asset_reference(source: Path, root: Path, reference: str) -> Path | None:

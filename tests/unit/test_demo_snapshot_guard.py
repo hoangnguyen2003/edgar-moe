@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
 from pathlib import Path
 
 import orjson
@@ -17,12 +16,12 @@ def _fail_if_training_starts(*_args: object, **_kwargs: object) -> None:
 def test_demo_refuses_to_overwrite_the_locked_public_snapshot(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    locked = tmp_path / "snapshot.json"
-    shutil.copyfile("data/demo/snapshot.json", locked)
+    del tmp_path
+    locked = Path("data/demo/snapshot.json")
     digest = hashlib.sha256(locked.read_bytes()).hexdigest()
     monkeypatch.setattr(demo, "generate_synthetic_dataset", _fail_if_training_starts)
 
-    with pytest.raises(FileExistsError, match="non-synthetic"):
+    with pytest.raises(FileExistsError, match="locked public snapshot"):
         demo.build_demo_snapshot(locked)
 
     assert hashlib.sha256(locked.read_bytes()).hexdigest() == digest

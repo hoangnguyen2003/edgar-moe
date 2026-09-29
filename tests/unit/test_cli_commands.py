@@ -34,8 +34,8 @@ def test_validate_config_reports_each_protocols_fact_policy() -> None:
 
 
 def test_demo_refuses_to_replace_the_locked_public_snapshot(tmp_path: Path) -> None:
-    locked = tmp_path / "snapshot.json"
-    shutil.copyfile("data/demo/snapshot.json", locked)
+    del tmp_path
+    locked = Path("data/demo/snapshot.json")
     digest = hashlib.sha256(locked.read_bytes()).hexdigest()
 
     result = runner.invoke(cli.app, ["demo", "--output", str(locked), "--epochs", "1"])

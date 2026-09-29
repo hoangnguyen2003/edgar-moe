@@ -1,6 +1,6 @@
 import { Activity, CheckCircle2, TriangleAlert } from "lucide-react";
 import { dateTime, formatAge } from "../lib/format";
-import type { ForwardStatusResponse } from "../lib/types";
+import type { ForwardRegistryStatusResponse } from "../lib/types";
 
 /**
  * The forward runner's state, reported the same way on every page that shows
@@ -14,7 +14,7 @@ const RUNNER_STATE: Record<string, string> = {
 };
 
 /** The runner's state as a status line, the way a service reports it. */
-export function RunnerStatus({ status }: { status: ForwardStatusResponse }) {
+export function RunnerStatus({ status }: { status: ForwardRegistryStatusResponse }) {
   const tone = status.health_status === "ok" ? "ok" : status.health_status === "warning" ? "warning" : "critical";
   const age = status.age_seconds == null ? "no successful run yet" : `${formatAge(status.age_seconds)} ago`;
   // When the runner is unhealthy the banner below carries the full message, so
@@ -33,7 +33,7 @@ export function RunnerStatus({ status }: { status: ForwardStatusResponse }) {
   );
 }
 
-export function RunnerHealthBanner({ status }: { status: ForwardStatusResponse }) {
+export function RunnerHealthBanner({ status }: { status: ForwardRegistryStatusResponse }) {
   const healthy = status.health_status === "ok";
   const warning = status.health_status === "warning";
   const Icon = healthy ? CheckCircle2 : warning ? Activity : TriangleAlert;
@@ -58,7 +58,7 @@ export function RunnerHealthBanner({ status }: { status: ForwardStatusResponse }
  * so none wraps, and none can reflow when the web font replaces its fallback.
  * A run under way is news; none is not said.
  */
-function RunFacts({ status, age }: { status: ForwardStatusResponse; age: string }) {
+function RunFacts({ status, age }: { status: ForwardRegistryStatusResponse; age: string }) {
   const running = status.running_run_count;
   return (
     <>

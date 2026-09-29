@@ -1,8 +1,8 @@
 # Architecture decision records
 
 Each record states the context, the decision, the alternatives considered, and how
-the decision is verified. All 33 records are cataloged: 0001–0032 are accepted;
-0033 is proposed.
+the decision is verified. All 34 records are cataloged: 0001–0032 and 0034 are
+accepted; 0033 is proposed.
 When a decision changes,
 add a new record that supersedes the old one rather than rewriting it.
 The [Solution Architecture](../solution-architecture.md) document places these
@@ -29,6 +29,7 @@ decisions in the overall design.
 | [0031](0031-universe-observation-chronology.md) | Bind a reviewed candidate master and actual screen-generation chronology to the checkpoint and optional processed dataset, while withholding historical-membership claims. | 2026-09-27 |
 | [0032](0032-universe-screen-preflight.md) | Reject retrospective master/cutoff chronology before provider calls; isolate explicit diagnostics from research screens with a purpose-bound audit. | 2026-09-27 |
 | [0033](0033-sec-fixed-universe-protocol.md) | Propose a pre-cutoff SEC filing-derived fixed-universe pilot with historical identifier and rights gates; do not promote v2 yet. | 2026-09-28 |
+| [0034](0034-synthetic-public-boundary.md) | Keep the public application synthetic-only and withhold prospective registry output while source-rights review remains open; treat this as containment, not a purge or legal determination. | 2026-09-29 |
 
 ## Operations and delivery
 

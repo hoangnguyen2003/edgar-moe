@@ -70,17 +70,9 @@ def test_deployment_contract_excludes_private_data_from_the_function() -> None:
     payload = json.loads(Path("vercel.json").read_text(encoding="utf-8"))
     exclude_files = payload["functions"]["api/**/*.py"]["excludeFiles"]
 
-    for path in (
-        "data/**",
-        "mlruns/**",
-        "**/*.{duckdb,duckdb.wal}",
-        "ops/**",
-        "tools/**",
-        "migrations/**",
-        ".env*",
-        ".coverage",
-    ):
+    for path in _VALIDATOR_MODULE.REQUIRED_FUNCTION_EXCLUDE_PATHS:
         assert path in exclude_files
+    assert len(exclude_files) <= _VALIDATOR_MODULE.MAX_FUNCTION_GLOB_LENGTH
 
 
 def test_deployment_contract_includes_the_runtime_snapshot_lock() -> None:

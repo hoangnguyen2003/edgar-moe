@@ -53,7 +53,7 @@ ratios, and each dataset records it in its identity and provenance
 - Free-plan historical coverage can begin later than the requested start date;
   report the observed bar range and resulting temporal split dates for every run.
 - Split-adjusted daily bars exclude dividend total return and cannot model intraday slippage.
-- Public snapshots contain derived values only and are not a redistribution of raw market data. The deployed bundle exposes `data-provenance.json`, which records the source families plus the content-addressed snapshot identity; the manifest keeps redistribution review explicitly pending.
+- The deployed application currently exposes only a generated synthetic fixture. This does not settle the rights status of older derived research outputs in repository files, Git history, artifacts, or prior deployments.
 
 ## Source-rights review gate
 
@@ -80,7 +80,9 @@ predictions to that issue or to a release PR.
 
 ## Public snapshot and synthetic fixture
 
-`data/demo/snapshot.json` contains derived output from the frozen authenticated study and is marked `authenticated_locked_test`. It contains no credentials, raw filings, source bars, embeddings, or model checkpoint. The checked-in `config/public_snapshot.lock.json` pins its bytes and frozen metadata identity; `public/data-provenance.json` publishes the same identity without raw data, and CI plus the Vercel build reject drift between those records. The `edgar-moe demo` command generates an explicitly marked `synthetic_fixture` for software verification, by default at `data/interim/synthetic-snapshot.json`; it refuses to overwrite any snapshot that is not itself a synthetic fixture, including the frozen public snapshot.
+`data/demo/snapshot.json` is a generated `synthetic_fixture`. The former event-level v1 snapshot identity is preserved separately in `config/withdrawn_v1_identity.json`; its data bytes are no longer the current application snapshot. The checked-in `config/public_snapshot.lock.json` pins the synthetic fixture's bytes and metadata, and `public/data-provenance.json` publishes the same identity. CI and the Vercel build reject drift. The `edgar-moe demo` command generates fixtures for software verification, by default at `data/interim/synthetic-snapshot.json`.
+
+Historical reports, aggregate catalogs, and Git history may still contain v1-derived values. They remain pending the source-by-source review in [issue #280](https://github.com/hoangnguyen2003/edgar-moe/issues/280); replacing the live snapshot is not a full repository takedown or legal clearance.
 
 ## Authenticated refresh bundle
 

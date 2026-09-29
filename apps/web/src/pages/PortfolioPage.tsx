@@ -59,9 +59,9 @@ export function PortfolioPage() {
     </div>
   );
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Backtest" aside={costControl} answer={answer} placeholder="At 0.10% trading cost, the portfolio lost 3.3% a year.">
-      A market-neutral portfolio traded on the model's scores through the 2025–2026 final test, after trading costs and a
-      2% yearly fee for borrowing shares. Pick a trading cost to compare.
+    <PageHeader title="Portfolio simulation" aside={costControl} answer={answer} placeholder="Generated demo values only; not observed market performance.">
+      This interactive view applies transaction-cost settings to a generated software fixture. It does not represent
+      observed market returns or a live trading strategy.
     </PageHeader>
   );
   if (curve.isPending) return <div className="page">{header(null)}<LoadingState label="Repricing the backtest" skeleton={["chart", "figures:5"]} /></div>;

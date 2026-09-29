@@ -41,7 +41,7 @@ class FakeRunner:
             frozen_identity={
                 "path": "data/demo/snapshot.json",
                 "sha256": "a" * 64,
-                "data_mode": "demo",
+                "data_mode": "authenticated_locked_test",
                 "as_of": "2026-01-01",
                 "selection_hash": "b" * 64,
                 "locked_test_hash": "c" * 64,

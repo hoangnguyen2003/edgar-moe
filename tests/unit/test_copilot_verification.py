@@ -26,10 +26,10 @@ def valid_report() -> dict[str, Any]:
         "frozen_identity": {
             "path": "data/demo/snapshot.json",
             "sha256": "a" * 64,
-            "data_mode": "demo",
+            "data_mode": "synthetic_fixture",
             "as_of": "2026-09-18",
-            "selection_hash": "b" * 64,
-            "locked_test_hash": "c" * 64,
+            "selection_hash": None,
+            "locked_test_hash": None,
             "research_only": True,
         },
         "citations": [
@@ -55,6 +55,24 @@ def valid_report() -> dict[str, Any]:
 
 def test_verifier_accepts_a_grounded_answer_envelope() -> None:
     verify_copilot_answer_report(valid_report())
+
+
+def test_verifier_accepts_legacy_authenticated_identity_for_archived_reports() -> None:
+    report = valid_report()
+    identity = report["frozen_identity"]
+    identity["data_mode"] = "authenticated_locked_test"
+    identity["selection_hash"] = "b" * 64
+    identity["locked_test_hash"] = "c" * 64
+
+    verify_copilot_answer_report(report)
+
+
+def test_verifier_rejects_synthetic_identity_with_v1_hashes() -> None:
+    report = valid_report()
+    report["frozen_identity"]["selection_hash"] = "b" * 64
+
+    with pytest.raises(CopilotVerificationError, match="must not carry v1 hashes"):
+        verify_copilot_answer_report(report)
 
 
 def test_verifier_rejects_uncited_answer_after_evidence_tool_use() -> None:
@@ -89,6 +107,10 @@ def test_verifier_rejects_uncited_answer_after_evidence_tool_use() -> None:
         (
             "frozen_identity.sha256",
             lambda report: report["frozen_identity"].__setitem__("sha256", "invalid"),
+        ),
+        (
+            "unsupported",
+            lambda report: report["frozen_identity"].__setitem__("data_mode", "demo"),
         ),
         (
             "citation 1.source",

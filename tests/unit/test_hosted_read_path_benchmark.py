@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from io import BytesIO
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request
@@ -11,6 +12,53 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from scripts import benchmark_hosted_read_path as benchmark  # noqa: E402
+
+_REVIEW_DETAIL = (
+    "Prospective forecasts and outcomes are withheld from the public application "
+    "pending source-rights review. The registry remains private."
+)
+
+
+def _withheld_error(*, detail: str = _REVIEW_DETAIL, cache_control: str = "no-store") -> HTTPError:
+    headers = {
+        "Content-Type": "application/json",
+        "Cache-Control": cache_control,
+        "X-Vercel-Cache": "BYPASS",
+    }
+    return HTTPError(
+        "https://example.test/api/v1/forward/performance",
+        410,
+        "Gone",
+        headers,
+        BytesIO(json.dumps({"detail": detail}).encode()),
+    )
+
+
+def _fake_route_result(route: str, *, latency_ms: float = 10.0) -> dict:
+    if route in {"forecasts_page", "forward_performance"}:
+        return {
+            "result": "expected_withheld",
+            "http_status": 410,
+            "latency_ms": latency_ms,
+            "edge_cache": "BYPASS",
+            "public_visibility": "withheld_review",
+        }
+    if route == "forward_status":
+        return {
+            "result": "ok",
+            "http_status": 200,
+            "latency_ms": latency_ms,
+            "edge_cache": "MISS",
+            "semantic_status": "withheld_review",
+            "public_visibility": "withheld_review",
+            "health_reason": "publication_withheld_review",
+        }
+    return {
+        "result": "ok",
+        "http_status": 200,
+        "latency_ms": latency_ms,
+        "edge_cache": "MISS",
+    }
 
 
 class _Response:
@@ -116,37 +164,14 @@ def test_probe_never_retains_untrusted_semantic_strings() -> None:
     assert secret not in json.dumps(observed)
 
 
-@pytest.mark.parametrize(
-    ("message", "reason"),
-    [
-        ("No successful forward run has been recorded.", "no_successful_run"),
-        (
-            "The latest forward run failed; inspect its run details.",
-            "latest_run_failed",
-        ),
-        (
-            "The latest cycle's forecast run failed; inspect its run details.",
-            "latest_forecast_failed",
-        ),
-        ("The latest cycle has 2 failed quality gate(s).", "failed_quality_gates"),
-        (
-            "No successful forward run completed within the configured freshness window.",
-            "outside_freshness_window",
-        ),
-        ("The latest cycle has 3 quality warning(s).", "quality_warnings"),
-        ("Forward runner is healthy and within its freshness window.", "healthy"),
-        ("PRIVATE_MESSAGE_MUST_NOT_BE_RETAINED", "unclassified"),
-    ],
-)
-def test_forward_status_retains_only_bounded_health_reason(message: str, reason: str) -> None:
+def test_forward_status_reports_only_the_fixed_withheld_policy() -> None:
     observed = benchmark._probe(
         _Opener(
             _Response(
                 json.dumps(
                     {
-                        "health_status": "degraded",
-                        "available": True,
-                        "health_message": message,
+                        "public_visibility": "withheld_review",
+                        "message": _REVIEW_DETAIL,
                     }
                 ).encode()
             )
@@ -155,17 +180,55 @@ def test_forward_status_retains_only_bounded_health_reason(message: str, reason:
         timeout_seconds=2,
         route="forward_status",
     )
-    assert observed["health_reason"] == reason
-    assert message not in json.dumps(observed)
+    assert observed["result"] == "ok"
+    assert observed["public_visibility"] == "withheld_review"
+    assert observed["health_reason"] == "publication_withheld_review"
+
+    invalid = benchmark._probe(
+        _Opener(
+            _Response(
+                json.dumps(
+                    {
+                        "public_visibility": "withheld_review",
+                        "message": _REVIEW_DETAIL,
+                        "private": "DO_NOT_KEEP",
+                    }
+                ).encode()
+            )
+        ),
+        "https://example.test/api/v1/forward/status",
+        timeout_seconds=2,
+        route="forward_status",
+    )
+    assert invalid["result"] == "contract_error"
+    assert "DO_NOT_KEEP" not in json.dumps(invalid)
+
+    invalid = benchmark._probe(
+        _Opener(
+            _Response(
+                json.dumps(
+                    {
+                        "public_visibility": "available",
+                        "message": "PRIVATE_DETAILS",
+                    }
+                ).encode()
+            )
+        ),
+        "https://example.test/api/v1/forward/status",
+        timeout_seconds=2,
+        route="forward_status",
+    )
+    assert invalid["result"] == "contract_error"
+    assert "PRIVATE_DETAILS" not in json.dumps(invalid)
 
 
 def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None:
     header = "app_header_ms=12.345;worker=first;registry_read_ms=7.890"
     observed = benchmark._probe(
         _Opener(_Response(b"{}", origin_timing=header)),
-        "https://example.test/api/v1/forward/forecasts?limit=25",
+        "https://example.test/api/v1/summary",
         timeout_seconds=2,
-        route="forecasts_page",
+        route="summary",
     )
     assert observed["origin_timing_status"] == "observed"
     assert observed["worker_state"] == "first"
@@ -175,18 +238,18 @@ def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None
 
     cached = benchmark._probe(
         _Opener(_Response(b"{}", edge_cache="HIT", origin_timing=header)),
-        "https://example.test/api/v1/forward/forecasts?limit=25",
+        "https://example.test/api/v1/summary",
         timeout_seconds=2,
-        route="forecasts_page",
+        route="summary",
     )
     assert cached["origin_timing_status"] == "edge_or_unknown_ignored"
     assert "worker_state" not in cached and "app_header_ms" not in cached
 
     malformed = benchmark._probe(
         _Opener(_Response(b"{}", origin_timing=header + ";secret=PRIVATE_VALUE")),
-        "https://example.test/api/v1/forward/forecasts?limit=25",
+        "https://example.test/api/v1/summary",
         timeout_seconds=2,
-        route="forecasts_page",
+        route="summary",
     )
     assert malformed["origin_timing_status"] == "invalid"
     assert "PRIVATE_VALUE" not in json.dumps(malformed)
@@ -195,8 +258,10 @@ def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None
 @pytest.mark.parametrize(
     ("result", "expected"),
     [
-        (_Response(b'{"available":false,"health_status":"degraded"}'), "semantic_degraded"),
-        (_Response(b'{"available":true,"health_status":"unexpected"}'), "contract_error"),
+        (_withheld_error(), "expected_withheld"),
+        (_withheld_error(detail="UNTRUSTED_PRIVATE_TEXT"), "contract_error"),
+        (_withheld_error(cache_control="public, max-age=3600"), "contract_error"),
+        (_Response(b"{}"), "contract_error"),
         (_Response(b"not JSON"), "contract_error"),
         (_Response(b"{}", "text/html"), "contract_error"),
         (_Response(b"x" * (benchmark._MAX_BODY_BYTES + 1)), "contract_error"),
@@ -204,20 +269,21 @@ def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None
         (URLError("offline"), "transport_error"),
     ],
 )
-def test_probe_classifies_degradation_and_failure_without_body(
+def test_evidence_probe_accepts_only_fixed_noncacheable_410(
     result: _Response | Exception, expected: str
 ) -> None:
     observed = benchmark._probe(
         _Opener(result),
-        "https://example.test/api/v1/forward/status",
+        "https://example.test/api/v1/forward/performance",
         timeout_seconds=2,
-        route="forward_status",
+        route="forward_performance",
     )
     assert observed["result"] == expected
     assert "body" not in observed
+    assert "UNTRUSTED_PRIVATE_TEXT" not in json.dumps(observed)
 
 
-def test_performance_probe_validates_bounded_aggregate_contract_without_retaining_body() -> None:
+def test_performance_probe_rejects_public_aggregate_even_when_well_formed() -> None:
     valid = benchmark._probe(
         _Opener(
             _Response(b'{"forecast_count":3,"matured_count":2,"pending_count":1,"coverage":0.666}')
@@ -226,7 +292,7 @@ def test_performance_probe_validates_bounded_aggregate_contract_without_retainin
         timeout_seconds=2,
         route="forward_performance",
     )
-    assert valid["result"] == "ok"
+    assert valid["result"] == "contract_error"
     assert "forecast_count" not in valid and "body" not in valid
 
     invalid = benchmark._probe(
@@ -253,14 +319,7 @@ def test_bounded_round_robin_report_counts_failures_separately(
         )
         if route == "forecasts_page" and len(calls) == first_forecast_sample:
             return {"result": "http_error", "http_status": 503, "latency_ms": 4.0}
-        return {
-            "result": "ok",
-            "http_status": 200,
-            "latency_ms": 10.0,
-            "edge_cache": "MISS",
-            "semantic_status": "ok",
-            "registry_available": True,
-        }
+        return _fake_route_result(route)
 
     monkeypatch.setattr(benchmark, "_probe", fake_probe)
     monkeypatch.setattr(benchmark.time, "sleep", lambda _seconds: None)
@@ -271,14 +330,17 @@ def test_bounded_round_robin_report_counts_failures_separately(
     assert report["status"] == "degraded"
     assert report["traffic"]["concurrency"] == 1
     assert report["results"]["health"]["successful_latency_ms"]["p95"] == 10
-    assert report["schema_version"] == 5
+    assert report["schema_version"] == 6
     assert report["results"]["forward_performance"]["requests"] == 5
     assert report["results"]["health"]["successful_latency_by_edge_cache_ms"] == {
         "MISS": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
     }
     assert len(report["sample_observations"]["health"]) == 5
-    assert report["results"]["forecasts_page"]["result_counts"] == {"http_error": 1, "ok": 4}
-    assert report["results"]["forecasts_page"]["http_status_counts"] == {"200": 4, "503": 1}
+    assert report["results"]["forecasts_page"]["result_counts"] == {
+        "expected_withheld": 4,
+        "http_error": 1,
+    }
+    assert report["results"]["forecasts_page"]["http_status_counts"] == {"410": 4, "503": 1}
 
 
 def test_successful_latency_is_split_by_observed_edge_cache(
@@ -291,12 +353,8 @@ def test_successful_latency_is_split_by_observed_edge_cache(
         calls += 1
         cache = "HIT" if (calls // len(benchmark.ROUTES)) % 2 else "MISS"
         return {
-            "result": "ok",
-            "http_status": 200,
-            "latency_ms": 5.0 if cache == "HIT" else 50.0,
+            **_fake_route_result(route, latency_ms=5.0 if cache == "HIT" else 50.0),
             "edge_cache": cache,
-            "semantic_status": "ok",
-            "registry_available": True,
             "served_commit_sha": "a" * 40 if route == "health" else None,
         }
 
@@ -319,16 +377,17 @@ def test_successful_origin_latency_is_split_by_first_and_subsequent_process_requ
         nonlocal calls
         calls += 1
         worker = "first" if calls <= len(benchmark.ROUTES) else "subsequent"
+        result = _fake_route_result(route, latency_ms=80.0 if worker == "first" else 10.0)
+        if route not in {"forecasts_page", "forward_performance"}:
+            result.update(
+                {
+                    "origin_timing_status": "observed",
+                    "worker_state": worker,
+                    "app_header_ms": 40.0 if worker == "first" else 5.0,
+                }
+            )
         return {
-            "result": "ok",
-            "http_status": 200,
-            "latency_ms": 80.0 if worker == "first" else 10.0,
-            "edge_cache": "MISS",
-            "origin_timing_status": "observed",
-            "worker_state": worker,
-            "app_header_ms": 40.0 if worker == "first" else 5.0,
-            "semantic_status": "ok",
-            "registry_available": True,
+            **result,
             "served_commit_sha": "a" * 40 if route == "health" else None,
         }
 
@@ -342,37 +401,26 @@ def test_successful_origin_latency_is_split_by_first_and_subsequent_process_requ
     }
 
 
-def test_forward_quality_warning_is_visible_without_calling_it_an_outage(
+def test_expected_publication_hold_is_visible_without_calling_it_an_outage(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_probe(_opener: object, _url: str, *, timeout_seconds: float, route: str) -> dict:
-        return {
-            "result": "ok",
-            "http_status": 200,
-            "latency_ms": 10.0,
-            "edge_cache": "MISS",
-            "semantic_status": "warning" if route == "forward_status" else "ok",
-            "registry_available": True,
-            "health_reason": "quality_warnings" if route == "forward_status" else None,
-        }
+        return _fake_route_result(route)
 
     monkeypatch.setattr(benchmark, "_probe", fake_probe)
     monkeypatch.setattr(benchmark.time, "sleep", lambda _seconds: None)
     report = benchmark.measure("https://example.test", samples_per_route=5, pause_ms=200)
-    assert report["status"] == "warning"
-    assert report["results"]["forward_status"]["semantic_status_counts"] == {"warning": 5}
-    assert report["results"]["forward_status"]["health_reason_counts"] == {"quality_warnings": 5}
+    assert report["status"] == "observed"
+    assert report["results"]["forward_status"]["semantic_status_counts"] == {"withheld_review": 5}
+    assert report["results"]["forward_status"]["health_reason_counts"] == {
+        "publication_withheld_review": 5
+    }
 
 
 def test_benchmark_fails_closed_on_served_commit_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_probe(_opener: object, _url: str, *, timeout_seconds: float, route: str) -> dict:
         return {
-            "result": "ok",
-            "http_status": 200,
-            "latency_ms": 10.0,
-            "edge_cache": "MISS",
-            "semantic_status": "ok",
-            "registry_available": True,
+            **_fake_route_result(route),
             "served_commit_sha": "b" * 40 if route == "health" else None,
         }
 

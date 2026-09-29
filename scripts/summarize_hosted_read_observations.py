@@ -60,6 +60,7 @@ def _longest_run(days: set[date]) -> int:
 
 _RESULTS = {
     "ok",
+    "expected_withheld",
     "http_error",
     "transport_error",
     "contract_error",
@@ -75,6 +76,7 @@ def _safe_sample(
         not isinstance(item, dict)
         or not isinstance(item.get("result"), str)
         or item["result"] not in _RESULTS
+        or (schema_version < 6 and item["result"] == "expected_withheld")
     ):
         raise ValueError(f"{path}: invalid sample for {route}")
     latency = item.get("latency_ms")
@@ -101,6 +103,23 @@ def _safe_sample(
         if schema_version == 2
         else item.get("origin_timing_status", "missing"),
     }
+    if schema_version >= 6:
+        if route in {"forecasts_page", "forward_performance"}:
+            if (
+                item["result"] != "expected_withheld"
+                or item.get("public_visibility") != "withheld_review"
+            ):
+                raise ValueError(f"{path}: public forward evidence was not withheld for {route}")
+            safe_item["public_visibility"] = "withheld_review"
+        elif route == "forward_status":
+            if (
+                item["result"] != "ok"
+                or item.get("public_visibility") != "withheld_review"
+                or item.get("semantic_status") != "withheld_review"
+                or item.get("health_reason") != "publication_withheld_review"
+            ):
+                raise ValueError(f"{path}: public forward status does not match review policy")
+            safe_item["public_visibility"] = "withheld_review"
     if schema_version >= 3:
         timing_status = safe_item["origin_timing_status"]
         if not isinstance(timing_status, str) or timing_status not in {
@@ -158,9 +177,9 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         if (
             isinstance(schema_version, bool)
             or not isinstance(schema_version, int)
-            or schema_version not in {2, 3, 4, 5}
+            or schema_version not in {2, 3, 4, 5, 6}
         ):
-            raise ValueError(f"{path}: expected hosted observation schema v2 through v5")
+            raise ValueError(f"{path}: expected hosted observation schema v2 through v6")
         if report.get("scope") != "hosted_public_api_sequential_read_only_observation":
             raise ValueError(f"{path}: unexpected observation scope")
         captured_day = _day(report.get("captured_at"))

@@ -34,7 +34,7 @@ def test_answer_report_pins_the_reviewed_case_without_changing_the_envelope() ->
         frozen_identity={
             "path": "data/demo/snapshot.json",
             "sha256": "a" * 64,
-            "data_mode": "demo",
+            "data_mode": "authenticated_locked_test",
             "as_of": "2026-01-01",
             "selection_hash": "b" * 64,
             "locked_test_hash": "c" * 64,
@@ -95,7 +95,7 @@ def _grounded_report() -> dict[str, object]:
         "frozen_identity": {
             "path": "data/demo/snapshot.json",
             "sha256": "1" * 64,
-            "data_mode": "demo",
+            "data_mode": "authenticated_locked_test",
             "as_of": "2026-01-01",
             "selection_hash": "2" * 64,
             "locked_test_hash": "3" * 64,
@@ -135,7 +135,7 @@ def _uncited_report() -> dict[str, object]:
         "frozen_identity": {
             "path": "data/demo/snapshot.json",
             "sha256": "1" * 64,
-            "data_mode": "demo",
+            "data_mode": "authenticated_locked_test",
             "as_of": "2026-01-01",
             "selection_hash": "2" * 64,
             "locked_test_hash": "3" * 64,
