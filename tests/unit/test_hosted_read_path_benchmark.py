@@ -116,6 +116,49 @@ def test_probe_never_retains_untrusted_semantic_strings() -> None:
     assert secret not in json.dumps(observed)
 
 
+@pytest.mark.parametrize(
+    ("message", "reason"),
+    [
+        ("No successful forward run has been recorded.", "no_successful_run"),
+        (
+            "The latest forward run failed; inspect its run details.",
+            "latest_run_failed",
+        ),
+        (
+            "The latest cycle's forecast run failed; inspect its run details.",
+            "latest_forecast_failed",
+        ),
+        ("The latest cycle has 2 failed quality gate(s).", "failed_quality_gates"),
+        (
+            "No successful forward run completed within the configured freshness window.",
+            "outside_freshness_window",
+        ),
+        ("The latest cycle has 3 quality warning(s).", "quality_warnings"),
+        ("Forward runner is healthy and within its freshness window.", "healthy"),
+        ("PRIVATE_MESSAGE_MUST_NOT_BE_RETAINED", "unclassified"),
+    ],
+)
+def test_forward_status_retains_only_bounded_health_reason(message: str, reason: str) -> None:
+    observed = benchmark._probe(
+        _Opener(
+            _Response(
+                json.dumps(
+                    {
+                        "health_status": "degraded",
+                        "available": True,
+                        "health_message": message,
+                    }
+                ).encode()
+            )
+        ),
+        "https://example.test/api/v1/forward/status",
+        timeout_seconds=2,
+        route="forward_status",
+    )
+    assert observed["health_reason"] == reason
+    assert message not in json.dumps(observed)
+
+
 def test_origin_timing_is_numeric_allowlisted_and_ignored_on_edge_hits() -> None:
     header = "app_header_ms=12.345;worker=first;registry_read_ms=7.890"
     observed = benchmark._probe(
@@ -228,7 +271,7 @@ def test_bounded_round_robin_report_counts_failures_separately(
     assert report["status"] == "degraded"
     assert report["traffic"]["concurrency"] == 1
     assert report["results"]["health"]["successful_latency_ms"]["p95"] == 10
-    assert report["schema_version"] == 4
+    assert report["schema_version"] == 5
     assert report["results"]["forward_performance"]["requests"] == 5
     assert report["results"]["health"]["successful_latency_by_edge_cache_ms"] == {
         "MISS": {"requests": 5, "p50": 10.0, "p95": 10.0, "p99": 10.0, "max": 10.0}
@@ -310,6 +353,7 @@ def test_forward_quality_warning_is_visible_without_calling_it_an_outage(
             "edge_cache": "MISS",
             "semantic_status": "warning" if route == "forward_status" else "ok",
             "registry_available": True,
+            "health_reason": "quality_warnings" if route == "forward_status" else None,
         }
 
     monkeypatch.setattr(benchmark, "_probe", fake_probe)
@@ -317,6 +361,7 @@ def test_forward_quality_warning_is_visible_without_calling_it_an_outage(
     report = benchmark.measure("https://example.test", samples_per_route=5, pause_ms=200)
     assert report["status"] == "warning"
     assert report["results"]["forward_status"]["semantic_status_counts"] == {"warning": 5}
+    assert report["results"]["forward_status"]["health_reason_counts"] == {"quality_warnings": 5}
 
 
 def test_benchmark_fails_closed_on_served_commit_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
