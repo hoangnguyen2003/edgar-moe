@@ -30,6 +30,22 @@ LEGACY_ROUTES = {
 ROUTES = {**LEGACY_ROUTES, "forward_performance": "/api/v1/forward/performance"}
 _MAX_BODY_BYTES = 1024 * 1024
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
+_FAILED_QUALITY_MESSAGE = re.compile(
+    r"^The latest cycle has ([1-9][0-9]{0,8}) failed quality gate\(s\)\.$"
+)
+_WARNING_QUALITY_MESSAGE = re.compile(
+    r"^The latest cycle has ([1-9][0-9]{0,8}) quality warning\(s\)\.$"
+)
+HEALTH_REASONS = {
+    "healthy",
+    "no_successful_run",
+    "latest_run_failed",
+    "latest_forecast_failed",
+    "failed_quality_gates",
+    "outside_freshness_window",
+    "quality_warnings",
+    "unclassified",
+}
 _ORIGIN_TIMING = re.compile(
     r"app_header_ms=([0-9]+(?:\.[0-9]{1,3})?);worker=(first|subsequent)"
     r"(?:;registry_read_ms=([0-9]+(?:\.[0-9]{1,3})?))?\Z"
@@ -66,6 +82,26 @@ def _percentile(values: list[float], fraction: float) -> float:
     lower = int(position)
     upper = min(lower + 1, len(ordered) - 1)
     return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
+
+
+def _health_reason(message: Any) -> str:
+    """Map the API's fixed health messages to bounded codes; never retain text."""
+    fixed_messages = {
+        "Forward runner is healthy and within its freshness window.": "healthy",
+        "No successful forward run has been recorded.": "no_successful_run",
+        "The latest forward run failed; inspect its run details.": "latest_run_failed",
+        "The latest cycle's forecast run failed; inspect its run details.": "latest_forecast_failed",
+        "No successful forward run completed within the configured freshness window.": "outside_freshness_window",
+    }
+    if not isinstance(message, str):
+        return "unclassified"
+    if message in fixed_messages:
+        return fixed_messages[message]
+    if _FAILED_QUALITY_MESSAGE.fullmatch(message):
+        return "failed_quality_gates"
+    if _WARNING_QUALITY_MESSAGE.fullmatch(message):
+        return "quality_warnings"
+    return "unclassified"
 
 
 def _origin_timing(header: str | None, edge_cache: str) -> dict[str, Any]:
@@ -164,6 +200,10 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
                 if isinstance(payload.get("available"), bool)
                 else "unexpected"
             )
+            # The API message is deliberately reduced to a fixed category. It
+            # lets a degraded health sample be diagnosed without retaining
+            # free-form response text or registry details.
+            observation["health_reason"] = _health_reason(payload.get("health_message"))
             if payload.get("health_status") not in ("ok", "warning", "degraded"):
                 observation["result"] = "contract_error"
             elif payload.get("available") is not True or payload.get("health_status") == "degraded":
@@ -342,12 +382,19 @@ def measure(
                     ).items()
                 )
             )
+            results[name]["health_reason_counts"] = dict(
+                sorted(
+                    Counter(
+                        str(item["health_reason"]) for item in items if "health_reason" in item
+                    ).items()
+                )
+            )
     healthy = all(result == "ok" for result in warmup.values()) and all(
         item["result_counts"] == {"ok": samples_per_route} for item in results.values()
     )
     warning = results["forward_status"]["semantic_status_counts"].get("warning", 0) > 0
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "scope": "hosted_public_api_sequential_read_only_observation",
         "status": "degraded" if not healthy else "warning" if warning else "observed",
         "captured_at": datetime.now(UTC).isoformat(),

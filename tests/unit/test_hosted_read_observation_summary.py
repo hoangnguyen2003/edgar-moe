@@ -63,6 +63,44 @@ def test_summary_rejects_duplicate_utc_day_instead_of_overweighting_it(tmp_path:
         summary.summarize([first, second])
 
 
+def test_schema_v5_summary_counts_forward_health_reasons_without_copying_unknown_fields(
+    tmp_path: Path,
+) -> None:
+    path = _report(tmp_path / "v5.json", date(2026, 9, 1))
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["schema_version"] = 5
+    report["sample_observations"]["forward_performance"] = [
+        {"result": "ok", "latency_ms": 12.0, "edge_cache": "HIT"}
+    ] * 5
+    report["sample_observations"]["forward_status"] = [
+        {
+            "result": "semantic_degraded",
+            "latency_ms": 12.0,
+            "edge_cache": "MISS",
+            "health_reason": "latest_run_failed",
+            "message": "PRIVATE_TEXT_MUST_NOT_APPEAR",
+        },
+        *[
+            {
+                "result": "semantic_degraded",
+                "latency_ms": 12.0,
+                "edge_cache": "MISS",
+                "health_reason": "latest_run_failed",
+            }
+            for _ in range(4)
+        ],
+    ]
+    report["warmup_observations"] = {
+        route: items[0] for route, items in report["sample_observations"].items()
+    }
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    result = summary.summarize([path])
+
+    assert result["results"]["forward_status"]["health_reason_counts"] == {"latest_run_failed": 5}
+    assert "PRIVATE_TEXT_MUST_NOT_APPEAR" not in json.dumps(result)
+
+
 def test_summary_rejects_mixed_origins_and_unpinned_reports(tmp_path: Path) -> None:
     first = _report(tmp_path / "one.json", date(2026, 9, 1))
     second = _report(tmp_path / "two.json", date(2026, 9, 2), origin="https://other.test")
@@ -180,7 +218,7 @@ def test_summary_rejects_cached_or_malformed_origin_evidence(tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("schema_version", True, "schema v2, v3, or v4"),
+        ("schema_version", True, "schema v2 through v5"),
         ("status", [], "invalid report status"),
         ("sample_result", [], "invalid sample"),
     ],

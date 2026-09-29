@@ -66,8 +66,12 @@ counts, health status, and the limited sample size before comparing runs.
 ## Daily, low-rate collection
 
 The [daily GitHub Actions observer](../.github/workflows/hosted-read-observation.yml)
-also supports manual dispatch. The current schema-v4 probe adds the forward
-performance endpoint to the original four routes. It makes one warmup plus
+also supports manual dispatch. The current schema-v5 probe adds the forward
+performance endpoint to the original four routes and maps fixed forward health
+messages to bounded reason codes; it discards message text. This makes a degraded
+status auditable as a missing successful run, a failed latest cycle, a quality
+gate result, a freshness-window breach, or an unclassified message. The summary
+counts these reason codes by sample. It makes one warmup plus
 eight measured GETs per route: **45 requests total**, sequential, with at least
 500 ms between requests.
 It targets only the public production origin, uses no secrets or writer DB

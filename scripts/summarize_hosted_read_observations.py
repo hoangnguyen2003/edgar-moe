@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from scripts.benchmark_hosted_read_path import (
+    HEALTH_REASONS,
     LEGACY_ROUTES,
     ROUTES,
     _percentile,
@@ -130,6 +131,11 @@ def _safe_sample(
                 safe_item[field] = float(value)
         elif any(field in item for field in ("worker_state", "app_header_ms", "registry_read_ms")):
             raise ValueError(f"{path}: unattributed origin timing fields")
+    if schema_version >= 5 and route == "forward_status":
+        reason = item.get("health_reason")
+        if not isinstance(reason, str) or reason not in HEALTH_REASONS:
+            raise ValueError(f"{path}: invalid forward health reason")
+        safe_item["health_reason"] = reason
     return safe_item
 
 
@@ -152,9 +158,9 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
         if (
             isinstance(schema_version, bool)
             or not isinstance(schema_version, int)
-            or schema_version not in {2, 3, 4}
+            or schema_version not in {2, 3, 4, 5}
         ):
-            raise ValueError(f"{path}: expected hosted observation schema v2, v3, or v4")
+            raise ValueError(f"{path}: expected hosted observation schema v2 through v5")
         if report.get("scope") != "hosted_public_api_sequential_read_only_observation":
             raise ValueError(f"{path}: unexpected observation scope")
         captured_day = _day(report.get("captured_at"))
@@ -272,6 +278,14 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
                 ]
             ),
         }
+        if route == "forward_status" and any("health_reason" in item for item in items):
+            results[route]["health_reason_counts"] = dict(
+                sorted(
+                    Counter(
+                        item["health_reason"] for item in items if "health_reason" in item
+                    ).items()
+                )
+            )
     warmup_results: dict[str, Any] = {}
     for route, items in warmups_by_route.items():
         successful = [item for item in items if item["result"] == "ok"]
@@ -320,6 +334,7 @@ def summarize(paths: list[Path]) -> dict[str, Any]:
             "Daily samples are sequential and low-rate; coverage does not establish an SLO or concurrency capacity.",
             "One warmup per route is reported separately from measured requests; warmups from legacy v2 reports are unavailable.",
             "Legacy v2/v3 reports predate the performance route; overall day coverage is not complete route coverage.",
+            "Schema v5 forward health reasons are bounded categories derived from fixed API messages; free-form messages are discarded.",
             "First/subsequent app-process markers on edge MISS/BYPASS can separate those samples, but do not prove platform cold starts or idle database resume.",
             "Registry-read duration includes connection acquisition, SQL, and Python computation; it is not database-only timing.",
             "Legacy v2 observations have no origin timing, and mixed serving commits are not performance-equivalent cohorts.",
