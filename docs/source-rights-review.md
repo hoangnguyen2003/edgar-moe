@@ -6,14 +6,24 @@ opinion or permission to use, train on, store, or publish any source content.
 Keep issue [#280](https://github.com/hoangnguyen2003/edgar-moe/issues/280) open.
 
 The production forward workflow now enforces this hold through a failing,
-credential-free prerequisite job. Scheduled and manual starts stop before the
-forecast/settlement job; cache cleanup is also skipped. The configured cron and
-filing-cutoff semantics remain available for the eventual reopening. This is an
-administrative hold implementing the existing review decision, not a determination
-of provider rights. Existing registry evidence remains readable and its freshness
-will age while ingestion is held. After the required source-use determination,
-reopen the workflow in a separate PR that cites the decision and updates the
-schedule-boundary contract. Only then perform the live verification in #288.
+credential-free prerequisite job. The manual authenticated-data refresh and
+forward cache-prewarm workflows have the same fail-closed prerequisite; neither
+reads provider secrets nor installs the research runtime before stopping. Their
+synthetic demo path remains available. The supported CLI also rejects provider
+refresh, universe construction/screening, authenticated dataset/model studies,
+and new forward forecast/settlement commands before loading inputs or contacting
+providers. There is no environment-variable or CLI-flag bypass. Synthetic demo,
+configuration validation, and evidence-only verification remain available.
+
+Scheduled and manual forward starts stop before the forecast/settlement job;
+cache cleanup is also skipped. The configured cron and filing-cutoff semantics
+remain available for the eventual reopening. This is an administrative hold
+implementing the existing review decision, not a determination of provider
+rights. Existing registry evidence remains readable and its freshness will age
+while ingestion is held. After the required source-use determination, reopen
+the workflows and CLI in a separate reviewed PR that cites the decision and
+updates the schedule-boundary contract. Only then perform the live verification
+in #288.
 
 ## Exact research inputs to review
 

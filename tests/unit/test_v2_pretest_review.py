@@ -286,7 +286,9 @@ def test_v2_review_rejects_legacy_policy_and_tampered_scores(tmp_path: Path) -> 
         review_v2_pretest(dataset, selection_dir, bootstrap_samples=100)
 
 
-def test_v2_review_cli_writes_an_immutable_private_report(tmp_path: Path) -> None:
+def test_v2_review_cli_writes_an_immutable_private_report(
+    tmp_path: Path, cleared_source_use_review_for_test: None
+) -> None:
     dataset, selection_dir = _fixture(tmp_path)
     dataset_dir = dataset.save(tmp_path / "processed")
     output_dir = tmp_path / "private-reviews"
