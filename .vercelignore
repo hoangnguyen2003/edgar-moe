@@ -23,14 +23,15 @@ reports/*
 ops
 tools
 migrations
-# The Vercel build contract needs these two reviewed inputs, but no other
-# operator scripts or private configuration should enter the source archive.
+# The Vercel build contract needs these reviewed inputs, but no other operator
+# scripts or private configuration should enter the source archive.
 scripts/*
 !scripts/verify_public_snapshot_lock.py
 !scripts/verify_research_evidence_catalog.py
 !scripts/validate_public_bundle.py
 config/*
 !config/public_snapshot.lock.json
+!config/withdrawn_v1_identity.json
 .github
 data/raw
 data/cache

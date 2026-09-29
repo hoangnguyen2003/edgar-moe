@@ -44,6 +44,7 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "!reports/locked_rank_ic_interval_2026-09-23.md",
     "config/*",
     "!config/public_snapshot.lock.json",
+    "!config/withdrawn_v1_identity.json",
     "data/cache",
     "data/forward",
     "*.duckdb.wal",

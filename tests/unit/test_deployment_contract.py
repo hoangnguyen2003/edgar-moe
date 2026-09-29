@@ -64,6 +64,7 @@ def test_deployment_contract_requires_serving_only_vercel_source_boundary(
     assert any("!scripts/validate_public_bundle.py" in error for error in errors)
     assert any("config/*" in error for error in errors)
     assert any("!config/public_snapshot.lock.json" in error for error in errors)
+    assert any("!config/withdrawn_v1_identity.json" in error for error in errors)
 
 
 def test_deployment_contract_excludes_private_data_from_the_function() -> None:
@@ -81,6 +82,7 @@ def test_deployment_contract_includes_the_runtime_snapshot_lock() -> None:
 
     assert "config/public_snapshot.lock.json" in include_files
     assert "data/demo/snapshot.json" in include_files
+    assert "config/withdrawn_v1_identity.json" not in include_files
 
 
 def test_deployment_contract_rejects_overlong_function_glob(tmp_path: Path) -> None:
