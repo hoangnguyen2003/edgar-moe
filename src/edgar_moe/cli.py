@@ -5,15 +5,22 @@ import csv
 import json
 import re
 import subprocess
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, cast
 from zoneinfo import ZoneInfo
 
 import orjson
 import typer
 
 from edgar_moe.capacity import DEFAULT_BASELINE_PATHS, build_capacity_baseline
+from edgar_moe.data.source_rights import (
+    SOURCE_USE_HELD_COMMANDS,
+    SourceUseReviewRequired,
+    require_source_use_clearance,
+)
 from edgar_moe.settings import runtime_settings
 from edgar_moe.utils.timestamps import (
     NaiveTimestampError,
@@ -30,6 +37,25 @@ app = typer.Typer(
     help="Point-in-time multimodal SEC filing alpha research.",
     no_args_is_help=True,
 )
+
+
+def _hold_source_use_command[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    """Fail before a held CLI command can load data, contact providers, or train."""
+
+    command_name = function.__name__.replace("_", "-")
+    if command_name not in SOURCE_USE_HELD_COMMANDS:
+        raise RuntimeError(f"source-use hold decorator is not registered for {command_name}")
+
+    @wraps(function)
+    def guarded(*args: P.args, **kwargs: P.kwargs) -> R:
+        try:
+            require_source_use_clearance(command_name)
+        except SourceUseReviewRequired as error:
+            raise typer.BadParameter(str(error)) from error
+        return function(*args, **kwargs)
+
+    cast(Any, guarded).__source_use_review_held__ = True
+    return guarded
 
 
 @app.command()
@@ -100,6 +126,7 @@ def ingest_sec(
 
 
 @app.command("ingest-assets")
+@_hold_source_use_command
 def ingest_assets(
     output: Annotated[Path, typer.Option()] = Path("data/raw/alpaca/assets.json"),
 ) -> None:
@@ -122,6 +149,7 @@ def ingest_assets(
 
 
 @app.command("build-universe")
+@_hold_source_use_command
 def build_universe(
     output: Annotated[Path, typer.Option()] = Path("config/universe.csv"),
     review_output: Annotated[Path, typer.Option()] = Path(
@@ -210,6 +238,7 @@ def build_universe(
 
 
 @app.command("record-universe-capture")
+@_hold_source_use_command
 def record_universe_capture(
     source: Annotated[Path, typer.Option()] = Path("config/universe.csv"),
     mapping_review: Annotated[Path, typer.Option()] = Path(
@@ -225,6 +254,7 @@ def record_universe_capture(
 
 
 @app.command("refresh-data")
+@_hold_source_use_command
 def refresh_data(
     universe: Annotated[Path, typer.Option(help="CSV with cik and symbol columns.")] = Path(
         "config/universe.example.csv"
@@ -319,6 +349,7 @@ def refresh_data(
 
 
 @app.command("screen-universe")
+@_hold_source_use_command
 def screen_universe(
     source: Annotated[Path, typer.Option(help="Reviewed broad-universe CSV.")] = Path(
         "config/universe.csv"
@@ -495,6 +526,7 @@ def verify_universe_screen(
 
 
 @app.command("build-dataset")
+@_hold_source_use_command
 def build_dataset(
     checkpoint: Annotated[Path, typer.Option(help="Authenticated dated checkpoint directory.")],
     output_dir: Annotated[Path, typer.Option()] = Path("data/processed"),
@@ -546,6 +578,7 @@ def build_dataset(
 
 
 @app.command("research-drift")
+@_hold_source_use_command
 def research_drift(
     baseline_dataset_dir: Annotated[
         Path,
@@ -619,6 +652,7 @@ def research_drift(
 
 
 @app.command("research-drift-history")
+@_hold_source_use_command
 def research_drift_history(
     reports: Annotated[
         list[Path],
@@ -695,6 +729,7 @@ def research_drift_history_verify(
 
 
 @app.command("research-drift-readiness")
+@_hold_source_use_command
 def research_drift_readiness(
     history: Annotated[
         Path,
@@ -743,6 +778,7 @@ def research_drift_readiness(
 
 
 @app.command("run-study")
+@_hold_source_use_command
 def run_study(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
     output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/studies"),
@@ -831,6 +867,7 @@ def run_study(
 
 
 @app.command("walk-forward-study")
+@_hold_source_use_command
 def walk_forward_study(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
     output_dir: Annotated[Path, typer.Option()] = Path("data/artifacts/walk-forward"),
@@ -881,6 +918,7 @@ def walk_forward_study(
 
 
 @app.command("v2-pretest-review")
+@_hold_source_use_command
 def v2_pretest_review(
     dataset_dir: Annotated[Path, typer.Option(help="Processed duration-aware v2 dataset.")],
     selection_dir: Annotated[
@@ -931,6 +969,7 @@ def v2_pretest_review(
 
 
 @app.command("open-frozen-test")
+@_hold_source_use_command
 def open_frozen_test(
     dataset_dir: Annotated[Path, typer.Option(help="Processed research dataset directory.")],
     selection_path: Annotated[
@@ -1113,6 +1152,7 @@ def forward_reconcile_artifacts(
 
 
 @app.command("forward-forecast")
+@_hold_source_use_command
 def forward_forecast(
     dataset_dir: Annotated[Path, typer.Option(help="Processed point-in-time dataset directory.")],
     as_of: Annotated[
@@ -1159,6 +1199,7 @@ def forward_forecast(
 
 
 @app.command("forward-settle")
+@_hold_source_use_command
 def forward_settle(
     dataset_dir: Annotated[
         Path, typer.Option(help="Later processed dataset containing newly matured labels.")

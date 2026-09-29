@@ -6,6 +6,7 @@ from collections.abc import Iterator
 
 import pytest
 
+from edgar_moe.data import source_rights
 from edgar_moe.settings import runtime_settings
 
 # Settings a local .env.local may fill with real credentials or production URLs.
@@ -36,3 +37,16 @@ def isolated_runtime_settings(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]
     runtime_settings.cache_clear()
     yield
     runtime_settings.cache_clear()
+
+
+@pytest.fixture
+def cleared_source_use_review_for_test(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise held CLI paths using fixtures without creating a production bypass."""
+
+    monkeypatch.setattr(
+        source_rights,
+        "SOURCE_USE_DECISION",
+        source_rights.SourceUseReviewDecision(
+            status="cleared", evidence="isolated synthetic-test fixture"
+        ),
+    )

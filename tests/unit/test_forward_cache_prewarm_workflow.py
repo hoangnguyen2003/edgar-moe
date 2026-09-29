@@ -24,6 +24,8 @@ def test_prewarm_is_manual_main_only_and_preserves_an_active_cycle() -> None:
     assert prewarm["concurrency"]["cancel-in-progress"] is False
     job = prewarm["jobs"]["prewarm"]
     assert job["if"] == "${{ github.ref == 'refs/heads/main' }}"
+    assert job["needs"] == "provider-use-review"
+    assert prewarm["jobs"]["provider-use-review"]["permissions"] == {}
 
 
 def test_prewarm_reuses_production_cache_without_registry_credentials() -> None:

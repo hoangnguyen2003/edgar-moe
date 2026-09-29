@@ -90,7 +90,9 @@ def _fixture(
     return audit, source, screened, checkpoint, capture, review
 
 
-def test_record_source_capture_hashes_reviewed_local_files(tmp_path: Path) -> None:
+def test_record_source_capture_hashes_reviewed_local_files(
+    tmp_path: Path, cleared_source_use_review_for_test: None
+) -> None:
     source = tmp_path / "source.csv"
     source.write_text("cik,symbol\n1,AAA\n", encoding="utf-8")
     review = tmp_path / "review.json"
@@ -156,6 +158,7 @@ def test_screen_observation_uses_new_york_cutoff_boundary() -> None:
 def test_screen_command_pins_inputs_before_fetching(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    cleared_source_use_review_for_test: None,
     change_during_fetch: bool,
     diagnostic: bool,
 ) -> None:
@@ -238,7 +241,10 @@ def test_screen_command_pins_inputs_before_fetching(
 
 @pytest.mark.parametrize("cutoff", ["2022-12-30", "future"])
 def test_screen_command_rejects_bad_chronology_before_provider_access(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cutoff: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cleared_source_use_review_for_test: None,
+    cutoff: str,
 ) -> None:
     _, source, _, _, capture, review = _fixture(tmp_path, monkeypatch)
     payload = orjson.loads(capture.read_bytes())
@@ -297,7 +303,9 @@ def test_screen_trace_rejects_explicit_diagnostic(
 
 
 def test_diagnostic_cannot_overwrite_default_research_paths(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    cleared_source_use_review_for_test: None,
 ) -> None:
     _, source, _, _, capture, review = _fixture(tmp_path, monkeypatch)
     monkeypatch.setattr(cli, "runtime_settings", lambda: pytest.fail("credentials read too early"))

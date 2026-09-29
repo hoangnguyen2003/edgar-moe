@@ -17,8 +17,22 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  provider-use-review:
+    name: Provider cache prewarm held pending issue 280
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Enforce the documented source-use hold
+        shell: bash
+        run: |
+          printf '%s\n' 'Provider-backed cache prewarming is held pending source-rights issue #280. No provider credentials are read and no refresh is started. Reopening requires a reviewed PR after source-specific written clearance or an approved replacement.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
   prewarm:
     if: ${{ github.ref == 'refs/heads/main' }}
+    needs: provider-use-review
     runs-on: ubuntu-24.04
     timeout-minutes: 360
     env:

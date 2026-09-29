@@ -33,8 +33,22 @@ jobs:
       - name: Validate snapshot API
         run: uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
 
+  provider-use-review:
+    name: Authenticated refresh held pending issue 280
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'authenticated-data'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions: {}
+    steps:
+      - name: Enforce the documented source-use hold
+        shell: bash
+        run: |
+          printf '%s\n' 'Authenticated provider ingestion is held pending source-rights issue #280. No provider credentials are read and no refresh is started. Reopening requires a reviewed PR after source-specific written clearance or an approved replacement.' >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+
   authenticated-data:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'authenticated-data'
+    needs: provider-use-review
     runs-on: ubuntu-24.04
     timeout-minutes: 330
     steps:
