@@ -32,16 +32,44 @@ does not reproduce source values, bars, model outputs, or credentials.
 | [`DFF`](https://fred.stlouisfed.org/series/DFF) | Board of Governors of the Federal Reserve System; FRED tags the series “Public Domain: Citation Requested.” | Confirm source notice and permitted acquisition/vintage-storage route. A source label does not override FRED API terms. |
 | [`DGS10`](https://fred.stlouisfed.org/series/DGS10) | Board of Governors of the Federal Reserve System; FRED tags the series “Public Domain: Citation Requested.” | Confirm source notice and permitted acquisition/vintage-storage route. A source label does not override FRED API terms. |
 
-The current [FRED Services and API terms](https://fred.stlouisfed.org/legal/terms/)
-explicitly address software/ML development, cached or archived API content,
-third-party series rights, and a notice for applications using the API. Their
-application to past runs, model-derived aggregates, and a public portfolio
-site requires a qualified determination; do not infer clearance from the
-series source label. [Alpaca's redistribution answer](https://alpaca.markets/support/redistribute-alpaca-api)
-says its API data cannot be redistributed. It does **not** answer, by itself,
-whether this project's derived scores, per-event realized returns, metrics,
-plots, and public API are permitted; obtain that answer rather than treating
-“not raw bars” as sufficient.
+## Provider terms observed on 2026-09-29
+
+This is a technical reading of the providers' currently posted terms, not a
+legal opinion about the project or any past use.
+
+- The current [FRED Services and API terms](https://fred.stlouisfed.org/legal/terms/)
+  contain express restrictions on using FRED services/content or the API in
+  connection with developing or training software and machine-learning/AI
+  systems. The API-specific terms also restrict storing, caching, archiving, or
+  incorporating FRED content into a database or other compilation. The terms
+  separately say that FRED cannot grant rights to third-party series and that
+  the underlying data owner's restrictions still apply. These provisions are
+  broader than a redistribution-only question. Since the project used FRED /
+  ALFRED series in a quantitative-modeling pipeline and retained private
+  checkpoints, there is an apparent terms-scope conflict that must be assessed
+  before further FRED-backed ingestion, model development, or use of retained
+  content. This is a risk inference from the documented project activity and
+  provider text, not a conclusion that a breach occurred or that no permission
+  exists. Obtain a written provider determination or qualified review; absent
+  approval, use an independently approved replacement source and rebuild the
+  affected dataset and study identity.
+- The FRED API terms also require a prominent notice on an API application and
+  terms links / user acknowledgement for applications used by others. Whether
+  this project's past public site triggers those requirements, and what duties
+  remain while the site serves only a synthetic fixture, need separate review.
+- [Alpaca's redistribution answer](https://alpaca.markets/support/redistribute-alpaca-api)
+  (posted November 2022) says Alpaca API data cannot be redistributed. It does
+  not itself decide whether this project's derived scores, per-event returns,
+  metrics, plots, or public API are permitted, nor replace review of the exact
+  account agreement and market-data feed terms. Do not treat “not raw bars” as
+  sufficient.
+
+The application of these terms to past runs, model-derived aggregates, public
+outputs, and historical storage requires a qualified determination. Do not
+infer clearance from a FRED series source label, attribution, an API notice, or
+this inventory. The production source-use hold remains in force while this
+review is open; this inventory does not authorize resuming the workflow or
+using previously retained source-derived content.
 
 ## Public-output exposure to review
 
