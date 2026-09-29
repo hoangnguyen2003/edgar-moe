@@ -30,6 +30,50 @@ def _report(path: Path, day: date, *, origin: str = "https://example.test") -> P
     return path
 
 
+def _review_hold_report(path: Path, day: date) -> Path:
+    result = _report(path, day)
+    report = json.loads(result.read_text(encoding="utf-8"))
+    report["schema_version"] = 6
+    report["status"] = "observed"
+    report["sample_observations"] = {}
+    for route in summary.ROUTES:
+        if route in {"forecasts_page", "forward_performance"}:
+            sample = {
+                "result": "expected_withheld",
+                "http_status": 410,
+                "latency_ms": 12.0,
+                "edge_cache": "BYPASS",
+                "origin_timing_status": "missing",
+                "public_visibility": "withheld_review",
+            }
+        elif route == "forward_status":
+            sample = {
+                "result": "ok",
+                "http_status": 200,
+                "latency_ms": 12.0,
+                "edge_cache": "MISS",
+                "origin_timing_status": "missing",
+                "semantic_status": "withheld_review",
+                "public_visibility": "withheld_review",
+                "health_reason": "publication_withheld_review",
+            }
+        else:
+            sample = {
+                "result": "ok",
+                "http_status": 200,
+                "latency_ms": 12.0,
+                "edge_cache": "HIT",
+                "origin_timing_status": "edge_or_unknown_ignored",
+                "served_commit_sha": "a" * 40 if route == "health" else None,
+            }
+        report["sample_observations"][route] = [sample] * 5
+    report["warmup_observations"] = {
+        route: items[0] for route, items in report["sample_observations"].items()
+    }
+    result.write_text(json.dumps(report), encoding="utf-8")
+    return result
+
+
 def test_summary_requires_seven_consecutive_utc_days_and_ignores_extra_fields(
     tmp_path: Path,
 ) -> None:
@@ -99,6 +143,35 @@ def test_schema_v5_summary_counts_forward_health_reasons_without_copying_unknown
 
     assert result["results"]["forward_status"]["health_reason_counts"] == {"latest_run_failed": 5}
     assert "PRIVATE_TEXT_MUST_NOT_APPEAR" not in json.dumps(result)
+
+
+def test_schema_v6_accepts_expected_withheld_policy_and_summarizes_it(tmp_path: Path) -> None:
+    path = _review_hold_report(tmp_path / "v6.json", date(2026, 9, 1))
+
+    result = summary.summarize([path])
+
+    assert result["results"]["forecasts_page"]["result_counts"] == {"expected_withheld": 5}
+    assert result["results"]["forward_performance"]["result_counts"] == {"expected_withheld": 5}
+    assert result["results"]["forward_status"]["health_reason_counts"] == {
+        "publication_withheld_review": 5
+    }
+
+
+def test_schema_v6_rejects_public_forward_data_leaking_through_observer(
+    tmp_path: Path,
+) -> None:
+    path = _review_hold_report(tmp_path / "leak.json", date(2026, 9, 1))
+    report = json.loads(path.read_text(encoding="utf-8"))
+    report["sample_observations"]["forward_performance"][0] = {
+        "result": "ok",
+        "http_status": 200,
+        "latency_ms": 12.0,
+        "edge_cache": "HIT",
+    }
+    path.write_text(json.dumps(report), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="public forward evidence was not withheld"):
+        summary.summarize([path])
 
 
 def test_summary_rejects_mixed_origins_and_unpinned_reports(tmp_path: Path) -> None:
@@ -218,7 +291,7 @@ def test_summary_rejects_cached_or_malformed_origin_evidence(tmp_path: Path) -> 
 @pytest.mark.parametrize(
     ("field", "value", "message"),
     [
-        ("schema_version", True, "schema v2 through v5"),
+        ("schema_version", True, "schema v2 through v6"),
         ("status", [], "invalid report status"),
         ("sample_result", [], "invalid sample"),
     ],

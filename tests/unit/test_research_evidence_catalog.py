@@ -9,7 +9,7 @@ from pathlib import Path
 import orjson
 import pytest
 
-from edgar_moe.api.repository import SnapshotRepository
+from edgar_moe.api.repository import SnapshotIntegrityError, SnapshotRepository
 from edgar_moe.api.research_evidence import (
     CATALOG_PATH,
     LOCK_PATH,
@@ -90,19 +90,12 @@ def _write_rights_review(path: Path, report: dict) -> None:
     )
 
 
-def test_pending_catalog_is_locked_to_frozen_snapshot() -> None:
+def test_withdrawn_v1_catalog_is_not_served_as_the_synthetic_snapshot() -> None:
     repo = SnapshotRepository(
         "data/demo/snapshot.json", lock_path="config/public_snapshot.lock.json"
     )
-    result = build_research_evidence(repo)
-    assert result.frozen_v1.locked_test_events > 0
-    assert result.frozen_v1.locked_rank_ic_interval_95.low < 0
-    assert result.frozen_v1.portfolio_10bps_sharpe < 0
-    assert result.frozen_v1.candidate_universe.status == "retrospective_test_period_screen"
-    assert result.frozen_v1.candidate_universe.screen_as_of.isoformat() == "2026-07-31"
-    assert "future information" in result.frozen_v1.candidate_universe.interpretation
-    assert result.duration_aware_v2.status == "pending_review"
-    assert "oof_events" not in result.duration_aware_v2.model_dump()
+    with pytest.raises(SnapshotIntegrityError, match="not in the public snapshot"):
+        build_research_evidence(repo)
     verify()
 
 

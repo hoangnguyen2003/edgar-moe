@@ -8,7 +8,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from edgar_moe.api.app import SpaStaticFiles, app, get_forward_registry, get_repository
+from edgar_moe.api.app import SpaStaticFiles, app, get_repository
 from edgar_moe.api.repository import SnapshotRepository
 
 # The deployment smoke check's HTML parser, so the docs page is held to the same
@@ -46,11 +46,11 @@ def fixture_snapshot() -> dict:
             "version": "0.1.0",
             "generated_at": "2026-01-01T00:00:00Z",
             "as_of": "2026-01-01",
-            "data_mode": "authenticated_locked_test",
+            "data_mode": "synthetic_fixture",
             "research_only": True,
             "disclaimer": "test",
-            "selection_hash": "a" * 64,
-            "locked_test_hash": "b" * 64,
+            "selection_hash": None,
+            "locked_test_hash": None,
         },
         "summary": {
             "title": "Test",
@@ -97,7 +97,6 @@ def test_api_contracts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path.write_text(json.dumps(fixture_snapshot()), encoding="utf-8")
     repo = SnapshotRepository(path)
     app.dependency_overrides[get_repository] = lambda: repo
-    app.dependency_overrides[get_forward_registry] = lambda: None
     with TestClient(app) as client:
         health = client.get("/api/v1/health", headers={"X-Request-ID": "smoke-probe-123"})
         assert health.json()["status"] == "ok"
@@ -111,18 +110,26 @@ def test_api_contracts(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         assert client.get("/api/v1/events/0000000000-26-000001").json()["ticker"] == "TEST"
         assert client.get("/api/v1/equity-curves?cost_bps=17").status_code == 422
         status = client.get("/api/v1/forward/status")
-        assert status.json()["configured"] is False
+        assert status.json()["public_visibility"] == "withheld_review"
         governance = client.get("/api/v1/governance")
         assert governance.status_code == 200
         governance_payload = governance.json()
-        assert governance_payload["schema_version"] == 1
-        assert governance_payload["frozen_v1"]["path"] == "data/demo/snapshot.json"
-        assert governance_payload["frozen_v1"]["sha256"] == sha256(path.read_bytes()).hexdigest()
+        assert governance_payload["schema_version"] == 2
+        assert governance_payload["published_snapshot"]["path"] == "data/demo/snapshot.json"
+        assert (
+            governance_payload["published_snapshot"]["sha256"]
+            == sha256(path.read_bytes()).hexdigest()
+        )
         assert governance_payload["public_data"]["raw_sources_public"] is False
-        assert governance_payload["forward_status"]["available"] is False
+        assert governance_payload["public_data"]["historical_v1_served_by_application"] is False
+        assert (
+            governance_payload["public_data"]["prospective_outputs_served_by_application"] is False
+        )
+        assert governance_payload["forward_status"]["public_visibility"] == "withheld_review"
         assert {control["status"] for control in governance_payload["controls"]} == {
             "enforced",
             "pending_operator_evidence",
+            "withheld_review",
         }
         assert status.headers["x-content-type-options"] == "nosniff"
         assert status.headers["x-frame-options"] == "DENY"

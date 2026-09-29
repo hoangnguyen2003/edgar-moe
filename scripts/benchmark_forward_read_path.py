@@ -1,8 +1,8 @@
-"""Benchmark the local forward read path against a deterministic synthetic registry.
+"""Benchmark the private local registry against deterministic synthetic records.
 
-This measures in-process FastAPI + SQLite, not hosted latency, edge-cache hit
-rate, Postgres query plans, throughput, or a production SLO. No credentials,
-provider calls, or market data are used.
+This measures direct ForwardRegistry + SQLite operations, not the public API,
+hosted latency, edge-cache hit rate, Postgres query plans, throughput, or a
+production SLO. No credentials, provider calls, or market data are used.
 """
 
 from __future__ import annotations
@@ -13,13 +13,12 @@ import platform
 import statistics
 import tempfile
 import time
+from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import orjson
-from fastapi.testclient import TestClient
 
-from edgar_moe.api.app import app, get_forward_registry
 from edgar_moe.forward.database import RegistryDatabase
 from edgar_moe.forward.domain import (
     DatasetRegistration,
@@ -148,7 +147,7 @@ def _percentile(values: list[float], fraction: float) -> float:
 
 
 def _measure(
-    client: TestClient, path: str, *, samples: int, cold_interval: bool = False
+    operation: Callable[[], object], *, samples: int, cold_interval: bool = False
 ) -> dict[str, int | float]:
     durations: list[float] = []
     errors = 0
@@ -156,9 +155,11 @@ def _measure(
         if cold_interval:
             _bootstrap.cache_clear()
         start = time.perf_counter()
-        response = client.get(path)
+        try:
+            operation()
+        except Exception:
+            errors += 1
         durations.append((time.perf_counter() - start) * 1000)
-        errors += response.status_code != 200
     return {
         "requests": samples,
         "errors": errors,
@@ -182,28 +183,25 @@ def measure(*, rows: int = 240, settled_percent: int = 75, samples: int = 20) ->
             database.create_schema()
             registry = ForwardRegistry(database, actor="synthetic-benchmark")
             settled = _seed(registry, rows=rows, settled_percent=settled_percent)
-            app.dependency_overrides[get_forward_registry] = lambda: registry
-            with TestClient(app) as client:
-                paths = {
-                    "status_uncached": "/api/v1/forward/status",
-                    "forecasts_page": "/api/v1/forward/forecasts?limit=50",
-                    "forecasts_filtered": f"/api/v1/forward/forecasts?limit=50&ticker=S{0:05d}",
-                    "performance_warm": "/api/v1/forward/performance",
-                }
-                # Warm the route/ORM once; the performance interval's bounded
-                # process cache is explicitly cold only in the separate probe.
-                for path in paths.values():
-                    if client.get(path).status_code != 200:
-                        raise RuntimeError(f"synthetic read failed: {path}")
-                results = {
-                    name: _measure(client, path, samples=samples) for name, path in paths.items()
-                }
-                results["performance_cold_interval"] = _measure(
-                    client, "/api/v1/forward/performance", samples=5, cold_interval=True
-                )
+            operations: dict[str, Callable[[], object]] = {
+                "status_uncached": registry.status,
+                "forecasts_page": lambda: registry.list_forecasts(limit=50),
+                "forecasts_filtered": lambda: registry.list_forecasts(limit=50, ticker="S00000"),
+                "performance_warm": registry.performance,
+            }
+            # Warm each SQL path; the interval's bounded process cache is
+            # explicitly cold only in the separate probe.
+            for operation in operations.values():
+                operation()
+            results = {
+                name: _measure(operation, samples=samples) for name, operation in operations.items()
+            }
+            results["performance_cold_interval"] = _measure(
+                registry.performance, samples=5, cold_interval=True
+            )
             return {
                 "schema_version": 1,
-                "scope": "synthetic_in_process_fastapi_sqlite_sequential",
+                "scope": "synthetic_private_registry_sqlite_sequential",
                 "python": platform.python_version(),
                 "platform": platform.platform(),
                 "forecasts": rows,
@@ -218,7 +216,6 @@ def measure(*, rows: int = 240, settled_percent: int = 75, samples: int = 20) ->
                 ],
             }
         finally:
-            app.dependency_overrides.pop(get_forward_registry, None)
             _bootstrap.cache_clear()
             database.dispose()
 

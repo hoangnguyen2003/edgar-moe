@@ -4,7 +4,6 @@ import { CallsStrip } from "../components/CallsStrip";
 import { GateDiagram } from "../components/GateDiagram";
 import { MetricCard } from "../components/MetricCard";
 import { ErrorState, LoadingState } from "../components/QueryState";
-import rankIcInterval from "../data/locked-rank-ic-interval.json";
 import { latestSignalsQuery, summaryQuery } from "../lib/queries";
 import { averageWeights, EXPERTS, type ExpertKey } from "../lib/experts";
 import { tallyCalls } from "../lib/calls";
@@ -13,7 +12,7 @@ import { intervalLayout } from "../lib/interval";
 import { Link } from "../lib/router";
 import type { EventRecord } from "../lib/types";
 
-/** The study's answer in plain words, derived from the locked-test figures. */
+/** Explain the current dataset plainly; public deployments use synthetic fixtures. */
 function verdict(rankIc: number | null | undefined, annualReturn: number | null | undefined) {
   if (rankIc == null || annualReturn == null) return null;
   const skill = rankIc <= 0 ? "no better than chance" : rankIc < 0.05 ? "slightly better than chance" : "better than chance";
@@ -63,14 +62,14 @@ export function OverviewPage() {
   const portfolio = data.portfolio_scenarios.find((item) => item.cost_bps === 10) ?? {};
   const demo = data.metadata.data_mode === "synthetic_fixture";
   const weights = averageWeights(signals.data);
-  const hasFrozenInterval = data.metadata.data_mode === "authenticated_locked_test"
-    && data.metadata.selection_hash === rankIcInterval.selection_hash
-    && data.metadata.locked_test_hash === rankIcInterval.locked_test_hash
-    && test.rank_ic != null
-    && Math.abs(test.rank_ic - rankIcInterval.rank_ic) < 1e-12;
   const sharpeInterval = intervalLayout(portfolio.sharpe_ci_low, portfolio.sharpe, portfolio.sharpe_ci_high);
-  const calls = callsSummary(signals.data);
-  const answer = hasFrozenInterval && portfolio.annualized_return != null && portfolio.annualized_return < 0
+  const calls = demo ? null : callsSummary(signals.data);
+  const answer = demo
+    ? {
+        title: "Software demo only—not evidence of investment skill.",
+        detail: "Every filing, score, return, and portfolio result below is generated synthetic data. Nothing here is observed market performance.",
+      }
+    : portfolio.annualized_return != null && portfolio.annualized_return < 0
     ? {
         title: "Not convincingly, and not profitably.",
         detail: `On 2025–2026 filings it had never seen, the model's ranking skill was ${decimal(test.rank_ic, 3)}, too small to tell from luck: its 95% interval includes zero. A portfolio trading on those scores lost ${percent(-portfolio.annualized_return)} a year after trading costs.`,
@@ -97,7 +96,7 @@ export function OverviewPage() {
             <Link className="button button--secondary" to="/methodology">How it works</Link>
           </div>
           <p className="hero__meta">
-            {demo ? "Synthetic test data, not market results" : <>Data through <time dateTime={data.metadata.as_of}>{shortDate(data.metadata.as_of)}</time></>}
+            {demo ? "Synthetic software fixture · not real filings or market results" : <>Data through <time dateTime={data.metadata.as_of}>{shortDate(data.metadata.as_of)}</time></>}
             {" · "}Research only, not investment advice
           </p>
         </div>
@@ -114,13 +113,11 @@ export function OverviewPage() {
       <section className="figures" aria-label="Headline results">
         <MetricCard label="Filings analyzed" value={count(data.summary.events)} detail={`From ${count(data.summary.issuers)} companies`} />
         <MetricCard
-          label="Ranking skill"
+          label={demo ? "Synthetic rank metric" : "Ranking skill"}
           info="rankIc"
           value={decimal(test.rank_ic, 3)}
-          interval={hasFrozenInterval ? { low: rankIcInterval.ci_low, point: test.rank_ic, high: rankIcInterval.ci_high } : undefined}
-          detail={hasFrozenInterval
-            ? `95% two-month calendar-block interval ${decimal(rankIcInterval.ci_low, 3)} to ${decimal(rankIcInterval.ci_high, 3)}; includes zero`
-            : "Rank IC on the final test; 0 is random"}
+          interval={undefined}
+          detail={demo ? "Synthetic fixture only; no market inference" : "Rank IC on the final test; 0 is random"}
         />
         <MetricCard
           label="Sharpe ratio"
@@ -133,22 +130,17 @@ export function OverviewPage() {
         />
         <MetricCard label="Worst drop" info="drawdown" value={percent(portfolio.maximum_drawdown)} detail="Largest fall from a peak in the backtest" />
       </section>
-      {(hasFrozenInterval || sharpeInterval) && <p className="panel__note">
+      {sharpeInterval && <p className="panel__note">
         In the marks, the bar is the 95% interval, the dot the estimate, and the tick zero.
-        {hasFrozenInterval && <>
-          {" "}The ranking interval groups filings by calendar month and does not adjust for model selection.
-          {" "}<a href="https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md">Read the dated method and caveats</a>.
-        </>}
       </p>}
 
       <section className="panel fair-test">
         <header>
           <div>
             <h2>How the test was kept fair</h2>
-            <p>
-              Candidate models learned from earlier filings and were compared on 2023–2024. The chosen model was then
-              frozen and scored once on 2025–2026 filings it had never seen.
-            </p>
+            <p>{demo
+              ? "This generated timeline demonstrates the software's train/validation/test layout; it contains no real SEC filings or market outcomes."
+              : "Candidate models learned from earlier filings and were compared on 2023–2024. The chosen model was then frozen and scored once on 2025–2026 filings it had never seen."}</p>
           </div>
         </header>
         <div

@@ -17,10 +17,10 @@ def write_locked_fixture(root: Path) -> tuple[Path, Path]:
     snapshot_path.parent.mkdir(parents=True)
     snapshot = {
         "metadata": {
-            "data_mode": "authenticated_locked_test",
+            "data_mode": "synthetic_fixture",
             "as_of": "2026-07-31",
-            "selection_hash": "a" * 64,
-            "locked_test_hash": "b" * 64,
+            "selection_hash": None,
+            "locked_test_hash": None,
             "research_only": True,
         }
     }
@@ -34,10 +34,10 @@ def write_locked_fixture(root: Path) -> tuple[Path, Path]:
                 "schema_version": 1,
                 "path": "data/demo/snapshot.json",
                 "sha256": sha256(snapshot_bytes).hexdigest(),
-                "data_mode": "authenticated_locked_test",
+                "data_mode": "synthetic_fixture",
                 "as_of": "2026-07-31",
-                "selection_hash": "a" * 64,
-                "locked_test_hash": "b" * 64,
+                "selection_hash": None,
+                "locked_test_hash": None,
             }
         ),
         encoding="utf-8",
@@ -61,12 +61,12 @@ def test_snapshot_lock_rejects_changed_bytes(tmp_path: Path) -> None:
 def test_snapshot_lock_rejects_identity_change(tmp_path: Path) -> None:
     lock_path, snapshot_path = write_locked_fixture(tmp_path)
     payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    payload["metadata"]["data_mode"] = "synthetic_fixture"
+    payload["metadata"]["data_mode"] = "authenticated_locked_test"
     snapshot_path.write_text(json.dumps(payload), encoding="utf-8")
 
     errors = _MODULE.validate_public_snapshot_lock(lock_path, repo_root=tmp_path)
 
-    assert "public snapshot data_mode must remain authenticated_locked_test" in errors
+    assert "public snapshot data_mode must remain synthetic_fixture" in errors
     assert "public snapshot metadata does not match lock field: data_mode" in errors
 
 
@@ -79,11 +79,11 @@ def test_snapshot_lock_rejects_published_provenance_drift(tmp_path: Path) -> Non
             {
                 "snapshot": {
                     "path": "data/demo/snapshot.json",
-                    "data_mode": "authenticated_locked_test",
+                    "data_mode": "synthetic_fixture",
                     "as_of": "2026-07-31",
                     "sha256": "c" * 64,
-                    "selection_hash": "a" * 64,
-                    "locked_test_hash": "b" * 64,
+                    "selection_hash": None,
+                    "locked_test_hash": None,
                     "research_only": True,
                 }
             }

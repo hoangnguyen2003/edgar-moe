@@ -7,7 +7,7 @@ import { InfoTip } from "../components/InfoTip";
 import { PageHeader } from "../components/PageHeader";
 import { ErrorState, LoadingState } from "../components/QueryState";
 import { tallyCalls } from "../lib/calls";
-import { latestSignalsQuery, freshnessQuery } from "../lib/queries";
+import { latestSignalsQuery, freshnessQuery, summaryQuery } from "../lib/queries";
 import { filedDate, shortDate, signedDecimal, standing } from "../lib/format";
 import { Link } from "../lib/router";
 import type { EventRecord } from "../lib/types";
@@ -21,26 +21,32 @@ const DIRECTIONS: Array<{ direction: EventRecord["direction"]; title: string; no
 export function SignalsPage() {
   const signals = useQuery(latestSignalsQuery);
   const freshness = useQuery(freshnessQuery);
+  const summary = useQuery(summaryQuery);
+  const demo = summary.data?.metadata?.data_mode === "synthetic_fixture";
   const updated = freshness.data?.last_successful_update;
   // The stamp's line is held only while freshness loads; without a date it is left out.
   const stamp = freshness.isPending ? null : updated ? `Updated ${shortDate(updated.slice(0, 10))}` : undefined;
   const header = (answer?: ReactNode) => (
-    <PageHeader title="Study signals" answer={answer} placeholder="Of its 6 calls, 3 went as called: 1 of 4 longs and both shorts." stamp={stamp}>
-      The study's final filings, grouped by what a long-short portfolio would do with them (long and short are the
-      top and bottom 10% of scores), and what each stock then did against the market over 20 trading days. A dozen
-      filings illustrate; the <Link to="/portfolio">backtest</Link> of all 1,794 is the evidence. Forecasts recorded
-      since the study ended are on <Link to="/forward">Live tracking</Link>.
+    <PageHeader title={demo ? "Synthetic signals" : "Study signals"} answer={answer} placeholder="Generated demo values only; not observed market performance." stamp={stamp}>
+      {demo
+        ? "Generated example records exercise the signal interface; they are not real filings, stock calls, or market outcomes."
+        : <>The study's final filings, grouped by what a long-short portfolio would do with them (long and short are the
+          top and bottom 10% of scores), and what each stock then did against the market over 20 trading days. A dozen
+          filings illustrate; the <Link to="/portfolio">backtest</Link> is the evidence. Forecasts recorded
+          since the study ended are on <Link to="/forward">Live tracking</Link>.</>}
     </PageHeader>
   );
-  if (signals.isLoading) return <div className="page">{header(null)}<LoadingState label="Loading the study's final filings" skeleton={["rows"]} /></div>;
+  if (signals.isLoading) return <div className="page">{header(null)}<LoadingState label={demo ? "Loading generated example records" : "Loading the study's final filings"} skeleton={["rows"]} /></div>;
   if (signals.error) return <div className="page">{header()}<ErrorState error={signals.error} onRetry={() => void signals.refetch()} /></div>;
   const items = signals.data!;
   const counts = DIRECTIONS.map(({ direction, title }) => `${items.filter((item) => item.direction === direction).length} ${title.toLowerCase()}`);
   // The answer is how the calls turned out; until a result is known, what was called.
   const tally = tallyCalls(items);
-  const answer = tally
-    ? <>Of its {tally.calls} calls, <mark>{tally.right} went as called</mark>: {tally.bySide}.</>
-    : `${items.length} filings scored: ${counts.join(", ")}.`;
+  const answer = demo
+    ? <><mark>Generated example scores only.</mark> They do not represent real calls or outcomes.</>
+    : tally
+      ? <>Of its {tally.calls} calls, <mark>{tally.right} went as called</mark>: {tally.bySide}.</>
+      : `${items.length} filings scored: ${counts.join(", ")}.`;
   // One scale for every bar on the page, so results compare across groups.
   const scale = Math.max(...items.map((item) => Math.abs(item.realized_abnormal_return ?? 0)), 0.01);
   return (

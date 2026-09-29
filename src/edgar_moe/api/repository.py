@@ -101,32 +101,53 @@ class SnapshotRepository:
         metadata = snapshot.get("metadata")
         if not isinstance(metadata, dict) or metadata.get("research_only") is not True:
             raise SnapshotIntegrityError("public snapshot metadata is not research-only")
+        if lock.get("data_mode") != "synthetic_fixture":
+            raise SnapshotIntegrityError("public lock must identify a synthetic fixture")
+        if metadata.get("data_mode") != "synthetic_fixture":
+            raise SnapshotIntegrityError("only a synthetic fixture may be publicly served")
         for field in ("data_mode", "as_of", "selection_hash", "locked_test_hash"):
             if lock.get(field) != metadata.get(field):
                 raise SnapshotIntegrityError("public snapshot metadata does not match its lock")
 
-    def frozen_identity(self) -> dict[str, Any]:
-        """Return the public, content-addressed identity of the frozen snapshot."""
+    def published_identity(self) -> dict[str, Any]:
+        """Return the content-addressed identity of the currently published snapshot."""
         snapshot = self.load()
         metadata = snapshot.get("metadata")
         if not isinstance(metadata, dict):
             raise ValueError("Invalid snapshot; metadata must be an object")
         if self._snapshot_sha256 is None:
             raise ValueError("Invalid snapshot; content hash is unavailable")
-        required = ("data_mode", "as_of", "selection_hash", "locked_test_hash")
-        if any(not isinstance(metadata.get(field), str) for field in required):
-            raise ValueError("Invalid snapshot; frozen identity metadata is incomplete")
+        data_mode = metadata.get("data_mode")
+        if data_mode != "synthetic_fixture":
+            raise SnapshotIntegrityError("only a synthetic fixture may be publicly served")
+        as_of = metadata.get("as_of")
+        if not isinstance(as_of, str) or not as_of.strip():
+            raise ValueError("Invalid snapshot; published identity metadata is incomplete")
         if metadata.get("research_only") is not True:
-            raise ValueError("Invalid snapshot; frozen snapshot must be research-only")
+            raise ValueError("Invalid snapshot; published snapshot must be research-only")
+        if (
+            metadata.get("selection_hash") is not None
+            or metadata.get("locked_test_hash") is not None
+        ):
+            raise ValueError("Invalid synthetic snapshot; frozen-v1 hashes are not applicable")
         return {
             "path": "data/demo/snapshot.json",
             "sha256": self._snapshot_sha256,
-            "data_mode": metadata["data_mode"],
-            "as_of": metadata["as_of"],
-            "selection_hash": metadata["selection_hash"],
-            "locked_test_hash": metadata["locked_test_hash"],
+            "data_mode": data_mode,
+            "as_of": as_of,
+            "selection_hash": None,
+            "locked_test_hash": None,
             "research_only": True,
         }
+
+    def frozen_identity(self) -> dict[str, Any]:
+        """Return the identity used by existing copilot report envelopes.
+
+        The legacy method name is retained for report-schema compatibility. It
+        deliberately returns only the currently published synthetic snapshot;
+        frozen-v1 evidence remains unavailable to the application.
+        """
+        return self.published_identity()
 
     def summary(self) -> dict[str, Any]:
         snapshot = self.load()

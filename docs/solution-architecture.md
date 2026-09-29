@@ -5,9 +5,9 @@ operated, and verified. It summarizes and links the detailed documents rather
 than repeating them. Every claim separates what the code enforces from what
 depends on provider configuration or operator action.
 
-- **Status date:** 2026-09-27.
+- **Status date:** 2026-09-29.
 - **Live system:** [edgar-moe.vercel.app](https://edgar-moe.vercel.app), its [API reference](https://edgar-moe.vercel.app/api/docs), and a plain-language [architecture page](https://edgar-moe.vercel.app/architecture) for visitors.
-- **Decision log:** [33 architecture decision records](adr/README.md), one proposed.
+- **Decision log:** [34 architecture decision records](adr/README.md), one proposed.
 - **Detailed views:** [architecture and data flow](architecture.md), [forward-testing operations](forward-testing.md), [improvement plan](architecture-roadmap.md).
 
 ## 1. Context and goals
@@ -19,17 +19,16 @@ perform over the next 20 trading sessions, relative to the market.
 
 The system has two lives:
 
-1. **A finished historical study (frozen v1).** The model was selected on
-   2023–2024 validation data, frozen and fingerprinted, then scored once on
-   1,794 filings from 2025–2026. The result is published honestly. Ranking skill
-   was weak but positive (rank IC 0.0316), and a cost-aware market-neutral
-   portfolio lost money (−3.28% a year and a Sharpe ratio of −0.63 at 10 bps).
-   See the [locked report](../reports/authenticated_research_report.md) and the
-   [model card](model-card.md).
-2. **An ongoing prospective test.** A scheduled runner scores new filings with
-   the same frozen model. It saves each forecast before the stock can trade, and
-   appends each outcome only after 20 sessions. Nothing can be adjusted with
-   hindsight.
+1. **A historical study record (frozen v1).** The research record is retained,
+   but its source-backed results are currently withheld from the deployed
+   application while source-use and redistribution review remains open. Related
+   reports may still exist in repository files, Git history, artifacts, or prior
+   deployments; the synthetic-demo change is not a full takedown or legal clearance.
+2. **A private ongoing prospective test.** A scheduled runner scores new filings
+   with the same frozen model. It saves each forecast before the stock can trade,
+   and appends each outcome only after 20 sessions. Nothing can be adjusted with
+   hindsight. These outputs are currently withheld from the public app while
+   source-rights review remains open ([ADR 0034](adr/0034-synthetic-public-boundary.md)).
 
 It is research software. It never places orders, gives advice, or assesses
 suitability.
@@ -38,7 +37,7 @@ suitability.
 
 | Stakeholder | Main concern | Where it is addressed |
 | --- | --- | --- |
-| Visitor or reviewer | What was found, and can I trust it? | The public site's answer-first pages, the Audit page, and [§8](#8-verification-and-traceability) |
+| Visitor or reviewer | Is this real evidence or only a demo? | The global synthetic-data disclosure, the Audit page, and [§8](#8-verification-and-traceability) |
 | Quant researcher | No look-ahead, honest selection, costs included | [Research contract](../README.md#research-contract), [model card](model-card.md), and [ADR 0017](adr/0017-post-v1-selection-protocol.md) |
 | Maintainer (operator) | Cheap, recoverable, observable operation | [§6](#6-reliability-and-operations), [runbooks](#runbooks), and [operator evidence](operator-evidence.md) |
 | Data providers | Terms of use and redistribution | [Public-surface review](public-surface-review.md) and the `data-provenance.json` manifest |
@@ -72,7 +71,7 @@ A missed forecast is always preferable to a backdated one.
 | F1 | Build a point-in-time dataset from filings, XBRL facts, prices, and macro vintages. |
 | F2 | Select a model on pre-test folds, freeze it, and evaluate the locked test once. |
 | F3 | Backtest a cost-aware, market-neutral long-short portfolio. |
-| F4 | Publish the frozen results through a public, read-only site and API. |
+| F4 | Publish a synthetic software demo through a public, read-only site and API while historical source rights are reviewed. |
 | F5 | Record prospective forecasts before entry, and settle outcomes after 20 sessions. |
 | F6 | Expose the frozen identity, public-data boundary, and control status for audit. |
 | F7 | Offer an operator-run AI copilot that explains evidence with verifiable citations. |
@@ -86,11 +85,11 @@ Each scenario gives a stimulus, the required response, and the current evidence.
 | Integrity | A forecast is attempted at or after its entry time. It is refused; zero such forecasts are accepted. | Enforced in code and tested ([§8](#8-verification-and-traceability), R2) |
 | Integrity | Any client issues `UPDATE`, `DELETE`, or `TRUNCATE` on an evidence row. The database rejects it. | Triggers installed in production ([ADR 0016](adr/0016-database-append-only-triggers.md)) |
 | Reproducibility | A deployment serves a snapshot different from the reviewed one. The API refuses to serve it, and the deployment gate fails. | Runtime lock check ([ADR 0004](adr/0004-runtime-snapshot-lock.md)), plus a smoke check that compares identities on every production deploy |
-| Availability | The registry database is unreachable. Historical pages still load, and forward data reports unavailable instead of failing silently. | API tests; see the [failure scenarios](architecture-roadmap.md#failure-scenarios-to-exercise) |
-| Security | The public serving tier is compromised. It cannot write evidence, because routes are GET-only and sessions read-only. | Enforced in code ([ADR 0011](adr/0011-api-read-only-statement-boundary.md)), and by a SELECT-only provider role verified on 2026-09-22 |
+| Availability | The private registry database is unreachable. The synthetic public demo still loads; runner/auditor operations fail independently, and the public API never probes or exposes database state. | Public API boundary tests and private failure scenarios; see the [failure scenarios](architecture-roadmap.md#failure-scenarios-to-exercise) |
+| Security | The public serving tier is compromised. Its function has no registry connection, source credentials, or write path; private runner/auditor credentials remain in separate workflows. | Enforced in code ([ADR 0034](adr/0034-synthetic-public-boundary.md)); private database least privilege is separately verified |
 | Security | A credential is committed or bundled. The bundle validator and secret scanning block or flag it. | Enforced in CI; push protection is enabled |
 | Timeliness | A scheduled run starts late. Its margin before the open is recorded, with a warning below 90 minutes. | Enforced ([ADR 0020](adr/0020-pre-open-schedule-margin.md)); manual read-only observers verify a selected dispatch and summarize historical scheduled-time, creation-time, and start-time delays. Punctuality and scheduler origin are not guaranteed by GitHub metadata. |
-| Research honesty | A live ranking figure rests on too few settled outcomes or too few distinct filing months. The page labels the point estimate as a running log and withholds interval bounds; the interval does not treat same-month filings as independent time observations. | Enforced by the [calendar-cluster interval gate](../src/edgar_moe/forward/uncertainty.py), the Live tracking notice, and [ADR 0027](adr/0027-clustered-forward-rank-ic-uncertainty.md). Bounds require at least 100 settled pairs in 12 distinct UTC acceptance months and remain conditional when available. |
+| Research honesty | Rights review is unresolved, or a future public performance estimate is based on too few settled outcomes or filing months. Today the page withholds registry results entirely; any future publication must re-establish rights approval and the independent calendar-cluster gates. | Current hold enforced by [ADR 0034](adr/0034-synthetic-public-boundary.md); private metric uncertainty is specified by [ADR 0027](adr/0027-clustered-forward-rank-ic-uncertainty.md) |
 | Recoverability | The registry is lost. It can be restored into an isolated target and reconciled with R2 evidence. | Rehearsed locally and in CI. **Pending:** a provider-side drill; the candidate RPO (24 h) and RTO (4 h) are unverified. |
 | Performance | A change adds weight to the site. The first visit still downloads under 130 KB of compressed HTML, JavaScript, and CSS, and CI fails when it would not. | Enforced ([`check_web_budget.py`](../scripts/check_web_budget.py), budget in [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json)); measured at 97 KB on 2026-09-23 |
 | Cost | A copilot tool loop or provider outage runs long. Wall-clock and context budgets stop it before the next provider call. | Enforced ([ADR 0008](adr/0008-copilot-run-execution-budget.md), [ADR 0009](adr/0009-copilot-context-budget.md)) |
@@ -122,7 +121,8 @@ flowchart TB
     research[Research pipeline<br/>maintainer workstation]
   end
   subgraph stores["Evidence stores"]
-    snapshot[(Frozen v1 snapshot<br/>and lock, in Git)]
+    snapshot[(Synthetic public fixture<br/>and lock, in Git)]
+    archive[(Historical research archive<br/>not served by application)]
     registry[(Postgres registry<br/>append-only triggers)]
     r2[(R2 evidence mirror<br/>content-addressed)]
   end
@@ -133,7 +133,7 @@ flowchart TB
   end
   web --> api
   api --> snapshot
-  api -->|reader role, read-only session| registry
+  research -->|private research| archive
   research -->|reviewed PR| snapshot
   runner -->|writer role| registry
   runner --> r2
@@ -143,9 +143,10 @@ flowchart TB
   smoke -->|verifies served identity| api
 ```
 
-The main separation ([ADR 0001](adr/0001-separate-serving-and-batch.md)) is
-between two tiers:
-- The **public tier** holds no write credentials and no training stack.
+The separation ([ADR 0001](adr/0001-separate-serving-and-batch.md), constrained
+by [ADR 0034](adr/0034-synthetic-public-boundary.md)) is between two tiers:
+- The **public tier** serves a synthetic fixture only, with no database
+  connection, source credentials, write credentials, or training stack.
 - The **private tier** holds source and database write credentials, and runs
   only as reviewed code in scheduled or manual workflows.
 
@@ -179,12 +180,12 @@ Evidence is never erased to make a retry look clean.
 | Component | Runs on | Trigger | Credentials | Trust |
 | --- | --- | --- | --- | --- |
 | React app | Vercel CDN (static `public/`) | Merge to `main` | None | Public |
-| FastAPI | Vercel Python function, `sin1` | Merge to `main` | Optional read-only registry URL | Public, read-only |
+| FastAPI | Vercel Python function, `sin1` | Merge to `main` | None; no registry connection | Public, read-only |
 | Forward runner | GitHub-hosted Ubuntu 24.04 | Cron `17 7 * * 2-6` UTC, or manual | Writer DB, R2, and sources, each scoped per step ([ADR 0018](adr/0018-workflow-supply-chain.md)) | Private |
 | Optional scheduler observer | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with a run ID | GitHub `actions: read` and `contents: read` only | Read-only evidence |
 | Optional scheduler-lateness measurement | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with a bounded lookback | GitHub `actions: read` and `contents: read` only | Read-only evidence |
 | Optional diagnostic-history collector | GitHub-hosted Ubuntu 24.04 | Manual `workflow_dispatch` with paired forward run IDs and artifact names | GitHub `actions: read` and `contents: read` only | Redacted research evidence |
-| Registry | Managed Postgres (Neon) | — | Writer (runner) and reader (API and auditor) | Evidence store |
+| Registry | Managed Postgres (Neon) | — | Writer (runner); reader (auditor only) | Private evidence store |
 | Evidence mirror | Cloudflare R2 | — | Runner write; auditor read-only | Evidence store |
 | CI | GitHub Actions | Every PR and push | `contents: read` | Gate |
 | Smoke check | GitHub Actions | Each production deploy | None | Gate |
@@ -209,20 +210,22 @@ Evidence is never erased to make a retry look clean.
   human review of one short-horizon history without rewriting it. It does not
   authenticate reviewer identity or authorize model changes ([ADR 0028](adr/0028-forward-history-review-attestations.md)).
 - **Public boundary:**
-  - Only derived results are published. Raw licensed data never leaves the
-    private tier ([public-surface review](public-surface-review.md)).
-  - Redistribution terms remain under operator review, as recorded in
-    `data-provenance.json`.
+  - The deployed app serves a generated synthetic fixture only. Historical
+    research outputs and database-backed prospective records are withheld from
+    the application while source-use and redistribution review remains open.
+  - Raw provider data remains private. The remaining repository, Git-history,
+    artifact, and prior-deployment copies are not thereby cleared or purged
+    ([public-surface review](public-surface-review.md)).
 
 ## 5. Security architecture
 
 | Threat | Mitigation | Residual risk |
 | --- | --- | --- |
-| Published results are swapped or altered | A lock is verified at build, at serving time, and against the reviewed commit on every production deploy. Fingerprints are shown on the Audit page. | The Git host and maintainer account are trusted roots. |
+| The synthetic fixture is swapped or altered | Its lock is verified at build, at serving time, and against the reviewed commit on every production deploy. Its fingerprint is shown on the Audit page. | The Git host and maintainer account are trusted roots. Historical and prospective results are not served. |
 | Forward evidence is edited or deleted | Database triggers, ORM guards, content hashes, the R2 mirror, and a read-only Go auditor. | A database owner can drop triggers with DDL. The mitigation is R2 retention, which is pending. |
 | Forecasts are backdated | The `accepted_at ≤ forecast_as_of < entry_at` rule, a clock-skew bound, and the recorded pre-open margin. | A late scheduler reduces coverage but never permits backdating. |
 | A credential leaks through the public bundle | The bundle validator rejects private runtime names, and secret scanning and push protection are on. Secrets are scoped to steps. | Human error is still possible; revoke and rotate per the [incident row](architecture-roadmap.md#failure-scenarios-to-exercise). |
-| The serving tier is compromised | GET-only routes, read-only sessions, a statement timeout, separate reader and writer URLs, and a SELECT-only provider role (verified 2026-09-22). | Provider connection limits are unverified; see [§9](#9-risks-and-open-items). |
+| The serving tier is compromised | The public API is GET-only, serves only the synthetic fixture, and does not connect to Postgres or carry source credentials. | Provider operations still apply to private runner/auditor paths; see [§9](#9-risks-and-open-items). |
 | Supply-chain compromise | Actions are pinned to commit SHAs, dependencies are locked (`uv --locked`, `npm ci`), and Dependabot and CodeQL run. | Upstream compromise between reviews. |
 | Scraping or request floods | Paginated, bounded responses and CDN caching. | No application rate limit. Provider and CDN controls are pending. |
 | Copilot prompt injection or exfiltration | Operator-run only, with allowlisted read-only tools, an exact provider host allowlist, no redirects, budgets, and citations bound to tool payloads. | Answers support review; they are not evidence. |
@@ -230,16 +233,17 @@ Evidence is never erased to make a retry look clean.
 ## 6. Reliability and operations
 
 - **Degradation:**
-  - Historical pages depend only on the packaged snapshot.
-  - A registry outage makes forward data report unavailable (503s on data
-    routes), without affecting the rest of the site.
+  - Demo pages depend only on the packaged synthetic snapshot.
+  - Public forward-data routes return `410` with `no-store` while source-rights
+    review is open; this is a publication hold, not a registry outage.
   - An error while rendering a page is caught in the page area: the reader
     keeps the navigation and is told to reload or pick another page, instead
     of being left with a blank document. A page asset that a new deployment
     replaced is named as such, because reloading fixes it.
 - **Observability:**
-  - `/api/v1/governance` and `/api/v1/forward/status` expose the frozen identity
-    and the runner's health.
+  - `/api/v1/governance` exposes the synthetic identity and the current
+    publication holds. `/api/v1/forward/status` reports policy only; runner
+    health is inspected through private operator evidence.
   - Each run appends quality checks, including the pre-open margin.
   - Redacted run artifacts are kept for 30 days.
   - An optional redacted webhook sends alerts.
@@ -256,19 +260,11 @@ Evidence is never erased to make a retry look clean.
   - a candidate RPO of 24 hours and RTO of 4 hours, to be demonstrated by drills.
 
   See the [proposed objectives](architecture-roadmap.md#proposed-service-objectives--not-measured-commitments).
-- **Cold starts:** the Vercel function and the Neon compute both scale to zero,
-  and they share a region (`sin1` and `ap-southeast-1`).
-  - Steady-state registry reads take about 0.2 s.
-  - The first request after an idle period waits while both resume; one
-    `governance` request took 22.7 s on 2026-09-22.
-  - Keeping the database warm would spend free compute allowance, so the pages
-    that read the registry show a delayed "the database pauses when idle" hint
-    instead.
-  - Snapshot reads carry `s-maxage`, so the edge answers them without waking
-    the function: after a deployment the first visitor pays the resume, and
-    the readers behind them do not. Registry reads keep a 60-second edge
-    lifetime, and health, freshness, and forward status are never cached.
-    Asserted in [`test_cache_policy.py`](../tests/unit/test_cache_policy.py).
+- **Cold starts:** Vercel serves the static bundle from its edge and invokes a
+  small Python function only for uncached API reads. The public function does
+  not connect to Neon, so it cannot wake the private registry or expose its
+  contents. Historical hosted read observations describe the prior API
+  boundary and are not a current production SLO.
 - **Capacity:** `edgar-moe capacity-baseline` records latency, storage, and
   runtime, and marks provider quotas as unobserved rather than guessing. The
   [synthetic read-path benchmark](../scripts/benchmark_forward_read_path.py)
@@ -319,10 +315,10 @@ how it is verified. CI runs the linked tests on every pull request.
 | R3 | Evidence is append-only, even against direct SQL | [`forward/immutability.py`](../src/edgar_moe/forward/immutability.py), [migration `0002`](../migrations/versions/20260921_0002_append_only_triggers.py) | [`test_registry_immutability.py`](../tests/integration/test_registry_immutability.py) |
 | R4 | The frozen v1 identity cannot drift | [`ops/frozen/SHA256SUMS`](../ops/frozen/SHA256SUMS), [`validate_frozen_runtime.py`](../scripts/validate_frozen_runtime.py) | [`test_frozen_runtime.py`](../tests/unit/test_frozen_runtime.py), in CI before every run |
 | R5 | Production serves exactly the reviewed snapshot | [`api/repository.py`](../src/edgar_moe/api/repository.py), [`smoke_deployment.py`](../scripts/smoke_deployment.py) `--expect-lock` | [`test_snapshot_repository.py`](../tests/unit/test_snapshot_repository.py), [`test_smoke_deployment.py`](../tests/unit/test_smoke_deployment.py), and the [smoke workflow](../.github/workflows/deployment-smoke.yml) on each deploy |
-| R6 | The public API cannot write | [`api/app.py`](../src/edgar_moe/api/app.py) (GET only), read-only sessions ([ADR 0011](adr/0011-api-read-only-statement-boundary.md)), [reader grants](../ops/postgres/provision-reader.sql) | [`test_api_database_boundary.py`](../tests/unit/test_api_database_boundary.py), [`test_reader_role_audit.py`](../tests/unit/test_reader_role_audit.py), and CI's disposable-Postgres reader job |
+| R6 | The public API cannot read or write the private registry | [`api/app.py`](../src/edgar_moe/api/app.py) (no registry connection; derived routes withheld) | [`test_forward_api.py`](../tests/integration/test_forward_api.py), [`test_smoke_deployment.py`](../tests/unit/test_smoke_deployment.py) |
 | R7 | No secrets in the public bundle | [`validate_public_bundle.py`](../scripts/validate_public_bundle.py) | [`test_public_bundle.py`](../tests/unit/test_public_bundle.py), plus secret scanning |
 | R8 | Workflow supply chain pinned and secrets scoped | [`.github/workflows/`](../.github/workflows/) ([ADR 0018](adr/0018-workflow-supply-chain.md)) | [`test_workflow_supply_chain.py`](../tests/unit/test_workflow_supply_chain.py) |
-| R9 | Without the registry, historical reads still work and forward status says so | [`api/app.py`](../src/edgar_moe/api/app.py) | [`test_api.py`](../tests/integration/test_api.py), plus the deployment smoke contract for explicit registry-unavailable responses |
+| R9 | The public app serves only synthetic results and withholds registry output | [`api/app.py`](../src/edgar_moe/api/app.py) | [`test_forward_api.py`](../tests/integration/test_forward_api.py), [`test_smoke_deployment.py`](../tests/unit/test_smoke_deployment.py) |
 | R10 | Late runs are visible before the open | [`forward/workflow.py`](../src/edgar_moe/forward/workflow.py) ([ADR 0020](adr/0020-pre-open-schedule-margin.md)) | [`test_forward_workflow.py`](../tests/integration/test_forward_workflow.py) |
 | R11 | Copilot citations are bound to real tool output | [`copilot/agent.py`](../src/edgar_moe/copilot/agent.py), [`copilot/verification.py`](../src/edgar_moe/copilot/verification.py) | [`test_copilot_agent.py`](../tests/unit/test_copilot_agent.py), [`test_copilot_verification.py`](../tests/unit/test_copilot_verification.py) |
 | R12 | The first visit stays inside the page-weight budget | [`check_web_budget.py`](../scripts/check_web_budget.py), [`config/web_page_weight_budget.json`](../config/web_page_weight_budget.json) | [`test_web_budget.py`](../tests/unit/test_web_budget.py), and the bundle job in CI |
@@ -347,12 +343,12 @@ close it alone.
 
 | Item | Why it matters | Next step | Owner |
 | --- | --- | --- | --- |
-| Reader-role evidence | The role was provisioned with [`provision-reader.sql`](../ops/postgres/provision-reader.sql) on 2026-09-22 and verified against production: SELECT on all eight forward tables, no write privileges, and every write or DDL probe denied. The API must use Neon's direct host. | Keep a redacted report by running the [reader audit](../.github/workflows/provider-reader-contract-audit.yml) with the reader URL as a GitHub secret | Maintainer |
+| Private reader-role evidence | The former API reader role was provisioned with [`provision-reader.sql`](../ops/postgres/provision-reader.sql) on 2026-09-22 and verified against production: SELECT on all eight forward tables, no write privileges, and every write or DDL probe denied. It is no longer used by public serving. | Retain a redacted report by running the [reader audit](../.github/workflows/provider-reader-contract-audit.yml) with the SELECT-only URL as a private GitHub secret | Maintainer |
 | Provider restore drill | The RPO and RTO are unproven until a restore runs against the provider | Follow the [restore rehearsal](restore-rehearsal.md) into an isolated target, and record the evidence packet | Maintainer |
 | Object-store failure exercise | Partial-write recovery is tested locally, not against the hosted target | Run the provider R2 audit after an injected failure | Maintainer |
 | Scheduler lateness ([#156](https://github.com/hoangnguyen2003/edgar-moe/issues/156)) | Runs finish roughly 40–100 minutes before the open | Run the read-only historical lateness measurement and selected-dispatch observer to establish a baseline; then configure the `scheduler` environment, deploy and observe the optional [Cloudflare scheduler adapter](../ops/scheduler/README.md), retain the reports and application margin, and cut over in a separate PR. The observers do not prove scheduler origin and an earlier cron remains a research-design change | Maintainer |
 | Alert delivery | Failures are recorded but not yet pushed to a person | Configure a webhook recipient and exercise the failure cases | Maintainer |
-| Redistribution terms | Derived outputs are public under operator review | The factual half is recorded: [what each source contributes](public-surface-review.md#what-each-source-contributes-to-the-bundle) is documented and pinned by [`test_public_data_surface.py`](../tests/unit/test_public_data_surface.py). Confirm the source terms, then record the decision in `data-provenance.json` | Maintainer |
+| Source rights and historical copies | The current app is synthetic-only, but older reports, Git history, Actions artifacts, and prior deployments may still contain derived research output; rights remain unresolved. | Complete the source-rights and retention inventory. Do not re-enable publication or claim full takedown until separately approved and verified ([ADR 0034](adr/0034-synthetic-public-boundary.md)) | Maintainer |
 | Known v1 defects | Mixed-period fundamentals and over-regularized baselines | Disclosed and kept frozen. Later studies use [ADR 0015](adr/0015-xbrl-fact-selection-policy.md) and [ADR 0017](adr/0017-post-v1-selection-protocol.md). | Research |
 
 The roadmap tracks each item with its acceptance evidence in the
@@ -369,4 +365,4 @@ Five decisions carry most of the design:
 4. **Append-only evidence enforced in the database** ([0016](adr/0016-database-append-only-triggers.md)): integrity does not depend on application discipline.
 5. **Make operational risk visible rather than hidden** ([0020](adr/0020-pre-open-schedule-margin.md), [0023](adr/0023-external-forward-scheduler.md), [0019](adr/0019-forward-cache-lifecycle.md)): late runs and cache growth are measured and bounded, with an optional external trigger staged behind an observed cutover.
 
-The [ADR index](adr/README.md) lists all 33 decisions by theme, including one proposal.
+The [ADR index](adr/README.md) lists all 34 decisions by theme, including one proposal.

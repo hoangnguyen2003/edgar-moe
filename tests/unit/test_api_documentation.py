@@ -49,30 +49,30 @@ def test_every_operation_is_grouped_under_a_tag(schema: dict[str, Any]) -> None:
 def test_the_overview_states_the_terms_of_use(schema: dict[str, Any]) -> None:
     description = schema["info"]["description"]
 
-    assert "read-only" in description
+    assert "read-only" in description.lower()
     # A reader must not leave with the impression that the study made money.
     assert "not profitable" in description
     assert "investment advice" in description
 
 
-def test_the_forecast_route_explains_what_a_rank_means(schema: dict[str, Any]) -> None:
-    # Ranks are percentiles inside one run's batch, which is the single most
-    # misread number on the live page.
-    description = schema["paths"]["/api/v1/forward/forecasts"]["get"]["description"]
-
-    assert "cohort_size" in description
-    assert "single filing" in description
-
-
-def test_the_performance_route_states_how_the_rank_ic_is_computed(schema: dict[str, Any]) -> None:
-    # Pooling across runs is a choice with consequences; an undocumented IC
-    # invites comparison with the locked study's, which is not comparable.
-    description = schema["paths"]["/api/v1/forward/performance"]["get"]["description"]
-
-    assert "pooled" in description
-    assert "not comparable" in description
-    assert "two-calendar-month moving blocks" in description
-    assert "null until" in description
+def test_prospective_data_routes_document_only_the_withheld_contract(
+    schema: dict[str, Any],
+) -> None:
+    for route in (
+        "/api/v1/forward/runs",
+        "/api/v1/forward/forecasts",
+        "/api/v1/forward/performance",
+        "/api/v1/forward/data-quality",
+    ):
+        operation = schema["paths"][route]["get"]
+        assert set(operation["responses"]) == {"410"}
+        assert "withheld" in operation["description"].lower()
+        content = operation["responses"]["410"]["content"]["application/json"]["schema"]
+        assert content["$ref"].endswith("/WithheldResponse")
+    # The schema cannot advertise the historical forecast/performance fields
+    # as a successful public response while those records are held.
+    assert "ForwardForecastPage" not in schema["components"]["schemas"]
+    assert "ForwardPerformanceResponse" not in schema["components"]["schemas"]
 
 
 def test_documented_query_limits_match_the_code(schema: dict[str, Any]) -> None:

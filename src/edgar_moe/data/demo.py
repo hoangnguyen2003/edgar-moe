@@ -151,11 +151,17 @@ def generate_synthetic_dataset(seed: int = 42, securities: int = 300) -> Synthet
 
 
 def require_replaceable_demo_output(path: Path) -> None:
-    """Refuse to replace anything except an earlier synthetic fixture.
+    """Refuse to replace the published snapshot or any non-synthetic file.
 
-    The committed public snapshot is authenticated, hash-locked evidence; a
-    synthetic run must never overwrite it or any other non-synthetic file.
+    The currently published fixture is content-locked and must only be changed
+    by an explicit snapshot-review workflow, not by a demo generation command.
     """
+    published_snapshot = Path(__file__).resolve().parents[3] / "data" / "demo" / "snapshot.json"
+    if path.expanduser().resolve() == published_snapshot.resolve():
+        raise FileExistsError(
+            f"Refusing to replace the locked public snapshot {path}; "
+            "write to data/interim/ and review a new lock separately"
+        )
     if not path.exists():
         return
     try:

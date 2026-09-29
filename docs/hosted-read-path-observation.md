@@ -1,5 +1,14 @@
 # Hosted read-path observation
 
+> Historical observation only: this capture predates ADR 0034. At that time,
+> prospective registry data was publicly readable; the current deployment is
+> intended to serve a synthetic fixture and withhold prospective routes with
+> non-cacheable `410` responses. The values below are retained evidence of the
+> former public surface, not a description or authorization of the current
+> one. The current deployment smoke test verifies the new boundary. Prior
+> deployments, this report, Actions artifacts, and Git history are separate
+> retained copies and are not removed by the application-level hold.
+
 On 2026-09-27 at 07:40 UTC, an operator sampled the public
 [`edgar-moe.vercel.app`](https://edgar-moe.vercel.app) API from this workspace.
 The existing [deployment smoke check](../scripts/smoke_deployment.py) first

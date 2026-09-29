@@ -22,8 +22,9 @@ function jsonResponse(payload: unknown) {
 describe("Forward Lab", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("does not imply forward evidence when the registry is disconnected", async () => {
+  it("withholds prospective evidence while the public rights review is open", async () => {
     vi.stubGlobal("fetch", vi.fn(() => jsonResponse({
+      public_visibility: "withheld_review",
       configured: false,
       available: false,
       model_count: 0,
@@ -32,14 +33,16 @@ describe("Forward Lab", () => {
       matured_count: 0,
       pending_count: 0,
       latest_successful_run_at: null,
-      message: "not configured",
+      message: "Prospective forecasts and outcomes are withheld from the public application pending source-rights review. The registry remains private.",
     })));
 
     renderPage();
 
-    expect(await screen.findByRole("heading", { name: "Live results aren't connected here" })).toBeInTheDocument();
-    expect(screen.getByText(/No made-up or back-dated rows/)).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Prospective records are withheld" })).toBeInTheDocument();
+    expect(screen.getByText(/withheld from public access while source-rights review remains open/)).toBeInTheDocument();
+    expect(screen.getByText(/No registry rows or performance figures are returned/)).toBeInTheDocument();
     expect(screen.queryByText("Forecasts recorded")).not.toBeInTheDocument();
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(1);
   });
 
   it("shows each forecast's place within its own run", async () => {
@@ -68,7 +71,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 2, forecast_count: 2,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 2, forecast_count: 2,
         matured_count: 0, pending_count: 2, latest_successful_run_at: "2026-09-19T12:10:00Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -103,7 +106,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
         matured_count: 120, pending_count: 80, latest_successful_run_at: "2026-12-01T12:10:00Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-12-01T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -134,7 +137,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 73, forecast_count: 48,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 73, forecast_count: 48,
         matured_count: 24, pending_count: 24, latest_successful_run_at: "2026-09-22T12:45:05Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
@@ -161,7 +164,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 80, forecast_count: 200,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 80, forecast_count: 200,
         matured_count: 120, pending_count: 80, health_status: "ok",
         latest_quality_warnings: 0, latest_quality_failures: 0, message: "available",
       });
@@ -188,7 +191,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 60, forecast_count: 200,
         matured_count: 120, pending_count: 80, latest_successful_run_at: "2026-12-01T12:10:00Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-12-01T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -217,6 +220,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
+        public_visibility: "available",
         configured: true,
         available: true,
         model_count: 1,
@@ -309,7 +313,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 3,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 3,
         matured_count: 1, pending_count: 2, latest_successful_run_at: "2026-09-19T12:10:00Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -362,7 +366,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 4, forecast_count: 0,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 4, forecast_count: 0,
         matured_count: 0, pending_count: 0, latest_successful_run_at: "2026-09-23T13:17:40Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-09-23T13:17:40Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -410,7 +414,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 90, forecast_count: 400,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 90, forecast_count: 400,
         matured_count: 300, pending_count: 100, latest_successful_run_at: "2026-09-19T12:10:00Z",
         health_status: "ok", health_message: "Forward runner is healthy and within its freshness window.",
         latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "succeeded", latest_failed_run_at: null,
@@ -446,7 +450,7 @@ describe("Forward Lab", () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.includes("/status")) return jsonResponse({
-        configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 0,
+        public_visibility: "available", configured: true, available: true, model_count: 1, run_count: 3, forecast_count: 0,
         matured_count: 0, pending_count: 0, latest_successful_run_at: "2026-09-19T12:10:00Z",
         health_status: "warning", health_message: message,
         latest_run_at: "2026-09-19T12:10:00Z", latest_run_status: "failed", latest_failed_run_at: "2026-09-19T12:10:00Z",

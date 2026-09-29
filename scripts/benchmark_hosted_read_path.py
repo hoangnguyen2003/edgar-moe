@@ -1,8 +1,10 @@
-"""Observe a small, sequential sample of the public read-only API.
+"""Observe the synthetic public API and its prospective-data publication hold.
 
 This is an operator-initiated latency/error observation, not a load test,
 throughput estimate, cache-control experiment, or production SLO. It never
-sends credentials or records response bodies.
+sends credentials or records response bodies. While source-rights review is
+pending, prospective-data routes are expected to return a fixed HTTP 410 with
+``Cache-Control: no-store``; that policy response is not treated as an outage.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import time
 from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit, urlunsplit
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -29,6 +31,10 @@ LEGACY_ROUTES = {
 }
 ROUTES = {**LEGACY_ROUTES, "forward_performance": "/api/v1/forward/performance"}
 _MAX_BODY_BYTES = 1024 * 1024
+_FORWARD_REVIEW_DETAIL = (
+    "Prospective forecasts and outcomes are withheld from the public application "
+    "pending source-rights review. The registry remains private."
+)
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 _FAILED_QUALITY_MESSAGE = re.compile(
     r"^The latest cycle has ([1-9][0-9]{0,8}) failed quality gate\(s\)\.$"
@@ -45,6 +51,7 @@ HEALTH_REASONS = {
     "outside_freshness_window",
     "quality_warnings",
     "unclassified",
+    "publication_withheld_review",
 }
 _ORIGIN_TIMING = re.compile(
     r"app_header_ms=([0-9]+(?:\.[0-9]{1,3})?);worker=(first|subsequent)"
@@ -86,6 +93,8 @@ def _percentile(values: list[float], fraction: float) -> float:
 
 def _health_reason(message: Any) -> str:
     """Map the API's fixed health messages to bounded codes; never retain text."""
+    if message == _FORWARD_REVIEW_DETAIL:
+        return "publication_withheld_review"
     fixed_messages = {
         "Forward runner is healthy and within its freshness window.": "healthy",
         "No successful forward run has been recorded.": "no_successful_run",
@@ -148,12 +157,41 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
             cache = response.headers.get("X-Vercel-Cache", "missing").upper()
             origin_header = response.headers.get("X-EDGAR-Read-Timing")
     except HTTPError as error:
-        error.close()
-        return {
+        latency = round((time.perf_counter() - started) * 1000, 3)
+        error_observation: dict[str, Any] = {
             "result": "http_error",
             "http_status": int(error.code),
-            "latency_ms": round((time.perf_counter() - started) * 1000, 3),
+            "latency_ms": latency,
         }
+        if route in {"forecasts_page", "forward_performance"} and error.code == 410:
+            headers: Any = error.headers or {}
+            content_type = headers.get("Content-Type", "").split(";", 1)[0].lower()
+            cache_directives = {
+                item.strip().lower().split("=", 1)[0]
+                for item in headers.get("Cache-Control", "").split(",")
+                if item.strip()
+            }
+            cache = headers.get("X-Vercel-Cache", "missing").upper()
+            try:
+                body = error.read(_MAX_BODY_BYTES + 1)
+                payload = json.loads(body) if len(body) <= _MAX_BODY_BYTES else None
+            except (OSError, ValueError, UnicodeDecodeError):
+                payload = None
+            error_observation["edge_cache"] = (
+                cache if cache in {"HIT", "MISS", "STALE", "BYPASS"} else "other"
+            )
+            if (
+                content_type == "application/json"
+                and isinstance(payload, dict)
+                and payload.get("detail") == _FORWARD_REVIEW_DETAIL
+                and "no-store" in cache_directives
+            ):
+                error_observation["result"] = "expected_withheld"
+                error_observation["public_visibility"] = "withheld_review"
+            else:
+                error_observation["result"] = "contract_error"
+        error.close()
+        return error_observation
     except (OSError, URLError, TimeoutError) as error:
         return {
             "result": "transport_error",
@@ -167,10 +205,15 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
         "edge_cache": cache if cache in {"HIT", "MISS", "STALE", "BYPASS"} else "other",
     }
     observation.update(_origin_timing(origin_header, observation["edge_cache"]))
-    if status != 200 or content_type != "application/json" or len(body) > _MAX_BODY_BYTES:
+    if (
+        status != 200
+        or content_type != "application/json"
+        or len(body) > _MAX_BODY_BYTES
+        or route in {"forecasts_page", "forward_performance"}
+    ):
         observation["result"] = "contract_error"
         return observation
-    if route in {"health", "forward_status", "forward_performance"}:
+    if route in {"health", "forward_status"}:
         try:
             payload = json.loads(body)
         except (ValueError, UnicodeDecodeError):
@@ -190,41 +233,17 @@ def _probe(opener: Any, url: str, *, timeout_seconds: float, route: str) -> dict
             if payload.get("status") != "ok" or payload.get("snapshot_loaded") is not True:
                 observation["result"] = "semantic_degraded"
         elif route == "forward_status":
-            observation["semantic_status"] = (
-                payload.get("health_status")
-                if payload.get("health_status") in ("ok", "warning", "degraded")
-                else "unexpected"
+            expected_policy = (
+                set(payload) == {"public_visibility", "message"}
+                and payload.get("public_visibility") == "withheld_review"
+                and payload.get("message") == _FORWARD_REVIEW_DETAIL
             )
-            observation["registry_available"] = (
-                payload.get("available")
-                if isinstance(payload.get("available"), bool)
-                else "unexpected"
+            observation["public_visibility"] = (
+                "withheld_review" if expected_policy else "unexpected"
             )
-            # The API message is deliberately reduced to a fixed category. It
-            # lets a degraded health sample be diagnosed without retaining
-            # free-form response text or registry details.
-            observation["health_reason"] = _health_reason(payload.get("health_message"))
-            if payload.get("health_status") not in ("ok", "warning", "degraded"):
-                observation["result"] = "contract_error"
-            elif payload.get("available") is not True or payload.get("health_status") == "degraded":
-                observation["result"] = "semantic_degraded"
-        else:
-            counts = [
-                payload.get(field) for field in ("forecast_count", "matured_count", "pending_count")
-            ]
-            coverage = payload.get("coverage")
-            if (
-                any(
-                    isinstance(value, bool)
-                    or not isinstance(value, int)
-                    or not 0 <= value <= 1_000_000_000
-                    for value in counts
-                )
-                or isinstance(coverage, bool)
-                or not isinstance(coverage, (int, float))
-                or not math.isfinite(coverage)
-                or not 0 <= coverage <= 1
-            ) or cast(int, counts[1]) + cast(int, counts[2]) != cast(int, counts[0]):
+            observation["semantic_status"] = "withheld_review" if expected_policy else "unexpected"
+            observation["health_reason"] = _health_reason(payload.get("message"))
+            if not expected_policy:
                 observation["result"] = "contract_error"
     return observation
 
@@ -373,12 +392,12 @@ def measure(
                 )
             )
         if name == "forward_status":
-            results[name]["registry_available_counts"] = dict(
+            results[name]["public_visibility_counts"] = dict(
                 sorted(
                     Counter(
-                        str(item["registry_available"])
+                        str(item["public_visibility"])
                         for item in items
-                        if "registry_available" in item
+                        if "public_visibility" in item
                     ).items()
                 )
             )
@@ -389,12 +408,17 @@ def measure(
                     ).items()
                 )
             )
-    healthy = all(result == "ok" for result in warmup.values()) and all(
-        item["result_counts"] == {"ok": samples_per_route} for item in results.values()
+    expected_results = {
+        route: "expected_withheld" if route in {"forecasts_page", "forward_performance"} else "ok"
+        for route in ROUTES
+    }
+    healthy = all(warmup[route] == expected_results[route] for route in ROUTES) and all(
+        item["result_counts"] == {expected_results[route]: samples_per_route}
+        for route, item in results.items()
     )
     warning = results["forward_status"]["semantic_status_counts"].get("warning", 0) > 0
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "scope": "hosted_public_api_sequential_read_only_observation",
         "status": "degraded" if not healthy else "warning" if warning else "observed",
         "captured_at": datetime.now(UTC).isoformat(),
@@ -416,10 +440,10 @@ def measure(
         "limitations": [
             "Client-observed latency includes network, edge, serverless, and origin effects; no layer is isolated.",
             "A short sequential sample does not establish concurrency capacity, a seven-day baseline, or an SLO.",
-            "Only successful 200 JSON responses enter latency percentiles; all failures are counted separately.",
+            "Only successful 200 JSON responses enter latency percentiles; expected 410 policy responses and all failures are counted separately.",
             "Samples retain bounded timing, HTTP/cache and semantic categories, and serving commit only; no provider payload, credentials, or response bodies are retained.",
             "Origin timing is used only on edge MISS/BYPASS; cached responses can replay old timing headers.",
-            "The first app-process request marker is not proof of a platform cold start. Registry-read time includes connection, SQL, and Python work; it cannot isolate idle database resume.",
+            "The public API does not connect to or reveal the private forward registry.",
         ],
     }
 

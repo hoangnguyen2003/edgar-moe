@@ -110,7 +110,9 @@ describe("Filing explorer", () => {
     expect(await screen.findByRole("heading", { name: "American Airlines Q3" })).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Search by ticker or company")).toHaveValue("AAL");
     expect(screen.getByRole("button", { name: /American Airlines Q3/ })).toHaveAttribute("aria-pressed", "true");
-    const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
+    const requested = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input), "https://terminal.example"))
+      .filter((url) => url.pathname.endsWith("/api/v1/events"));
     expect(requested.every((url) => url.searchParams.get("q") === "AAL")).toBe(true);
   });
 
@@ -148,7 +150,9 @@ describe("Filing explorer", () => {
 
     expect(await screen.findByRole("heading", { name: "American Airlines" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: /Signal/ })).toHaveValue("short");
-    const requested = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example"));
+    const requested = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input), "https://terminal.example"))
+      .filter((url) => url.pathname.endsWith("/api/v1/events"));
     expect(requested.every((url) => url.searchParams.get("direction") === "short")).toBe(true);
 
     unmount();
@@ -167,7 +171,10 @@ describe("Filing explorer", () => {
     renderPage();
 
     expect(await screen.findByText("NVDA")).toBeInTheDocument();
-    const limits = fetchMock.mock.calls.map(([input]) => new URL(String(input), "https://terminal.example").searchParams.get("limit"));
+    const limits = fetchMock.mock.calls
+      .map(([input]) => new URL(String(input), "https://terminal.example"))
+      .filter((url) => url.pathname.endsWith("/api/v1/events"))
+      .map((url) => url.searchParams.get("limit"));
     expect(limits).toEqual(["25"]);
   });
 

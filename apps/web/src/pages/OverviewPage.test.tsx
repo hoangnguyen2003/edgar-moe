@@ -5,20 +5,18 @@ import { RouterProvider } from "../lib/router";
 import { OverviewPage } from "./OverviewPage";
 
 const summary = {
-  metadata: { as_of: "2026-07-31", data_mode: "authenticated_locked_test",
-    selection_hash: "0bce6d674607af4e6f8e0930332923d1ab8f9c5409c63634c678ad4b67f1f906",
-    locked_test_hash: "9caf4c4dfd12ec8d1981342cd190195e2c45db0b2f1ea751c3b0bcedf3e62987" },
-  summary: { events: 5961, issuers: 421, development_events: 1647, validation_events: 2305, test_events: 1794 },
-  predictive_metrics: { locked_test: { rank_ic: 0.03162415620680004 } },
+  metadata: { as_of: "2026-07-31", data_mode: "synthetic_fixture", selection_hash: null, locked_test_hash: null },
+  summary: { events: 24, issuers: 6, development_events: 8, validation_events: 8, test_events: 8 },
+  predictive_metrics: { locked_test: { rank_ic: 0.0127 } },
   portfolio_scenarios: [{
-    cost_bps: 10, annualized_return: -0.0328, sharpe: -0.63, sharpe_ci_low: -2.3132, sharpe_ci_high: 0.945, maximum_drawdown: -0.1205,
+    cost_bps: 10, annualized_return: 0.004, sharpe: 0.08, sharpe_ci_low: -0.4, sharpe_ci_high: 0.5, maximum_drawdown: -0.052,
   }],
 };
 
 const signals = [
-  { event_id: "e-MU", ticker: "MU", direction: "long", score: 0.0038, rank: 0.995, realized_abnormal_return: -0.192, expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 } },
-  { event_id: "e-CSCO", ticker: "CSCO", direction: "long", score: 0.0009, rank: 0.93, realized_abnormal_return: 0.0075, expert_weights: { text: 0.06, fundamental: 0.9, market: 0.04 } },
-  { event_id: "e-TTWO", ticker: "TTWO", direction: "short", score: -0.0067, rank: 0.03, realized_abnormal_return: -0.011, expert_weights: { text: 0.08, fundamental: 0.85, market: 0.07 } },
+  { event_id: "demo-event-a", ticker: "EXA", direction: "long", score: 0.0038, rank: 0.995, realized_abnormal_return: -0.012, expert_weights: { text: 0.1, fundamental: 0.8, market: 0.1 } },
+  { event_id: "demo-event-b", ticker: "EXB", direction: "long", score: 0.0009, rank: 0.93, realized_abnormal_return: 0.0075, expert_weights: { text: 0.06, fundamental: 0.9, market: 0.04 } },
+  { event_id: "demo-event-c", ticker: "EXC", direction: "short", score: -0.0067, rank: 0.03, realized_abnormal_return: -0.011, expert_weights: { text: 0.08, fundamental: 0.85, market: 0.07 } },
 ];
 
 function jsonResponse(payload: unknown) {
@@ -28,7 +26,7 @@ function jsonResponse(payload: unknown) {
 describe("Overview", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("answers the research question in plain words before the detail", async () => {
+  it("labels the public figures as synthetic software examples", async () => {
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const path = new URL(String(input), "https://terminal.example").pathname;
       return jsonResponse(path === "/api/v1/latest-signals" ? signals : summary);
@@ -37,33 +35,24 @@ describe("Overview", () => {
     render(<QueryClientProvider client={client}><RouterProvider><OverviewPage /></RouterProvider></QueryClientProvider>);
 
     const answer = await screen.findByRole("region", { name: "Short answer" });
-    expect(answer).toHaveTextContent("Not convincingly, and not profitably.");
-    expect(answer).toHaveTextContent("ranking skill was 0.032, too small to tell from luck: its 95% interval includes zero");
-    expect(answer).toHaveTextContent("lost 3.3% a year after trading costs");
+    expect(answer).toHaveTextContent("Software demo only—not evidence of investment skill.");
+    expect(answer).toHaveTextContent("generated synthetic data");
+    expect(answer).toHaveTextContent("Nothing here is observed market performance.");
     // The answer wears the highlighter every page uses for its answer, not a box of its own.
-    expect(within(answer).getByText("Not convincingly, and not profitably.").tagName).toBe("MARK");
-    // Both headline uncertainties are drawn as well as stated.
-    expect(await screen.findByText(/After 0\.10% trading costs; 95% interval −2\.31 to 0\.94 includes zero/)).toBeInTheDocument();
-    expect(document.querySelectorAll(".figures .interval-glyph")).toHaveLength(2);
-    expect(screen.getByText(/In the marks, the bar is the 95% interval, the dot the estimate, and the tick zero\./)).toBeInTheDocument();
-    expect(await screen.findByText(/95% two-month calendar-block interval −0\.011 to 0\.070; includes zero/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Read the dated method and caveats" })).toHaveAttribute(
-      "href", "https://github.com/hoangnguyen2003/edgar-moe/blob/main/reports/locked_rank_ic_interval_2026-09-23.md",
-    );
+    expect(within(answer).getByText("Software demo only—not evidence of investment skill.").tagName).toBe("MARK");
+    expect([...document.querySelectorAll(".figure__label")].some((label) => label.textContent?.includes("Synthetic rank metric"))).toBe(true);
+    expect(screen.queryByRole("link", { name: "Read the dated method and caveats" })).not.toBeInTheDocument();
     expect(await screen.findByText(/it leaned most on financial statements \(85%\)/)).toBeInTheDocument();
 
     // It ends on cases, not a list of pages the navigation already gives.
     expect(screen.queryByRole("navigation", { name: "Explore the project" })).not.toBeInTheDocument();
-    const calls = screen.getByRole("region", { name: "Where the study's last calls landed" });
-    expect(calls).toHaveTextContent("Of its last 3 calls, 2 went as called: 1 of 2 longs and the short.");
-    expect(calls).toHaveTextContent("Its most confident long, MU (top 1% of scores), fell 19.2% behind the market.");
-    expect(within(calls).getByRole("link", { name: "All twelve, with what the model relied on" })).toHaveAttribute("href", "/signals");
+    expect(screen.queryByRole("region", { name: "Where the study's last calls landed" })).not.toBeInTheDocument();
   });
 
-  it("does not attach the frozen interval to a different snapshot identity", async () => {
+  it("does not imply real skill for synthetic metrics", async () => {
     const other = {
       ...summary,
-      metadata: { ...summary.metadata, locked_test_hash: "different" },
+      metadata: { ...summary.metadata, locked_test_hash: null },
     };
     vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
       const path = new URL(String(input), "https://terminal.example").pathname;
@@ -72,7 +61,7 @@ describe("Overview", () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(<QueryClientProvider client={client}><RouterProvider><OverviewPage /></RouterProvider></QueryClientProvider>);
 
-    expect(await screen.findByText("Rank IC on the final test; 0 is random")).toBeInTheDocument();
+    expect(await screen.findByText("Synthetic fixture only; no market inference")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Read the dated method and caveats" })).not.toBeInTheDocument();
   });
 });

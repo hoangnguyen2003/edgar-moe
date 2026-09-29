@@ -11,7 +11,6 @@ import type {
   ForwardStatusResponse,
   GovernanceResponse,
   MethodologyResponse,
-  ResearchEvidenceResponse,
   SummaryResponse,
 } from "./types";
 
@@ -44,7 +43,6 @@ async function request<T>(path: string): Promise<T> {
 export const api = {
   summary: () => request<SummaryResponse>("/api/v1/summary"),
   experiments: () => request<ExperimentRecord[]>("/api/v1/experiments"),
-  researchEvidence: () => request<ResearchEvidenceResponse>("/api/v1/research-evidence"),
   equityCurve: (costBps: number) =>
     request<EquityCurveResponse>(`/api/v1/equity-curves?cost_bps=${costBps}`),
   events: (params: URLSearchParams) => request<EventPage>(`/api/v1/events?${params}`),

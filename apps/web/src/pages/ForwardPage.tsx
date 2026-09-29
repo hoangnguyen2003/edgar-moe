@@ -11,7 +11,7 @@ import { ErrorState, IDLE_DATABASE_HINT, LoadingState } from "../components/Quer
 import { api } from "../lib/api";
 import { forwardForecastsQuery, forwardPerformanceQuery, forwardQualityQuery, forwardRunsQuery, forwardStatusQuery } from "../lib/queries";
 import { checkName, checkReading, compact, dateTime, decimal, marketDay, percent, runPosition, signedDecimal, signedPercent } from "../lib/format";
-import type { ForwardQualityRecord, ForwardStatusResponse } from "../lib/types";
+import type { ForwardQualityRecord, ForwardRegistryStatusResponse } from "../lib/types";
 
 /**
  * Below this many settled outcomes the live figures are reported as a running
@@ -49,7 +49,8 @@ function latestChecks(checks: ForwardQualityRecord[]): ForwardQualityRecord[] {
 
 export function ForwardPage() {
   const status = useQuery(forwardStatusQuery);
-  const enabled = Boolean(status.data?.available);
+  const enabled =
+    status.data?.public_visibility === "available" && status.data.available;
   const performance = useQuery({ ...forwardPerformanceQuery, enabled });
   const runs = useQuery({ ...forwardRunsQuery, enabled });
   const forecasts = useQuery({ ...forwardForecastsQuery, enabled });
@@ -58,13 +59,16 @@ export function ForwardPage() {
   const quality = useQuery({ ...forwardQualityQuery, enabled });
 
   if (status.isLoading) {
-    return <div className="page"><ForwardHeader answer={null} early /><LoadingState label="Checking the live forecast records" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
+    return <div className="page"><ForwardHeader answer={null} early /><LoadingState label="Confirming public access policy" skeleton={["figures", "rows"]} /></div>;
   }
   if (status.error) {
     return <div className="page"><ForwardHeader /><ErrorState error={status.error} onRetry={() => void status.refetch()} /></div>;
   }
-  if (!status.data?.available) {
-    return <UnconfiguredForwardLab configured={Boolean(status.data?.configured)} />;
+  if (status.data?.public_visibility !== "available") {
+    return <WithheldForwardLab confirmed={status.data?.public_visibility === "withheld_review"} />;
+  }
+  if (!status.data.available) {
+    return <UnconfiguredForwardLab configured={Boolean(status.data.configured)} />;
   }
   if (performance.isLoading || runs.isLoading || forecasts.isLoading || quality.isLoading) {
     return <div className="page"><ForwardHeader answer={null} early /><LoadingState label="Loading live forecasts" slowHint={IDLE_DATABASE_HINT} skeleton={["figures", "rows"]} /></div>;
@@ -280,7 +284,7 @@ function Protocol() {
   );
 }
 
-function ForwardHeader({ status, answer, early = false }: { status?: ForwardStatusResponse; answer?: ReactNode; early?: boolean }) {
+function ForwardHeader({ status, answer, early = false }: { status?: ForwardRegistryStatusResponse; answer?: ReactNode; early?: boolean }) {
   return (
     <PageHeader
       title="Live tracking"
@@ -308,6 +312,29 @@ function UnconfiguredForwardLab({ configured }: { configured: boolean }) {
             : "This copy of the site has no connection to the forecast database, so it can't show live results yet."}
         </p>
         <div className="forward-empty__note"><LockKeyhole size={15} aria-hidden="true" /> No made-up or back-dated rows are ever shown as live forecasts.</div>
+      </section>
+    </div>
+  );
+}
+
+function WithheldForwardLab({ confirmed }: { confirmed: boolean }) {
+  return (
+    <div className="page">
+      <PageHeader
+        title="Prospective testing"
+        answer="Private forecasts are not displayed in the public demo."
+        placeholder="Prospective evidence is withheld pending source-rights review."
+      >
+        The private runner and append-only registry are separate from this synthetic public application.
+      </PageHeader>
+      <section className="forward-empty panel">
+        <h2>Prospective records are withheld</h2>
+        <p>
+          {confirmed
+            ? "Forecasts, outcomes, and performance metrics are withheld from public access while source-rights review remains open."
+            : "This API release has not confirmed that prospective evidence may be shown publicly, so the page fails closed."}
+        </p>
+        <div className="forward-empty__note"><LockKeyhole size={15} aria-hidden="true" /> No registry rows or performance figures are returned by this public page.</div>
       </section>
     </div>
   );

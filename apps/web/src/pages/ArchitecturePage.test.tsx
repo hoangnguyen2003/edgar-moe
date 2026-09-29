@@ -5,24 +5,24 @@ import { RouterProvider } from "../lib/router";
 import { ArchitecturePage } from "./ArchitecturePage";
 
 const governance = {
-  schema_version: 1,
-  frozen_v1: {
+  schema_version: 2,
+  published_snapshot: {
     path: "data/demo/snapshot.json",
-    sha256: "06aa652c638d12400f5e8210778b0d0842dab3c70cfbd59bbb84a67879dab7a5",
-    data_mode: "authenticated_locked_test",
+    sha256: "a".repeat(64),
+    data_mode: "synthetic_fixture",
     as_of: "2026-07-31",
-    selection_hash: "b".repeat(64),
-    locked_test_hash: "c".repeat(64),
+    selection_hash: null,
+    locked_test_hash: null,
     research_only: true,
   },
-  public_data: { raw_sources_public: false, derived_output_public: true, redistribution_status: "operator_review_required" },
+  public_data: { raw_sources_public: false, current_output_mode: "synthetic_fixture", historical_v1_served_by_application: false, prospective_outputs_served_by_application: false, redistribution_status: "historical_v1_review_required" },
   controls: [
-    { key: "frozen_v1_identity", status: "enforced", owner: "repository", summary: "" },
+    { key: "published_snapshot_identity", status: "enforced", owner: "repository", summary: "" },
     { key: "pre_entry_forecasts", status: "enforced", owner: "repository", summary: "" },
     { key: "append_only_outcomes", status: "enforced", owner: "repository", summary: "" },
     { key: "provider_operations", status: "pending_operator_evidence", owner: "operator", summary: "" },
   ],
-  forward_status: { configured: false, available: false },
+  forward_status: { public_visibility: "withheld_review", message: "Prospective forecasts and outcomes are withheld from the public application pending source-rights review. The registry remains private." },
 };
 
 function renderPage(response: () => Promise<Response>) {
@@ -39,7 +39,7 @@ describe("Architecture page", () => {
 
     const lanes = screen.getByRole("region", { name: "How the system fits together" });
     const titles = within(lanes).getAllByRole("heading", { level: 2 }).map((heading) => heading.textContent);
-    expect(titles).toEqual(["Research study", "Public site", "Live tracking", "Evidence copilot", "Delivery and checks"]);
+    expect(titles).toEqual(["Historical research study", "Public site", "Live tracking", "Evidence copilot", "Delivery and checks"]);
     const copilot = screen.getByRole("region", { name: "Evidence copilot" });
     expect(within(copilot).getByText(/read-only evidence tools/i)).toBeInTheDocument();
     expect(within(copilot).getByText(/Human review/i)).toBeInTheDocument();
@@ -76,9 +76,9 @@ describe("Architecture page", () => {
     })));
 
     expect(await screen.findByText(/3 of 4 safeguards are enforced in code; the remaining one needs operator evidence\./)).toBeInTheDocument();
-    const fingerprint = screen.getByText("06aa652c638d1240…");
-    expect(fingerprint).toHaveAttribute("title", governance.frozen_v1.sha256);
+    const fingerprint = screen.getByText("aaaaaaaaaaaaaaaa…");
+    expect(fingerprint).toHaveAttribute("title", governance.published_snapshot.sha256);
     // The shortened fingerprint sits mid-sentence, so its ellipsis never meets a full stop.
-    expect(fingerprint.parentElement).toHaveTextContent("The live snapshot fingerprint, 06aa652c638d1240…, must match the lock in the repository.");
+    expect(fingerprint.parentElement).toHaveTextContent("The live snapshot fingerprint, aaaaaaaaaaaaaaaa…, must match the lock in the repository.");
   });
 });

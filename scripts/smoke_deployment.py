@@ -38,9 +38,13 @@ _REQUIRED_SECURITY_HEADERS = {
 _MINIMUM_HSTS_MAX_AGE_SECONDS = 31_536_000
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _COMMIT_SHA = re.compile(r"^[0-9a-f]{40}$")
-# The frozen identity a deployment publishes twice (governance API and provenance
-# manifest) and the repository pins in config/public_snapshot.lock.json.
+# The published synthetic identity exposed by governance and provenance, and
+# pinned in config/public_snapshot.lock.json.
 _IDENTITY_FIELDS = ("path", "data_mode", "as_of", "sha256", "selection_hash", "locked_test_hash")
+_PUBLIC_FORWARD_WITHHELD_DETAIL = (
+    "Prospective forecasts and outcomes are withheld from the public application "
+    "pending source-rights review. The registry remains private."
+)
 _FORWARD_INTERVAL_STATUSES = frozenset(
     {
         "ready",
@@ -52,8 +56,6 @@ _FORWARD_INTERVAL_STATUSES = frozenset(
     }
 )
 _FORWARD_INTERVAL_METHOD = "calendar_month_moving_block"
-# Independently pin the reviewed serving contract from forward/uncertainty.py.
-# A research-method change must update this release gate in the same reviewed PR.
 _FORWARD_INTERVAL_BLOCK_MONTHS = 2
 _FORWARD_INTERVAL_BOOTSTRAP_SAMPLES = 1000
 _FORWARD_INTERVAL_MINIMUM_PAIRS = 100
@@ -197,16 +199,22 @@ def run_smoke(
             base,
             origin,
             "/api/v1/forward/performance",
-            "forward_performance",
+            "forward_evidence_withheld",
             "application/json",
             timeout,
-            accepted_statuses=frozenset({200, 503}),
+            accepted_statuses=frozenset({410}),
+        ),
+        _check_endpoint(
+            base,
+            origin,
+            "/api/v1/forward/status",
+            "forward_visibility",
+            "application/json",
+            timeout,
         ),
         _check_endpoint(base, origin, "/api/v1/health", "health", "application/json", timeout),
     ]
 
-    forward_registry_configured: bool | None = None
-    forward_registry_available: bool | None = None
     for check in checks:
         if check["name"] == "robots":
             body = check.pop("_body", "")
@@ -252,47 +260,49 @@ def run_smoke(
         elif check["name"] == "governance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
-                frozen = payload.get("frozen_v1") if isinstance(payload, dict) else None
+                published = payload.get("published_snapshot") if isinstance(payload, dict) else None
                 public_data = payload.get("public_data") if isinstance(payload, dict) else None
                 controls = payload.get("controls") if isinstance(payload, dict) else None
                 forward_status = (
                     payload.get("forward_status") if isinstance(payload, dict) else None
                 )
-                frozen_valid = isinstance(frozen, dict) and all(
+                published_valid = isinstance(published, dict) and all(
                     (
-                        frozen.get("path") == "data/demo/snapshot.json",
-                        frozen.get("data_mode") == "authenticated_locked_test",
-                        frozen.get("research_only") is True,
-                        _SHA256.fullmatch(str(frozen.get("sha256", ""))) is not None,
-                        _SHA256.fullmatch(str(frozen.get("selection_hash", ""))) is not None,
-                        _SHA256.fullmatch(str(frozen.get("locked_test_hash", ""))) is not None,
+                        published.get("path") == "data/demo/snapshot.json",
+                        published.get("data_mode") == "synthetic_fixture",
+                        published.get("research_only") is True,
+                        _SHA256.fullmatch(str(published.get("sha256", ""))) is not None,
+                        published.get("selection_hash") is None,
+                        published.get("locked_test_hash") is None,
                     )
                 )
                 boundary_valid = isinstance(public_data, dict) and (
                     public_data.get("raw_sources_public") is False
-                    and public_data.get("derived_output_public") is True
-                    and public_data.get("redistribution_status") == "operator_review_required"
+                    and public_data.get("current_output_mode") == "synthetic_fixture"
+                    and public_data.get("historical_v1_served_by_application") is False
+                    and public_data.get("prospective_outputs_served_by_application") is False
+                    and public_data.get("redistribution_status") == "historical_v1_review_required"
                 )
                 controls_valid = (
                     isinstance(controls, list)
                     and bool(controls)
                     and all(
                         isinstance(control, dict)
-                        and control.get("status") in {"enforced", "pending_operator_evidence"}
+                        and control.get("status")
+                        in {"enforced", "pending_operator_evidence", "withheld_review"}
                         and control.get("owner") in {"repository", "operator"}
                         for control in controls
                     )
                 )
-                forward_valid = isinstance(forward_status, dict) and all(
-                    isinstance(forward_status.get(field), bool)
-                    for field in ("configured", "available")
+                forward_valid = (
+                    isinstance(forward_status, dict)
+                    and set(forward_status) == {"public_visibility", "message"}
+                    and forward_status.get("public_visibility") == "withheld_review"
+                    and forward_status.get("message") == _PUBLIC_FORWARD_WITHHELD_DETAIL
                 )
-                if forward_valid and isinstance(forward_status, dict):
-                    forward_registry_configured = forward_status["configured"]
-                    forward_registry_available = forward_status["available"]
-                if not isinstance(payload, dict) or payload.get("schema_version") != 1:
+                if not isinstance(payload, dict) or payload.get("schema_version") != 2:
                     check.update(status="failed", error="governance_schema_invalid")
-                elif not frozen_valid:
+                elif not published_valid:
                     check.update(status="failed", error="governance_identity_contract_invalid")
                 elif not boundary_valid:
                     check.update(status="failed", error="governance_public_boundary_invalid")
@@ -301,44 +311,32 @@ def run_smoke(
                 elif not forward_valid:
                     check.update(status="failed", error="governance_forward_status_invalid")
                 elif expected_identity is not None:
-                    _verify_identity(check, frozen, expected_identity, "governance")
-        elif check["name"] == "forward_performance":
+                    _verify_identity(check, published, expected_identity, "governance")
+        elif check["name"] == "forward_evidence_withheld":
             payload = check.pop("_json", None)
-            if check["status"] == "passed":
-                if check.get("http_status") == 503:
-                    if (
-                        isinstance(payload, dict)
-                        and payload.get("detail") == "Forward registry unavailable"
-                        and forward_registry_configured is True
-                        and forward_registry_available is False
-                    ):
-                        # A read-path outage is an explicitly supported degraded
-                        # mode: historical results stay available and governance
-                        # reports that live registry data is unavailable.
-                        check["availability"] = "unavailable"
-                        check["degraded_mode"] = "registry_unavailable"
-                    else:
-                        check.update(
-                            status="failed",
-                            error="forward_registry_unavailability_unconfirmed",
-                        )
-                else:
-                    error = _forward_performance_error(payload)
-                    if error is not None:
-                        check.update(status="failed", error=error)
-                    else:
-                        assert isinstance(payload, dict)
-                        method = payload["rank_ic_interval_method"]
-                        status = payload["rank_ic_interval_status"]
-                        check.update(
-                            availability="unconfigured" if method is None else "available",
-                            forecast_count=payload["forecast_count"],
-                            matured_count=payload["matured_count"],
-                            pending_count=payload["pending_count"],
-                            rank_ic_interval_method=method,
-                            rank_ic_interval_status=status,
-                            rank_ic_calendar_months=payload["rank_ic_calendar_months"],
-                        )
+            if (
+                check["status"] != "passed"
+                or check.get("http_status") != 410
+                or "no-store" not in check.get("cache_control", "")
+                or not isinstance(payload, dict)
+                or payload.get("detail") != _PUBLIC_FORWARD_WITHHELD_DETAIL
+            ):
+                check.update(status="failed", error="forward_evidence_not_withheld")
+            else:
+                check["availability"] = "withheld_review"
+        elif check["name"] == "forward_visibility":
+            payload = check.pop("_json", None)
+            if (
+                check["status"] != "passed"
+                or "no-store" not in check.get("cache_control", "")
+                or not isinstance(payload, dict)
+                or set(payload) != {"public_visibility", "message"}
+                or payload.get("public_visibility") != "withheld_review"
+                or payload.get("message") != _PUBLIC_FORWARD_WITHHELD_DETAIL
+            ):
+                check.update(status="failed", error="forward_visibility_contract_invalid")
+            else:
+                check["availability"] = "withheld_review"
         elif check["name"] == "provenance":
             payload = check.pop("_json", None)
             if check["status"] == "passed":
@@ -349,6 +347,9 @@ def run_smoke(
                 elif (
                     snapshot.get("raw_sources_public") is not False
                     or snapshot.get("derived_output_public") is not True
+                    or snapshot.get("data_mode") != "synthetic_fixture"
+                    or snapshot.get("selection_hash") is not None
+                    or snapshot.get("locked_test_hash") is not None
                     or review.get("redistribution_status") != "operator_review_required"
                     or review.get("legal_approval") is not False
                 ):
@@ -372,8 +373,8 @@ def run_smoke(
     return report
 
 
-def load_expected_identity(path: Path) -> dict[str, str]:
-    """Read the reviewed frozen identity that a deployment must serve."""
+def load_expected_identity(path: Path) -> dict[str, Any]:
+    """Read the reviewed synthetic identity that a deployment must serve."""
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
@@ -381,16 +382,23 @@ def load_expected_identity(path: Path) -> dict[str, str]:
     if not isinstance(payload, dict) or payload.get("schema_version") != 1:
         raise ValueError("expected lock must be a schema_version 1 object")
     identity = {field: payload.get(field) for field in _IDENTITY_FIELDS}
-    if not all(isinstance(value, str) and value for value in identity.values()):
-        raise ValueError("expected lock is missing identity fields")
-    for field in ("sha256", "selection_hash", "locked_test_hash"):
-        if _SHA256.fullmatch(str(identity[field])) is None:
-            raise ValueError(f"expected lock {field} must be a lowercase SHA-256 digest")
-    return {field: str(value) for field, value in identity.items()}
+    as_of = identity.get("as_of")
+    if (
+        identity.get("path") != "data/demo/snapshot.json"
+        or identity.get("data_mode") != "synthetic_fixture"
+        or not isinstance(as_of, str)
+        or not as_of.strip()
+        or identity.get("selection_hash") is not None
+        or identity.get("locked_test_hash") is not None
+    ):
+        raise ValueError("expected lock must identify the synthetic public snapshot")
+    if _SHA256.fullmatch(str(identity.get("sha256", ""))) is None:
+        raise ValueError("expected lock sha256 must be a lowercase SHA-256 digest")
+    return identity
 
 
 def _verify_identity(
-    check: dict[str, Any], served: Any, expected: dict[str, str], source: str
+    check: dict[str, Any], served: Any, expected: dict[str, Any], source: str
 ) -> None:
     """Fail ``check`` unless ``served`` carries exactly the expected frozen identity."""
     mismatched = [
@@ -618,6 +626,8 @@ def _check_endpoint(
                 str(key).lower(): str(value).strip().lower()
                 for key, value in response.headers.items()
             }
+            if name in {"forward_evidence_withheld", "forward_visibility"}:
+                check["cache_control"] = response_headers.get("cache-control", "")
             final_parts = urlsplit(response.geturl())
             final_origin = (final_parts.scheme.lower(), final_parts.netloc.lower())
             media_type = content_type.split(";", 1)[0].strip()
@@ -659,7 +669,13 @@ def _check_endpoint(
                     # arbitrary response header value in the redacted artifact.
                     check["request_id"] = request_id
             decoded = body.decode("utf-8")
-            if name in {"health", "provenance", "governance", "forward_performance"}:
+            if name in {
+                "health",
+                "provenance",
+                "governance",
+                "forward_evidence_withheld",
+                "forward_visibility",
+            }:
                 try:
                     check["_json"] = json.loads(decoded)
                 except json.JSONDecodeError:

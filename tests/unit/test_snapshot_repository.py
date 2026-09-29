@@ -19,10 +19,10 @@ def _write_locked_repository(root: Path) -> tuple[Path, Path]:
     snapshot_path.parent.mkdir(parents=True)
     snapshot = {
         "metadata": {
-            "data_mode": "authenticated_locked_test",
+            "data_mode": "synthetic_fixture",
             "as_of": "2026-07-31",
-            "selection_hash": "a" * 64,
-            "locked_test_hash": "b" * 64,
+            "selection_hash": None,
+            "locked_test_hash": None,
             "research_only": True,
         },
         "summary": {},
@@ -46,10 +46,10 @@ def _write_locked_repository(root: Path) -> tuple[Path, Path]:
                 "schema_version": 1,
                 "path": "data/demo/snapshot.json",
                 "sha256": hashlib.sha256(raw).hexdigest(),
-                "data_mode": "authenticated_locked_test",
+                "data_mode": "synthetic_fixture",
                 "as_of": "2026-07-31",
-                "selection_hash": "a" * 64,
-                "locked_test_hash": "b" * 64,
+                "selection_hash": None,
+                "locked_test_hash": None,
             },
             sort_keys=True,
         )
@@ -82,7 +82,7 @@ def test_locked_repository_verifies_snapshot_and_identity(tmp_path: Path) -> Non
 
     assert repository.load()["metadata"]["as_of"] == "2026-07-31"
     assert (
-        repository.frozen_identity()["sha256"]
+        repository.published_identity()["sha256"]
         == hashlib.sha256(snapshot_path.read_bytes()).hexdigest()
     )
 
@@ -148,7 +148,7 @@ def test_a_missing_lock_is_reported_as_unavailable(tmp_path: Path) -> None:
         ({"sha256": "A" * 64}, "bytes do not match"),
         ({"sha256": "z" * 64}, "bytes do not match"),
         ({"sha256": "abc"}, "bytes do not match"),
-        ({"data_mode": "synthetic_demo"}, "does not match its lock"),
+        ({"data_mode": "synthetic_demo"}, "must identify a synthetic fixture"),
         ({"as_of": "2026-06-30"}, "does not match its lock"),
         ({"selection_hash": "d" * 64}, "does not match its lock"),
         ({"locked_test_hash": "e" * 64}, "does not match its lock"),
@@ -193,7 +193,7 @@ def test_a_snapshot_that_is_not_research_only_is_refused(tmp_path: Path) -> None
     ("metadata_change", "message"),
     [
         ({"research_only": False}, "must be research-only"),
-        ({"selection_hash": 7}, "identity metadata is incomplete"),
+        ({"selection_hash": "a" * 64}, "frozen-v1 hashes are not applicable"),
         ({"as_of": None}, "identity metadata is incomplete"),
     ],
 )
@@ -210,7 +210,7 @@ def test_the_published_identity_refuses_incomplete_metadata(
     snapshot_path.write_text(json.dumps(snapshot, sort_keys=True) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match=message):
-        SnapshotRepository(snapshot_path).frozen_identity()
+        SnapshotRepository(snapshot_path).published_identity()
 
 
 def test_the_published_identity_refuses_a_snapshot_without_metadata(tmp_path: Path) -> None:
@@ -220,7 +220,7 @@ def test_the_published_identity_refuses_a_snapshot_without_metadata(tmp_path: Pa
     snapshot_path.write_text(json.dumps(snapshot, sort_keys=True) + "\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="metadata must be an object"):
-        SnapshotRepository(snapshot_path).frozen_identity()
+        SnapshotRepository(snapshot_path).published_identity()
 
 
 def _repository_with_events(root: Path) -> SnapshotRepository:

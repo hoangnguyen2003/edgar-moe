@@ -44,6 +44,7 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "!reports/locked_rank_ic_interval_2026-09-23.md",
     "config/*",
     "!config/public_snapshot.lock.json",
+    "!config/withdrawn_v1_identity.json",
     "data/cache",
     "data/forward",
     "*.duckdb.wal",
@@ -52,14 +53,13 @@ REQUIRED_VERCEL_IGNORE_RULES = (
     "migrations",
 )
 REQUIRED_FUNCTION_EXCLUDE_PATHS = (
-    "data/**",
-    "mlruns/**",
+    "{.venv,.github,apps,config,docs,notebooks,reports,scripts,tests,dist,data,mlruns,ops,tools,migrations}/**",
     "**/*.{duckdb,duckdb.wal}",
-    "ops/**",
-    "tools/**",
-    "migrations/**",
+    "**/__pycache__/**",
+    "{.mypy_cache,.pytest_cache,.ruff_cache}/**",
     ".env*",
     ".coverage",
+    "src/edgar_moe/api/research_evidence_catalog.*",
 )
 MAX_FUNCTION_GLOB_LENGTH = 256
 
@@ -111,15 +111,7 @@ def validate_deployment_contract(
             _require_path_tokens(
                 errors,
                 api_function.get("excludeFiles"),
-                (
-                    ".github/**",
-                    "apps/**",
-                    "config/**",
-                    "docs/**",
-                    "scripts/**",
-                    "tests/**",
-                    *REQUIRED_FUNCTION_EXCLUDE_PATHS,
-                ),
+                (*REQUIRED_FUNCTION_EXCLUDE_PATHS,),
                 "functions.api/**/*.py.excludeFiles",
             )
             exclude_files = api_function.get("excludeFiles")

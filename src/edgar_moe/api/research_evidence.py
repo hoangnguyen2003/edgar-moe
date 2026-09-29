@@ -23,7 +23,7 @@ from edgar_moe.api.models import (
     V2PendingEvidence,
     V2ReviewedEvidence,
 )
-from edgar_moe.api.repository import SnapshotRepository
+from edgar_moe.api.repository import SnapshotIntegrityError, SnapshotRepository
 
 CATALOG_PATH = Path(__file__).with_name("research_evidence_catalog.json")
 LOCK_PATH = Path(__file__).with_name("research_evidence_catalog.sha256")
@@ -143,6 +143,8 @@ def build_research_evidence(
     catalog_path: Path = CATALOG_PATH,
     lock_path: Path = LOCK_PATH,
 ) -> ResearchEvidenceResponse:
+    if repo.load().get("metadata", {}).get("data_mode") != "authenticated_locked_test":
+        raise SnapshotIntegrityError("frozen v1 evidence is not in the public snapshot")
     catalog, catalog_sha256 = load_public_catalog(catalog_path, lock_path)
     identity = repo.frozen_identity()
     recorded = catalog.frozen_v1

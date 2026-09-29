@@ -26,7 +26,7 @@ describe("App routing", () => {
   it("takes a page's visible name to that page", async () => {
     renderAt("/backtest");
 
-    expect(await screen.findByRole("heading", { level: 1, name: "Backtest" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Portfolio simulation" })).toBeInTheDocument();
     expect(window.location.pathname).toBe("/portfolio");
   });
 

@@ -148,13 +148,15 @@ def test_the_provenance_manifest_names_every_source_the_bundle_depends_on() -> N
     manifest = json.loads(PROVENANCE.read_text(encoding="utf-8"))
 
     assert {source["id"] for source in manifest["sources"]} == {
-        "sec-edgar",
-        "alpaca-iex",
-        "fred-alfred",
+        "synthetic-fixture-generator",
     }
     for source in manifest["sources"]:
         assert source["terms_url"].startswith("https://")
-        assert source["redistribution_status"] in {"review_required", "approved"}
+        assert source["redistribution_status"] in {
+            "synthetic_only",
+            "review_required",
+            "approved",
+        }
 
 
 def test_the_review_state_is_recorded_rather_than_assumed() -> None:

@@ -16,27 +16,27 @@ type Step = { title: string; detail: string };
 const LANES: Array<{ id: string; title: string; zone: string; summary: string; steps: Step[] }> = [
   {
     id: "research",
-    title: "Research study",
-    zone: "Finished and frozen",
-    summary: "The original result is preserved, including its retrospective candidate-universe limitation.",
+    title: "Historical research study",
+    zone: "Withheld from the app",
+    summary: "The frozen v1 record remains identified, but its source-backed results are not served while source-rights review is unresolved.",
     steps: [
       { title: "Collect data", detail: "SEC filings, financial statements, prices, and macro data; historical candidate membership remains unverified" },
       { title: "Build the dataset", detail: "Feature availability is checked against filing times; the retrospective universe screen is disclosed separately" },
       { title: "Compare 33 models", detail: "Chosen on 2023–2024 data only" },
       { title: "Freeze, then test once", detail: "Fingerprinted first, then scored once on 2025–2026" },
-      { title: "Publish a snapshot", detail: "The results file is pinned by a SHA-256 lock" },
+      { title: "Publish a demo", detail: "The app currently serves a hash-locked synthetic fixture; historical v1 output is withheld" },
     ],
   },
   {
     id: "serving",
     title: "Public site",
     zone: "Public, read-only",
-    summary: "What you are using now. It holds no write credentials and cannot change any evidence.",
+    summary: "What you are using now: a synthetic software fixture and read-only endpoints. It holds no write credentials and cannot change evidence.",
     steps: [
       { title: "Your browser", detail: "Anonymous visitors" },
       { title: "Web app", detail: "Static React files on the Vercel CDN" },
       { title: "API", detail: "Read-only endpoints in one small Vercel function" },
-      { title: "Evidence", detail: "The locked snapshot and, when connected, the live registry through a read-only session" },
+      { title: "Evidence", detail: "Synthetic demo values and, when connected, the live registry through a read-only session" },
     ],
   },
   {
@@ -79,7 +79,7 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
 ];
 
 const ZONES = [
-  { zone: "Public", runs: "Browser, web app, and API", can: "Read the snapshot and registry", holds: "No secrets; at most a read-only database address" },
+  { zone: "Public", runs: "Browser, web app, and API", can: "Read the synthetic demo and registry", holds: "No secrets; at most a read-only database address" },
   { zone: "Private", runs: "Scheduled runner and research pipeline", can: "Add forecasts, results, and evidence", holds: "Database writer, R2, and data-source keys, each scoped to the step that needs it" },
   { zone: "AI copilot", runs: "Operator CLI and an LLM provider", can: "Explain cited evidence and compare controls", holds: "A local provider key; no write credentials and no public endpoint" },
   { zone: "Verification", runs: "CI, CodeQL, post-deploy check, evidence auditor", can: "Check and report", holds: "No secrets, or read-only access" },
@@ -101,12 +101,11 @@ export function ArchitecturePage() {
   const governance = useQuery(governanceQuery);
   const controls = governance.data?.controls;
   const enforced = controls?.filter((control) => control.status === "enforced").length;
-  const sha = governance.data?.frozen_v1.sha256;
+  const sha = governance.data?.published_snapshot.sha256;
   return (
     <div className="page">
-      <PageHeader title="System architecture" answer="The public site can only read, and recorded evidence can only be added to.">
-        Every published number comes from a fingerprinted snapshot, and every live forecast is saved before trading and
-        never edited.
+      <PageHeader title="System architecture" answer="The public site serves synthetic demo data; historical v1 results are not served by the application.">
+        The demo snapshot is fingerprinted, and every live forecast is saved before trading and never edited.
         {controls && enforced != null && ` ${enforced} of ${controls.length} safeguards are enforced in code${
           enforced < controls.length ? `; ${remainingNeed(controls.length - enforced)} operator evidence` : ""
         }.`}
@@ -191,7 +190,7 @@ export function ArchitecturePage() {
         <header>
           <div>
             <h2 id="decisions-title">Key design decisions</h2>
-            <p>Eight of the 33 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
+            <p>Eight of the 34 recorded decisions, each with its reasoning, alternatives, and how it is tested.</p>
           </div>
           <a className="button button--secondary button--small" href={`${REPOSITORY}/blob/main/docs/adr/README.md`}>
             All decisions <ArrowUpRight size={14} aria-hidden="true" />

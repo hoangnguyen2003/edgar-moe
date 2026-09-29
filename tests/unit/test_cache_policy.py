@@ -59,15 +59,21 @@ def test_a_snapshot_read_is_cacheable_by_the_edge(client, route: str) -> None:
     assert policy["max-age"] is not None and policy["max-age"] <= 3_600
 
 
-def test_live_registry_reads_expire_quickly_everywhere(client) -> None:
-    response = client.get("/api/v1/forward/forecasts")
-    if response.status_code != 200:  # pragma: no cover - only when no registry is configured
-        pytest.skip("forward registry is not configured in this environment")
-    policy = directives(response.headers["cache-control"])
+@pytest.mark.parametrize(
+    "route",
+    [
+        "/api/v1/forward/runs",
+        "/api/v1/forward/forecasts",
+        "/api/v1/forward/performance",
+        "/api/v1/forward/data-quality",
+    ],
+)
+def test_prospective_registry_reads_are_withheld_and_never_cached(client, route: str) -> None:
+    response = client.get(route)
 
-    assert policy["max-age"] == 60
-    assert policy["s-maxage"] == 60
-    assert policy["stale-while-revalidate"] == 300
+    assert response.status_code == 410
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["detail"].startswith("Prospective forecasts and outcomes are withheld")
 
 
 def test_operational_state_is_never_cached(client) -> None:
@@ -122,13 +128,6 @@ def test_an_invented_request_id_is_replaced_rather_than_reflected(client) -> Non
     echoed = response.headers["x-request-id"]
     assert echoed != "../../etc/passwd"
     assert echoed.isalnum()
-
-
-def test_the_cache_helpers_cannot_drift_apart() -> None:
-    from edgar_moe.api import app as api
-
-    assert api._EDGE_LIVE_SECONDS < api._EDGE_SNAPSHOT_SECONDS
-    assert api._EDGE_LIVE_STALE_SECONDS < api._EDGE_SNAPSHOT_STALE_SECONDS
 
 
 def _header_rules() -> list[dict[str, object]]:

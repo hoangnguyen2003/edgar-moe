@@ -21,7 +21,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const initialRoute = useRef(true);
-  const asOf = summary.data?.metadata.as_of;
+  const asOf = summary.data?.metadata?.as_of;
+  const syntheticDemo = summary.data?.metadata?.data_mode === "synthetic_fixture";
   const menuOpen = collapsed && open;
 
   // Client-side navigation loads no document, so the title, focus, and a
@@ -119,6 +120,13 @@ export function Layout({ children }: { children: ReactNode }) {
       </header>
       {menuOpen && <button type="button" className="backdrop" aria-label="Close menu" tabIndex={-1} onClick={closeMenu} />}
       <main id="main-content" ref={mainRef} tabIndex={-1} inert={menuOpen} aria-busy={pending || undefined}>
+        {syntheticDemo && (
+          <div className="site-disclosure" role="note">
+            <strong>Synthetic software demo.</strong> Public filing, score, return, and portfolio values are generated
+            fixtures—not observed market evidence. Historical v1 results are withheld from this application pending
+            source-rights review.
+          </div>
+        )}
         {children}
         <NextPage pathname={pathname} />
       </main>
@@ -126,7 +134,8 @@ export function Layout({ children }: { children: ReactNode }) {
         <div className="site-footer__inner">
           <p>
             <strong>EDGAR–MoE</strong> is research software: not investment advice, and it places no orders.
-            {asOf && <> Data through {shortDate(asOf)}.</>}
+            {syntheticDemo && asOf && <> Synthetic fixture date: {shortDate(asOf)}.</>}
+            {!syntheticDemo && asOf && <> Data through {shortDate(asOf)}.</>}
           </p>
           <nav aria-label="Footer">
             <a href="/api/docs">API reference</a>

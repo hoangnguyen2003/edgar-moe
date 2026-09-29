@@ -6,10 +6,9 @@ from fastapi.testclient import TestClient
 import edgar_moe.api.app as app_module
 from edgar_moe.api.app import app, get_repository
 from edgar_moe.api.repository import SnapshotRepository
-from edgar_moe.api.research_evidence import CatalogIntegrityError
 
 
-def test_research_evidence_api_serves_frozen_v1_and_pending_v2() -> None:
+def test_research_evidence_api_is_withheld_for_the_synthetic_public_snapshot() -> None:
     repo = SnapshotRepository(
         "data/demo/snapshot.json", lock_path="config/public_snapshot.lock.json"
     )
@@ -17,37 +16,29 @@ def test_research_evidence_api_serves_frozen_v1_and_pending_v2() -> None:
     try:
         with TestClient(app) as client:
             response = client.get("/api/v1/research-evidence")
-        assert response.status_code == 200
-        assert response.headers["cache-control"].startswith("public")
-        payload = response.json()
-        assert payload["schema_version"] == 1
-        assert payload["frozen_v1"]["locked_rank_ic_interval_95"]["low"] < 0
-        assert payload["frozen_v1"]["portfolio_10bps_sharpe"] < 0
-        assert payload["frozen_v1"]["candidate_universe"]["status"] == (
-            "retrospective_test_period_screen"
-        )
-        assert "future information" in payload["frozen_v1"]["candidate_universe"]["interpretation"]
-        assert payload["duration_aware_v2"] == {
-            "status": "pending_review",
-            "reason": (
-                "No separately reviewed duration-aware v2 aggregate is published; "
-                "historical candidate membership and source rights remain unresolved."
-            ),
+        assert response.status_code == 410
+        assert response.headers["cache-control"] == "no-store"
+        assert response.json() == {
+            "detail": "Frozen v1 research evidence is withheld pending source-rights review."
         }
         assert "private_event_rows" not in response.text
     finally:
         app.dependency_overrides.clear()
 
 
-def test_research_evidence_api_fails_closed_without_leaking_catalog_detail(
+def test_research_evidence_api_withholding_happens_before_catalog_access(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    called = False
+
     def reject(_repo: SnapshotRepository) -> None:
-        raise CatalogIntegrityError("private-path-or-hash")
+        nonlocal called
+        called = True
+        raise AssertionError("the retired public route must not read the v1 catalog")
 
     monkeypatch.setattr(app_module, "build_research_evidence", reject)
     with TestClient(app) as client:
         response = client.get("/api/v1/research-evidence")
-    assert response.status_code == 503
-    assert response.json() == {"detail": "Public research evidence unavailable"}
-    assert "private-path-or-hash" not in response.text
+    assert response.status_code == 410
+    assert called is False
+    assert response.headers["cache-control"] == "no-store"

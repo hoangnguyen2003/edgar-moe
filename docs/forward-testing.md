@@ -1,6 +1,11 @@
 # Forward-testing operations
 
-This guide operates the prospective v2 layer. It does not modify, retrain, or reinterpret the frozen v1 locked study.
+This guide describes private prospective-v2 operations. It does not modify,
+retrain, or reinterpret the frozen v1 locked study. While source-rights review
+is unresolved, prospective outputs are withheld from the public application;
+the website's status endpoint reports publication policy, not registry health.
+This application-level hold is not a rights determination and does not purge
+historical files, Git history, workflow artifacts, or prior deployments.
 
 ## Integrity contract
 
@@ -54,22 +59,24 @@ flowchart LR
   DS --> JOB
   JOB --> PG[(Postgres registry)]
   JOB --> R2[(Cloudflare R2 evidence)]
-  PG --> API[Vercel read-only FastAPI]
-  API --> UI[Live tracking page]
+  AUDITOR[Private read-only auditor] -->|SELECT-only audit| PG
+  SNAP[Hash-locked synthetic fixture] --> API[Vercel FastAPI]
+  API --> UI[Public synthetic demo]
+  UI --> HOLD[Prospective data withheld]
 ```
 
-- Use a Postgres database such as Neon for the registry and require TLS. Keep the
-  writer URL (`EDGAR_MOE_REGISTRY_DATABASE_URL`) only in the private runner and
-  migration environment. Configure a separate SELECT-only reader URL
-  (`EDGAR_MOE_REGISTRY_READ_DATABASE_URL`) in the API host; the API prefers it and
-  falls back to a writer URL only when that URL is local SQLite. A missing reader
-  URL never causes a hosted API to use the Postgres writer credential.
-- Provision the API/auditor role from the trusted migration connection with
+- Use a Postgres database such as Neon for private registry operations and
+  require TLS. Keep the writer URL (`EDGAR_MOE_REGISTRY_DATABASE_URL`) only in
+  the private runner and migration environment. The public Vercel function does
+  not connect to Postgres and must not receive either registry URL. A separate
+  SELECT-only reader URL (`EDGAR_MOE_REGISTRY_READ_DATABASE_URL`) is for
+  explicitly authorized private audit workflows, not public serving.
+- Provision the private audit role from the trusted migration connection with
   [`ops/postgres/provision-reader.sql`](../ops/postgres/provision-reader.sql), then
   run `scripts/verify_postgres_reader.py` with the reader URL. The verifier checks
   effective privileges and rolled-back UPDATE, DELETE, and DDL probes; a green
   application test is not evidence that the provider grants are correct.
-- For a repeatable hosted check, add the exact SELECT-only URL as the
+- For a repeatable provider audit, add the exact SELECT-only URL as the
   `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` GitHub Actions secret, then manually run
   **Provider reader contract audit** from the Actions tab. The job never prints the
   URL, retains the redacted role report, failure output, run metadata, and SHA-256
@@ -77,23 +84,22 @@ flowchart LR
   succeeds. A successful local CI service test is not a substitute for this
   provider-specific run; do not configure the writer URL as the secret.
 - Use Cloudflare R2 only for non-public model/run evidence. Create a scoped token for one bucket; do not expose R2 credentials to the browser.
-- Vercel serves the React bundle and read-only GET endpoints. It never trains, forecasts, settles labels, or holds market-data credentials.
-- The application remains useful without Postgres: historical v1 pages load normally and the Live tracking page reports that its registry is disconnected.
+- Vercel serves the React bundle and hash-locked synthetic fixture. It never
+  trains, forecasts, settles labels, connects to the registry, or holds source
+  credentials. Historical research evidence and all prospective registry
+  endpoints are withheld while rights review remains open.
+- The private runner and auditor continue to use their separately scoped
+  credentials. The public `/forward` page explains the publication hold; it does
+  not claim that the database is disconnected or report private registry health.
 
 Production environment variables:
 
 ```text
 # Private runner and trusted migration environment only:
 EDGAR_MOE_REGISTRY_DATABASE_URL=postgresql://writer:...?...sslmode=require
-# API host only (for example Vercel):
+# Optional authorized private audit workflow only (never Vercel):
 EDGAR_MOE_REGISTRY_READ_DATABASE_URL=postgresql://reader:...?...sslmode=require
-# API-host pool and query bounds: one connection, no overflow, five-second checkout
-# wait, and a five-second Postgres statement timeout by default. API Postgres
-# sessions also request default_transaction_read_only=on as defense in depth.
-EDGAR_MOE_REGISTRY_API_POOL_SIZE=1
-EDGAR_MOE_REGISTRY_API_MAX_OVERFLOW=0
-EDGAR_MOE_REGISTRY_API_POOL_TIMEOUT_SECONDS=5
-EDGAR_MOE_REGISTRY_API_STATEMENT_TIMEOUT_MS=5000
+# R2 credentials belong only to the private runner/auditor that needs them.
 EDGAR_MOE_ARTIFACT_BACKEND=local
 EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2
 EDGAR_MOE_R2_ENDPOINT_URL=https://<account-id>.r2.cloudflarestorage.com
@@ -171,9 +177,10 @@ EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$READER_URL" \
   uv run python scripts/verify_postgres_reader.py
 ```
 
-The verifier must pass before putting the reader URL in Vercel. Keep the writer
-URL out of the API host; if the reader is unavailable, the API intentionally
-reports the registry as disconnected rather than using a more powerful credential.
+The verifier must pass before using the reader URL in a private audit workflow.
+Never put either URL in Vercel. The public API has no registry dependency, so
+registry health must be checked with the local CLI or an authorized private
+operator workflow.
 
 The pull-request CI job also provisions the same contract in a disposable
 PostgreSQL 16 service and runs the verifier as the reader role. That catches SQL,
@@ -263,20 +270,13 @@ After the runtime is installed, the workflow fails closed on a partial
 configuration before source refresh or the Go audit; it reports only missing
 variable names and never prints a database URL or credential value.
 
-Use the pooled Neon URL for the scheduled application connection. Give the API
-reader Neon's **direct** (unpooled) host instead: the pooler rejects the startup
-options that make API sessions read-only and time-bounded (`unsupported startup
-parameter in options: statement_timeout`), and the API then reports the registry
-as configured but unavailable. The API reader
-uses a separate bounded SQLAlchemy pool per warm serverless instance (one base
-connection, no overflow, and a five-second checkout timeout by default). Hosted
-Postgres API sessions request read-only transactions and a bounded five-second
-statement timeout by default; this is defense in depth, not a substitute for
-the provider role grant or the provider-specific audit. The pool and timeout
-limit connection fan-out and hung queries but are not a substitute for provider,
-project, or CDN limits; verify those limits with the hosted provider. Apply
-Alembic migrations separately with a direct writer URL. Create a private R2
-bucket and restrict the S3 token to object read/write access for that bucket
+Use the pooled Neon URL for the scheduled private runner. A private audit
+workflow that queries Postgres should use the SELECT-only role and a provider
+endpoint verified to accept the required read-only and timeout options. The
+public Vercel API no longer creates SQLAlchemy pools or queries Postgres; the
+historic API pool and session settings are not part of the current serving path.
+Apply Alembic migrations separately with a direct writer URL. Create a private
+R2 bucket and restrict the S3 token to object read/write access for that bucket
 only.
 
 The job restores a bounded cache containing immutable filing bodies, FinBERT
@@ -349,11 +349,11 @@ nothing, because no filing was accepted that day: eight of the nine runs before
 2026-09-23 recorded a `prospective_candidate_count` warning for exactly that
 reason. Paging daily for the normal case is how an operator learns to ignore the
 channel, so a run whose **only** warnings are expected ones does not raise an
-alert. The warning is still appended to the registry and shown on Live tracking;
-it simply does not page. A warning of any other kind, a warning alongside an
-expected one, a failure, a failed run, staleness, and an unavailable registry
-all still alert. The alert payload names the checks that warned, so a recipient
-can see which condition it is. Delivery is
+alert. The warning is still appended to the private registry; it simply does
+not page. A warning of any other kind, a warning alongside an expected one,
+a failure, a failed run, staleness, and an unavailable registry all still
+alert. The alert payload names the checks that warned, so a recipient can
+see which condition it is. Delivery is
 best-effort (`continue-on-error`) so a notification outage cannot hide the
 original run result. The payload contains only operational identifiers and
 machine-readable classification; database URLs, R2 credentials, raw exception
@@ -557,14 +557,14 @@ run, is the part that is usually asserted rather than shown:
 - the pipeline's own quality checks are published with the numbers behind them.
 
 Those are claims about process integrity, and a small sample proves them as well
-as a large one. The statistical claim is the one that needs years. Live
-tracking therefore reports the sample size and calls the point estimate a
-running log; it withholds a time-clustered interval until enough calendar
-history exists.
+as a large one. The statistical claim is the one that needs years. The private
+registry diagnostic treats the point estimate as a running log and withholds a
+time-clustered interval until enough calendar history exists. The public app
+currently withholds this entire prospective output pending rights review.
 
 ## How the live rank IC is computed
 
-The forward rank IC is a **single Spearman correlation over every settled
+The private forward rank IC is a **single Spearman correlation over every settled
 (score, realized return) pair**, pooled across runs. It is not the average of
 per-run cross-sectional correlations, which is the usual definition of an
 information coefficient.
@@ -578,9 +578,9 @@ with a respectable-looking name.
 The cost of pooling is that the figure mixes cross-sectional ordering with
 variation between periods, so it is not comparable to the locked study's rank
 IC, which was computed over a far larger cross-section. Both limits are why the
-page withholds a statistical reading below 100 settled outcomes:
+private calculation withholds a statistical reading below 100 settled outcomes:
 
-- The public API uses [`forward/uncertainty.py`](../src/edgar_moe/forward/uncertainty.py)
+- The private registry performance calculation uses [`forward/uncertainty.py`](../src/edgar_moe/forward/uncertainty.py)
   to draw 1,000 deterministic bootstrap samples of **two consecutive UTC
   calendar months**. Every filing accepted in the same month moves together;
   overlapping month blocks retain some dependence across adjacent months.
@@ -595,9 +595,8 @@ page withholds a statistical reading below 100 settled outcomes:
   acceptance-date span above 120 months also leaves bounds `null` with an
   explicit reason; the capacity cases require review before extending the
   public calculation.
-- The calculation is capped at 1,000 replicates, cached for at most eight
-  unchanged settled cohorts within a warm API process, and the endpoint's
-  public response is edge-cached for 60 seconds. It is a conditional
+- The calculation is capped at 1,000 replicates and cached for at most eight
+  unchanged settled cohorts within a warm process. It is a conditional
   descriptive interval, **not** a correction for model selection, long-lived
   market-regime changes, issuer dependence beyond these time blocks, or a
   guarantee that future performance will match the observed period.
@@ -610,13 +609,10 @@ page withholds a statistical reading below 100 settled outcomes:
   which retains repeated forecasts. The short-horizon diagnostic reports no
   confidence bounds, even when it has enough pairs for the older helper to
   calculate an independence-assuming interval.
-- Live tracking states how many outcomes the figure rests on, and calls it a
-  running log rather than evidence until the sample is large enough to read.
-  The browser displays bounds only when the API names the reviewed
-  calendar-block method, reports `ready`, and supplies finite ordered bounds
-  after the minimum pair and month history. If an older API still sends
-  independence-assuming bounds without that metadata, the browser hides them
-  and shows a release-mismatch notice; the point estimate remains preliminary.
+- The current public `/forward` page withholds prospective outcomes, so it does
+  not display this private metric. If a later release is considered for public
+  publication, it must first restore these evidence and uncertainty gates and
+  pass source-rights review; no current API response implies approval.
 
 ## Short-horizon diagnostic
 
@@ -767,7 +763,7 @@ recovery check. Its findings are diagnostic; it never repairs evidence.
 uv run edgar-moe forward-status
 ```
 
-The `status` object includes a machine-readable `health_status` (`ok`, `warning`,
+The private CLI `status` object includes a machine-readable `health_status` (`ok`, `warning`,
 or `degraded`), the latest run state, the age of the latest successful run, the
 freshness threshold, active-run count, and quality-gate counts. For a settlement,
 quality health combines its checks with the most recent preceding forecast on
@@ -776,11 +772,11 @@ name supersedes an earlier one; a prior day's forecast cannot carry its warning
 into an unpaired settlement. `latest_cycle_forecast_status` shows the paired
 forecast state separately from `latest_run_status`, so a failed forecast cannot
 be hidden by a later successful settlement. No registry records are rewritten:
-status is computed from append-only rows at read time. The same payload
-is exposed by the read-only `GET /api/v1/forward/status` endpoint and rendered on
-the Live tracking page, so the dashboard and the scheduled job summary use the same health
-decision. The default freshness window is 96 hours, which allows for the
-Tuesday–Saturday schedule and its weekend gap.
+status is computed from append-only rows at read time. The public
+`GET /api/v1/forward/status` endpoint instead reports only the fixed
+`withheld_review` publication policy; it does not inspect the registry. The
+default freshness window is 96 hours, which allows for the Tuesday–Saturday
+schedule and its weekend gap.
 
 An expected `prospective_candidate_count` warning still appears in health and
 quality counts, but does not send a webhook alert by itself. Actionable forecast

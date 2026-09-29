@@ -1,44 +1,24 @@
 # EDGAR-MoE
 
-Regime-aware multimodal alpha research from SEC filings.
+Regime-aware multimodal quant research software using SEC filings.
 
 EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, and market features changes with the market regime. A learned Mixture-of-Experts gate combines the modalities, and a cost-aware neutral portfolio translates scores into an auditable research backtest.
 
 > Research software only. It does not provide investment advice, assess suitability, or submit orders.
 
-[Live research terminal](https://edgar-moe.vercel.app) · [API docs](https://edgar-moe.vercel.app/api/docs) · [Frozen locked-test report](reports/authenticated_research_report.md)
+[Synthetic software demo](https://edgar-moe.vercel.app) · [API docs](https://edgar-moe.vercel.app/api/docs) · [Source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
 
-> **Authenticated-study status (cutoff 2026-07-31):** complete. The frozen 75%
-> fundamental / 25% MoE hybrid achieved rank IC 0.0632 across 2,305 pre-test
-> out-of-fold events and 0.0316 across 1,794 locked 2025–2026 events. The pre-test
-> figure is development evidence, not an independent estimate: each fold
-> early-stopped on itself and the champion was the best of 33 candidates, so part
-> of the gap is selection bias. The cost-aware portfolio was not profitable: at
-> 10 bps round-trip cost, annualized return was -3.28% and Sharpe was -0.63 (95%
-> block-bootstrap interval [-2.31, 0.94]). The weak positive ordering did not
-> survive implementation costs. See the [locked report](reports/authenticated_research_report.md).
-> A [dated companion analysis](reports/locked_rank_ic_interval_2026-09-23.md)
-> estimates a 95% two-calendar-month block-bootstrap interval of **[-0.0114,
-> 0.0702]** for the locked rank IC, which includes zero. The corresponding
-> selected-development interval is [0.0173, 0.1181] and is not adjusted for
-> the 33-candidate model search.
->
-> **Known v1 defects:** the frozen fundamental features mix quarterly with
-> year-to-date income and can reuse years-old revenue, and the Elastic Net
-> baselines were over-regularized. v1 stays frozen and these limitations are
-> disclosed in the [model card](docs/model-card.md#known-v1-limitations); later
-> studies use corrected fundamentals ([ADR 0015](docs/adr/0015-xbrl-fact-selection-policy.md))
-> and a revised selection protocol ([ADR 0017](docs/adr/0017-post-v1-selection-protocol.md)).
+> **Current public status:** the deployed application serves a fingerprinted synthetic fixture only. Historical v1 results are withheld from the application while source-use and redistribution review remains unresolved. Historical research reports and metrics may still be present in repository files, Git history, artifacts, or prior deployments; they have not been purged and are not thereby cleared for redistribution. This notice is not a legal determination.
 
 ## Start here
 
 | If you want to… | Go to |
 | --- | --- |
-| See what the study found | The [live site](https://edgar-moe.vercel.app), whose pages lead with a one-sentence answer |
+| Explore the software | The [synthetic demo](https://edgar-moe.vercel.app), which uses generated example data and makes no investment-performance claim |
 | Understand the system design | [Solution architecture](docs/solution-architecture.md): context, views, security, operations, and a requirement-to-test traceability matrix |
-| Review the decisions | The [ADR index](docs/adr/README.md): 33 decisions grouped by theme (one proposed) |
-| Check the research is honest | The [research contract](#research-contract), [model card](docs/model-card.md), and [locked report](reports/authenticated_research_report.md) |
-| Verify the live site yourself | Run `uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app --expect-lock config/public_snapshot.lock.json` from a clone. It needs no credentials and checks that production serves the reviewed frozen identity. |
+| Review the decisions | The [ADR index](docs/adr/README.md): 34 decisions grouped by theme (one proposed) |
+| Review the historical record | See the [model card](docs/model-card.md) and [source-rights issue](https://github.com/hoangnguyen2003/edgar-moe/issues/280); archival metrics remain under review |
+| Verify the live site yourself | Run `uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app --expect-lock config/public_snapshot.lock.json` from a clone. It needs no credentials and checks that production serves the fingerprinted synthetic identity. |
 
 ## What makes this a quant project
 
@@ -46,7 +26,7 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 - Development, validation, and locked-test periods are chronological and separated by an embargo.
 - The portfolio constrains gross, net, beta, industry, and individual-name exposure.
 - Results include baselines, ablations, transaction costs, borrow costs, confidence intervals, and failed hypotheses.
-- The bundled public snapshot is derived from the frozen authenticated study; the optional synthetic generator remains explicitly labeled for software verification.
+- The bundled public snapshot is a synthetic software fixture; frozen v1 research output is not served by the public application while rights review remains open.
 - A separate append-only registry records new forecasts before their tradable entry and appends outcomes only after maturity; it never rewrites the frozen v1 study.
 
 ## Architecture
@@ -67,7 +47,8 @@ flowchart LR
   FUND --> ANCHOR
   ANCHOR --> SCORE[20-session alpha score]
   SCORE --> PORT[Neutral portfolio]
-  PORT --> SNAP[Versioned public snapshot]
+  PORT --> ARCHIVE[Historical research artifacts<br/>rights review pending]
+  DEMO[Generated synthetic fixture] --> SNAP[Fingerprint-locked public snapshot]
   SNAP --> API[FastAPI]
   ANCHOR --> FWD[Pre-entry forward forecast]
   FWD --> REG[(Append-only registry)]
@@ -97,9 +78,9 @@ uv run edgar-moe serve
 npm --prefix apps/web run dev
 ```
 
-Open `http://localhost:5173`. API documentation is at `http://localhost:8000/api/docs`. The committed snapshot is the authenticated frozen result, so serving the app requires no data credentials.
+Open `http://localhost:5173`. API documentation is at `http://localhost:8000/api/docs`. The committed snapshot is synthetic and fingerprint-locked, so serving the app requires no data credentials.
 
-To verify the model → backtest → export path without touching the authenticated snapshot, write a deterministic synthetic fixture to a separate file:
+To verify the model → backtest → export path without changing the committed public snapshot, write a deterministic synthetic fixture to a separate file:
 
 ```bash
 uv run edgar-moe demo --epochs 12 --output /tmp/edgar-moe-synthetic.json
@@ -108,7 +89,7 @@ uv run python scripts/validate_snapshot.py /tmp/edgar-moe-synthetic.json
 
 ## Deployment
 
-The public terminal deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes FastAPI as one Python Function in Singapore (`sin1`). The frozen v1 snapshot remains stateless. The Audit page (`/governance`) and `/api/v1/governance` endpoint expose the content-addressed v1 identity and distinguish repository-enforced controls from pending provider evidence. The optional Live tracking page (`/forward`) reads from Postgres when a SELECT-only `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` is configured (the API never uses the writer URL for hosted Postgres); without it, the UI explicitly reports that prospective evidence is not connected.
+The public terminal deploys as one Vercel project: Vite emits the React static application, and `api/index.py` exposes FastAPI as one Python Function in Singapore (`sin1`). The app serves a fingerprint-locked synthetic fixture only. Historical v1 research evidence is withheld (`/api/v1/research-evidence` returns `410`), and the governance page reports the synthetic identity and open source-rights review. Prospective forecasts remain in the private runner/registry; their public data endpoints are withheld while that review is open, and `/forward` explains why rather than treating the registry as disconnected.
 
 ```bash
 npm run build:public
@@ -116,7 +97,7 @@ npx vercel@latest
 npx vercel@latest --prod
 ```
 
-The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app, verifies the frozen snapshot lock, the reviewed research-evidence catalog and its companion interval report, and checks the disclosure files. CI also validates source/bundle and snapshot integrity. The `.vercelignore` boundary excludes `uv.lock`, private research caches, and operator/research trees, retaining only the reviewed public inputs and build validators. The Python Function excludes those private trees and explicitly includes the frozen snapshot, its lock, and the public evidence catalog; the serving repository fails closed on identity drift. Raw filings, processed tables, model artifacts, and forward-run files stay outside the serving bundle. After a successful Production deployment, the `Deployment smoke check` workflow probes the configured public URL and retains a redacted report. Vercel and FastAPI apply browser security headers. Viewing the frozen study requires no database, secrets, or paid data service; a custom domain is optional.
+The deterministic `public/` bundle is committed because Vercel serves that directory through its CDN before invoking FastAPI. The Vercel build rebuilds the React app, verifies the synthetic snapshot lock, checks the archived research-evidence catalog and interval report for integrity, and validates the disclosure files. CI also validates source/bundle and snapshot integrity. The `.vercelignore` boundary excludes `uv.lock`, private research caches, and operator/research trees, retaining only the build inputs and validators. The Python Function includes the synthetic snapshot and lock but explicitly excludes the historical evidence catalog and private trees; the serving repository fails closed on identity drift. Raw filings, processed tables, model artifacts, and forward-run files stay outside the serving bundle. After a successful Production deployment, the `Deployment smoke check` workflow verifies the synthetic identity and withheld-evidence boundary, then retains a redacted report. Vercel and FastAPI apply browser security headers. Viewing the synthetic demo requires no database, secrets, or paid data service; a custom domain is optional.
 
 The repository also ships a provider-neutral container path for a future host:
 
@@ -260,7 +241,8 @@ only safe identities, counts, hashes, check statuses, and blocker codes; it
 never authorizes retraining or changes the frozen v1 artifact.
 
 For evidence navigation, the optional operator-run research copilot can answer
-questions over the frozen snapshot and (when configured) the forward registry.
+questions over the currently published synthetic snapshot and, in a private
+operator workflow, the forward registry.
 It uses bounded read-only tools and content-hashed citations. Every evidence
 tool result must carry provenance, and once an evidence tool is called,
 generation and offline verification fail closed unless at least one tool
@@ -327,7 +309,7 @@ with the [platform readiness guide](docs/platform-readiness.md). The aggregate
 is hash-pinned and keeps missing, blocked, stale, and review-required controls
 visible; it never authorizes retraining or hides pending provider evidence.
 
-For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. Set `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` to a separate SELECT-only Postgres role in the API host (for example Neon + Vercel); the API requires it for hosted Postgres and never falls back to the writer credential. API Postgres sessions additionally request read-only transactions and a bounded five-second statement timeout by default, but provider grants and the external reader audit remain required. Local SQLite development remains compatible with the writer URL. R2 is optional: the existing registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. The public API is read-only; forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
+For a hosted free-tier setup, set `EDGAR_MOE_REGISTRY_DATABASE_URL` only on the private runner and migration environment. While source-rights review is open, do not configure a registry reader on Vercel: the public application withholds prospective registry data. If public read access is reconsidered after review, use a separate SELECT-only Postgres role, read-only transactions, a bounded statement timeout, and an external reader audit; never use the writer URL for serving. Local SQLite development remains compatible with the writer URL. R2 is optional: the registry keeps stable `local://` identities and sets `EDGAR_MOE_ARTIFACT_MIRROR_BACKEND=r2` plus its endpoint, bucket, and credentials only on the private forecasting runner. Forecasting and settlement are CLI-only operations. See the [forward-testing operations guide](docs/forward-testing.md).
 
 ## Authenticated research run
 
@@ -396,11 +378,12 @@ runtime; neither replaces frozen v1. `scripts/compare_xbrl_policy_inputs.py`
 retains a private, pre-test-only attribution audit. If text/runtime or other
 inputs differ, it marks the comparison
 `confounded`; it never turns the known v1 locked outcome into new test evidence.
-The [Research page](apps/web/src/pages/ResearchPage.tsx) now serves the frozen
-v1 uncertainty and negative cost-aware result through a hash-locked evidence
-catalog, while v2 remains explicitly pending. The [review procedure](docs/research-runbook.md#reviewed-aggregate-publication-boundary)
-allows only approved aggregate-only v2 development results into the public API;
-it never copies the private pretest report or changes the immutable v1 snapshot.
+The [Research page](apps/web/src/pages/ResearchPage.tsx) currently withholds
+the frozen-v1 catalog and prospective results while source-rights review remains
+open. Earlier research summaries and the evidence catalog remain in the
+repository for review but are not part of the current app response. The
+[review procedure](docs/research-runbook.md#reviewed-aggregate-publication-boundary)
+is a future publication control, not present authorization to expose results.
 
 The earlier single-window diagnostic remains in `reports/validation_report.md`;
 the walk-forward report supersedes it for model selection. `open-frozen-test`
@@ -412,9 +395,9 @@ timezone failure.
 
 The five-company `config/universe.example.csv` and `--embedder hashing` are connectivity fixtures only. They must never be used to claim market performance. A credible run uses the reviewed broad universe and the configured FinBERT encoder.
 
-Raw, processed, and model artifacts are ignored by Git. Public snapshots contain derived research output only; they do not redistribute source market data. The historical site can still run from one immutable snapshot; Postgres is used only for the optional prospective registry. Local research tables remain Parquet/NPZ files with hash manifests.
+Raw, processed, and model artifacts are ignored by Git. The deployed app currently publishes synthetic demo data only. Historical derived reports, the archived evidence catalog, Git history, retained workflow artifacts, or prior deployments may still contain research output; withholding it from the current app is not a full purge or a rights determination. Prospective records remain in the private registry and are not exposed by the public API while source-rights review is unresolved. Local research tables remain Parquet/NPZ files with hash manifests.
 
-The scheduled GitHub job builds and validates a temporary synthetic fixture without changing the frozen public snapshot. The authenticated checkpoint job is manual, requires all four repository secrets plus a reviewed `config/universe.csv`, and retains its private bundle for seven days. It never opens the locked test or publishes signals automatically.
+The scheduled GitHub job builds and validates a temporary synthetic fixture without changing the locked synthetic public snapshot. The authenticated checkpoint job is manual, requires all four repository secrets plus a reviewed `config/universe.csv`, and retains its private bundle for seven days. It never opens the locked test or publishes signals automatically.
 
 ## Repository map
 

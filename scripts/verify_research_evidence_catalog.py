@@ -15,7 +15,7 @@ from typing import Any
 
 CATALOG = Path("src/edgar_moe/api/research_evidence_catalog.json")
 LOCK = Path("src/edgar_moe/api/research_evidence_catalog.sha256")
-SNAPSHOT = Path("data/demo/snapshot.json")
+WITHDRAWN_V1_IDENTITY = Path("config/withdrawn_v1_identity.json")
 REPORT = Path("reports/locked_rank_ic_interval_2026-09-23.md")
 COMPARATORS = {
     "Elastic Net",
@@ -39,7 +39,7 @@ def _object(value: Any, expected: set[str], label: str) -> dict[str, Any]:
 def verify(
     catalog_path: Path = CATALOG,
     lock_path: Path = LOCK,
-    snapshot_path: Path = SNAPSHOT,
+    identity_path: Path = WITHDRAWN_V1_IDENTITY,
     companion_report: Path = REPORT,
 ) -> None:
     expected = lock_path.read_text(encoding="ascii").strip()
@@ -88,19 +88,31 @@ def verify(
     )
     if _sha256(companion_report) != interval["source_sha256"]:
         raise ValueError("reviewed v1 interval report hash mismatch")
-    snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
-    metadata = snapshot["metadata"]
+    identity = _object(
+        json.loads(identity_path.read_text(encoding="utf-8")),
+        {"schema_version", "status", "former_public_snapshot", "notice"},
+        "withdrawn v1 identity",
+    )
     if (
-        metadata["data_mode"] != "authenticated_locked_test"
-        or metadata["as_of"] != universe["screen_as_of"]
-        or metadata["selection_hash"] != frozen["selection_hash"]
-        or metadata["locked_test_hash"] != frozen["locked_test_hash"]
-        or not interval["low"] <= 0 <= interval["high"]
-        or not interval["low"]
-        <= snapshot["predictive_metrics"]["locked_test"]["rank_ic"]
-        <= interval["high"]
+        identity["schema_version"] != 1
+        or identity["status"] != "withdrawn_pending_source_rights_review"
     ):
-        raise ValueError("catalog disagrees with the frozen study or interval")
+        raise ValueError("withdrawn v1 identity status is invalid")
+    former = _object(
+        identity["former_public_snapshot"],
+        {"path", "sha256", "data_mode", "as_of", "selection_hash", "locked_test_hash"},
+        "former public snapshot identity",
+    )
+    if (
+        former["path"] != "data/demo/snapshot.json"
+        or former["data_mode"] != "authenticated_locked_test"
+        or former["as_of"] != universe["screen_as_of"]
+        or former["selection_hash"] != frozen["selection_hash"]
+        or former["locked_test_hash"] != frozen["locked_test_hash"]
+        or len(str(former["sha256"])) != 64
+        or not interval["low"] <= 0 <= interval["high"]
+    ):
+        raise ValueError("catalog disagrees with the withdrawn frozen-study identity")
     v2 = catalog["duration_aware_v2"]
     if not isinstance(v2, dict) or v2.get("status") not in {
         "pending_review",
@@ -183,10 +195,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--catalog", type=Path, default=CATALOG)
     parser.add_argument("--lock", type=Path, default=LOCK)
-    parser.add_argument("--snapshot", type=Path, default=SNAPSHOT)
+    parser.add_argument("--identity", type=Path, default=WITHDRAWN_V1_IDENTITY)
     parser.add_argument("--companion-report", type=Path, default=REPORT)
     args = parser.parse_args()
-    verify(args.catalog, args.lock, args.snapshot, args.companion_report)
+    verify(args.catalog, args.lock, args.identity, args.companion_report)
     print("Research evidence catalog verified")
     return 0
 
