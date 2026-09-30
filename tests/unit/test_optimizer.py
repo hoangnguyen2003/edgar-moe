@@ -2,11 +2,13 @@ import builtins
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from edgar_moe.backtest.optimizer import allocate_neutral
 
 
-def test_allocator_produces_capped_balanced_book() -> None:
+def test_cvxpy_allocator_produces_capped_balanced_book() -> None:
+    pytest.importorskip("cvxpy")
     rows = 120
     frame = pd.DataFrame(
         {
@@ -17,10 +19,13 @@ def test_allocator_produces_capped_balanced_book() -> None:
         }
     )
     weights, diagnostics = allocate_neutral(frame)
+    # A dependency regression must not pass this test through the fallback.
+    assert diagnostics.solver == "cvxpy-clarabel"
     assert np.abs(weights).max() <= 0.020001
     assert abs(weights.sum()) <= 0.020001
     assert diagnostics.gross_exposure > 0.95
     assert abs(diagnostics.beta_exposure) <= 0.051
+    assert diagnostics.maximum_industry_exposure <= 0.051
 
 
 def test_allocator_falls_back_when_cvxpy_is_unavailable(monkeypatch) -> None:
