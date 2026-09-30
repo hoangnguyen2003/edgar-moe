@@ -24,7 +24,7 @@ and does not resolve source-rights questions.
 
 The source archive and Python Function apply the private-data boundary
 independently: raw/processed/forward data, model/operator directories, local
-database files, and dotenv files are excluded, while only the derived
+database files, and dotenv files are excluded, while only the synthetic
 `data/demo/snapshot.json` is explicitly included. This protects local Vercel
 builds as well as Git-based deployments. The bundle also publishes two
 low-cost discovery controls: `robots.txt`
@@ -72,23 +72,29 @@ rate-limit, backup, or account evidence.
 
 The following source inventory describes content in the former locked snapshot,
 not the current synthetic bundle. It remains here to scope the outstanding
-redistribution review. Verify the historical inventory with
-`pytest tests/unit/test_public_data_surface.py`.
+redistribution review. `tests/unit/test_public_data_surface.py` checks the
+current synthetic fixture; passing it does not verify the historical inventory.
+Historical review must use the former release's content-addressed identity and
+appropriately restricted evidence, not today's replacement fixture.
 
 | Source | In the public bundle | Not in the public bundle |
 | --- | --- | --- |
-| SEC EDGAR | Accession numbers, company names, tickers, form types, acceptance timestamps, SIC industry codes, and a `https://www.sec.gov/...` link per filing | Filing text or HTML, and XBRL fact values. The longest string in the snapshot is a 233-character status message this project wrote |
+| SEC EDGAR | In the former locked snapshot: accession numbers, company names, tickers, form types, acceptance timestamps, SIC industry codes, and a `https://www.sec.gov/...` link per filing | Filing text or HTML, and XBRL fact values. The longest string in that snapshot was a 233-character status message this project wrote |
 | Alpaca (IEX feed) | In the former locked snapshot: one `realized_abnormal_return` per filing and three portfolio series of 395 daily points | Quotes, bars, prices, volumes, or any per-session market record |
 | FRED / ALFRED | Nothing. Regime features are model inputs; no series value or observation reaches the bundle | Every FRED series and observation |
 
 The former snapshot included project-computed values such as model scores,
 ranks, expert weights, attributions, and outcomes. These are an inventory of
 content requiring review, not a statement that the current bundle publishes
-them. The bundle links to filings rather than copying them.
+them. The former bundle linked to filings rather than copying them.
 
 That is the factual half of the review. The remaining half is a judgement about
 each provider's terms, which belongs to the operator and is not made here or by
-CI. To record it, set each source's `redistribution_status` to `approved` in
+CI. Restoring any provider-derived output requires the source-specific decision
+in issue #280 and a separate reviewed PR, not just editing approval flags.
+The current manifest describes the synthetic generator, not the former sources.
+For an explicitly authorized release, record each reviewed source's
+`redistribution_status` as `approved` in
 `apps/web/public/data-provenance.json`, then set the `review` block's
 `redistribution_status` to `approved`, `legal_approval` to `true`, and
 `last_reviewed_at` to the UTC time of the review. Until then
@@ -105,7 +111,15 @@ carry unreviewed content. `favicon.svg` and `sitemap.xml` stay text. The two
 images are rendered from text sources by `scripts/render_brand_images.py`: the
 card from `apps/web/brand/social-card.html`, and the touch icon from
 `favicon.svg`, which draws the logotype's own "E" outline. The social image
-repeats only figures already published on the site. See
+describes the synthetic demo only; it does not repeat withdrawn v1 metrics.
+Both images and their text sources have reviewed SHA-256 digests enforced by
+the validator, so valid pixel-only PNGs are not accepted merely because of
+their filename. A changed source or image requires visual review and an explicit
+digest update. Metadata removal alone cannot prevent publication of sensitive
+numbers drawn into pixels. The HTML description, Open Graph text, and image alt
+text must also describe the current synthetic boundary. The image URL carries
+a new revision query to distinguish it from earlier link previews; this does
+not purge third-party caches. See
 [ADR 0024](adr/0024-reviewed-public-images.md).
 
 ## Failure behavior

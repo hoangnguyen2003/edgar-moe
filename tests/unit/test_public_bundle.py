@@ -167,11 +167,56 @@ def minimal_png(extra: bytes = b"") -> bytes:
     )
 
 
-def test_public_bundle_accepts_a_declared_pixel_only_image(tmp_path: Path) -> None:
+@pytest.mark.parametrize("name", ["social-card.png", "apple-touch-icon.png"])
+def test_public_bundle_accepts_reviewed_image_content(tmp_path: Path, name: str) -> None:
+    write_bundle(tmp_path)
+    source = Path(__file__).parents[2] / "apps" / "web" / "public" / name
+    (tmp_path / name).write_bytes(source.read_bytes())
+
+    assert validate_public_bundle(tmp_path) == []
+
+
+def test_pixel_only_image_still_requires_content_review(tmp_path: Path) -> None:
     write_bundle(tmp_path)
     (tmp_path / "social-card.png").write_bytes(minimal_png())
 
-    assert validate_public_bundle(tmp_path) == []
+    assert validate_public_bundle(tmp_path) == [
+        "publishable image content is not a reviewed file: social-card.png"
+    ]
+
+
+@pytest.mark.parametrize("source_state", ["changed", "missing", "symlink"])
+def test_public_bundle_rejects_image_source_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, source_state: str
+) -> None:
+    bundle = tmp_path / "bundle"
+    write_bundle(bundle)
+    repository = Path(__file__).parents[2]
+    (bundle / "social-card.png").write_bytes(
+        (repository / "apps/web/public/social-card.png").read_bytes()
+    )
+    monkeypatch.setattr(_VALIDATOR_MODULE, "_IMAGE_SOURCE_ROOT", tmp_path / "source")
+    source = tmp_path / "source/apps/web/brand/social-card.html"
+    source.parent.mkdir(parents=True)
+    if source_state == "changed":
+        source.write_text("<h1>Unreviewed content</h1>", encoding="utf-8")
+    elif source_state == "symlink":
+        source.symlink_to(repository / "apps/web/brand/social-card.html")
+
+    expected = "has changed" if source_state == "changed" else "is missing or a symlink"
+    assert validate_public_bundle(bundle) == [
+        f"publishable image review source {expected}: social-card.png"
+    ]
+
+
+def test_public_bundle_rejects_text_masquerading_as_a_reviewed_image(tmp_path: Path) -> None:
+    write_bundle(tmp_path)
+    (tmp_path / "social-card.png").write_text("not a reviewed image", encoding="utf-8")
+
+    errors = validate_public_bundle(tmp_path)
+
+    assert "publishable image must be a PNG: social-card.png" in errors
+    assert "publishable image content is not a reviewed file: social-card.png" in errors
 
 
 def test_public_bundle_rejects_images_that_could_hide_content(tmp_path: Path) -> None:

@@ -83,13 +83,22 @@ using previously retained source-derived content.
 
 ## Public-output exposure to review
 
-This is an exposure inventory, not a rights conclusion. The frozen
-`data/demo/snapshot.json` contains event-level identifiers, model scores and
-ranks, realized abnormal returns, attributions, predictive metrics,
-portfolio scenarios, and equity curves. The built public site serves those
-derived fields; the forward API additionally serves event-level forecast rows
-and performance aggregates. The snapshot is content-locked, but being immutable
-does not constitute permission to publish it. `public/data-provenance.json` currently
+This is an exposure inventory, not a rights conclusion. Since ADR 0034
+(2026-09-29), `data/demo/snapshot.json` is a generated synthetic fixture, not
+the former v1 research output. The public API has no registry connection;
+forecast/performance evidence routes return a fixed `410`/`no-store` hold.
+The link-preview image and social metadata also describe only the synthetic
+demo, with no withdrawn study figures. The current image and its source are
+content-reviewed and hash-bound by the public-bundle validator.
+
+The **former** locked snapshot contained event-level identifiers, model scores
+and ranks, realized abnormal returns, attributions, predictive metrics,
+portfolio scenarios, and equity curves. Former public API versions also served
+forecast rows and performance aggregates. Its identity is retained in
+`config/withdrawn_v1_identity.json`; Git history, reports, workflow artifacts,
+prior deployments, and third-party link-preview caches are not purged by the
+current serving boundary. Those exposures still require review. Being immutable
+does not constitute permission to publish content. `public/data-provenance.json` currently
 states `legal_approval: false` and `redistribution_status:
 operator_review_required`; a notice does not resolve the underlying use.
 The private v2 pretest report remains outside the public catalog, whose status
@@ -99,8 +108,8 @@ should be attached to a public PR or issue.
 Before changing any public output, inventory its fields and dependency chain
 against the exact locked dataset and ask whether (1) event-level derived
 returns/scores, (2) aggregate metrics and charts, and (3) the API and static
-snapshot have different permissions. Review whether the existing v1 public
-snapshot needs withdrawal, redaction, replacement, or added notices; make no
+snapshot have different permissions. Determine any remaining duties concerning
+the withdrawn v1 release and its historical copies or caches; make no
 silent claim that a derived number is automatically licensed.
 
 ## Decision record required before publication
