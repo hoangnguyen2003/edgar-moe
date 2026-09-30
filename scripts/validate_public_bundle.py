@@ -37,7 +37,23 @@ _EXPECTED_SNAPSHOT_PATH = "data/demo/snapshot.json"
 # Images cannot be reviewed as text, so only these exact files may be binary. Each
 # must be a PNG carrying pixel data alone: no text, EXIF, or colour-profile chunk
 # can smuggle content into the public bundle, and every chunk checksum must match.
-_REVIEWED_IMAGES = frozenset({"apple-touch-icon.png", "social-card.png"})
+# These pairs were visually reviewed under the synthetic-only boundary. PNG
+# structure alone cannot detect withdrawn metrics drawn into pixels. Updating
+# either source or pixels requires explicit content review, not an auto-relock.
+_IMAGE_SOURCE_ROOT = Path(__file__).resolve().parents[1]
+_REVIEWED_IMAGE_CONTENT = {
+    "social-card.png": (
+        "apps/web/brand/social-card.html",
+        "bb36f3f0800ba4286dcb42dc08867af185554f7ebbdb3b326b348bb51d4edffe",
+        "51b44c52d70c34cf579053ecb1c604a11a125de068e15276ada2013f31633e48",
+    ),
+    "apple-touch-icon.png": (
+        "apps/web/public/favicon.svg",
+        "2a624c1808927750e2171fa48c9a3d43e25e8ad992ea595ea5440c36efa50183",
+        "5910014b3f2510ce3e40292a54cf970c22b2f023d08350a826e27e8d563939df",
+    ),
+}
+_REVIEWED_IMAGES = frozenset(_REVIEWED_IMAGE_CONTENT)
 _MAX_IMAGE_BYTES = 200_000
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _ALLOWED_PNG_CHUNKS = frozenset(
@@ -109,13 +125,16 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
         if path.suffix == ".woff2":
             _validate_reviewed_font(path, relative, errors)
             continue
+        # Declared image filenames must not bypass image review by containing
+        # UTF-8 text instead of a PNG.
+        if relative in _REVIEWED_IMAGES:
+            _validate_reviewed_image(path, relative, errors)
+            _validate_image_content_review(path, relative, errors)
+            continue
         try:
             text = path.read_text(encoding="utf-8")
         except UnicodeDecodeError:
-            if relative in _REVIEWED_IMAGES:
-                _validate_reviewed_image(path, relative, errors)
-            else:
-                errors.append(f"non-text publishable file requires review: {relative}")
+            errors.append(f"non-text publishable file requires review: {relative}")
             continue
         if _SOURCE_MAP_REFERENCE.search(text):
             errors.append(f"source-map reference found: {relative}")
@@ -133,6 +152,18 @@ def validate_public_bundle(root: Path = Path("public")) -> list[str]:
                 )
 
     return errors
+
+
+def _validate_image_content_review(path: Path, relative: str, errors: list[str]) -> None:
+    """Bind published pixels and their source to an explicitly reviewed pair."""
+    source_name, source_digest, image_digest = _REVIEWED_IMAGE_CONTENT[relative]
+    if hashlib.sha256(path.read_bytes()).hexdigest() != image_digest:
+        errors.append(f"publishable image content is not a reviewed file: {relative}")
+    source = _IMAGE_SOURCE_ROOT / source_name
+    if source.is_symlink() or not source.is_file():
+        errors.append(f"publishable image review source is missing or a symlink: {relative}")
+    elif hashlib.sha256(source.read_bytes()).hexdigest() != source_digest:
+        errors.append(f"publishable image review source has changed: {relative}")
 
 
 def _validate_reviewed_image(path: Path, relative: str, errors: list[str]) -> None:

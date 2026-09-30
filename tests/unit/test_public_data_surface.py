@@ -1,9 +1,10 @@
-"""What the public bundle publishes from each upstream source.
+"""Shape and disclosures of the current synthetic public fixture.
 
 The redistribution review recorded in `public/data-provenance.json` is an
 operator decision about specific content, so the content must not drift after
-it is made. These assertions describe the published surface exactly: derived
-scores, SEC identifiers and links, and aggregate series. A new field, or a
+it is made. These assertions describe generated scores, SEC-shaped identifiers
+and links, and aggregate series; they do not verify former research content or
+establish provider permission. A new field, or a
 string long enough to hold document text, fails here and sends the question
 back for review rather than shipping quietly.
 """
@@ -11,6 +12,7 @@ back for review rather than shipping quietly.
 from __future__ import annotations
 
 import json
+from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
@@ -20,8 +22,51 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 SNAPSHOT = REPOSITORY / "data" / "demo" / "snapshot.json"
 PROVENANCE = REPOSITORY / "apps" / "web" / "public" / "data-provenance.json"
 
-#: Every field published for one scored filing. SEC identifiers and links, the
-#: model's own outputs, and one realized outcome computed from market data.
+
+class _SocialMetadata(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.values: dict[str, list[str]] = {}
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "meta":
+            return
+        fields = dict(attrs)
+        name = fields.get("property") or fields.get("name")
+        if name and (name.startswith("og:") or name == "description"):
+            self.values.setdefault(name, []).append(fields.get("content") or "")
+
+
+@pytest.mark.parametrize("path", ["apps/web/index.html", "public/index.html"])
+def test_social_metadata_describes_only_the_current_synthetic_demo(path: str) -> None:
+    """Review visible link-preview text, not just the PNG's container format."""
+    metadata = _SocialMetadata()
+    metadata.feed((REPOSITORY / path).read_text(encoding="utf-8"))
+    approved = {
+        "description": (
+            "Explore EDGAR-MoE's AI-driven filing research workflow with a generated "
+            "synthetic fixture. A software demo, not evidence of investment skill; "
+            "live forecasts remain on hold pending source-rights review."
+        ),
+        "og:title": "EDGAR-MoE — Synthetic research demo",
+        "og:description": (
+            "Explore an AI-driven filing research workflow using synthetic data, "
+            "not observed market performance. Live forecasts remain on hold pending "
+            "source-rights review."
+        ),
+        "og:image:alt": (
+            "EDGAR-MoE: Explore AI-driven filing research. A synthetic demo, not "
+            "market evidence. Generated software fixture; traceable models and "
+            "backtests; live forecasts on hold pending source-rights review."
+        ),
+        "og:image": "https://edgar-moe.vercel.app/social-card.png?v=synthetic-20260930",
+    }
+    for name, value in approved.items():
+        assert metadata.values.get(name) == [value], f"unreviewed social metadata: {path} {name}"
+
+
+#: Every field published for one synthetic scored filing, including generated
+#: identifiers, model outputs, and outcomes (not observed market data).
 EVENT_FIELDS = frozenset(
     {
         "accepted_at",
@@ -47,7 +92,7 @@ EVENT_FIELDS = frozenset(
 EQUITY_POINT_FIELDS = frozenset({"date", "equity", "drawdown", "turnover"})
 
 #: No string in the snapshot should be long enough to carry filing text; the
-#: longest today is a 233-character status message written by this project.
+#: bound is deliberately conservative and does not prove a source license.
 MAX_STRING_LENGTH = 400
 
 #: Field names a republished price bar, quote, or filing body would carry.

@@ -25,7 +25,13 @@ boundary, and the project is meant to be shared.
   - have a valid CRC on every chunk and nothing after `IEND`.
 - Keep icons in SVG where possible (`favicon.svg`), because SVG is text and
   needs no exception.
-- The social image may state only figures already published on the site.
+- The social image must respect the current publication boundary. Under
+  ADR 0034 it describes the synthetic demo, not withdrawn research figures.
+- Follow-up on 2026-09-30: PNG chunk validation was insufficient to enforce
+  visual-content review. Bind both the rendered image and its text source to
+  reviewed SHA-256 digests in the bundle validator. Check declared images as
+  images even when their bytes decode as UTF-8. Changed pixels or source require
+  explicit review and digest updates; the gate does not itself establish rights.
 
 ## Alternatives considered
 
@@ -50,4 +56,7 @@ Unit tests cover the accepted case and five rejections: a text chunk, bytes
 appended after `IEND`, a corrupt chunk checksum, an oversized file, and a
 non-PNG file. An undeclared binary elsewhere in the bundle is still rejected. CI
 runs the bundle validator on every pull request, and the Vercel build runs it
-before publishing.
+before publishing. Follow-up regression tests reject an altered pixel-only
+image, source/image drift, and text masquerading as a declared image. Visual
+inspection of the reviewed PNG remains necessary; a digest alone cannot infer
+whether content is appropriate.
