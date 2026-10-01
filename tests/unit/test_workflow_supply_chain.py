@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +12,30 @@ import yaml
 
 WORKFLOWS = sorted(Path(".github/workflows").glob("*.yml"))
 PINNED = re.compile(r"^[A-Za-z0-9._-]+/[A-Za-z0-9._/-]+@[0-9a-f]{40}$")
+
+
+def test_codeql_subactions_share_one_reviewed_commit() -> None:
+    workflow = yaml.safe_load(Path(".github/workflows/codeql.yml").read_text(encoding="utf-8"))
+    actions = {
+        step["uses"].split("@", 1)[0]: step["uses"].split("@", 1)[1]
+        for step in _steps(workflow)
+        if str(step.get("uses", "")).startswith("github/codeql-action/")
+    }
+    assert set(actions) == {"github/codeql-action/init", "github/codeql-action/analyze"}
+    assert len(set(actions.values())) == 1, "CodeQL init and analyze must use the same commit"
+
+
+def test_dependabot_groups_codeql_subaction_updates() -> None:
+    config = yaml.safe_load(Path(".github/dependabot.yml").read_text(encoding="utf-8"))
+    updates = [item for item in config["updates"] if item["package-ecosystem"] == "github-actions"]
+    assert len(updates) == 1
+    group = updates[0]["groups"]["codeql"]
+    assert group.get("applies-to", "version-updates") == "version-updates"
+    for action in ("github/codeql-action/init", "github/codeql-action/analyze"):
+        assert any(fnmatchcase(action, pattern) for pattern in group["patterns"])
+        assert not any(
+            fnmatchcase(action, pattern) for pattern in group.get("exclude-patterns", [])
+        )
 
 
 def _steps(workflow: dict[str, Any]) -> list[dict[str, Any]]:
