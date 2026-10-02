@@ -49,3 +49,9 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    groups:
+      # Init writes versioned configuration consumed by analyze. Update both
+      # sub-actions atomically; separate bumps fail CodeQL's version check.
+      codeql:
+        patterns:
+          - "github/codeql-action/*"
