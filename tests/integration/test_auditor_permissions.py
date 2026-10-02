@@ -114,7 +114,9 @@ def test_non_inherited_membership_is_still_rejected(
 ) -> None:
     admin, role, dsn = auditor_database
     admin.execute(psycopg.sql.SQL("ALTER ROLE {} NOINHERIT").format(psycopg.sql.Identifier(role)))
-    admin.execute(psycopg.sql.SQL("GRANT pg_write_all_data TO {}").format(psycopg.sql.Identifier(role)))
+    admin.execute(
+        psycopg.sql.SQL("GRANT pg_write_all_data TO {}").format(psycopg.sql.Identifier(role))
+    )
     with pytest.raises(audit.AuditorPermissionError, match="^role_membership_not_allowed$"):
         audit.audit_auditor_role(dsn)
 
