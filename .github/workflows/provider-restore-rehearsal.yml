@@ -132,9 +132,25 @@ jobs:
           printf '{"status":"ready","source_target_distinct":true,"auditor_urls_aligned":true,"target_table_count":0,"checked_at":"%s"}\n' \
             "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$REHEARSAL_DIR/preflight.json"
 
+      - name: Verify source auditor permissions
+        id: source_grants
+        if: ${{ steps.preflight.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL }}
+        run: uv run python scripts/verify_postgres_auditor.py --profile evidence > "$REHEARSAL_DIR/source-permissions.json"
+
+      - name: Verify empty target auditor permissions
+        id: empty_target_grants
+        if: ${{ steps.preflight.outcome == 'success' && steps.source_grants.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+        run: uv run python scripts/verify_postgres_auditor.py --profile empty-restore-target > "$REHEARSAL_DIR/empty-target-permissions.json"
+
       - name: Export source registry counts
         id: source_counts
-        if: ${{ steps.preflight.outcome == 'success' }}
+        if: ${{ steps.preflight.outcome == 'success' && steps.source_grants.outcome == 'success' && steps.empty_target_grants.outcome == 'success' }}
         continue-on-error: true
         shell: bash
         env:
@@ -249,9 +265,17 @@ jobs:
             --database-url "$TARGET_DATABASE_URL" \
             --output "$REHEARSAL_DIR/restored-counts.json"
 
+      - name: Verify restored target reader permissions
+        id: restored_grants
+        if: ${{ steps.restored_counts.outcome == 'success' }}
+        continue-on-error: true
+        env:
+          AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
+        run: uv run python scripts/verify_postgres_auditor.py --profile registry-reader > "$REHEARSAL_DIR/restored-target-permissions.json"
+
       - name: Audit restored registry and R2 evidence
         id: restored_audit
-        if: ${{ steps.restored_counts.outcome == 'success' }}
+        if: ${{ steps.restored_counts.outcome == 'success' && steps.restored_grants.outcome == 'success' }}
         working-directory: tools/evidence-auditor
         shell: bash
         env:
@@ -272,7 +296,7 @@ jobs:
 
       - name: Probe restored read path
         id: read_path
-        if: ${{ steps.restored_counts.outcome == 'success' }}
+        if: ${{ steps.restored_counts.outcome == 'success' && steps.restored_grants.outcome == 'success' }}
         continue-on-error: true
         shell: bash
         env:
@@ -338,6 +362,9 @@ jobs:
         shell: bash
         env:
           PREFLIGHT_OUTCOME: ${{ steps.preflight.outcome }}
+          SOURCE_GRANTS_OUTCOME: ${{ steps.source_grants.outcome }}
+          EMPTY_TARGET_GRANTS_OUTCOME: ${{ steps.empty_target_grants.outcome }}
+          RESTORED_GRANTS_OUTCOME: ${{ steps.restored_grants.outcome }}
           SOURCE_COUNTS_OUTCOME: ${{ steps.source_counts.outcome }}
           SOURCE_DUMP_OUTCOME: ${{ steps.source_dump.outcome }}
           TARGET_EMPTY_OUTCOME: ${{ steps.target_empty.outcome }}
@@ -351,6 +378,9 @@ jobs:
           status=passed
           for outcome in \
             "$PREFLIGHT_OUTCOME" \
+            "$SOURCE_GRANTS_OUTCOME" \
+            "$EMPTY_TARGET_GRANTS_OUTCOME" \
+            "$RESTORED_GRANTS_OUTCOME" \
             "$SOURCE_COUNTS_OUTCOME" \
             "$SOURCE_DUMP_OUTCOME" \
             "$TARGET_EMPTY_OUTCOME" \
@@ -363,9 +393,10 @@ jobs:
               status=failed
             fi
           done
-          printf '{"status":"%s","workflow":"provider-isolated-restore-rehearsal","run_id":"%s","run_attempt":"%s","commit":"%s","steps":{"preflight":"%s","source_counts":"%s","source_dump":"%s","target_empty":"%s","restore":"%s","schema":"%s","restored_counts":"%s","read_path":"%s","compare":"%s"}}\n' \
+          printf '{"status":"%s","workflow":"provider-isolated-restore-rehearsal","run_id":"%s","run_attempt":"%s","commit":"%s","steps":{"preflight":"%s","source_grants":"%s","empty_target_grants":"%s","restored_grants":"%s","source_counts":"%s","source_dump":"%s","target_empty":"%s","restore":"%s","schema":"%s","restored_counts":"%s","read_path":"%s","compare":"%s"}}\n' \
             "$status" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" \
-            "$PREFLIGHT_OUTCOME" "$SOURCE_COUNTS_OUTCOME" "$SOURCE_DUMP_OUTCOME" \
+            "$PREFLIGHT_OUTCOME" "$SOURCE_GRANTS_OUTCOME" "$EMPTY_TARGET_GRANTS_OUTCOME" \
+            "$RESTORED_GRANTS_OUTCOME" "$SOURCE_COUNTS_OUTCOME" "$SOURCE_DUMP_OUTCOME" \
             "$TARGET_EMPTY_OUTCOME" "$RESTORE_OUTCOME" "$SCHEMA_OUTCOME" \
             "$RESTORED_COUNTS_OUTCOME" "$READ_PATH_OUTCOME" "$COMPARE_OUTCOME" \
             > "$REHEARSAL_DIR/summary.json"

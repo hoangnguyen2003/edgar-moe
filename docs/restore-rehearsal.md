@@ -63,6 +63,40 @@ evidence of this specific source/target rehearsal; it is not proof that the
 provider's managed backup job, RPO, or RTO meets a target until those observations
 are recorded separately.
 
+Database identities alone do not establish least privilege. Before exporting or
+restoring, the workflow verifies the source auditor's effective SELECT-only grants
+on `forward_runs` and `forward_artifacts`, and checks the target auditor's role
+attributes and effective grants while the target has no user tables. After
+restore, it requires SELECT on all eight forward-registry tables before either
+the restored Go audit or application read probe can run. Optional SELECT on
+`alembic_version` (migration metadata) is allowed; unrelated table reads, table
+writes, role memberships, schema creation and executable user-defined
+SECURITY DEFINER functions are rejected. These are bounded, read-only catalog
+checks, not mutation probes or proof of future privileges/provider IAM.
+
+Configure target-reader privileges **before** dispatch, using the isolated
+restore owner. Since `pg_restore --no-privileges` does not copy source grants,
+the target owner can set default SELECT privileges for tables it will create:
+
+```sql
+-- Run only in the explicitly isolated, empty target; replace the role names.
+GRANT CONNECT ON DATABASE isolated_target TO isolated_reader;
+GRANT USAGE ON SCHEMA public TO isolated_reader;
+ALTER DEFAULT PRIVILEGES FOR ROLE isolated_restore_owner IN SCHEMA public
+  GRANT SELECT ON TABLES TO isolated_reader;
+```
+
+The reader must be a dedicated non-owner LOGIN role, without elevated role
+attributes, other role memberships, database CREATE or schema CREATE. Do not
+grant writes or sequence access. Default privileges are scoped to the exact
+owner used by restore, not the source owner. Use a registry-only source database
+containing the forward tables and migration metadata; restoring unrelated
+tables with these defaults fails the permission gate. A passing empty-target
+check explicitly does **not** verify future SELECT grants; the separate
+post-restore check is mandatory. A populated provider clone is not an empty
+logical-restore target: use a new empty database instead, without clearing or
+overwriting the clone.
+
 Pull-request CI also runs a fully disposable PostgreSQL 16 version of this
 exercise. It seeds an explicit synthetic fixture (only when the workflow passes
 `--allow-synthetic`), creates a custom-format dump, restores it into a different
@@ -81,7 +115,7 @@ R2 credentials, network policy, or production RPO/RTO.
   manager. Do not paste them into this runbook, shell history, CI logs, or an
   issue. Disable shell tracing (`set +x`) before running commands.
 - Use the migration owner only for restoring and schema inspection. Use the
-  read-only database and R2 roles for verification where possible.
+  dedicated read-only database and R2 roles for auditor/read-path verification.
 - The rehearsal must not change forecasts, labels, model identities, or source
   artifacts. Any mismatch is recorded and investigated; it is not repaired by
   editing the restored data.
@@ -100,8 +134,10 @@ Define these variables without printing them:
 
 ```bash
 set +x
-export SOURCE_DATABASE_URL='...'       # private writer URL; never commit it
-export RESTORE_DATABASE_URL='...'      # isolated target URL; not production
+export SOURCE_DATABASE_URL='...'       # private dump/read URL; never commit it
+export RESTORE_DATABASE_URL='...'      # isolated restore-owner URL; not production
+export SOURCE_AUDITOR_DATABASE_URL='...'  # SELECT-only on the two evidence tables
+export RESTORE_AUDITOR_DATABASE_URL='...' # isolated SELECT-only registry reader
 export AUDITOR_R2_ENDPOINT_URL='...'
 export AUDITOR_R2_BUCKET='...'
 export AUDITOR_R2_ACCESS_KEY_ID='...'
@@ -110,10 +146,24 @@ export REHEARSAL_DIR="$(mktemp -d -t edgar-moe-restore)"
 chmod 700 "$REHEARSAL_DIR"
 ```
 
-If the provider offers a point-in-time branch, create it before setting
-`RESTORE_DATABASE_URL`. Otherwise create a new empty database owned by the
-migration role. Confirm the target hostname and database name twice before
-continuing.
+For the logical dump below, create a new empty database owned by the migration
+role and configure the separate target-reader/default privileges described
+above. Do not restore a dump over a populated point-in-time clone. A provider's
+managed point-in-time recovery is a separate operation. Confirm the target
+hostname and database name twice before continuing; independently verify that
+both auditor URLs point to their corresponding source/isolated databases.
+
+Before any dump/restore, retain these permission reports and stop if either
+command fails:
+
+```bash
+AUDITOR_DATABASE_URL="$SOURCE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile evidence \
+  > "$REHEARSAL_DIR/source-permissions.json"
+AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile empty-restore-target \
+  > "$REHEARSAL_DIR/empty-target-permissions.json"
+```
 
 ## Capture a backup and restore it
 
@@ -134,17 +184,17 @@ psql "$SOURCE_DATABASE_URL" -XAtc \
     'forward_audit_events', (SELECT count(*) FROM forward_audit_events)
   )::text" | tee "$REHEARSAL_DIR/source-counts.json"
 (
-  export AUDITOR_DATABASE_URL="$SOURCE_DATABASE_URL"
+  export AUDITOR_DATABASE_URL="$SOURCE_AUDITOR_DATABASE_URL"
   cd tools/evidence-auditor
   go run . -timeout 5m -stale-after 96h
 ) \
   >"$REHEARSAL_DIR/source-evidence-audit.json"
-/usr/bin/time -p pg_dump --format=custom --no-owner \
+/usr/bin/time -p pg_dump --format=custom --no-owner --no-privileges \
   --file="$REHEARSAL_DIR/registry.dump" "$SOURCE_DATABASE_URL" \
   2>"$REHEARSAL_DIR/pg-dump.time.txt"
 pg_restore --list "$REHEARSAL_DIR/registry.dump" \
   >"$REHEARSAL_DIR/restore-contents.txt"
-/usr/bin/time -p pg_restore --no-owner --exit-on-error \
+/usr/bin/time -p pg_restore --no-owner --no-privileges --exit-on-error \
   --dbname="$RESTORE_DATABASE_URL" "$REHEARSAL_DIR/registry.dump" \
   2>"$REHEARSAL_DIR/pg-restore.time.txt"
 date -u +%Y-%m-%dT%H:%M:%SZ | tee "$REHEARSAL_DIR/finished-at.txt"
@@ -189,11 +239,15 @@ row is harmless because the API still starts.
 
 The Go auditor reads a consistent registry snapshot and verifies every artifact
 reference and object byte. Run it with the isolated database and read-only R2
-credentials:
+credentials. First retain the post-restore grant report; stop on a failure
+before running either the auditor or API probe:
 
 ```bash
+AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile registry-reader \
+  > "$REHEARSAL_DIR/restored-target-permissions.json"
 (
-  export AUDITOR_DATABASE_URL="$RESTORE_DATABASE_URL"
+  export AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL"
   cd tools/evidence-auditor
   go run . -timeout 5m -stale-after 96h
 ) \
@@ -236,7 +290,7 @@ production backup.
 Start a local API process against the restored target, not the production URL:
 
 ```bash
-EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_DATABASE_URL" \
+EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
   EDGAR_MOE_REGISTRY_DATABASE_URL='' \
   uv run uvicorn edgar_moe.api.app:app --host 127.0.0.1 --port 8000
 ```

@@ -36,3 +36,16 @@ def test_provider_restore_workflow_protects_source_and_target_evidence() -> None
     assert "SHA256SUMS" in text
     assert "scripts/validate_redacted_artifacts.py" in text
     assert "steps.redaction.outcome == 'success'" in text
+
+
+def test_runbook_never_uses_owner_credentials_for_read_verification() -> None:
+    text = Path("docs/restore-rehearsal.md").read_text()
+    assert 'export AUDITOR_DATABASE_URL="$SOURCE_AUDITOR_DATABASE_URL"' in text
+    assert 'export AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL"' in text
+    assert 'EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL"' in text
+    assert 'export AUDITOR_DATABASE_URL="$SOURCE_DATABASE_URL"' not in text
+    assert 'export AUDITOR_DATABASE_URL="$RESTORE_DATABASE_URL"' not in text
+    assert 'EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_DATABASE_URL"' not in text
+    for profile in ("evidence", "empty-restore-target", "registry-reader"):
+        assert f"scripts/verify_postgres_auditor.py --profile {profile}" in text
+    assert "post-restore check is mandatory" in text

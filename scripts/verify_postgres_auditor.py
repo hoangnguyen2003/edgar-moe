@@ -15,7 +15,10 @@ from typing import Any
 import psycopg
 from psycopg import Connection, sql
 
+from edgar_moe.forward.reader_role import READER_TABLES
+
 AUDITOR_TABLES = ("forward_runs", "forward_artifacts")
+PROFILES = ("evidence", "empty-restore-target", "registry-reader")
 _USER_SCHEMA = "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'"
 
 
@@ -29,8 +32,24 @@ def _require(connection: Connection[Any], query: str, code: str) -> None:
         raise AuditorPermissionError(code)
 
 
-def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
+def inspect_permissions(
+    connection: Connection[Any], *, profile: str = "evidence"
+) -> dict[str, object]:
     """Inspect current-session grants; caller must start a read-only snapshot."""
+    if profile not in PROFILES:
+        raise AuditorPermissionError("invalid_permission_profile")
+    tables = (
+        AUDITOR_TABLES
+        if profile == "evidence"
+        else READER_TABLES
+        if profile == "registry-reader"
+        else ()
+    )
+    # A logical registry dump also contains Alembic's non-sensitive migration
+    # revision table. Permit its SELECT grant, but do not require/read it.
+    allowed_tables = tables + (("alembic_version",) if profile == "registry-reader" else ())
+    # These names are internal constants, never SQL supplied by an operator.
+    allowed_names = ", ".join(f"'{table}'" for table in allowed_tables) or "''"
     _require(
         connection,
         "SELECT current_setting('transaction_read_only') = 'on'",
@@ -81,7 +100,7 @@ def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
             SELECT 1 FROM pg_catalog.pg_class c
             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             WHERE {_USER_SCHEMA} AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
-            AND NOT (n.nspname = 'public' AND c.relname IN ('forward_runs', 'forward_artifacts'))
+            AND NOT (n.nspname = 'public' AND c.relname IN ({allowed_names}))
             AND has_any_column_privilege(current_user, c.oid, 'SELECT'))""",
         "unrelated_table_read_allowed",
     )
@@ -118,7 +137,16 @@ def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
             AND has_function_privilege(current_user, p.oid, 'EXECUTE'))""",
         "security_definer_execution_allowed",
     )
-    for table in AUDITOR_TABLES:
+    if profile == "empty-restore-target":
+        _require(
+            connection,
+            f"""SELECT NOT EXISTS (
+                SELECT 1 FROM pg_catalog.pg_class c
+                JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+                WHERE {_USER_SCHEMA} AND c.relkind IN ('r', 'p', 'v', 'm', 'f'))""",
+            "restore_target_not_empty",
+        )
+    for table in tables:
         row = connection.execute(
             "SELECT has_table_privilege(current_user, %s, 'SELECT')",
             (f"public.{table}",),
@@ -130,7 +158,10 @@ def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
         "schema_version": 1,
         "status": "passed",
         "identity_redacted": True,
-        "select_tables": list(AUDITOR_TABLES),
+        "profile": profile,
+        "select_tables": list(tables),
+        "allowed_select_tables": list(allowed_tables),
+        "future_table_grants_verified": False,
         "transaction": "read_only_repeatable_read",
         "mutation_probes": False,
         "scope": "current_database_non_system_schema_grants",
@@ -145,12 +176,14 @@ def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
             "no_sequence_mutation",
             "no_security_definer_execution",
             "no_unrelated_table_reads",
-            "required_table_reads",
+            "empty_restore_target" if profile == "empty-restore-target" else "required_table_reads",
         ],
     }
 
 
-def audit_auditor_role(database_url: str) -> dict[str, object]:
+def audit_auditor_role(database_url: str, *, profile: str = "evidence") -> dict[str, object]:
+    if profile not in PROFILES:
+        raise AuditorPermissionError("invalid_permission_profile")
     if not database_url.strip():
         raise AuditorPermissionError("database_not_configured")
     with psycopg.connect(database_url, connect_timeout=10) as connection:
@@ -160,13 +193,17 @@ def audit_auditor_role(database_url: str) -> dict[str, object]:
         connection.execute("SET LOCAL statement_timeout = '10s'")
         connection.execute("SET LOCAL lock_timeout = '1s'")
         connection.execute("SET LOCAL search_path = pg_catalog")
-        return inspect_permissions(connection)
+        return inspect_permissions(connection, profile=profile)
 
 
 def main(argv: list[str] | None = None) -> int:
-    argparse.ArgumentParser(description=__doc__).parse_args(argv)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--profile", choices=PROFILES, default="evidence")
+    args = parser.parse_args(argv)
     try:
-        report = audit_auditor_role(os.environ.get("AUDITOR_DATABASE_URL", ""))
+        report = audit_auditor_role(
+            os.environ.get("AUDITOR_DATABASE_URL", ""), profile=args.profile
+        )
     except AuditorPermissionError as error:
         report = {"schema_version": 1, "status": "failed", "error_code": str(error)}
     except (psycopg.Error, ValueError):
