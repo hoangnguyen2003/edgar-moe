@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import importlib.util
 import os
 from collections.abc import Iterator
+from pathlib import Path
 from uuid import uuid4
 
 import psycopg
 import pytest
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
-from scripts import verify_postgres_auditor as audit
+_SPEC = importlib.util.spec_from_file_location(
+    "verify_postgres_auditor", Path(__file__).parents[2] / "scripts/verify_postgres_auditor.py"
+)
+assert _SPEC is not None and _SPEC.loader is not None
+audit = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(audit)
 
 
 @pytest.fixture

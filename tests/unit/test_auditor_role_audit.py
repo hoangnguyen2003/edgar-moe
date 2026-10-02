@@ -1,12 +1,19 @@
 from __future__ import annotations
 
+import importlib.util
 import json
+from pathlib import Path
 from typing import Any
 
 import psycopg
 import pytest
 
-from scripts import verify_postgres_auditor as audit
+_SPEC = importlib.util.spec_from_file_location(
+    "verify_postgres_auditor", Path(__file__).parents[2] / "scripts/verify_postgres_auditor.py"
+)
+assert _SPEC is not None and _SPEC.loader is not None
+audit = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(audit)
 
 
 class Cursor:
@@ -91,9 +98,13 @@ def test_live_connection_is_bounded_and_read_only(monkeypatch: pytest.MonkeyPatc
     report = audit.audit_auditor_role("postgresql://fixture")
     assert report["status"] == "passed"
     assert connection.options["connect_timeout"] == 10
-    assert "default_transaction_read_only=on" in str(connection.options["options"])
-    assert "statement_timeout=10000" in str(connection.options["options"])
-    assert connection.queries[0] == "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY"
+    assert "options" not in connection.options
+    assert connection.queries[:4] == [
+        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY",
+        "SET LOCAL statement_timeout = '10s'",
+        "SET LOCAL lock_timeout = '1s'",
+        "SET LOCAL search_path = pg_catalog",
+    ]
 
 
 def test_empty_url_is_not_a_success() -> None:

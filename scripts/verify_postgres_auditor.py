@@ -153,15 +153,13 @@ def inspect_permissions(connection: Connection[Any]) -> dict[str, object]:
 def audit_auditor_role(database_url: str) -> dict[str, object]:
     if not database_url.strip():
         raise AuditorPermissionError("database_not_configured")
-    with psycopg.connect(
-        database_url,
-        connect_timeout=10,
-        options=(
-            "-c default_transaction_read_only=on -c statement_timeout=10000 "
-            "-c lock_timeout=1000 -c search_path=pg_catalog"
-        ),
-    ) as connection:
+    with psycopg.connect(database_url, connect_timeout=10) as connection:
         connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        # Transaction-local settings work with transaction poolers and cannot
+        # leak into the next borrower. Avoid unsupported startup options.
+        connection.execute("SET LOCAL statement_timeout = '10s'")
+        connection.execute("SET LOCAL lock_timeout = '1s'")
+        connection.execute("SET LOCAL search_path = pg_catalog")
         return inspect_permissions(connection)
 
 
