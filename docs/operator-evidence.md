@@ -112,7 +112,9 @@ publish the provider role or database name. A local pass without the Actions
 artifact is useful diagnostic evidence, not completion of this provider check.
 
 The read-only R2 audit credentials are exposed only to its prerequisite check
-and independent Go auditor. Checkout, dependency/tool setup, hashing,
+and independent Go auditor. The database-only effective-permission check
+receives only the auditor database URL, never the R2 credentials. Its redacted
+report must pass before the integrity audit runs. Checkout, dependency/tool setup, hashing,
 redaction, and artifact upload do not receive the database or object-store
 credentials. This narrows the workflow's execution boundary; it does not prove
 that the hosted roles and bucket grants are configured or that an audit passed.

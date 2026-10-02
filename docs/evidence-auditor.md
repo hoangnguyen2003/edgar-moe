@@ -77,7 +77,23 @@ evidence audit**. Configure these Actions secrets with read-only credentials:
 - `EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY`
 
 Run it from the Actions tab after a provider change, suspected partial write, or
-before relying on a restore. The workflow never enables the Go repair path or
+before relying on a restore. Before the Go audit, `verify_postgres_auditor.py`
+uses the actual auditor login to inspect effective grants in a bounded,
+repeatable-read, read-only transaction. It rejects elevated role attributes,
+any other role membership (including non-inherited membership), database or
+non-system-schema CREATE, table/column write or SELECT grant-option privileges,
+sequence mutation, unrelated table reads, and executable user-schema
+SECURITY DEFINER functions. It also probes both required tables with LIMIT 0.
+Postgres 17+ MAINTAIN is checked without asking older servers for that privilege.
+The fixed-code, identity-redacted `database-permissions.json` report is retained
+and must pass before any R2 objects are read. No writes, DDL, grants, repair,
+or permission-denial mutation probes are attempted, even with bad credentials.
+This is a current-database grant snapshot, not a universal proof about built-in
+functions, temporary objects, future grants, or provider IAM. In particular,
+successful R2 reads do not prove the R2 token lacks write permission; retain
+separate provider-side token-scope evidence without credentials.
+
+The workflow never enables the Go repair path or
 uses the runner's writer/R2 upload credentials. It retains the JSON result, a
 redacted error stream, run metadata, and a SHA-256 file list for 30 days. Before
 upload, it scans every retained text file for credential-bearing URLs, token
