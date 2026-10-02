@@ -3,6 +3,9 @@ from shutil import copy2
 from subprocess import run
 from sys import executable
 
+import pytest
+import yaml
+
 WORKFLOW_ROOT = Path(".github/workflows")
 PROVIDER_WORKFLOWS = (
     "provider-evidence-preflight.yml",
@@ -203,6 +206,93 @@ def test_provider_restore_requires_secret_on_restore_step(tmp_path: Path) -> Non
     assert (
         "Restore into the isolated target must receive only its reviewed secrets" in result.stdout
     )
+
+
+@pytest.mark.parametrize(
+    "step_name",
+    [
+        "Verify source auditor permissions",
+        "Verify empty target auditor permissions",
+        "Export source registry counts",
+        "Audit source registry and R2 evidence",
+        "Dump source into private temporary storage",
+        "Re-check target emptiness before restore",
+        "Restore into the isolated target",
+        "Export restored registry counts",
+        "Verify restored target reader permissions",
+        "Audit restored registry and R2 evidence",
+        "Probe restored read path",
+    ],
+)
+def test_restore_cannot_bypass_permission_dependency_chain(tmp_path: Path, step_name: str) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        step
+        for step in workflow["jobs"]["restore-rehearsal"]["steps"]
+        if step.get("name") == step_name
+    )
+    step["if"] = "${{ always() }}"
+    path.write_text(yaml.safe_dump(workflow))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert f"{step_name} must preserve the restore permission gates" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("step_name", "mutation", "message"),
+    [
+        ("Verify source auditor permissions", "owner", "must receive only its reviewed secrets"),
+        (
+            "Verify empty target auditor permissions",
+            "owner",
+            "must receive only its reviewed secrets",
+        ),
+        (
+            "Verify restored target reader permissions",
+            "owner",
+            "must receive only its reviewed secrets",
+        ),
+        (
+            "Verify restored target reader permissions",
+            "profile",
+            "must retain the correct permission profile",
+        ),
+        ("Write redacted rehearsal summary", "summary", "must reject failed restored_grants"),
+        ("Write redacted rehearsal summary", "loop", "must reject failed restored_grants"),
+        ("Fail unless the rehearsal passed", "final", "final restore gate must require summary"),
+    ],
+)
+def test_restore_rejects_owner_substitution_wrong_profile_or_incomplete_final_gate(
+    tmp_path: Path, step_name: str, mutation: str, message: str
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        step
+        for step in workflow["jobs"]["restore-rehearsal"]["steps"]
+        if step.get("name") == step_name
+    )
+    if mutation == "owner":
+        step["env"]["AUDITOR_DATABASE_URL"] = "${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}"
+    elif mutation == "profile":
+        step["run"] = step["run"].replace(
+            "--profile registry-reader", "--profile empty-restore-target"
+        )
+    elif mutation == "summary":
+        del step["env"]["RESTORED_GRANTS_OUTCOME"]
+    elif mutation == "loop":
+        step["run"] = step["run"].replace('"$RESTORED_GRANTS_OUTCOME"', '"success"', 1)
+    else:
+        step["if"] = "${{ always() && steps.redaction.outcome != 'success' }}"
+    path.write_text(yaml.safe_dump(workflow))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert message in result.stdout
 
 
 def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:

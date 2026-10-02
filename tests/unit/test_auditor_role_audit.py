@@ -122,7 +122,7 @@ def test_empty_url_is_not_a_success() -> None:
 def test_driver_and_input_error_details_never_enter_report(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], error: Exception
 ) -> None:
-    def inspect(dsn: str) -> dict[str, object]:
+    def inspect(dsn: str, **kwargs: object) -> dict[str, object]:
         raise error
 
     monkeypatch.setattr(audit, "audit_auditor_role", inspect)
@@ -149,3 +149,46 @@ def test_help_does_not_connect_to_a_provider(monkeypatch: pytest.MonkeyPatch) ->
     with pytest.raises(SystemExit) as stopped:
         audit.main(["--help"])
     assert stopped.value.code == 0
+
+
+@pytest.mark.parametrize(
+    ("profile", "tables", "reads"),
+    [
+        ("evidence", audit.AUDITOR_TABLES, 2),
+        ("registry-reader", audit.READER_TABLES, 8),
+        ("empty-restore-target", (), 0),
+    ],
+)
+def test_permission_profiles_are_explicit_and_do_not_claim_future_grants(
+    profile: str, tables: tuple[str, ...], reads: int
+) -> None:
+    connection = Connection()
+    report = audit.inspect_permissions(connection, profile=profile)  # type: ignore[arg-type]
+    assert report["profile"] == profile
+    assert report["select_tables"] == list(tables)
+    assert report["future_table_grants_verified"] is False
+    assert len([query for query in connection.queries if "LIMIT 0" in query]) == reads
+    assert ("empty_restore_target" in report["checks"]) == (profile == "empty-restore-target")
+
+
+def test_unknown_profile_fails_before_connection(monkeypatch: pytest.MonkeyPatch) -> None:
+    def forbidden(*args: object, **kwargs: object) -> None:
+        raise AssertionError("invalid profile must never connect")
+
+    monkeypatch.setattr(audit.psycopg, "connect", forbidden)
+    with pytest.raises(audit.AuditorPermissionError, match="^invalid_permission_profile$"):
+        audit.audit_auditor_role("postgresql://fixture", profile="arbitrary_table")
+    with pytest.raises(audit.AuditorPermissionError, match="^invalid_permission_profile$"):
+        audit.inspect_permissions(Connection(), profile="arbitrary_table")
+
+
+def test_cli_forwards_only_allowlisted_profile(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def inspect(dsn: str, *, profile: str) -> dict[str, object]:
+        assert profile == "registry-reader"
+        return {"status": "passed"}
+
+    monkeypatch.setattr(audit, "audit_auditor_role", inspect)
+    assert audit.main(["--profile", "registry-reader"]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "passed"

@@ -501,6 +501,9 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
             **r2,
         },
         "Export source registry counts": {"SOURCE_DATABASE_URL": source},
+        "Verify source auditor permissions": {"AUDITOR_DATABASE_URL": source_auditor},
+        "Verify empty target auditor permissions": {"AUDITOR_DATABASE_URL": target_auditor},
+        "Verify restored target reader permissions": {"AUDITOR_DATABASE_URL": target_auditor},
         "Audit source registry and R2 evidence": {"AUDITOR_DATABASE_URL": source_auditor, **r2},
         "Dump source into private temporary storage": {"SOURCE_DATABASE_URL": source},
         "Re-check target emptiness before restore": {"TARGET_DATABASE_URL": target},
@@ -511,6 +514,82 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         "Probe restored read path": {"EDGAR_MOE_REGISTRY_READ_DATABASE_URL": target_auditor},
     }
     errors.extend(_validate_step_secret_bindings(name, workflow, "restore-rehearsal", consumers))
+    jobs = workflow.get("jobs", {})
+    job = jobs.get("restore-rehearsal", {}) if isinstance(jobs, dict) else {}
+    steps = job.get("steps", []) if isinstance(job, dict) else []
+    named = (
+        {str(step.get("name", "")): step for step in steps if isinstance(step, dict)}
+        if isinstance(steps, list)
+        else {}
+    )
+    gates = {
+        "Verify source auditor permissions": ("source_grants", ("preflight",)),
+        "Verify empty target auditor permissions": (
+            "empty_target_grants",
+            ("preflight", "source_grants"),
+        ),
+        "Export source registry counts": (
+            "source_counts",
+            ("preflight", "source_grants", "empty_target_grants"),
+        ),
+        "Audit source registry and R2 evidence": ("source_audit", ("source_counts",)),
+        "Dump source into private temporary storage": ("source_dump", ("source_counts",)),
+        "Re-check target emptiness before restore": ("target_empty", ("source_dump",)),
+        "Restore into the isolated target": ("restore", ("target_empty",)),
+        "Export restored registry counts": ("restored_counts", ("restore",)),
+        "Verify restored target reader permissions": ("restored_grants", ("restored_counts",)),
+        "Audit restored registry and R2 evidence": (
+            "restored_audit",
+            ("restored_counts", "restored_grants"),
+        ),
+        "Probe restored read path": ("read_path", ("restored_counts", "restored_grants")),
+    }
+    for step_name, (step_id, dependencies) in gates.items():
+        step = named.get(step_name, {})
+        condition = (
+            "${{ "
+            + " && ".join(f"steps.{dependency}.outcome == 'success'" for dependency in dependencies)
+            + " }}"
+        )
+        if step.get("id") != step_id or step.get("if") != condition:
+            errors.append(f"{name}: {step_name} must preserve the restore permission gates")
+    profiles = {
+        "Verify source auditor permissions": ("evidence", "source-permissions.json"),
+        "Verify empty target auditor permissions": (
+            "empty-restore-target",
+            "empty-target-permissions.json",
+        ),
+        "Verify restored target reader permissions": (
+            "registry-reader",
+            "restored-target-permissions.json",
+        ),
+    }
+    summary = named.get("Write redacted rehearsal summary", {})
+    summary_env = summary.get("env", {})
+    outcome_loop = re.search(r"for outcome in (.*?); do", str(summary.get("run", "")), re.S)
+    for step_name, (profile, report) in profiles.items():
+        step = named.get(step_name, {})
+        command = (
+            f"uv run python scripts/verify_postgres_auditor.py --profile {profile}"
+            f' > "$REHEARSAL_DIR/{report}"'
+        )
+        if step.get("run") != command:
+            errors.append(f"{name}: {step_name} must retain the correct permission profile")
+        step_id = gates[step_name][0]
+        variable = step_id.upper() + "_OUTCOME"
+        if (
+            not isinstance(summary_env, dict)
+            or summary_env.get(variable) != "${{ steps." + step_id + ".outcome }}"
+            or outcome_loop is None
+            or f'"${variable}"' not in outcome_loop.group(1)
+        ):
+            errors.append(f"{name}: rehearsal summary must reject failed {step_id}")
+    final = named.get("Fail unless the rehearsal passed", {})
+    if final.get("if") != (
+        "${{ always() && (steps.summary.outputs.overall_status != 'passed' "
+        "|| steps.redaction.outcome != 'success') }}"
+    ):
+        errors.append(f"{name}: final restore gate must require summary and redaction success")
     return errors
 
 

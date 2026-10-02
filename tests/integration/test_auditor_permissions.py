@@ -34,6 +34,13 @@ def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]],
         assert admin.execute("SELECT to_regclass('public.forward_runs')").fetchone() == (None,)
         admin.execute("CREATE TABLE public.forward_runs (run_id text)")
         admin.execute("CREATE TABLE public.forward_artifacts (artifact_id text)")
+        for table in set(audit.READER_TABLES) - set(audit.AUDITOR_TABLES):
+            admin.execute(
+                psycopg.sql.SQL("CREATE TABLE public.{} (id text)").format(
+                    psycopg.sql.Identifier(table)
+                )
+            )
+        admin.execute("CREATE TABLE public.alembic_version (version_num text)")
         admin.execute("CREATE TABLE public.unrelated_fixture (id integer)")
         admin.execute("CREATE SEQUENCE public.auditor_fixture_sequence")
         admin.execute(
@@ -61,9 +68,12 @@ def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]],
         finally:
             admin.execute("DROP FUNCTION public.auditor_fixture_function()")
             admin.execute("DROP SEQUENCE public.auditor_fixture_sequence")
-            admin.execute(
-                "DROP TABLE public.forward_runs, public.forward_artifacts, public.unrelated_fixture"
-            )
+            for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+                admin.execute(
+                    psycopg.sql.SQL("DROP TABLE IF EXISTS public.{}").format(
+                        psycopg.sql.Identifier(table)
+                    )
+                )
             admin.execute(psycopg.sql.SQL("DROP OWNED BY {}").format(psycopg.sql.Identifier(role)))
             admin.execute(psycopg.sql.SQL("DROP ROLE {}").format(psycopg.sql.Identifier(role)))
 
@@ -135,3 +145,97 @@ def test_public_column_write_grant_is_still_rejected(
     admin.execute("GRANT UPDATE (run_id) ON public.forward_runs TO PUBLIC")
     with pytest.raises(audit.AuditorPermissionError, match="^table_write_or_grant_allowed$"):
         audit.audit_auditor_role(dsn)
+
+
+def test_empty_target_is_not_proof_of_future_select_grants(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    admin.execute(
+        psycopg.sql.SQL(
+            "REVOKE SELECT ON public.forward_runs, public.forward_artifacts FROM {}"
+        ).format(psycopg.sql.Identifier(role))
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^restore_target_not_empty$"):
+        audit.audit_auditor_role(dsn, profile="empty-restore-target")
+    for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+        admin.execute(psycopg.sql.SQL("DROP TABLE public.{}").format(psycopg.sql.Identifier(table)))
+    report = audit.audit_auditor_role(dsn, profile="empty-restore-target")
+    assert report["status"] == "passed"
+    assert report["select_tables"] == []
+    assert report["future_table_grants_verified"] is False
+    # No default privileges: a subsequently restored table is not readable.
+    admin.execute("CREATE TABLE public.forward_datasets (id text)")
+    with pytest.raises(audit.AuditorPermissionError, match="^required_select_missing$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+    admin.execute(
+        psycopg.sql.SQL("GRANT CREATE ON SCHEMA public TO {}").format(psycopg.sql.Identifier(role))
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^schema_create_allowed$"):
+        audit.audit_auditor_role(dsn, profile="empty-restore-target")
+
+
+def test_restored_reader_accepts_only_registry_and_optional_migration_metadata(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    for table in (*audit.READER_TABLES, "alembic_version"):
+        admin.execute(
+            psycopg.sql.SQL("GRANT SELECT ON public.{} TO {}").format(
+                psycopg.sql.Identifier(table), psycopg.sql.Identifier(role)
+            )
+        )
+    report = audit.audit_auditor_role(dsn, profile="registry-reader")
+    assert report["select_tables"] == list(audit.READER_TABLES)
+    assert report["allowed_select_tables"] == [*audit.READER_TABLES, "alembic_version"]
+    with pytest.raises(audit.AuditorPermissionError, match="^unrelated_table_read_allowed$"):
+        audit.audit_auditor_role(dsn)  # Default evidence profile was not weakened.
+    admin.execute(
+        psycopg.sql.SQL("GRANT SELECT ON public.unrelated_fixture TO {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^unrelated_table_read_allowed$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+
+
+def test_restored_reader_rejects_owner_write_privileges(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    admin.execute(
+        psycopg.sql.SQL("GRANT SELECT, UPDATE ON ALL TABLES IN SCHEMA public TO {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    # Remove unrelated reads so this specifically exercises the write check.
+    admin.execute(
+        psycopg.sql.SQL("REVOKE SELECT ON public.unrelated_fixture FROM {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^table_write_or_grant_allowed$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+
+
+def test_isolated_owner_default_grants_support_post_restore_reader_check(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+        admin.execute(psycopg.sql.SQL("DROP TABLE public.{}").format(psycopg.sql.Identifier(table)))
+    assert audit.audit_auditor_role(dsn, profile="empty-restore-target")["status"] == "passed"
+    admin.execute(
+        psycopg.sql.SQL(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}"
+        ).format(psycopg.sql.Identifier(role))
+    )
+    # As with --no-owner --no-privileges, the target owner creates new tables;
+    # the source ACL is not imported. The reader obtains only target defaults.
+    for table in (*audit.READER_TABLES, "alembic_version"):
+        admin.execute(
+            psycopg.sql.SQL("CREATE TABLE public.{} (id text)").format(
+                psycopg.sql.Identifier(table)
+            )
+        )
+    assert audit.audit_auditor_role(dsn, profile="registry-reader")["status"] == "passed"
