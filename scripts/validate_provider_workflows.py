@@ -370,22 +370,28 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
         if exposes_credentials(job.get("env")):
             errors.append(f"{name}: R2 audit credentials must not be job-scoped")
         consumers = {
-            "Require read-only provider credentials",
-            "Run the independent Go auditor",
+            "Require read-only provider credentials": credentials,
+            "Verify auditor database permissions": {
+                "AUDITOR_DATABASE_URL": credentials["AUDITOR_DATABASE_URL"],
+            },
+            "Run the independent Go auditor": credentials,
         }
         observed: set[str] = set()
+        named_steps: dict[str, dict[str, Any]] = {}
         steps = job.get("steps")
         if isinstance(steps, list):
             for step in steps:
                 if not isinstance(step, dict):
                     continue
                 step_name = str(step.get("name", ""))
+                named_steps[step_name] = step
                 step_env = step.get("env")
                 if step_name in consumers:
+                    if step_name in observed:
+                        errors.append(f"{name}: duplicate R2 audit credential consumer {step_name}")
                     observed.add(step_name)
-                    if not isinstance(step_env, dict) or any(
-                        step_env.get(key) != expression for key, expression in credentials.items()
-                    ):
+                    expected = consumers[step_name]
+                    if step_env != expected:
                         errors.append(f"{name}: {step_name} must receive the read-only credentials")
                     if isinstance(step_env, dict) and any(
                         key not in credentials and references_secret(item)
@@ -398,8 +404,29 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
                     errors.append(
                         f"{name}: R2 audit credentials must not enter {step_name or 'unnamed step'}"
                     )
-        for missing_step in sorted(consumers - observed):
+        for missing_step in sorted(set(consumers) - observed):
             errors.append(f"{name}: missing R2 audit credential consumer {missing_step}")
+        grants = named_steps.get("Verify auditor database permissions")
+        audit = named_steps.get("Run the independent Go auditor")
+        final = named_steps.get("Fail unless the provider audit passed")
+        if (
+            not grants
+            or grants.get("id") != "grants"
+            or (
+                'scripts/verify_postgres_auditor.py > "$AUDIT_DIR/database-permissions.json"'
+                not in str(grants.get("run", ""))
+            )
+        ):
+            errors.append(f"{name}: auditor permission report must be retained")
+        if not audit or audit.get("if") != (
+            "${{ always() && steps.secret.outcome == 'success' && steps.grants.outcome == 'success' }}"
+        ):
+            errors.append(f"{name}: Go audit must require passed auditor permissions")
+        if not final or final.get("if") != (
+            "${{ always() && (steps.secret.outcome != 'success' || steps.grants.outcome != 'success' "
+            "|| steps.audit.outputs.exit_code != '0' || steps.redaction.outcome != 'success') }}"
+        ):
+            errors.append(f"{name}: final audit gate must reject failed auditor permissions")
     for required in (
         "actions/setup-go@",
         "AUDITOR_DATABASE_URL",

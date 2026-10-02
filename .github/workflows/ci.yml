@@ -27,6 +27,8 @@ jobs:
       - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
       - name: Check the reader-role audit command is runnable
         run: uv run python scripts/verify_postgres_reader.py --help
+      - name: Check the auditor-permission command is runnable
+        run: uv run python scripts/verify_postgres_auditor.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
       - name: Check restore comparison verifier is runnable
@@ -216,6 +218,17 @@ jobs:
             --variable api_reader_role=edgar_moe_api_reader \
             --variable migration_owner=edgar_moe_migrator \
             --file ops/postgres/provision-reader.sql
+      - name: Create an isolated database for auditor grant regressions
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
+        run: >-
+          psql "$EDGAR_MOE_REGISTRY_DATABASE_URL"
+          --set ON_ERROR_STOP=1
+          --command "CREATE DATABASE edgar_moe_auditor_permission_test"
+      - name: Verify auditor catalog checks against real PostgreSQL grants
+        env:
+          EDGAR_MOE_TEST_AUDITOR_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe_auditor_permission_test
+        run: uv run pytest tests/integration/test_auditor_permissions.py -q
       - name: Verify effective PostgreSQL reader privileges and denied writes
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe

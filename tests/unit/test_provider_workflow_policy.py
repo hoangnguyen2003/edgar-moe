@@ -28,6 +28,52 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+def test_r2_permissions_cannot_receive_object_store_credentials(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    before, after = workflow.read_text().split(
+        "      - name: Verify auditor database permissions", 1
+    )
+    after = after.replace(
+        "        run: uv run python scripts/verify_postgres_auditor.py",
+        "          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}\n"
+        "        run: uv run python scripts/verify_postgres_auditor.py",
+        1,
+    )
+    workflow.write_text(before + "      - name: Verify auditor database permissions" + after)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert (
+        "Verify auditor database permissions must receive the read-only credentials"
+        in result.stdout
+    )
+
+
+def test_r2_go_audit_cannot_bypass_failed_permissions(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    workflow.write_text(
+        workflow.read_text().replace(" && steps.grants.outcome == 'success'", " || true", 1)
+    )
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "Go audit must require passed auditor permissions" in result.stdout
+
+
+def test_r2_final_gate_cannot_ignore_failed_permissions(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    workflow.write_text(
+        workflow.read_text().replace(" || steps.grants.outcome != 'success'", "", 1)
+    )
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "final audit gate must reject failed auditor permissions" in result.stdout
+
+
 def test_provider_preflight_rejects_job_scoped_secrets(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
