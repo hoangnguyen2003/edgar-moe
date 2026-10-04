@@ -96,7 +96,11 @@ def _validate_partial_write(name: str, workflow: dict[str, Any]) -> list[str]:
         (step for step in steps if isinstance(step, dict) and step.get("id") == "rehearsal"), {}
     )
     command = (
-        'uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"'
+        'case "$READ_ONLY_PREFLIGHT" in\n'
+        '  true) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" --preflight-only ;;\n'
+        '  false) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" ;;\n'
+        "  *) exit 2 ;;\n"
+        "esac\n"
     )
     if exercise.get("run") != command or exercise.get("continue-on-error"):
         errors.append(
@@ -104,8 +108,20 @@ def _validate_partial_write(name: str, workflow: dict[str, Any]) -> list[str]:
         )
     if exercise.get("env", {}).get("CONFIRM_ISOLATED_FAILURE") != "${{ inputs.confirm }}":
         errors.append(f"{name}: isolated recovery requires explicit confirmation")
+    if exercise.get("env", {}).get("READ_ONLY_PREFLIGHT") != "${{ inputs.preflight_only }}":
+        errors.append(f"{name}: read-only preflight must use the explicit input")
     trigger = _workflow_trigger(workflow)
     dispatch = trigger.get("workflow_dispatch", {}) if isinstance(trigger, dict) else {}
+    preflight = (
+        dispatch.get("inputs", {}).get("preflight_only", {}) if isinstance(dispatch, dict) else {}
+    )
+    if preflight != {
+        "description": "Read-only diagnostics; disable only with new explicit recovery approval",
+        "required": True,
+        "default": True,
+        "type": "boolean",
+    }:
+        errors.append(f"{name}: read-only preflight must be the required safe default")
     confirmation = (
         dispatch.get("inputs", {}).get("confirm", {}) if isinstance(dispatch, dict) else {}
     )

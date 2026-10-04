@@ -53,6 +53,39 @@ REQUIRED = (
     "REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
     "REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY",
 )
+_SAFE_PREFLIGHT_CODES = frozenset(
+    {
+        "confirmation_required",
+        "missing_configuration",
+        "invalid_database_url",
+        "source_endpoint_not_distinct",
+        "unapproved_target_database",
+        "reader_identity_invalid",
+        "unapproved_target_bucket",
+        "production_bucket_conflict",
+        "invalid_r2_endpoint",
+        "r2_writer_reader_identity_conflict",
+        "observed_database_or_role_mismatch",
+        "isolated_target_not_empty",
+        "invalid_server_version",
+        "empty_reader_permissions_failed",
+        "test_bucket_not_empty",
+        "unexpected_bucket_volume",
+    }
+)
+
+
+class PreflightError(ValueError):
+    """Only fixed stages and allowlisted codes may leave provider diagnostics."""
+
+    def __init__(self, stage: str, error: Exception):
+        self.stage = stage
+        self.reason = (
+            str(error)
+            if isinstance(error, ValueError) and str(error) in _SAFE_PREFLIGHT_CODES
+            else "provider_observation_failed"
+        )
+        super().__init__(self.reason)
 
 
 def require(condition: bool, code: str) -> None:
@@ -198,16 +231,27 @@ def audit(
     write_report(root, name, report)
 
 
-def exercise(root: Path, env: Mapping[str, str]) -> None:
-    validate_scope(env)
-    owner_url, reader_url = env["REHEARSAL_DATABASE_URL"], env["REHEARSAL_AUDITOR_DATABASE_URL"]
-    observe(owner_url, endpoint(owner_url), empty=True)
-    observe(reader_url, endpoint(reader_url), empty=True)
-    permission = audit_auditor_role(reader_url, profile="empty-restore-target")
-    require(permission["status"] == "passed", "empty_reader_permissions_failed")
-    write_report(root, "empty-reader-permissions.json", permission)
-    writer, reader = store(env, reader=False), store(env, reader=True)
-    require(object_count(writer) == 0 and object_count(reader) == 0, "test_bucket_not_empty")
+def preflight(root: Path, env: Mapping[str, str]) -> None:
+    """Only configuration checks, read-only DB observations and fixed-bucket lists."""
+    stage = "configuration"
+    try:
+        validate_scope(env)
+        stage = "owner_identity_and_emptiness"
+        owner_url = env["REHEARSAL_DATABASE_URL"]
+        observe(owner_url, endpoint(owner_url), empty=True)
+        stage = "reader_identity_and_emptiness"
+        reader_url = env["REHEARSAL_AUDITOR_DATABASE_URL"]
+        observe(reader_url, endpoint(reader_url), empty=True)
+        stage = "reader_permissions"
+        permission = audit_auditor_role(reader_url, profile="empty-restore-target")
+        require(permission["status"] == "passed", "empty_reader_permissions_failed")
+        write_report(root, "empty-reader-permissions.json", permission)
+        stage = "writer_bucket_list"
+        require(object_count(store(env, reader=False)) == 0, "test_bucket_not_empty")
+        stage = "reader_bucket_list"
+        require(object_count(store(env, reader=True)) == 0, "test_bucket_not_empty")
+    except Exception as error:
+        raise PreflightError(stage, error) from None
     write_report(
         root,
         "preflight.json",
@@ -218,6 +262,12 @@ def exercise(root: Path, env: Mapping[str, str]) -> None:
             "source_endpoint_distinct": True,
         },
     )
+
+
+def exercise(root: Path, env: Mapping[str, str]) -> None:
+    preflight(root, env)
+    owner_url, reader_url = env["REHEARSAL_DATABASE_URL"], env["REHEARSAL_AUDITOR_DATABASE_URL"]
+    writer, reader = store(env, reader=False), store(env, reader=True)
     # Last check before initializing a fresh target; never clear or reuse it.
     observe(owner_url, endpoint(owner_url), empty=True)
     migration_env = child_environment()
@@ -335,6 +385,7 @@ def exercise(root: Path, env: Mapping[str, str]) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-root", type=Path, required=True)
+    parser.add_argument("--preflight-only", action="store_true")
     args = parser.parse_args()
     os.umask(0o077)
     root = args.output_root.absolute()
@@ -343,19 +394,27 @@ def main() -> int:
         return 2
     root.mkdir(parents=True, mode=0o700)
     try:
-        exercise(root, os.environ)
-    except Exception:
+        if args.preflight_only:
+            preflight(root, os.environ)
+        else:
+            exercise(root, os.environ)
+    except Exception as error:
+        failure = {
+            "status": "failed",
+            "reason": error.reason
+            if isinstance(error, PreflightError)
+            else "rehearsal_gate_failed",
+            "stage": error.stage if isinstance(error, PreflightError) else "recovery_exercise",
+            "preflight_only": args.preflight_only,
+            "raw_diagnostics_retained": False,
+            "no_cleanup_or_retry_attempted": True,
+        }
         write_report(
             root,
             "summary.json",
-            {
-                "status": "failed",
-                "reason": "rehearsal_gate_failed",
-                "raw_diagnostics_retained": False,
-                "no_cleanup_or_retry_attempted": True,
-            },
+            failure,
         )
-        print('{"status":"failed","reason":"rehearsal_gate_failed"}')
+        print(json.dumps(failure))
         return 1
     write_report(
         root,
@@ -366,7 +425,10 @@ def main() -> int:
             "observed_at": datetime.now(UTC).isoformat(),
             "run_id": os.environ.get("GITHUB_RUN_ID", "local"),
             "commit": os.environ.get("GITHUB_SHA", "local"),
-            "scope": "isolated_synthetic_partial_write_recovery",
+            "scope": "isolated_read_only_preflight"
+            if args.preflight_only
+            else "isolated_synthetic_partial_write_recovery",
+            "preflight_only": args.preflight_only,
             "raw_diagnostics_retained": False,
             "limitations": [
                 "not_real_forecast_or_source_use_approval",
@@ -375,7 +437,7 @@ def main() -> int:
             ],
         },
     )
-    print('{"status":"passed","scope":"isolated_synthetic_partial_write_recovery"}')
+    print(json.dumps({"status": "passed", "preflight_only": args.preflight_only}))
     return 0
 
 

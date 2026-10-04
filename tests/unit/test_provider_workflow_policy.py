@@ -34,7 +34,16 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
 
 @pytest.mark.parametrize(
     "mutation",
-    ["ignore_failure", "wrong_helper", "confirmation", "production_writer", "missing_reader"],
+    [
+        "ignore_failure",
+        "wrong_helper",
+        "confirmation",
+        "production_writer",
+        "missing_reader",
+        "unsafe_default",
+        "hardcoded_mode",
+        "removed_read_only_flag",
+    ],
 )
 def test_partial_write_workflow_cannot_widen_or_bypass_scope(tmp_path, mutation):
     for name in PROVIDER_WORKFLOWS:
@@ -56,11 +65,19 @@ def test_partial_write_workflow_cannot_widen_or_bypass_scope(tmp_path, mutation)
         text = text.replace(
             "secrets.EDGAR_MOE_REHEARSAL_DATABASE_URL", "secrets.EDGAR_MOE_REGISTRY_DATABASE_URL"
         )
-    else:
+    elif mutation == "missing_reader":
         text = text.replace(
             "secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
             "secrets.EDGAR_MOE_REHEARSAL_R2_ACCESS_KEY_ID",
         )
+    elif mutation == "unsafe_default":
+        text = text.replace("default: true", "default: false")
+    elif mutation == "hardcoded_mode":
+        text = text.replace(
+            "READ_ONLY_PREFLIGHT: ${{ inputs.preflight_only }}", "READ_ONLY_PREFLIGHT: false"
+        )
+    else:
+        text = text.replace(" --preflight-only", "")
     path.write_text(text)
     result = _run_validator(tmp_path)
     assert result.returncode != 0

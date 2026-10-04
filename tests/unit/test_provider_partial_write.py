@@ -239,6 +239,102 @@ def test_main_retains_only_fixed_failure_receipt(tmp_path, monkeypatch, capsys):
     assert rehearsal.main() == 2
 
 
+def test_read_only_main_never_exercises_or_starts_children(tmp_path, monkeypatch):
+    root = tmp_path / "preflight"
+    monkeypatch.setattr(
+        rehearsal.sys, "argv", ["rehearsal", "--output-root", str(root), "--preflight-only"]
+    )
+    monkeypatch.setattr(rehearsal.os, "environ", configuration())
+    observe = Mock()
+    audit = Mock(return_value={"status": "passed"})
+    remote = Mock()
+    remote.client.list_objects_v2.return_value = {"Contents": []}
+    monkeypatch.setattr(rehearsal, "observe", observe)
+    monkeypatch.setattr(rehearsal, "audit_auditor_role", audit)
+    monkeypatch.setattr(rehearsal, "store", Mock(return_value=remote))
+    mutation = Mock(side_effect=AssertionError("mutation forbidden"))
+    for name in ("exercise", "seed_fixture", "RegistryDatabase", "run_json"):
+        monkeypatch.setattr(rehearsal, name, mutation)
+    monkeypatch.setattr(rehearsal.subprocess, "run", mutation)
+    assert rehearsal.main() == 0
+    mutation.assert_not_called()
+    assert observe.call_count == 2
+    assert all(call.kwargs == {"empty": True} for call in observe.call_args_list)
+    assert remote.client.list_objects_v2.call_count == 2
+    summary = json.loads((root / "summary.json").read_bytes())
+    assert summary["preflight_only"] is True
+    assert summary["scope"] == "isolated_read_only_preflight"
+
+
+@pytest.mark.parametrize("unsafe", [False, True])
+def test_preflight_reports_fixed_stage_and_never_raw_error(tmp_path, monkeypatch, capsys, unsafe):
+    root = tmp_path / "preflight"
+    monkeypatch.setattr(
+        rehearsal.sys, "argv", ["rehearsal", "--output-root", str(root), "--preflight-only"]
+    )
+    monkeypatch.setattr(rehearsal.os, "environ", configuration())
+    error = ValueError("secret-password-url") if unsafe else ValueError("invalid_r2_endpoint")
+    monkeypatch.setattr(rehearsal, "validate_scope", Mock(side_effect=error))
+    provider = Mock()
+    monkeypatch.setattr(rehearsal, "observe", provider)
+    assert rehearsal.main() == 1
+    provider.assert_not_called()
+    summary = json.loads((root / "summary.json").read_bytes())
+    assert summary["stage"] == "configuration"
+    assert summary["reason"] == ("provider_observation_failed" if unsafe else "invalid_r2_endpoint")
+    assert "secret-password-url" not in capsys.readouterr().out
+    assert "secret-password-url" not in (root / "summary.json").read_text()
+
+
+@pytest.mark.parametrize(
+    "failed_stage",
+    [
+        "owner_identity_and_emptiness",
+        "reader_identity_and_emptiness",
+        "reader_permissions",
+        "writer_bucket_list",
+        "reader_bucket_list",
+    ],
+)
+def test_preflight_provider_failures_have_fixed_stage(tmp_path, monkeypatch, failed_stage):
+    monkeypatch.setattr(
+        rehearsal,
+        "observe",
+        Mock(
+            side_effect=[RuntimeError("secret-url")]
+            if failed_stage == "owner_identity_and_emptiness"
+            else [None, RuntimeError("secret-url")]
+            if failed_stage == "reader_identity_and_emptiness"
+            else [None, None]
+        ),
+    )
+    monkeypatch.setattr(
+        rehearsal,
+        "audit_auditor_role",
+        Mock(
+            side_effect=RuntimeError("secret-url")
+            if failed_stage == "reader_permissions"
+            else None,
+            return_value={"status": "passed"},
+        ),
+    )
+    monkeypatch.setattr(rehearsal, "store", Mock())
+    monkeypatch.setattr(
+        rehearsal,
+        "object_count",
+        Mock(
+            side_effect=[RuntimeError("secret-url")]
+            if failed_stage == "writer_bucket_list"
+            else [0, RuntimeError("secret-url")]
+        ),
+    )
+    with pytest.raises(rehearsal.PreflightError) as failure:
+        rehearsal.preflight(tmp_path, configuration())
+    assert failure.value.stage == failed_stage
+    assert failure.value.reason == "provider_observation_failed"
+    assert "secret-url" not in str(failure.value)
+
+
 def test_main_refuses_existing_or_symlinked_output_before_exercise(tmp_path, monkeypatch):
     existing = tmp_path / "existing"
     existing.mkdir()
