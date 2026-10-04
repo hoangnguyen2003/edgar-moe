@@ -89,9 +89,10 @@ ALTER DEFAULT PRIVILEGES FOR ROLE isolated_restore_owner IN SCHEMA public
 The reader must be a dedicated non-owner LOGIN role, without elevated role
 attributes, other role memberships, database CREATE or schema CREATE. Do not
 grant writes or sequence access. Default privileges are scoped to the exact
-owner used by restore, not the source owner. Use a registry-only source database
-containing the forward tables and migration metadata; restoring unrelated
-tables with these defaults fails the permission gate. A passing empty-target
+owner used by restore, not the source owner. The scoped exporter selects exactly
+the eight public forward tables and `public.alembic_version`, even when the source
+also contains unrelated relations. It never exports those other relations.
+Restoring unrelated tables with these defaults fails the permission gate. A passing empty-target
 check explicitly does **not** verify future SELECT grants; the separate
 post-restore check is mandatory. A populated provider clone is not an empty
 logical-restore target: use a new empty database instead, without clearing or
@@ -189,16 +190,37 @@ psql "$SOURCE_DATABASE_URL" -XAtc \
   go run . -timeout 5m -stale-after 96h
 ) \
   >"$REHEARSAL_DIR/source-evidence-audit.json"
-/usr/bin/time -p pg_dump --format=custom --no-owner --no-privileges \
-  --file="$REHEARSAL_DIR/registry.dump" "$SOURCE_DATABASE_URL" \
+SOURCE_DATABASE_URL="$SOURCE_DATABASE_URL" \
+  uv run python scripts/export_registry_dump.py \
+  --output "$REHEARSAL_DIR/registry.dump" \
+  --functions-output "$REHEARSAL_DIR/registry-functions.sql" \
+  > "$REHEARSAL_DIR/dump-scope.json" \
   2>"$REHEARSAL_DIR/pg-dump.time.txt"
 pg_restore --list "$REHEARSAL_DIR/registry.dump" \
   >"$REHEARSAL_DIR/restore-contents.txt"
+# Stop on any function installation error; never continue to pg_restore.
+psql "$RESTORE_DATABASE_URL" -X --set ON_ERROR_STOP=1 \
+  --file="$REHEARSAL_DIR/registry-functions.sql" && \
 /usr/bin/time -p pg_restore --no-owner --no-privileges --exit-on-error \
   --dbname="$RESTORE_DATABASE_URL" "$REHEARSAL_DIR/registry.dump" \
   2>"$REHEARSAL_DIR/pg-restore.time.txt"
 date -u +%Y-%m-%dT%H:%M:%SZ | tee "$REHEARSAL_DIR/finished-at.txt"
 ```
+
+The exporter currently supports reviewed migration `20260921_0002` only. It
+rejects missing/partitioned registry tables, altered or extra registry triggers,
+trigger-function drift, external foreign keys, and custom/default/generated
+column dependencies. It requires private output directories and never
+overwrites an existing output. Inspection and dump share one exported read-only
+snapshot, held open until `pg_dump` finishes. Table-filtered `pg_dump` omits function
+dependencies, so the SQL sidecar contains only the two append-only functions
+from the pinned migration implementation; install it before restoring the
+archive's tables, indexes, foreign keys, and triggers. Keep source schema changes
+paused throughout export. This is **registry recovery**, not a complete backup
+of a shared database. CI tests exclusion and restored immutability using only
+synthetic, disposable PostgreSQL data. Keep both raw outputs private and remove
+them after the rehearsal; the hosted workflow retains only its redacted scope
+report and deletes the entire private temporary directory.
 
 For a provider-managed backup, replace only the dump/restore commands with the
 provider's isolated restore operation and retain its job ID, start/end times,

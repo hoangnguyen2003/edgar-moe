@@ -31,6 +31,34 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+@pytest.mark.parametrize(
+    "mutation", ["whole_database_dump", "missing_functions", "ignored_function_failure"]
+)
+def test_restore_rejects_export_scope_and_function_installation_bypass(
+    tmp_path: Path, mutation: str
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    if mutation == "whole_database_dump":
+        text = text.replace(
+            "uv run python scripts/export_registry_dump.py", "pg_dump --format=custom"
+        )
+    elif mutation == "missing_functions":
+        text = text.replace(
+            '--file="$WORK_DIR/registry-functions.sql"', '--file="$WORK_DIR/unreviewed.sql"'
+        )
+    else:
+        text = text.replace('if [[ "$functions_code" -ne 0 ]]', "if [[ 0 -ne 0 ]]")
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert (
+        "scoped registry exporter" in result.stdout or "reviewed trigger functions" in result.stdout
+    )
+
+
 def test_r2_permissions_cannot_receive_object_store_credentials(tmp_path: Path) -> None:
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)

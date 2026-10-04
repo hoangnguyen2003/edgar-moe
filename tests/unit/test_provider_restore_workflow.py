@@ -30,7 +30,10 @@ def test_provider_restore_workflow_protects_source_and_target_evidence() -> None
     assert "EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL" in text
     assert "source and isolated target identities are not distinct" in text
     assert "isolated target is not empty" in text
-    assert "pg_dump --format=custom" in text
+    assert "scripts/export_registry_dump.py" in text
+    assert '"$WORK_DIR/registry-functions.sql"' in text
+    assert '"$REHEARSAL_DIR/dump-scope.json"' in text
+    assert "pg_dump --format=custom" not in text
     assert "pg_restore --no-owner --no-privileges --exit-on-error" in text
     assert "--clean" not in text
     assert "registry.dump" in text
