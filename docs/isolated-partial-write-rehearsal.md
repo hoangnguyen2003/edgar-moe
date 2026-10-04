@@ -11,7 +11,7 @@ the branch topology and bucket-scoped token settings. Endpoint checks cannot
 independently establish provider branch topology or prove token IAM scope.
 
 The workflow defaults to `preflight_only=true`: configuration validation,
-read-only identity/emptiness observations, rolled-back reader permission probes,
+read-only identity/emptiness observations, read-only reader grant checks,
 and fixed-test-bucket object lists only. It never migrates, seeds, writes objects,
 creates runs, or repairs anything. Its result is not recovery evidence. Failure
 reports identify a fixed stage and allowlisted reason, never raw driver errors.
