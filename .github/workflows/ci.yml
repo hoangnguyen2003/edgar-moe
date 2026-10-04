@@ -319,7 +319,7 @@ jobs:
       - name: Verify scoped restore excludes unrelated relations and preserves triggers
         env:
           EDGAR_MOE_TEST_REGISTRY_DUMP_URL: ${{ env.RESTORE_DATABASE_URL }}
-        run: uv run pytest tests/integration/test_registry_dump.py -q
+        run: uv run pytest tests/integration/test_scoped_registry_restore.py -q
       - name: Check restored schema and export counts
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
