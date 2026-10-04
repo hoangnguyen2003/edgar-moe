@@ -31,6 +31,29 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+@pytest.mark.parametrize("mutation", ["skip_helper", "ignore_failure", "backend_ip", "public_only"])
+def test_restore_identity_and_all_schema_emptiness_cannot_be_bypassed(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    command = 'uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"'
+    if mutation == "skip_helper":
+        text = text.replace(command, "true")
+    elif mutation == "ignore_failure":
+        text = text.replace(command, command + " || true")
+    elif mutation == "backend_ip":
+        text = text.replace(command, "echo inet_server_addr\n          " + command)
+    else:
+        text = text.replace(
+            "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'", "n.nspname = 'public'"
+        )
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "endpoint identity checks" in result.stdout or "all non-system schemas" in result.stdout
+
+
 @pytest.mark.parametrize(
     "mutation", ["whole_database_dump", "missing_functions", "ignored_function_failure"]
 )

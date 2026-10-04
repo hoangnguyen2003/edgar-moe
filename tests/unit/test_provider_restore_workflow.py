@@ -28,8 +28,9 @@ def test_provider_restore_workflow_protects_source_and_target_evidence() -> None
     assert "EDGAR_MOE_RESTORE_TARGET_DATABASE_URL" in text
     assert "EDGAR_MOE_RESTORE_SOURCE_AUDITOR_DATABASE_URL" in text
     assert "EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL" in text
-    assert "source and isolated target identities are not distinct" in text
-    assert "isolated target is not empty" in text
+    assert 'scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"' in text
+    assert "inet_server_addr" not in text
+    assert "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'" in text
     assert "scripts/export_registry_dump.py" in text
     assert '"$WORK_DIR/registry-functions.sql"' in text
     assert '"$REHEARSAL_DIR/dump-scope.json"' in text

@@ -471,8 +471,7 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         "TARGET_DATABASE_URL",
         "SOURCE_AUDITOR_DATABASE_URL",
         "TARGET_AUDITOR_DATABASE_URL",
-        "source and isolated target identities are not distinct",
-        "isolated target is not empty",
+        "scripts/verify_restore_identities.py",
         "scripts/export_registry_dump.py",
         '--functions-output "$WORK_DIR/registry-functions.sql"',
         "pg_restore --no-owner --no-privileges --exit-on-error",
@@ -523,6 +522,19 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         if isinstance(steps, list)
         else {}
     )
+    preflight = named.get("Validate isolated target and read-only audit credentials", {})
+    preflight_run = str(preflight.get("run", ""))
+    identity_command = 'uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"'
+    if (
+        preflight.get("id") != "preflight"
+        or "set -euo pipefail" not in preflight_run
+        or preflight_run.strip().splitlines()[-1:] != [identity_command]
+        or "inet_server_addr" in text
+    ):
+        errors.append(f"{name}: restore preflight must fail closed using endpoint identity checks")
+    empty_run = str(named.get("Re-check target emptiness before restore", {}).get("run", ""))
+    if "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'" not in empty_run:
+        errors.append(f"{name}: target emptiness must cover all non-system schemas")
     dump_run = str(named.get("Dump source into private temporary storage", {}).get("run", ""))
     restore_run = str(named.get("Restore into the isolated target", {}).get("run", ""))
     if "scripts/export_registry_dump.py" not in dump_run or re.search(r"\bpg_dump\b", dump_run):
