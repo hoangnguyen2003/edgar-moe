@@ -543,6 +543,13 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
     empty_run = str(named.get("Re-check target emptiness before restore", {}).get("run", ""))
     if "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'" not in empty_run:
         errors.append(f"{name}: target emptiness must cover all non-system schemas")
+    schema = named.get("Check restored schema", {})
+    if (
+        schema.get("id") != "schema"
+        or schema.get("run")
+        != 'uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"'
+    ):
+        errors.append(f"{name}: schema check must fail closed with credential-free diagnostics")
     read_run = str(named.get("Probe restored read path", {}).get("run", ""))
     if (
         "uv run python scripts/probe_restore_read_path.py" not in read_run
