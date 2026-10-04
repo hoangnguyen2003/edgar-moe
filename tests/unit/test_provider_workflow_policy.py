@@ -31,6 +31,23 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+@pytest.mark.parametrize("mutation", ["raw_diagnostics", "ignore_failure", "wrong_report"])
+def test_restore_schema_diagnostics_cannot_leak_or_ignore_failure(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    command = 'uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"'
+    replacement = {
+        "raw_diagnostics": 'uv run alembic check > "$REHEARSAL_DIR/alembic-check.txt" 2>&1',
+        "ignore_failure": command + " || true",
+        "wrong_report": command.replace("schema-check.json", "unreviewed.json"),
+    }[mutation]
+    path.write_text(path.read_text().replace(command, replacement))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "credential-free diagnostics" in result.stdout
+
+
 @pytest.mark.parametrize("mutation", ["ignore_failure", "wrong_baseline", "unreviewed_probe"])
 def test_restore_read_probe_cannot_ignore_failure_or_source_baseline(tmp_path, mutation):
     for name in PROVIDER_WORKFLOWS:

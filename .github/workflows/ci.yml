@@ -330,7 +330,7 @@ jobs:
           EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
         run: |
           set -euo pipefail
-          uv run alembic check
+          uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"
           uv run python scripts/export_forward_registry_counts.py \
             --database-url "$RESTORE_DATABASE_URL" \
             --output "$REHEARSAL_DIR/restored-counts.json"

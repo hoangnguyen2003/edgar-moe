@@ -108,6 +108,13 @@ timeout and a single bounded pool; raw driver errors and sample rows are never
 retained, including on failure. The permission gates, full eight-table comparison
 and both evidence audits remain separate required checks.
 
+Schema verification runs Alembic through a bounded, explicitly read-only helper.
+Only fixed-schema JSON is retained, on success or failure; raw Alembic/driver
+output stays in process memory and is never logged or uploaded. Percent-encoded
+connection options and passwords are escaped for ConfigParser interpolation so
+they round-trip unchanged. A schema error still fails the rehearsal. The artifact
+redaction gate remains mandatory; no suppressed diagnostic becomes a schema pass.
+
 A failed final probe does not make an already restored target empty again. Never
 dispatch another restore over it or clear it to obtain a green run. A standalone
 read-only follow-up may verify the existing copy against retained source counts,
