@@ -12,6 +12,7 @@ PROVIDER_WORKFLOWS = (
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
+    "provider-partial-write-rehearsal.yml",
 )
 
 
@@ -28,7 +29,41 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     result = _run_validator(WORKFLOW_ROOT)
 
     assert result.returncode == 0
-    assert "provider workflow safety contract passed (4 workflows)" in result.stdout
+    assert "provider workflow safety contract passed (5 workflows)" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["ignore_failure", "wrong_helper", "confirmation", "production_writer", "missing_reader"],
+)
+def test_partial_write_workflow_cannot_widen_or_bypass_scope(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-partial-write-rehearsal.yml"
+    text = path.read_text()
+    command = (
+        'uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"'
+    )
+    if mutation == "ignore_failure":
+        text = text.replace(command, command + " || true")
+    elif mutation == "wrong_helper":
+        text = text.replace(command, "echo skipped")
+    elif mutation == "confirmation":
+        text = text.replace(
+            "CONFIRM_ISOLATED_FAILURE: ${{ inputs.confirm }}", "CONFIRM_ISOLATED_FAILURE: yes"
+        )
+    elif mutation == "production_writer":
+        text = text.replace(
+            "secrets.EDGAR_MOE_REHEARSAL_DATABASE_URL", "secrets.EDGAR_MOE_REGISTRY_DATABASE_URL"
+        )
+    else:
+        text = text.replace(
+            "secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
+            "secrets.EDGAR_MOE_REHEARSAL_R2_ACCESS_KEY_ID",
+        )
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
 
 
 @pytest.mark.parametrize("mutation", ["raw_diagnostics", "ignore_failure", "wrong_report"])

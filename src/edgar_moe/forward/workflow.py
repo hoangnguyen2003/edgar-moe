@@ -23,6 +23,7 @@ from edgar_moe.forward.domain import (
 from edgar_moe.forward.failure_context import safe_exception_message
 from edgar_moe.forward.inference import ForecastBatch, ForecastQualityError, FrozenPredictor
 from edgar_moe.forward.models import utc_now
+from edgar_moe.forward.partial_write import record_partial_artifact
 from edgar_moe.forward.registry import ForwardRegistry
 from edgar_moe.utils.hashing import sha256_file
 from edgar_moe.utils.time import target_nyse_open
@@ -291,30 +292,7 @@ class ForwardWorkflow:
         failure classification rather than pretending the evidence is durable.
         """
 
-        try:
-            self.registry.register_artifact(
-                run_id,
-                kind=kind,
-                reference=error.primary_reference,
-            )
-        except Exception as registration_error:  # noqa: BLE001 - preserve original failure
-            self.registry.fail_run(
-                run_id,
-                error_message=(
-                    "ArtifactWriteError: mirror write failed and primary artifact "
-                    "registration failed "
-                    f"({type(registration_error).__name__})"
-                ),
-            )
-            return
-        self.registry.fail_run(
-            run_id,
-            error_message=(
-                "ArtifactWriteError: mirror write failed; primary artifact was "
-                "recorded for reconciliation "
-                f"(cause={error.cause_type})"
-            ),
-        )
+        record_partial_artifact(self.registry, run_id, kind=kind, error=error)
 
     def _ensure_registrations(
         self,

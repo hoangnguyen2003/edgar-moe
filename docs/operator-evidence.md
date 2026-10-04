@@ -157,6 +157,10 @@ without claiming that the provider-side roles have been tested.
 The packet is a record format, not proof by itself. For the current roadmap,
 retain a packet after these provider-side exercises:
 
+For the explicitly isolated synthetic write-failure/repair exercise, follow
+[the partial-write rehearsal runbook](isolated-partial-write-rehearsal.md).
+Never dispatch it against a populated restore copy or the production bucket.
+
 | Check | Required observation |
 | --- | --- |
 | `database_least_privilege` | The deployed API reader can perform the intended reads, cannot mutate the registry, and uses a bounded connection policy. |
