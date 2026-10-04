@@ -96,6 +96,24 @@ The exporter uses Neon's documented direct alias (removing only the endpoint's
 database, role, password, port and TLS options. Stored secrets are not changed.
 Neon's transaction pooler is not used for `pg_dump` startup/session options.
 
+The read-path probe checks availability and aggregate consistency against the
+source count report, not whether an old or intentionally held forward runner is
+currently healthy. It preserves `health_status` and `forward_health_ok` in its
+fixed-schema report: a faithfully restored stale registry can have available
+reads and still report `degraded` health. No forecast timestamps, quality gates,
+freshness thresholds or source-use holds are changed to make recovery pass.
+Wrong counts, malformed responses, failed reads and missing configuration still
+fail the probe. Connections are explicitly read-only with a 10-second statement
+timeout and a single bounded pool; raw driver errors and sample rows are never
+retained, including on failure. The permission gates, full eight-table comparison
+and both evidence audits remain separate required checks.
+
+A failed final probe does not make an already restored target empty again. Never
+dispatch another restore over it or clear it to obtain a green run. A standalone
+read-only follow-up may verify the existing copy against retained source counts,
+but does not change the original workflow outcome. For a clean end-to-end rerun,
+obtain approval and configure a new pre-created empty isolated database/reader.
+
 Database identities alone do not establish least privilege. Before exporting or
 restoring, the workflow verifies the source auditor's effective SELECT-only grants
 on `forward_runs` and `forward_artifacts`, and checks the target auditor's role

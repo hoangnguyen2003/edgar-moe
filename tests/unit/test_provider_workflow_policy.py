@@ -31,6 +31,32 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+@pytest.mark.parametrize("mutation", ["ignore_failure", "wrong_baseline", "unreviewed_probe"])
+def test_restore_read_probe_cannot_ignore_failure_or_source_baseline(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    marker = "uv run python scripts/probe_restore_read_path.py"
+    before, after = text.split(marker, 1)
+    if mutation == "ignore_failure":
+        after = after.replace(
+            '> "$REHEARSAL_DIR/read-path.json"', '> "$REHEARSAL_DIR/read-path.json" || true', 1
+        )
+    elif mutation == "wrong_baseline":
+        after = after.replace(
+            '--expected-counts "$REHEARSAL_DIR/source-counts.json"',
+            '--expected-counts "$REHEARSAL_DIR/unreviewed-counts.json"',
+            1,
+        )
+    else:
+        marker = "uv run python scripts/unreviewed_probe.py"
+    path.write_text(before + marker + after)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "read probe must verify source-count consistency" in result.stdout
+
+
 def test_restore_requires_reviewed_client_setup_before_preflight(tmp_path):
     for name in PROVIDER_WORKFLOWS:
         copy2(WORKFLOW_ROOT / name, tmp_path / name)
