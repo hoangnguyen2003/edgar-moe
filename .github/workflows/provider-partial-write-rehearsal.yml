@@ -1,0 +1,73 @@
+name: Provider isolated partial-write rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: One approved empty isolated database and private synthetic test bucket only
+        required: true
+        type: choice
+        options:
+          - I_UNDERSTAND_ISOLATED_FAILURE
+
+permissions:
+  contents: read
+
+concurrency:
+  group: provider-isolated-partial-write-rehearsal
+  cancel-in-progress: false
+
+jobs:
+  recovery-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      REHEARSAL_DIR: reports/provider-partial-write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked --extra dev --extra operations
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: tools/evidence-auditor/go.mod
+          cache-dependency-path: tools/evidence-auditor/go.sum
+      - name: Build independent read-only auditor
+        working-directory: tools/evidence-auditor
+        run: go build -o rehearsal-auditor .
+      - name: Exercise isolated failure and verified repair
+        id: rehearsal
+        env:
+          CONFIRM_ISOLATED_FAILURE: ${{ inputs.confirm }}
+          SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
+          PROTECTED_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          REHEARSAL_DATABASE_URL: ${{ secrets.EDGAR_MOE_REHEARSAL_DATABASE_URL }}
+          REHEARSAL_AUDITOR_DATABASE_URL: ${{ secrets.EDGAR_MOE_REHEARSAL_AUDITOR_DATABASE_URL }}
+          REHEARSAL_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_ENDPOINT_URL }}
+          REHEARSAL_R2_BUCKET: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_BUCKET }}
+          REHEARSAL_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_ACCESS_KEY_ID }}
+          REHEARSAL_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_SECRET_ACCESS_KEY }}
+          REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID }}
+          REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY }}
+        run: uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"
+      - name: Verify retained evidence is redacted
+        id: redaction
+        if: ${{ always() }}
+        run: uv run python scripts/validate_redacted_artifacts.py --root "$REHEARSAL_DIR"
+      - name: Hash retained evidence including synthetic primary
+        id: hash
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        run: find "$REHEARSAL_DIR" -type f ! -name SHA256SUMS -exec sha256sum {} + | sort > "$REHEARSAL_DIR/SHA256SUMS"
+      - name: Upload redacted isolated recovery evidence
+        if: ${{ always() && steps.redaction.outcome == 'success' && steps.hash.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: provider-partial-write-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/provider-partial-write/
+          if-no-files-found: error
+          retention-days: 30
+      - name: Fail unless the isolated rehearsal passed
+        if: ${{ always() && (steps.rehearsal.outcome != 'success' || steps.redaction.outcome != 'success' || steps.hash.outcome != 'success') }}
+        run: exit 1

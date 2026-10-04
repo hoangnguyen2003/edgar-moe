@@ -14,6 +14,7 @@ PROVIDER_WORKFLOWS = (
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
+    "provider-partial-write-rehearsal.yml",
 )
 
 # Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
@@ -55,7 +56,64 @@ def validate_provider_workflows(
             errors.extend(_validate_r2(name, workflow))
         elif name == "provider-restore-rehearsal.yml":
             errors.extend(_validate_restore(name, workflow))
+        elif name == "provider-partial-write-rehearsal.yml":
+            errors.extend(_validate_partial_write(name, workflow))
 
+    return errors
+
+
+def _validate_partial_write(name: str, workflow: dict[str, Any]) -> list[str]:
+    bindings = {
+        "SOURCE_DATABASE_URL": "EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL",
+        "PROTECTED_R2_BUCKET": "EDGAR_MOE_R2_BUCKET",
+        "REHEARSAL_DATABASE_URL": "EDGAR_MOE_REHEARSAL_DATABASE_URL",
+        "REHEARSAL_AUDITOR_DATABASE_URL": "EDGAR_MOE_REHEARSAL_AUDITOR_DATABASE_URL",
+        **{
+            variable: "EDGAR_MOE_" + variable
+            for variable in (
+                "REHEARSAL_R2_ENDPOINT_URL",
+                "REHEARSAL_R2_BUCKET",
+                "REHEARSAL_R2_ACCESS_KEY_ID",
+                "REHEARSAL_R2_SECRET_ACCESS_KEY",
+                "REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
+                "REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY",
+            )
+        },
+    }
+    expected = {key: "${{ secrets." + secret + " }}" for key, secret in bindings.items()}
+    errors = _validate_step_secret_bindings(
+        name,
+        workflow,
+        "recovery-rehearsal",
+        {
+            "Exercise isolated failure and verified repair": expected,
+        },
+    )
+    jobs = workflow.get("jobs", {})
+    job = jobs.get("recovery-rehearsal", {}) if isinstance(jobs, dict) else {}
+    steps = job.get("steps", []) if isinstance(job, dict) else []
+    exercise = next(
+        (step for step in steps if isinstance(step, dict) and step.get("id") == "rehearsal"), {}
+    )
+    command = (
+        'uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"'
+    )
+    if exercise.get("run") != command or exercise.get("continue-on-error"):
+        errors.append(
+            f"{name}: isolated recovery must use the reviewed helper without ignoring failure"
+        )
+    if exercise.get("env", {}).get("CONFIRM_ISOLATED_FAILURE") != "${{ inputs.confirm }}":
+        errors.append(f"{name}: isolated recovery requires explicit confirmation")
+    trigger = _workflow_trigger(workflow)
+    dispatch = trigger.get("workflow_dispatch", {}) if isinstance(trigger, dict) else {}
+    confirmation = (
+        dispatch.get("inputs", {}).get("confirm", {}) if isinstance(dispatch, dict) else {}
+    )
+    if (
+        confirmation.get("options") != ["I_UNDERSTAND_ISOLATED_FAILURE"]
+        or confirmation.get("required") is not True
+    ):
+        errors.append(f"{name}: isolated recovery confirmation must be required and scoped")
     return errors
 
 
