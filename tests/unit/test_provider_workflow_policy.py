@@ -31,6 +31,16 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     assert "provider workflow safety contract passed (4 workflows)" in result.stdout
 
 
+def test_restore_requires_reviewed_client_setup_before_preflight(tmp_path):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    path.write_text(path.read_text().replace("bash scripts/setup_postgres_client.sh", "true"))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "reviewed PostgreSQL client setup" in result.stdout
+
+
 @pytest.mark.parametrize("mutation", ["skip_helper", "ignore_failure", "backend_ip", "public_only"])
 def test_restore_identity_and_all_schema_emptiness_cannot_be_bypassed(tmp_path, mutation):
     for name in PROVIDER_WORKFLOWS:

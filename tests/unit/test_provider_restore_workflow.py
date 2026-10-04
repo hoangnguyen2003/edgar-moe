@@ -21,6 +21,34 @@ def test_provider_restore_workflow_is_manual_and_explicitly_gated() -> None:
     assert "timeout-minutes: 45" in text
 
 
+def test_postgresql_18_setup_is_shared_with_disposable_restore_ci() -> None:
+    provider = yaml.safe_load(WORKFLOW.read_text())["jobs"]["restore-rehearsal"]
+    ci = yaml.safe_load(Path(".github/workflows/ci.yml").read_text())["jobs"][
+        "postgres-restore-rehearsal"
+    ]
+    assert ci["services"]["postgres"]["image"] == "postgres:18"
+    for job in (provider, ci):
+        setup = next(
+            step
+            for step in job["steps"]
+            if step.get("name") == "Install reviewed PostgreSQL client tools"
+        )
+        assert setup["run"] == "bash scripts/setup_postgres_client.sh"
+        assert "env" not in setup
+    script = Path("scripts/setup_postgres_client.sh").read_text()
+    assert "postgresql-client-18" in script
+    assert "--no-install-recommends" in script
+    assert "secrets." not in script
+    result = run(
+        ["bash", "scripts/setup_postgres_client.sh"],
+        env={"PATH": os.defpath},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "restricted to the Linux Actions runner" in result.stderr
+
+
 def test_provider_restore_workflow_protects_source_and_target_evidence() -> None:
     text = WORKFLOW.read_text(encoding="utf-8")
 

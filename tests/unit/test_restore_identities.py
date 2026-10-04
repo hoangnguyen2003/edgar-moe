@@ -1,4 +1,5 @@
 import json
+from subprocess import CompletedProcess
 from unittest.mock import MagicMock
 
 import pytest
@@ -115,6 +116,7 @@ def test_static_failures_never_connect(monkeypatch, variable, value, reason):
 def test_success_observes_all_four_and_only_target_emptiness(monkeypatch):
     observe = MagicMock(return_value=18)
     monkeypatch.setattr(identities, "observe", observe)
+    monkeypatch.setattr(identities, "client_major", MagicMock(return_value=18))
     configured = environment()
     configured["SOURCE_AUDITOR_DATABASE_URL"] = url(
         "ep-source-pooler.example.neon.tech", role="auditor"
@@ -124,6 +126,7 @@ def test_success_observes_all_four_and_only_target_emptiness(monkeypatch):
     assert report["reason"] is None
     assert report["target_table_count"] == 0
     assert report["server_majors"] == dict.fromkeys(identities.DATABASE_VARIABLES, 18)
+    assert report["client_majors"] == {"pg_dump": 18, "pg_restore": 18}
     assert [call.kwargs["empty"] for call in observe.call_args_list] == [False, True, False, False]
     encoded = json.dumps(report)
     for private in ("synthetic-secret", "neon.tech", "fixture", "owner", "reader"):
@@ -204,3 +207,52 @@ def test_cli_retains_failure_and_refuses_report_overwrite(tmp_path, monkeypatch,
     assert identities.main() == 2
     assert output.read_bytes() == original
     assert "report_write_failed" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("dump,restore,target", [(16, 16, 18), (18, 17, 18), (18, 18, 16)])
+def test_client_and_target_version_incompatibility_stops_before_export(
+    monkeypatch, dump, restore, target
+):
+    monkeypatch.setattr(identities, "observe", MagicMock(side_effect=[18, target, 18, target]))
+    monkeypatch.setattr(identities, "client_major", MagicMock(side_effect=[dump, restore]))
+    report = identities.verify(environment())
+    assert report["status"] == "not_ready"
+    assert report["reason"] == "incompatible_postgresql_client_or_target_version"
+
+
+def test_client_errors_are_not_retained(monkeypatch):
+    monkeypatch.setattr(identities, "observe", MagicMock(return_value=18))
+    monkeypatch.setattr(
+        identities, "client_major", MagicMock(side_effect=RuntimeError("synthetic-secret"))
+    )
+    report = identities.verify(environment())
+    assert report["reason"] == "client_version_observation_failed"
+    assert "synthetic-secret" not in json.dumps(report)
+
+
+@pytest.mark.parametrize(
+    "stdout", ["pg_dump (PostgreSQL) 18.6\n", "pg_dump (PostgreSQL) 18.4 (Homebrew)\n"]
+)
+def test_client_version_is_bounded_numeric_observation(monkeypatch, stdout):
+    run = MagicMock(return_value=CompletedProcess([], 0, stdout=stdout))
+    monkeypatch.setattr(identities.subprocess, "run", run)
+    assert identities.client_major("pg_dump") == 18
+    run.assert_called_once_with(["pg_dump", "--version"], capture_output=True, text=True, timeout=5)
+
+
+@pytest.mark.parametrize(
+    "stdout,code",
+    [
+        ("pg_dump (PostgreSQL) 18.6\n", 1),
+        ("unexpected-secret", 0),
+        ("pg_restore (PostgreSQL) 18.6\n", 0),
+    ],
+)
+def test_client_version_observation_fails_closed(monkeypatch, stdout, code):
+    monkeypatch.setattr(
+        identities.subprocess,
+        "run",
+        MagicMock(return_value=CompletedProcess([], code, stdout=stdout)),
+    )
+    with pytest.raises(identities.RestoreIdentityError, match="^invalid_client_version$"):
+        identities.client_major("pg_dump")
