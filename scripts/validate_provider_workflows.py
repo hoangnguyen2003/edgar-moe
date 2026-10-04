@@ -543,6 +543,16 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
     empty_run = str(named.get("Re-check target emptiness before restore", {}).get("run", ""))
     if "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'" not in empty_run:
         errors.append(f"{name}: target emptiness must cover all non-system schemas")
+    read_run = str(named.get("Probe restored read path", {}).get("run", ""))
+    if (
+        "uv run python scripts/probe_restore_read_path.py" not in read_run
+        or '--expected-counts "$REHEARSAL_DIR/source-counts.json"' not in read_run
+        or '> "$REHEARSAL_DIR/read-path.json"' not in read_run
+        or "|| true" in read_run
+    ):
+        errors.append(
+            f"{name}: read probe must verify source-count consistency and retain its result"
+        )
     dump_run = str(named.get("Dump source into private temporary storage", {}).get("run", ""))
     restore_run = str(named.get("Restore into the isolated target", {}).get("run", ""))
     if "scripts/export_registry_dump.py" not in dump_run or re.search(r"\bpg_dump\b", dump_run):

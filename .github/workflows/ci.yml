@@ -35,6 +35,7 @@ jobs:
         run: |
           uv run python scripts/verify_restore_comparison.py --help
           uv run python scripts/verify_restore_identities.py --help
+          uv run python scripts/probe_restore_read_path.py --help
       - name: Check local restore rehearsal command is runnable
         run: uv run python scripts/rehearse_sqlite_restore.py --help
       - name: Check PostgreSQL restore fixture commands are runnable
@@ -353,24 +354,9 @@ jobs:
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
         run: |
-          uv run python - <<'PY'
-          import os
-
-          from edgar_moe.forward.database import RegistryDatabase
-          from edgar_moe.forward.registry import ForwardRegistry
-
-          database = RegistryDatabase(os.environ["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"])
-          try:
-              registry = ForwardRegistry(database, actor="restore-rehearsal-read-probe")
-              status = registry.status()
-              forecasts = registry.list_forecasts(limit=1)
-              assert status["health_status"] == "ok", status
-              assert status["run_count"] == 1, status
-              assert forecasts["total"] == 1, forecasts
-              assert registry.performance()["forecast_count"] == 1
-          finally:
-              database.dispose()
-          PY
+          uv run python scripts/probe_restore_read_path.py \
+            --expected-counts "$REHEARSAL_DIR/source-counts.json" \
+            > "$REHEARSAL_DIR/read-path.json"
       - name: Upload restore rehearsal evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

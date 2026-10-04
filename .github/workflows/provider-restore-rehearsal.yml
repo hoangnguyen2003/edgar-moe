@@ -282,31 +282,9 @@ jobs:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_TARGET_AUDITOR_DATABASE_URL }}
           EDGAR_MOE_REGISTRY_DATABASE_URL: ""
         run: |
-          uv run python - <<'PY' > "$REHEARSAL_DIR/read-path.json"
-          import json
-          import os
-
-          from edgar_moe.forward.database import RegistryDatabase
-          from edgar_moe.forward.registry import ForwardRegistry
-
-          database = RegistryDatabase(os.environ["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"])
-          try:
-              registry = ForwardRegistry(database, actor="provider-restore-read-probe")
-              status = registry.status()
-              forecasts = registry.list_forecasts(limit=1)
-              performance = registry.performance()
-              assert status["health_status"] == "ok", status
-              assert isinstance(forecasts["total"], int), forecasts
-              assert isinstance(performance["forecast_count"], int), performance
-              print(json.dumps({
-                  "status": "passed",
-                  "health_status": status["health_status"],
-                  "forecast_total": forecasts["total"],
-                  "performance_forecast_count": performance["forecast_count"],
-              }, sort_keys=True))
-          finally:
-              database.dispose()
-          PY
+          uv run python scripts/probe_restore_read_path.py \
+            --expected-counts "$REHEARSAL_DIR/source-counts.json" \
+            > "$REHEARSAL_DIR/read-path.json"
 
       - name: Compare and verify restore evidence
         id: compare
