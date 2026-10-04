@@ -31,8 +31,10 @@ jobs:
         run: uv run python scripts/verify_postgres_auditor.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
-      - name: Check restore comparison verifier is runnable
-        run: uv run python scripts/verify_restore_comparison.py --help
+      - name: Check restore comparison and identity verifiers are runnable
+        run: |
+          uv run python scripts/verify_restore_comparison.py --help
+          uv run python scripts/verify_restore_identities.py --help
       - name: Check local restore rehearsal command is runnable
         run: uv run python scripts/rehearse_sqlite_restore.py --help
       - name: Check PostgreSQL restore fixture commands are runnable

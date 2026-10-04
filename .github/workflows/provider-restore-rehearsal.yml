@@ -92,45 +92,8 @@ jobs:
             fail_preflight "required provider secret(s) are missing"
           fi
 
-          if ! source_identity="$(psql "$SOURCE_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
-            2>/dev/null)"; then
-            fail_preflight "source database is unreachable"
-          fi
-          if ! target_identity="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
-            2>/dev/null)"; then
-            fail_preflight "isolated target database is unreachable"
-          fi
-          if [[ -z "$source_identity" || -z "$target_identity" || "$source_identity" == "$target_identity" ]]; then
-            fail_preflight "source and isolated target identities are not distinct"
-          fi
-
-          if ! source_auditor_identity="$(psql "$SOURCE_AUDITOR_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
-            2>/dev/null)"; then
-            fail_preflight "source auditor database is unreachable"
-          fi
-          if ! target_auditor_identity="$(psql "$TARGET_AUDITOR_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT current_database() || '@' || coalesce(inet_server_addr()::text, 'local')" \
-            2>/dev/null)"; then
-            fail_preflight "target auditor database is unreachable"
-          fi
-          if [[ "$source_identity" != "$source_auditor_identity" || "$target_identity" != "$target_auditor_identity" ]]; then
-            fail_preflight "auditor URLs do not point to their corresponding databases"
-          fi
-
-          if ! target_table_count="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')" \
-            2>/dev/null)"; then
-            fail_preflight "isolated target table inventory failed"
-          fi
-          if [[ "$target_table_count" != "0" ]]; then
-            fail_preflight "isolated target is not empty"
-          fi
-
-          printf '{"status":"ready","source_target_distinct":true,"auditor_urls_aligned":true,"target_table_count":0,"checked_at":"%s"}\n' \
-            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$REHEARSAL_DIR/preflight.json"
+          umask 077
+          uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"
 
       - name: Verify source auditor permissions
         id: source_grants
@@ -215,7 +178,8 @@ jobs:
         run: |
           set -euo pipefail
           target_table_count="$(psql "$TARGET_DATABASE_URL" -XAtq --set ON_ERROR_STOP=1 \
-            --command "SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')")"
+            --command "SELECT count(*) FROM pg_class AS c JOIN pg_namespace AS n ON n.oid = c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('r', 'p', 'v', 'm', 'f')" \
+            2> "$WORK_DIR/target-empty.error")"
           if [[ "$target_table_count" != "0" ]]; then
             echo "The isolated target changed after preflight; refusing to restore." >&2
             exit 1

@@ -52,8 +52,9 @@ secrets, all kept outside logs and artifacts:
   `EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY`: read-only R2 verification access.
 
 The operator must choose `I_UNDERSTAND_ISOLATED_TARGET`. The workflow checks that
-source and target identities differ, both auditor URLs point at their matching
-database, and the target has no public tables before it runs. It uses a custom
+source and target configured endpoints differ, both auditor URLs point at their
+matching database, and the target has no relations in non-system schemas before
+it runs. It uses a custom
 `pg_dump` only as a logical rehearsal, stores the dump under a private temporary
 directory, removes it before job completion, and never uses `pg_restore --clean`.
 The dump itself is never uploaded. Retained evidence contains counts, schema and
@@ -62,6 +63,27 @@ step outcomes, and a SHA-256 file list for 30 days. A successful workflow is
 evidence of this specific source/target rehearsal; it is not proof that the
 provider's managed backup job, RPO, or RTO meets a target until those observations
 are recorded separately.
+
+The identity preflight compares explicit TLS PostgreSQL URL hostnames, ports and
+database names, then authenticates each URL in a bounded read-only transaction
+and checks the observed database and session/current role. Only Neon's documented
+`ep-…-pooler`/`ep-…` hostname pair is treated as the same endpoint; other aliases
+must match exactly. A different database or port on the source hostname is not an
+isolated target. Backend addresses (`inet_server_addr()`) are not stable provider
+endpoint identifiers and are not used for pairing or isolation. These checks do
+not independently prove provider branch topology: the operator must still verify
+the disposable branch/project in the provider console before confirming dispatch.
+See [PostgreSQL session information](https://www.postgresql.org/docs/current/functions-info.html)
+and [Neon connection pooling](https://neon.com/docs/connect/connection-pooling).
+
+The retained preflight report contains fixed failure codes, booleans, the empty
+relation count and numeric server major versions, never URLs, hostnames, database
+or role names, passwords or raw driver errors. For example,
+`source_auditor_endpoint_mismatch` requires correcting that auditor secret, not
+bypassing the check. Missing TLS/explicit credentials, connection-string endpoint
+overrides, observed identity mismatches and nonempty targets all stop the run
+before export/restore. A second all-non-system-schema emptiness check runs just
+before restore. No check clears the target.
 
 Database identities alone do not establish least privilege. Before exporting or
 restoring, the workflow verifies the source auditor's effective SELECT-only grants
