@@ -10,6 +10,14 @@ The reviewed workflow is **Provider isolated partial-write rehearsal**. Require
 the branch topology and bucket-scoped token settings. Endpoint checks cannot
 independently establish provider branch topology or prove token IAM scope.
 
+The workflow defaults to `preflight_only=true`: configuration validation,
+read-only identity/emptiness observations, rolled-back reader permission probes,
+and fixed-test-bucket object lists only. It never migrates, seeds, writes objects,
+creates runs, or repairs anything. Its result is not recovery evidence. Failure
+reports identify a fixed stage and allowlisted reason, never raw driver errors.
+Do not disable this default without explicit approval for a new recovery attempt;
+a previous failed run stays failed even if a later diagnostic passes.
+
 ## Configuration
 
 Use new secrets, never repoint the runner, auditor, or restore secrets:

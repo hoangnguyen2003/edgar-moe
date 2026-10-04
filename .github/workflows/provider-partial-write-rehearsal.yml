@@ -3,6 +3,11 @@ name: Provider isolated partial-write rehearsal
 on:
   workflow_dispatch:
     inputs:
+      preflight_only:
+        description: Read-only diagnostics; disable only with new explicit recovery approval
+        required: true
+        default: true
+        type: boolean
       confirm:
         description: One approved empty isolated database and private synthetic test bucket only
         required: true
@@ -41,6 +46,7 @@ jobs:
         id: rehearsal
         env:
           CONFIRM_ISOLATED_FAILURE: ${{ inputs.confirm }}
+          READ_ONLY_PREFLIGHT: ${{ inputs.preflight_only }}
           SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
           PROTECTED_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
           REHEARSAL_DATABASE_URL: ${{ secrets.EDGAR_MOE_REHEARSAL_DATABASE_URL }}
@@ -51,7 +57,12 @@ jobs:
           REHEARSAL_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_SECRET_ACCESS_KEY }}
           REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID }}
           REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY }}
-        run: uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"
+        run: |
+          case "$READ_ONLY_PREFLIGHT" in
+            true) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" --preflight-only ;;
+            false) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" ;;
+            *) exit 2 ;;
+          esac
       - name: Verify retained evidence is redacted
         id: redaction
         if: ${{ always() }}
