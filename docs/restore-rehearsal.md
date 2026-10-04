@@ -85,6 +85,17 @@ overrides, observed identity mismatches and nonempty targets all stop the run
 before export/restore. A second all-non-system-schema emptiness check runs just
 before restore. No check clears the target.
 
+The hosted workflow explicitly installs major-version-18 PostgreSQL client tools
+from the signed PGDG packages before any provider secrets are passed to a step.
+Preflight records numeric `pg_dump`/`pg_restore` majors and rejects an older dump
+client, differing dump/restore clients, or a target older than the dump client.
+It does not rely on the runner's default client version. The same setup is tested
+by disposable PostgreSQL 18 restore CI; the separate reader-grant CI remains on 16.
+The exporter uses Neon's documented direct alias (removing only the endpoint's
+`-pooler` suffix in memory) for its two shared-snapshot connections, preserving
+database, role, password, port and TLS options. Stored secrets are not changed.
+Neon's transaction pooler is not used for `pg_dump` startup/session options.
+
 Database identities alone do not establish least privilege. Before exporting or
 restoring, the workflow verifies the source auditor's effective SELECT-only grants
 on `forward_runs` and `forward_artifacts`, and checks the target auditor's role
@@ -120,7 +131,7 @@ post-restore check is mandatory. A populated provider clone is not an empty
 logical-restore target: use a new empty database instead, without clearing or
 overwriting the clone.
 
-Pull-request CI also runs a fully disposable PostgreSQL 16 version of this
+Pull-request CI also runs a fully disposable PostgreSQL 18 version of this
 exercise. It seeds an explicit synthetic fixture (only when the workflow passes
 `--allow-synthetic`), creates a custom-format dump, restores it into a different
 database, compares all registry-table counts, runs the Go auditor against the

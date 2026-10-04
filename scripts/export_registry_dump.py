@@ -16,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 import psycopg
-from sqlalchemy.engine import make_url
+from sqlalchemy.engine import URL, make_url
 
 from edgar_moe.forward.immutability import append_only_statements
 from edgar_moe.forward.reader_role import READER_TABLES
@@ -28,6 +28,19 @@ REVIEWED_REVISION = "20260921_0002"
 
 class RegistryDumpError(RuntimeError):
     """Fixed, credential-free refusal code."""
+
+
+def direct_export_url(url: URL) -> URL:
+    """Use the documented Neon direct alias for session/snapshot-based export.
+
+    Only the pooler suffix changes; database, role, password, port and TLS options
+    remain intact. Never change arbitrary provider hostnames or stored secrets.
+    """
+    host = url.host or ""
+    first, separator, rest = host.partition(".")
+    if host.endswith(".neon.tech") and first.startswith("ep-") and first.endswith("-pooler"):
+        return url.set(host=first.removesuffix("-pooler") + separator + rest)
+    return url
 
 
 def inspect_source(connection: psycopg.Connection[Any]) -> None:
@@ -158,7 +171,7 @@ def export_dump(database_url: str, output: Path, functions_output: Path) -> dict
             raise RegistryDumpError("output_parent_missing")
         if path.parent.stat().st_mode & 0o077:
             raise RegistryDumpError("output_directory_not_private")
-    url = make_url(database_url)
+    url = direct_export_url(make_url(database_url))
     if url.get_backend_name() != "postgresql" or not url.host or not url.database:
         raise RegistryDumpError("postgresql_source_required")
     # Use driver-compatible URL for the catalog check, but never subprocess argv.
@@ -201,6 +214,11 @@ def export_dump(database_url: str, output: Path, functions_output: Path) -> dict
                 check=False,
             )
             if result.returncode:
+                detail = str(result.stderr or "").lower()
+                if "server version mismatch" in detail:
+                    raise RegistryDumpError("registry_pg_dump_version_mismatch")
+                if "unsupported startup parameter" in detail:
+                    raise RegistryDumpError("registry_pg_dump_startup_options_rejected")
                 raise RegistryDumpError("registry_pg_dump_failed")
         # Fixed reviewed definitions, not arbitrary function bodies from the provider.
         with functions_output.open("x", encoding="utf-8") as handle:

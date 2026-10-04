@@ -523,6 +523,14 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         else {}
     )
     preflight = named.get("Validate isolated target and read-only audit credentials", {})
+    setup = named.get("Install reviewed PostgreSQL client tools", {})
+    setup_index = next((index for index, step in enumerate(steps) if step is setup), -1)
+    preflight_index = next((index for index, step in enumerate(steps) if step is preflight), -1)
+    if (
+        setup.get("run") != "bash scripts/setup_postgres_client.sh"
+        or not 0 <= setup_index < preflight_index
+    ):
+        errors.append(f"{name}: reviewed PostgreSQL client setup must precede credential preflight")
     preflight_run = str(preflight.get("run", ""))
     identity_command = 'uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"'
     if (

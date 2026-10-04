@@ -10,6 +10,8 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
+import subprocess
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -112,6 +114,17 @@ def observe(database_url: str, expected: tuple[str, int, str, str], *, empty: bo
         return major
 
 
+def client_major(client: str) -> int:
+    """Observe only a fixed client version, never driver diagnostics."""
+    result = subprocess.run([client, "--version"], capture_output=True, text=True, timeout=5)
+    match = re.fullmatch(
+        rf"{re.escape(client)} \(PostgreSQL\) (\d+)\.\d+[^\r\n]*\n?", result.stdout
+    )
+    if result.returncode or match is None:
+        raise RestoreIdentityError("invalid_client_version")
+    return int(match[1])
+
+
 def verify(environment: Mapping[str, str]) -> dict[str, Any]:
     """Fail closed before provider observations if configured endpoints disagree."""
     report: dict[str, Any] = {
@@ -123,6 +136,7 @@ def verify(environment: Mapping[str, str]) -> dict[str, Any]:
         "auditor_urls_aligned": False,
         "target_table_count": None,
         "server_majors": {},
+        "client_majors": {},
     }
     if environment.get("CONFIRM_ISOLATED_TARGET") != "I_UNDERSTAND_ISOLATED_TARGET":
         report["reason"] = "explicit_confirmation_required"
@@ -159,6 +173,21 @@ def verify(environment: Mapping[str, str]) -> dict[str, Any]:
         except Exception:
             report["reason"] = f"{label}_connection_or_observation_failed"
             return report
+    try:
+        report["client_majors"] = {
+            client: client_major(client) for client in ("pg_dump", "pg_restore")
+        }
+    except Exception:
+        report["reason"] = "client_version_observation_failed"
+        return report
+    dump_major = report["client_majors"]["pg_dump"]
+    if (
+        dump_major != report["client_majors"]["pg_restore"]
+        or dump_major < report["server_majors"]["source"]
+        or dump_major > report["server_majors"]["target"]
+    ):
+        report["reason"] = "incompatible_postgresql_client_or_target_version"
+        return report
     report.update(status="ready", reason=None, target_table_count=0)
     return report
 

@@ -2,6 +2,7 @@ from subprocess import CompletedProcess
 from unittest.mock import MagicMock
 
 import pytest
+from sqlalchemy.engine import make_url
 
 from scripts import export_registry_dump as exporter
 
@@ -172,3 +173,75 @@ def test_cli_redacts_driver_errors(tmp_path, monkeypatch, capsys):
     )
     assert exporter.main() == 1
     assert "private-url-password" not in capsys.readouterr().out
+
+
+def test_neon_export_uses_only_direct_alias_and_preserves_credentials_and_tls(
+    tmp_path, monkeypatch
+):
+    tmp_path.chmod(0o700)
+    original = make_url(
+        "postgresql://fixture:synthetic%40secret@ep-fixture-pooler.example.neon.tech:5432/fixture?sslmode=verify-full&sslrootcert=/fixture/ca.pem&channel_binding=require"
+    )
+    direct = exporter.direct_export_url(original)
+    assert direct.host == "ep-fixture.example.neon.tech"
+    assert direct.set(host=original.host) == original
+    connect = MagicMock()
+    connect.return_value.__enter__.return_value = fake_connection()
+    monkeypatch.setattr(exporter.psycopg, "connect", connect)
+    run = MagicMock(return_value=CompletedProcess([], 0))
+    monkeypatch.setattr(exporter.subprocess, "run", run)
+    exporter.export_dump(
+        original.render_as_string(hide_password=False), tmp_path / "dump", tmp_path / "functions"
+    )
+    assert make_url(connect.call_args.args[0]) == direct
+    settings = run.call_args.kwargs["env"]
+    assert settings["PGHOST"] == direct.host
+    assert settings["PGPASSWORD"] == original.password
+    assert settings["PGSSLROOTCERT"] == original.query["sslrootcert"]
+    assert settings["PGSSLMODE"] == "verify-full"
+    assert settings["PGCHANNELBINDING"] == "require"
+
+
+@pytest.mark.parametrize(
+    "host",
+    [
+        "ep-fixture-pooler.example.invalid",
+        "other-pooler.example.neon.tech",
+        "ep-fixture.example.neon.tech",
+        "127.0.0.1",
+    ],
+)
+def test_export_never_rewrites_arbitrary_hosts(host):
+    configured = make_url(f"postgresql://fixture@{host}/fixture")
+    assert exporter.direct_export_url(configured) == configured
+
+
+@pytest.mark.parametrize(
+    "stderr,code",
+    [
+        (
+            "aborting because of server version mismatch: synthetic-secret",
+            "registry_pg_dump_version_mismatch",
+        ),
+        (
+            "unsupported startup parameter: options synthetic-secret",
+            "registry_pg_dump_startup_options_rejected",
+        ),
+        ("other synthetic-secret", "registry_pg_dump_failed"),
+    ],
+)
+def test_export_classifies_known_failures_without_raw_diagnostics(
+    tmp_path, monkeypatch, stderr, code
+):
+    tmp_path.chmod(0o700)
+    connect = MagicMock()
+    connect.return_value.__enter__.return_value = fake_connection()
+    monkeypatch.setattr(exporter.psycopg, "connect", connect)
+    monkeypatch.setattr(
+        exporter.subprocess, "run", MagicMock(return_value=CompletedProcess([], 1, stderr=stderr))
+    )
+    with pytest.raises(exporter.RegistryDumpError, match=f"^{code}$"):
+        exporter.export_dump(
+            "postgresql://fixture@127.0.0.1/fixture", tmp_path / "dump", tmp_path / "functions"
+        )
+    assert not (tmp_path / "functions").exists()
