@@ -190,8 +190,10 @@ jobs:
           SOURCE_DATABASE_URL: ${{ secrets.EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL }}
         run: |
           set +e
-          pg_dump --format=custom --no-owner --no-privileges \
-            --file="$WORK_DIR/registry.dump" "$SOURCE_DATABASE_URL" \
+          uv run python scripts/export_registry_dump.py \
+            --output "$WORK_DIR/registry.dump" \
+            --functions-output "$WORK_DIR/registry-functions.sql" \
+            > "$REHEARSAL_DIR/dump-scope.json" \
             2> "$WORK_DIR/pg-dump.error"
           dump_code=$?
           set -e
@@ -231,6 +233,16 @@ jobs:
           set +e
           restore_started_epoch="$(date +%s)"
           restore_started_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          psql "$TARGET_DATABASE_URL" -X --set ON_ERROR_STOP=1 \
+            --file="$WORK_DIR/registry-functions.sql" \
+            > "$WORK_DIR/registry-functions.output" \
+            2> "$WORK_DIR/registry-functions.error"
+          functions_code=$?
+          if [[ "$functions_code" -ne 0 ]]; then
+            printf '{"exit_code":%s,"stage":"reviewed_functions"}\n' \
+              "$functions_code" > "$REHEARSAL_DIR/restore-timing.json"
+            exit "$functions_code"
+          fi
           pg_restore --no-owner --no-privileges --exit-on-error \
             --dbname="$TARGET_DATABASE_URL" "$WORK_DIR/registry.dump" \
             2> "$WORK_DIR/pg-restore.error"

@@ -473,7 +473,8 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         "TARGET_AUDITOR_DATABASE_URL",
         "source and isolated target identities are not distinct",
         "isolated target is not empty",
-        "pg_dump --format=custom",
+        "scripts/export_registry_dump.py",
+        '--functions-output "$WORK_DIR/registry-functions.sql"',
         "pg_restore --no-owner --no-privileges --exit-on-error",
         "Remove private temporary dump",
     ):
@@ -522,6 +523,17 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         if isinstance(steps, list)
         else {}
     )
+    dump_run = str(named.get("Dump source into private temporary storage", {}).get("run", ""))
+    restore_run = str(named.get("Restore into the isolated target", {}).get("run", ""))
+    if "scripts/export_registry_dump.py" not in dump_run or re.search(r"\bpg_dump\b", dump_run):
+        errors.append(f"{name}: restore export must use only the scoped registry exporter")
+    functions_marker = '--file="$WORK_DIR/registry-functions.sql"'
+    if (
+        functions_marker not in restore_run
+        or restore_run.find(functions_marker) > restore_run.find("pg_restore --no-owner")
+        or 'if [[ "$functions_code" -ne 0 ]]' not in restore_run
+    ):
+        errors.append(f"{name}: restore must install reviewed trigger functions and fail closed")
     gates = {
         "Verify source auditor permissions": ("source_grants", ("preflight",)),
         "Verify empty target auditor permissions": (
