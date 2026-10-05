@@ -114,6 +114,11 @@ provider-setting change affecting another project requires separate authorizatio
 
 ## What this does not close
 
+The [provider observations and safety plan](private-read-provider-safety-plan.md)
+record the maintainer's actual compute/restore screens, distinguish shared
+capacity from a pilot budget, and define the authorization gates for next steps.
+They do not authorize provider changes or another observation window.
+
 Issue #361 still needs deployed evidence, actual provider connection budgets and
 managed backup/retention observations. Logical recovery time is not managed-backup
 RPO/RTO. Issue #290 additionally requires representative volume, safe query plans,
