@@ -22,6 +22,36 @@ not presented as an exactly-once distributed scheduler.
 
 ## Secure, staged rollout
 
+### Dormant bootstrap credential verification (not a deployment)
+
+The **Verify dormant scheduler credentials** manual workflow reads the two
+Cloudflare secrets from the `scheduler` environment only on `main`. It performs
+at most two GET requests against the approved Worker's immutable ID: Worker
+metadata and the first page of versions. It checks the bootstrap Account ID
+digest, exact Worker identity, disabled `workers.dev` and version URLs, disabled
+observability/Logpush, no tail consumers, and zero uploaded versions. There is
+no retry, redirect following, Worker invocation, upload, deployment, cron
+configuration, workflow dispatch, or access to Postgres/R2/provider credentials.
+
+The retained report contains only fixed reason codes, booleans and bounded
+counts/status codes. API responses, URLs, Account IDs and credential values are
+never retained or printed. The report is hashed and checked for redaction before
+artifact upload. HTTP errors, missing metadata, configuration drift and any
+uploaded version fail closed.
+
+Success proves authenticated metadata reads and the undeployed boundary. It
+does **not** prove Editor write permission, exclusive token scope, expiration,
+billing state, or scheduler timing. Scope/expiration require the reviewed token
+policy; the Free plan requires separate account evidence. Keep the temporary
+bootstrap Admin token revoked and use only per-Worker Editor access for CI.
+
+Do not run **Deploy optional forward scheduler** after this check: its example
+config contains a live cron, and this dormant bootstrap approval does not
+authorize deployment, adding a GitHub dispatch secret, source-backed execution,
+or production cutover. Those remain separate reviewed and approved steps.
+
+### Later active rollout (requires separate approval)
+
 1. Create a fine-grained GitHub token restricted to this repository with only
    Actions read/write and Contents read. Store it as a Cloudflare Worker secret;
    never put it in `wrangler.toml`, Git, a GitHub issue, or a Worker response.

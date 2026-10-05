@@ -404,7 +404,7 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - name: Test the optional Cloudflare scheduler contract
-        run: node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs
+        run: node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs ops/scheduler/verify-dormant-credentials.test.mjs
 
   container:
     runs-on: ubuntu-24.04
