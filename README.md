@@ -241,11 +241,15 @@ only safe identities, counts, hashes, check statuses, and blocker codes; it
 never authorizes retraining or changes the frozen v1 artifact.
 
 For evidence navigation, `research-copilot` defaults to a credential-free,
-deterministic router over the currently published synthetic snapshot. It
-returns cited source fields, not synthesized conclusions, and never contacts
+deterministic navigator over the currently published synthetic snapshot. Its
+`deterministic-evidence-explanations-v1` templates display cited metrics, costs,
+methodology, experiment rows, identity, and governance with explicit missing-evidence
+and synthetic-only limits. They never contact
 a provider or registry database by default. A configured API key does not
-enable the LLM. The original router can omit evidence for multi-part questions;
-it is not a validated general-purpose question-answering system.
+enable the LLM. Topic matches can combine up to five evidence projections;
+unmatched topics abstain. This is not a validated general-purpose question-answering
+system. The original `deterministic-evidence-navigation-v1` benchmark router and
+its saved comparison remain unchanged.
 The operator-only LLM is experimental: `research-copilot`,
 `research-copilot-panel`, and `research-copilot-benchmark` require an explicit
 `--experimental-llm` flag before any model execution. It can also inspect the

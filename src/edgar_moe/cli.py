@@ -1687,11 +1687,11 @@ def research_copilot(
         normalize_copilot_profile,
         verify_copilot_answer_report,
     )
-    from edgar_moe.copilot.baseline import DeterministicEvidenceBaseline
     from edgar_moe.copilot.benchmark import (
         ensure_private_output_outside_git,
         write_benchmark_report,
     )
+    from edgar_moe.copilot.navigation import DeterministicEvidenceNavigator
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
 
@@ -1760,7 +1760,7 @@ def research_copilot(
                 ),
             }
         elif not experimental_llm:
-            report = DeterministicEvidenceBaseline(toolset).ask(question).as_dict()
+            report = DeterministicEvidenceNavigator(toolset).ask(question).as_dict()
         else:
             resolved_endpoint = endpoint or settings.edgar_moe_copilot_endpoint
             provider = OpenAICompatibleProvider(

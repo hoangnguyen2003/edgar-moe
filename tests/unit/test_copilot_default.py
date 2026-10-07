@@ -26,7 +26,7 @@ def no_provider_or_database(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("EDGAR_MOE_REGISTRY_DATABASE_URL", "sqlite:///must-not-open.db")
 
 
-def test_default_uses_unchanged_deterministic_navigation(
+def test_default_uses_versioned_deterministic_explanations(
     no_provider_or_database: None,
 ) -> None:
     result = CliRunner().invoke(cli.app, ["research-copilot", "Show the study summary."])
@@ -35,8 +35,10 @@ def test_default_uses_unchanged_deterministic_navigation(
     report = json.loads(result.stdout)
     verify_copilot_answer_report(report)
     assert report["provider"] == "none"
-    assert report["model"] == "deterministic-evidence-navigation-v1"
+    assert report["model"] == "deterministic-evidence-explanations-v1"
     assert report["tool_trace"][0]["name"] == "get_study_summary"
+    assert "Synthetic demonstration only" in report["answer"]
+    assert "Prediction metrics alone do not establish" in report["answer"]
     assert "usage" not in report
     assert "agent_identity" not in report
 

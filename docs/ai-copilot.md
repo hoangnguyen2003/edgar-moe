@@ -8,13 +8,22 @@ all outside the copilot's write boundary.
 
 ## What it does
 
-The `research-copilot` command uses the unchanged
-`deterministic-evidence-navigation-v1` router by default. It returns cited source
-fields rather than synthesizing claims, refuses matched order requests, and
-abstains when no fixed route matches. This mode reads only the local snapshot:
+The `research-copilot` command uses the separately versioned
+`deterministic-evidence-explanations-v1` navigator by default. Fixed templates
+display predictive metrics, cost scenarios, methodology, experiment rows, identity,
+and governance. Matched topics combine at most five zero-argument projections;
+experiment questions also include study metrics, and locked-test questions include
+both metrics and snapshot identity. It refuses matched order requests, explicitly
+reports unavailable live quotes, and abstains when no fixed route matches.
+Source text is quoted and bounded; missing or invalid values are labeled not recorded.
+This mode reads only the local snapshot:
 configured provider keys, endpoints, and registry URLs do not enable network or
 database access. It is a navigation aid, not a complete question-answering model;
-the fixed router can omit evidence needed for multi-part questions.
+the keyword routes and templates can omit parts of a question. The original
+`deterministic-evidence-navigation-v1` comparison arm in `research-copilot-baseline`
+is unchanged. Citation digests identify tool payloads, not proof of licensing,
+provider backup coverage, or performance. Locally projected governance is not a
+live console audit; an unattached registry says nothing about production's state.
 
 ```bash
 uv run edgar-moe research-copilot "Show the study summary and cost scenarios."
@@ -52,6 +61,8 @@ production readiness. No human ratings have been generated or substituted.
 The existing comparison router, corpus, saved reports, and frozen/forward
 records are unchanged. Future changes evaluated on these now-inspected cases
 are development regressions, not a new independent held-out confirmation.
+The new default explanations are an engineering response to those findings,
+tested with invented fixtures and boundary regressions, not a fresh utility study.
 
 The agent can make at most four tool calls by default. The provider transport
 allows at most two retries for explicitly transient HTTP/network failures, with
