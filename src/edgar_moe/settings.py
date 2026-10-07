@@ -140,7 +140,9 @@ class RuntimeSettings(BaseSettings):
     edgar_moe_r2_bucket: str = ""
     edgar_moe_r2_access_key_id: str = ""
     edgar_moe_r2_secret_access_key: str = ""
-    # Optional operator-run LLM copilot. The public API never reads these fields.
+    # Experimental operator-only LLM configuration. These fields never enable
+    # model execution without an explicit CLI --experimental-llm opt-in, and
+    # the public API never reads them.
     edgar_moe_copilot_api_key: SecretStr = SecretStr("")
     edgar_moe_copilot_endpoint: str = "https://api.openai.com/v1/chat/completions"
     # Exact comma-separated remote hostnames allowed to receive the copilot key.

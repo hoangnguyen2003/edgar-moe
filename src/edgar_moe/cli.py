@@ -10,6 +10,7 @@ from datetime import UTC, date, datetime, timedelta
 from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any, cast
+from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 import orjson
@@ -1576,8 +1577,7 @@ def research_copilot(
         str | None,
         typer.Option(
             "--database-url",
-            envvar="EDGAR_MOE_REGISTRY_READ_DATABASE_URL",
-            help="Optional SELECT-only forward-registry URL; local SQLite is also supported.",
+            help="Experimental LLM only: optional SELECT-only forward-registry URL.",
         ),
     ] = None,
     diagnostic_path: Annotated[
@@ -1666,12 +1666,26 @@ def research_copilot(
             help="Print the frozen identity and tool contract without contacting an LLM.",
         ),
     ] = False,
+    experimental_llm: Annotated[
+        bool,
+        typer.Option(
+            "--experimental-llm",
+            help="Explicitly opt into the experimental LLM; may contact a paid provider.",
+        ),
+    ] = False,
+    answer_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            help="Terminal answer format: json (default) or text. --output always saves JSON.",
+        ),
+    ] = "json",
 ) -> None:
-    """Ask an optional, read-only, citation-backed research copilot.
+    """Navigate cited snapshot evidence deterministically by default.
 
-    This command is intentionally operator-run. It never exposes the provider
-    key through the public API and never mutates the model, registry, labels, or
-    deployment state. Use --plan-only to inspect the agent boundary for free.
+    Provider configuration alone never enables an LLM. Use --experimental-llm
+    for an operator-only model exercise, or --plan-only to inspect the boundary.
+    Neither mode mutates forecasts, labels, registry records, or deployment state.
     """
     from edgar_moe.copilot import (
         OpenAICompatibleProvider,
@@ -1680,8 +1694,46 @@ def research_copilot(
         normalize_copilot_profile,
         verify_copilot_answer_report,
     )
+    from edgar_moe.copilot.benchmark import (
+        ensure_private_output_outside_git,
+        write_benchmark_report,
+    )
+    from edgar_moe.copilot.navigation import NAVIGATOR_VERSION, DeterministicEvidenceNavigator
+    from edgar_moe.copilot.presentation import render_copilot_answer_text
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
+
+    if answer_format not in {"json", "text"}:
+        raise typer.BadParameter("format must be json or text", param_hint="--format")
+    if plan_only and answer_format == "text":
+        raise typer.BadParameter(
+            "--format text is for answers; omit it for the JSON --plan-only contract.",
+            param_hint="--format",
+        )
+    if not experimental_llm and (
+        profile != "research"
+        or any(
+            value is not None
+            for value in (
+                database_url,
+                diagnostic_path,
+                diagnostic_history_path,
+                endpoint,
+                model,
+                max_tool_calls,
+                max_duration_seconds,
+                max_context_bytes,
+                max_retries,
+                retry_backoff_seconds,
+            )
+        )
+    ):
+        raise typer.BadParameter(
+            "Provider, profile, registry, diagnostic, and agent options require "
+            "--experimental-llm; default navigation reads only the snapshot."
+        )
+    if output is not None:
+        ensure_private_output_outside_git(output)
 
     settings = runtime_settings()
     try:
@@ -1691,7 +1743,9 @@ def research_copilot(
     repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
-    resolved_database_url = _copilot_database_url(settings, database_url)
+    resolved_database_url = (
+        _copilot_database_url(settings, database_url) if experimental_llm and not plan_only else ""
+    )
     if resolved_database_url:
         registry_database = RegistryDatabase(resolved_database_url)
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot")
@@ -1703,18 +1757,29 @@ def research_copilot(
             diagnostic_history_path=diagnostic_history_path,
         )
         if plan_only:
+            planned_tools = (
+                toolset.definitions()
+                if experimental_llm
+                else DeterministicEvidenceNavigator(toolset).definitions()
+            )
             report: dict[str, object] = {
                 "schema_version": 1,
                 "research_only": True,
                 "frozen_identity": repository.frozen_identity(),
-                "tools": [tool.as_provider_schema() for tool in toolset.definitions()],
+                "tools": [tool.as_provider_schema() for tool in planned_tools],
                 "profile_id": resolved_profile,
                 "provider_contacted": False,
+                "execution_mode": "experimental_llm" if experimental_llm else "deterministic",
                 "disclaimer": (
                     "The copilot is read-only and cannot modify forecasts, labels, registry records, "
                     "or deployment state."
                 ),
             }
+            if not experimental_llm:
+                report["navigator_version"] = NAVIGATOR_VERSION
+                report["max_tool_calls"] = len(planned_tools)
+        elif not experimental_llm:
+            report = DeterministicEvidenceNavigator(toolset).ask(question).as_dict()
         else:
             resolved_endpoint = endpoint or settings.edgar_moe_copilot_endpoint
             provider = OpenAICompatibleProvider(
@@ -1758,11 +1823,10 @@ def research_copilot(
         verify_copilot_answer_report(report)
     serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
     if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        temporary_output = output.with_suffix(output.suffix + ".tmp")
-        temporary_output.write_bytes(serialized)
-        temporary_output.replace(output)
+        write_benchmark_report(output, report)
         typer.echo(f"Wrote private research-copilot report to {output}")
+    elif answer_format == "text":
+        typer.echo(render_copilot_answer_text(report))
     else:
         typer.echo(serialized.decode())
 
@@ -1874,6 +1938,10 @@ def research_copilot_panel(
             help="Print the selected profiles and read-only tool contract without contacting an LLM.",
         ),
     ] = False,
+    experimental_llm: Annotated[
+        bool,
+        typer.Option("--experimental-llm", help="Explicitly opt into experimental LLM calls."),
+    ] = False,
 ) -> None:
     """Run bounded quant, architecture, and operations perspectives in parallel conceptually.
 
@@ -1894,6 +1962,8 @@ def research_copilot_panel(
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
 
+    if not plan_only:
+        _require_experimental_copilot_opt_in(experimental_llm)
     requested_profiles = profiles or ["quant", "architect", "operations"]
     try:
         selected_profiles = normalize_panel_profiles(requested_profiles)
@@ -1904,7 +1974,7 @@ def research_copilot_panel(
     repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
-    resolved_database_url = _copilot_database_url(settings, database_url)
+    resolved_database_url = _copilot_database_url(settings, database_url) if not plan_only else ""
     if resolved_database_url:
         registry_database = RegistryDatabase(resolved_database_url)
         registry = ForwardRegistry(registry_database, actor="edgar-moe-copilot-panel")
@@ -2058,6 +2128,7 @@ def research_copilot_eval(
     This is an offline structural evaluation. It never contacts an LLM and it
     never writes answer text into the aggregate report.
     """
+    from edgar_moe.copilot.benchmark import write_benchmark_report
     from edgar_moe.copilot.evaluation import (
         EvaluationInputError,
         evaluate_reports,
@@ -2081,10 +2152,10 @@ def research_copilot_eval(
         report["complete_gate_failed"] = True
     serialized = orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS)
     if output is not None:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        temporary_output = output.with_suffix(output.suffix + ".tmp")
-        temporary_output.write_bytes(serialized)
-        temporary_output.replace(output)
+        try:
+            write_benchmark_report(output, report)
+        except OSError as error:
+            raise typer.BadParameter(str(error)) from error
         typer.echo(f"Wrote private copilot evaluation to {output}")
     typer.echo(serialized.decode())
     if (require_complete and not suite.complete) or suite.pass_rate < fail_under:
@@ -2203,6 +2274,20 @@ def research_copilot_benchmark(
         bool,
         typer.Option("--plan-only", help="List selected cases without contacting an LLM."),
     ] = False,
+    synthetic_only: Annotated[
+        bool,
+        typer.Option(
+            "--synthetic-only",
+            help=(
+                "Require the lock-verified public synthetic snapshot and reject registry or "
+                "diagnostic context. This still contacts the configured provider."
+            ),
+        ),
+    ] = False,
+    experimental_llm: Annotated[
+        bool,
+        typer.Option("--experimental-llm", help="Explicitly opt into experimental LLM calls."),
+    ] = False,
 ) -> None:
     """Run the reviewed copilot corpus as a bounded private benchmark.
 
@@ -2260,7 +2345,20 @@ def research_copilot_benchmark(
         )
         return
 
+    _require_experimental_copilot_opt_in(experimental_llm)
     settings = runtime_settings()
+    if synthetic_only:
+        _require_synthetic_copilot_benchmark_context(
+            settings,
+            snapshot=snapshot,
+            database_url=database_url,
+            diagnostic_path=diagnostic_path,
+            diagnostic_history_path=diagnostic_history_path,
+        )
+        _require_synthetic_copilot_provider_credentials(
+            endpoint=endpoint or settings.edgar_moe_copilot_endpoint,
+            api_key_configured=bool(settings.edgar_moe_copilot_api_key.get_secret_value()),
+        )
     repository = _copilot_snapshot_repository(settings, snapshot)
     registry_database = None
     registry = None
@@ -2476,6 +2574,7 @@ def research_copilot_mask_review(
     ] = Path("/tmp/edgar-moe-copilot-masked-review"),
 ) -> None:
     """Prepare a private label-masked A/B packet from complete matched benchmarks."""
+    from edgar_moe.copilot.benchmark import ensure_private_output_outside_git
     from edgar_moe.copilot.blind_review import (
         MaskedReviewError,
         prepare_masked_review,
@@ -2486,6 +2585,7 @@ def research_copilot_mask_review(
     from edgar_moe.copilot.verification import CopilotVerificationError
 
     try:
+        ensure_private_output_outside_git(output_dir)
         packet, key = prepare_masked_review(
             baseline_dir, copilot_dir, load_evaluation_corpus(corpus)
         )
@@ -2765,6 +2865,51 @@ def _copilot_database_url(settings: RuntimeSettings, override: str | None) -> st
     if settings.edgar_moe_registry_database_url.lower().startswith("sqlite"):
         return settings.edgar_moe_registry_database_url
     return ""
+
+
+def _require_experimental_copilot_opt_in(enabled: bool) -> None:
+    if not enabled:
+        raise typer.BadParameter(
+            "LLM execution is experimental and disabled by default; add --experimental-llm "
+            "for an explicit provider exercise. This does not establish LLM utility."
+        )
+
+
+def _require_synthetic_copilot_benchmark_context(
+    settings: RuntimeSettings,
+    *,
+    snapshot: Path,
+    database_url: str | None,
+    diagnostic_path: Path | None,
+    diagnostic_history_path: Path | None,
+) -> None:
+    """Fail closed unless the provider benchmark can use only locked synthetic evidence."""
+    synthetic_snapshot = Path("data/demo/snapshot.json").resolve()
+    snapshot_lock = Path("config/public_snapshot.lock.json").resolve()
+    if (
+        snapshot.resolve() != synthetic_snapshot
+        or settings.edgar_moe_demo_snapshot.resolve() != synthetic_snapshot
+        or settings.edgar_moe_public_snapshot_lock.resolve() != snapshot_lock
+    ):
+        raise typer.BadParameter(
+            "--synthetic-only requires the exact lock-verified data/demo/snapshot.json fixture"
+        )
+    if database_url is not None or _copilot_database_url(settings, None):
+        raise typer.BadParameter("--synthetic-only forbids registry database context")
+    if diagnostic_path is not None or diagnostic_history_path is not None:
+        raise typer.BadParameter("--synthetic-only forbids diagnostic context")
+
+
+def _require_synthetic_copilot_provider_credentials(
+    *, endpoint: str, api_key_configured: bool
+) -> None:
+    """Avoid making unauthenticated remote provider requests from a benchmark run."""
+    host = (urlsplit(endpoint.strip()).hostname or "").lower().rstrip(".")
+    if not api_key_configured and host not in {"localhost", "127.0.0.1", "::1"}:
+        raise typer.BadParameter(
+            "--synthetic-only requires a provider API key for remote endpoints; "
+            "configure it privately"
+        )
 
 
 def _parse_timestamp(value: str | None) -> datetime:

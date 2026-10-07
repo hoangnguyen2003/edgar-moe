@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import stat
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -113,7 +116,7 @@ def run_benchmark(
     output_dir: Path,
 ) -> BenchmarkRun:
     """Run each selected case and write only private individual envelopes."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_private_directory(output_dir)
     if any(output_dir.iterdir()):
         raise FileExistsError(
             "benchmark output directory is not empty; use a fresh private directory"
@@ -178,11 +181,40 @@ def write_benchmark_report(path: Path, report: dict[str, object]) -> None:
     _write_json(path, report)
 
 
+def ensure_private_output_outside_git(path: Path) -> None:
+    """Refuse private answer/review artifacts anywhere inside a Git worktree."""
+    resolved = path.resolve()
+    for ancestor in (resolved, *resolved.parents):
+        if (ancestor / ".git").exists():
+            raise PermissionError("private copilot output must be outside a Git working tree")
+
+
 def _write_json(path: Path, payload: dict[str, object]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(path.suffix + ".tmp")
-    temporary.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
-    temporary.replace(path)
+    ensure_private_output_outside_git(path)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(orjson.dumps(payload, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def _ensure_private_directory(path: Path) -> None:
+    """Create a fresh owner-only directory or reject an existing broad path."""
+    if path.is_symlink():
+        raise PermissionError("benchmark output directory must not be a symlink")
+    ensure_private_output_outside_git(path)
+    path.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not path.is_dir() or stat.S_IMODE(path.stat().st_mode) != 0o700:
+        raise PermissionError("benchmark output directory must have owner-only mode 0700")
 
 
 def _aggregate_usage(reports: tuple[dict[str, object], ...]) -> BenchmarkUsage | None:
