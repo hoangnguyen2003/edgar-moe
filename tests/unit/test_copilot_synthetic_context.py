@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 import typer
+from click import unstyle
 from typer.testing import CliRunner
 
 from edgar_moe.cli import (
@@ -17,6 +18,12 @@ from edgar_moe.copilot.benchmark import (
 )
 from edgar_moe.copilot.blind_review import write_private_json
 from edgar_moe.settings import RuntimeSettings
+
+
+@pytest.fixture(autouse=True)
+def force_rich_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep CLI help and refusal assertions independent of ANSI styling."""
+    monkeypatch.setattr("typer.rich_utils.FORCE_TERMINAL", True)
 
 
 def _settings(**overrides: object) -> RuntimeSettings:
@@ -199,10 +206,11 @@ def test_benchmark_help_explains_synthetic_only_still_contacts_provider() -> Non
     result = CliRunner().invoke(app, ["research-copilot-benchmark", "--help"])
 
     assert result.exit_code == 0, result.output
-    assert "--synthetic-only" in result.output
-    assert "still contacts" in result.output
-    assert "configured" in result.output
-    assert "provider." in result.output
+    output = unstyle(result.output)
+    assert "--synthetic-only" in output
+    assert "still contacts" in output
+    assert "configured" in output
+    assert "provider." in output
 
 
 def test_synthetic_only_cli_rejects_database_override_before_creating_outputs(
@@ -223,7 +231,7 @@ def test_synthetic_only_cli_rejects_database_override_before_creating_outputs(
     )
 
     assert result.exit_code != 0
-    assert "--synthetic-only forbids registry database context" in result.output
+    assert "--synthetic-only forbids registry database context" in unstyle(result.output)
     assert "postgresql://" not in result.output
     assert not output_dir.exists()
 

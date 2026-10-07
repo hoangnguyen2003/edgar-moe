@@ -7,12 +7,19 @@ import stat
 from pathlib import Path
 
 import pytest
+from click import unstyle
 from typer.testing import CliRunner
 
 from edgar_moe import cli
 from edgar_moe.copilot.navigation import NAVIGATOR_TOOL_NAMES, NAVIGATOR_VERSION
 from edgar_moe.copilot.presentation import render_copilot_answer_text
 from edgar_moe.copilot.verification import verify_copilot_answer_report
+
+
+@pytest.fixture(autouse=True)
+def force_rich_terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise styled CLI diagnostics even on non-terminal local runners."""
+    monkeypatch.setattr("typer.rich_utils.FORCE_TERMINAL", True)
 
 
 def _unexpected_call(*args: object, **kwargs: object) -> None:
@@ -97,7 +104,7 @@ def test_invalid_presentation_options_fail_before_settings_or_outputs(
         cli.app, ["research-copilot", "Show summary", *options, "--output", str(output)]
     )
     assert result.exit_code == 2, result.output
-    assert "--format" in result.output
+    assert "--format" in unstyle(result.output)
     assert not output.exists()
 
 
@@ -222,7 +229,7 @@ def test_advanced_options_do_not_implicitly_enable_llm(
         ],
     )
     assert result.exit_code == 2, result.output
-    assert "--experimental-llm" in result.output
+    assert "--experimental-llm" in unstyle(result.output)
     assert not output.exists()
 
 
@@ -237,7 +244,7 @@ def test_provider_exercises_require_opt_in_before_settings_or_outputs(
     output = tmp_path / "must-not-be-created"
     result = CliRunner().invoke(cli.app, [*command, "--output-dir", str(output)])
     assert result.exit_code == 2, result.output
-    assert "--experimental-llm" in result.output
+    assert "--experimental-llm" in unstyle(result.output)
     assert not output.exists()
 
 
