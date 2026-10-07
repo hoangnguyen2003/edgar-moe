@@ -250,6 +250,11 @@ enable the LLM. Topic matches can combine up to five evidence projections;
 unmatched topics abstain. This is not a validated general-purpose question-answering
 system. The original `deterministic-evidence-navigation-v1` benchmark router and
 its saved comparison remain unchanged.
+Use `research-copilot "Explain the target and limitations." --format text` for
+a readable terminal answer with citations and the research disclaimer. JSON stays
+the default, and `--output` always retains the private JSON envelope without
+printing answer text. The default `--plan-only` preview lists only its five
+snapshot projections; experimental capability previews require `--experimental-llm`.
 The operator-only LLM is experimental: `research-copilot`,
 `research-copilot-panel`, and `research-copilot-benchmark` require an explicit
 `--experimental-llm` flag before any model execution. It can also inspect the

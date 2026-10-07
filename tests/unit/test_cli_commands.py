@@ -66,7 +66,7 @@ def test_copilot_plan_only_describes_the_tools_without_contacting_a_provider() -
     assert result.exit_code == 0, result.output
     report = json.loads(result.stdout)
     assert report["provider_contacted"] is False
-    assert len(report["tools"]) == 7
+    assert len(report["tools"]) == 5
     assert report["profile_id"] == "research"
     snapshot_digest = hashlib.sha256(Path("data/demo/snapshot.json").read_bytes()).hexdigest()
     assert report["frozen_identity"]["sha256"] == snapshot_digest
@@ -80,6 +80,7 @@ def test_copilot_plan_only_accepts_a_solution_architecture_profile() -> None:
             "Which controls are still unverified?",
             "--profile",
             "architect",
+            "--experimental-llm",
             "--plan-only",
         ],
     )

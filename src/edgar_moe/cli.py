@@ -1673,6 +1673,13 @@ def research_copilot(
             help="Explicitly opt into the experimental LLM; may contact a paid provider.",
         ),
     ] = False,
+    answer_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            help="Terminal answer format: json (default) or text. --output always saves JSON.",
+        ),
+    ] = "json",
 ) -> None:
     """Navigate cited snapshot evidence deterministically by default.
 
@@ -1691,29 +1698,33 @@ def research_copilot(
         ensure_private_output_outside_git,
         write_benchmark_report,
     )
-    from edgar_moe.copilot.navigation import DeterministicEvidenceNavigator
+    from edgar_moe.copilot.navigation import NAVIGATOR_VERSION, DeterministicEvidenceNavigator
+    from edgar_moe.copilot.presentation import render_copilot_answer_text
     from edgar_moe.forward.database import RegistryDatabase
     from edgar_moe.forward.registry import ForwardRegistry
 
-    if (
-        not experimental_llm
-        and not plan_only
-        and (
-            profile != "research"
-            or any(
-                value is not None
-                for value in (
-                    database_url,
-                    diagnostic_path,
-                    diagnostic_history_path,
-                    endpoint,
-                    model,
-                    max_tool_calls,
-                    max_duration_seconds,
-                    max_context_bytes,
-                    max_retries,
-                    retry_backoff_seconds,
-                )
+    if answer_format not in {"json", "text"}:
+        raise typer.BadParameter("format must be json or text", param_hint="--format")
+    if plan_only and answer_format == "text":
+        raise typer.BadParameter(
+            "--format text is for answers; omit it for the JSON --plan-only contract.",
+            param_hint="--format",
+        )
+    if not experimental_llm and (
+        profile != "research"
+        or any(
+            value is not None
+            for value in (
+                database_url,
+                diagnostic_path,
+                diagnostic_history_path,
+                endpoint,
+                model,
+                max_tool_calls,
+                max_duration_seconds,
+                max_context_bytes,
+                max_retries,
+                retry_backoff_seconds,
             )
         )
     ):
@@ -1746,11 +1757,16 @@ def research_copilot(
             diagnostic_history_path=diagnostic_history_path,
         )
         if plan_only:
+            planned_tools = (
+                toolset.definitions()
+                if experimental_llm
+                else DeterministicEvidenceNavigator(toolset).definitions()
+            )
             report: dict[str, object] = {
                 "schema_version": 1,
                 "research_only": True,
                 "frozen_identity": repository.frozen_identity(),
-                "tools": [tool.as_provider_schema() for tool in toolset.definitions()],
+                "tools": [tool.as_provider_schema() for tool in planned_tools],
                 "profile_id": resolved_profile,
                 "provider_contacted": False,
                 "execution_mode": "experimental_llm" if experimental_llm else "deterministic",
@@ -1759,6 +1775,9 @@ def research_copilot(
                     "or deployment state."
                 ),
             }
+            if not experimental_llm:
+                report["navigator_version"] = NAVIGATOR_VERSION
+                report["max_tool_calls"] = len(planned_tools)
         elif not experimental_llm:
             report = DeterministicEvidenceNavigator(toolset).ask(question).as_dict()
         else:
@@ -1806,6 +1825,8 @@ def research_copilot(
     if output is not None:
         write_benchmark_report(output, report)
         typer.echo(f"Wrote private research-copilot report to {output}")
+    elif answer_format == "text":
+        typer.echo(render_copilot_answer_text(report))
     else:
         typer.echo(serialized.decode())
 

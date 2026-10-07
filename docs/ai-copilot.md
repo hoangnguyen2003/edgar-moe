@@ -29,6 +29,25 @@ live console audit; an unattached registry says nothing about production's state
 uv run edgar-moe research-copilot "Show the study summary and cost scenarios."
 ```
 
+For a readable terminal answer with sources, fields, digests, and the research
+disclaimer, append `--format text`. JSON remains the default for scripts.
+`--output /tmp/private-copilot/answer.json` always saves the complete private JSON
+envelope, regardless of display format, and prints only the saved-file notice.
+The terminal view escapes control/bidirectional characters without changing the
+saved answer. Presentation verification checks the envelope, not prose factuality
+or the original source bytes.
+
+```bash
+uv run edgar-moe research-copilot "Explain the target and limitations." --format text
+uv run edgar-moe research-copilot "Show the study summary." --plan-only
+```
+
+The JSON-only default `--plan-only` preview lists exactly five snapshot projections,
+the navigator version, and its five-call ceiling. Previewing experimental profiles,
+provider/agent options, registry or diagnostic capabilities also requires
+`--experimental-llm`; planning still makes no provider call or database connection.
+`--format text` is for answers, not the plan contract.
+
 Adding `--experimental-llm` sends the question to an OpenAI-compatible
 chat-completions endpoint and gives the model seven baseline bounded, read-only tools:
 
@@ -46,8 +65,8 @@ expose one redacted diagnostic or one verified redacted diagnostic history.
 Provider execution in `research-copilot-panel` and `research-copilot-benchmark`
 also requires `--experimental-llm`. `--plan-only` remains provider-free without
 that flag, and does not open a registry database. Explicit provider, profile,
-diagnostic, registry, or agent-budget options on a non-planning single-question
-run require the flag rather than silently enabling or ignoring an experiment.
+diagnostic, registry, or agent-budget options on a single-question answer or
+preview require the flag rather than silently enabling or ignoring an experiment.
 
 ### Current engineering decision
 

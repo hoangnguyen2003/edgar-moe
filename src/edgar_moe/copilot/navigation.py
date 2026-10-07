@@ -11,7 +11,14 @@ import math
 import re
 from datetime import UTC, datetime
 
-from .contracts import MAX_QUESTION_BYTES, Citation, CopilotAnswer, ToolTrace, content_hash
+from .contracts import (
+    MAX_QUESTION_BYTES,
+    Citation,
+    CopilotAnswer,
+    ToolDefinition,
+    ToolTrace,
+    content_hash,
+)
 from .tools import ReadOnlyToolset
 from .verification import verify_copilot_answer_report
 
@@ -34,6 +41,7 @@ _ROUTES = (
         "get_governance_status",
     ),
 )
+NAVIGATOR_TOOL_NAMES = tuple(name for _, name in _ROUTES)
 _ORDER = re.compile(
     r"\b(buy|sell|purchase)\b|\bshort\s+(shares?|stocks?|positions?)\b|"
     r"\b(place|execute|submit|send|recommend|trade)\b.*"
@@ -57,6 +65,11 @@ class DeterministicEvidenceNavigator:
         ):
             raise ValueError("deterministic explanations accept snapshot-only tools")
         self.toolset = toolset
+
+    def definitions(self) -> tuple[ToolDefinition, ...]:
+        """Describe only the capabilities this navigator can execute, in route order."""
+        available = {tool.name: tool for tool in self.toolset.definitions()}
+        return tuple(available[name] for name in NAVIGATOR_TOOL_NAMES)
 
     def ask(self, question: str) -> CopilotAnswer:
         question = question.strip()
