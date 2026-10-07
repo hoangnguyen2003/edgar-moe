@@ -1,13 +1,26 @@
 # Evidence-grounded research copilot
 
-EDGAR-MoE includes an optional operator-run LLM/agentic layer for explaining the
-research record. It is deliberately not part of the forecasting path: the
+EDGAR-MoE defaults to deterministic, credential-free evidence navigation, with
+an experimental operator-run LLM/agentic layer available only by explicit opt-in.
+Neither mode is part of the forecasting path: the
 frozen v1 model, prospective forecast registry, labels, and deployment state are
 all outside the copilot's write boundary.
 
 ## What it does
 
-The `research-copilot` command sends a question to an OpenAI-compatible
+The `research-copilot` command uses the unchanged
+`deterministic-evidence-navigation-v1` router by default. It returns cited source
+fields rather than synthesizing claims, refuses matched order requests, and
+abstains when no fixed route matches. This mode reads only the local snapshot:
+configured provider keys, endpoints, and registry URLs do not enable network or
+database access. It is a navigation aid, not a complete question-answering model;
+the fixed router can omit evidence needed for multi-part questions.
+
+```bash
+uv run edgar-moe research-copilot "Show the study summary and cost scenarios."
+```
+
+Adding `--experimental-llm` sends the question to an OpenAI-compatible
 chat-completions endpoint and gives the model seven baseline bounded, read-only tools:
 
 - frozen snapshot identity;
@@ -20,6 +33,25 @@ chat-completions endpoint and gives the model seven baseline bounded, read-only 
 
 When an operator explicitly attaches diagnostic evidence, the toolset can also
 expose one redacted diagnostic or one verified redacted diagnostic history.
+
+Provider execution in `research-copilot-panel` and `research-copilot-benchmark`
+also requires `--experimental-llm`. `--plan-only` remains provider-free without
+that flag, and does not open a registry database. Explicit provider, profile,
+diagnostic, registry, or agent-budget options on a non-planning single-question
+run require the flag rather than silently enabling or ignoring an experiment.
+
+### Current engineering decision
+
+The 2026-10-07 local synthetic comparison does not justify promoting an LLM.
+Both original arms passed 5/8 structural checks; that score is not a factuality
+rating. An **unblinded AI assessment**, not a human study, identified unsupported
+tradability/model-superiority claims and an inadequate live-order refusal in
+the generated answers. Keep deterministic navigation as the default and the
+LLM experimental; do not claim incremental utility, human validation, or
+production readiness. No human ratings have been generated or substituted.
+The existing comparison router, corpus, saved reports, and frozen/forward
+records are unchanged. Future changes evaluated on these now-inspected cases
+are development regressions, not a new independent held-out confirmation.
 
 The agent can make at most four tool calls by default. The provider transport
 allows at most two retries for explicitly transient HTTP/network failures, with
@@ -164,6 +196,7 @@ For example, the architecture profile is useful when preparing a design review:
 
 ```bash
 uv run edgar-moe research-copilot \
+  --experimental-llm \
   --profile architect \
   "Which controls are observed, configured, or still unverified?"
 ```
@@ -180,6 +213,7 @@ run a small panel over the same question and read-only evidence boundary:
 
 ```bash
 uv run edgar-moe research-copilot-panel \
+  --experimental-llm \
   --profile quant \
   --profile architect \
   --profile operations \
@@ -219,6 +253,7 @@ digest in the citation.
 
 ```bash
 uv run edgar-moe research-copilot \
+  --experimental-llm \
   --diagnostic-path /private/path/diagnostic-2026-09-19.json \
   "Is the latest short-horizon diagnostic mature, and what remains pending?"
 ```
@@ -238,6 +273,7 @@ uv run edgar-moe forward-diagnostic-history \
   --output /tmp/forward-diagnostic-history.json
 
 uv run edgar-moe research-copilot \
+  --experimental-llm \
   --diagnostic-history-path /tmp/forward-diagnostic-history.json \
   "How has short-horizon diagnostic status changed across the retained observations?"
 ```
@@ -271,6 +307,7 @@ endpoint, or set another OpenAI-compatible endpoint:
 export EDGAR_MOE_COPILOT_API_KEY="..."
 export EDGAR_MOE_COPILOT_MODEL="gpt-4o-mini"
 uv run edgar-moe research-copilot \
+  --experimental-llm \
   --output /tmp/edgar-moe-copilot.json \
   "Summarize the locked result, costs, and the limitations I should disclose."
 ```
@@ -289,10 +326,10 @@ non-loopback host is rejected:
 ```bash
 export EDGAR_MOE_COPILOT_ENDPOINT="http://localhost:11434/v1/chat/completions"
 export EDGAR_MOE_COPILOT_MODEL="qwen2.5:7b"
-uv run edgar-moe research-copilot "Which controls are enforced versus pending?"
+uv run edgar-moe research-copilot --experimental-llm "Which controls are enforced versus pending?"
 ```
 
-To include prospective status, provide a SELECT-only reader URL through
+In the experimental LLM mode only, to include prospective status, provide a SELECT-only reader URL through
 `EDGAR_MOE_REGISTRY_READ_DATABASE_URL` or `--database-url`. With no registry,
 the answer explicitly reports that forward evidence is unavailable. The CLI
 prefers the reader URL and only falls back to a local SQLite writer URL for
@@ -349,6 +386,7 @@ estimate or provider-pricing calculation:
 
 ```bash
 uv run edgar-moe research-copilot-benchmark \
+  --experimental-llm \
   --output-dir /tmp/edgar-moe-copilot-benchmark
 ```
 
@@ -356,7 +394,11 @@ Use `--case governance-status` (repeatable) to exercise a subset, or
 `--plan-only` to list the selected cases without contacting the provider. A
 provider error is recorded only by case id and coarse exception type; the
 benchmark exits non-zero unless every selected case succeeds and meets the
-requested pass rate.
+requested pass rate. It creates answer-envelope directories with owner-only
+`0700` permissions and writes JSON files with owner-only `0600` permissions;
+symlinked or broadly accessible run directories are rejected before execution.
+Benchmark, evaluation, comparison, and review writers also refuse output
+paths inside a Git worktree.
 
 ### Deterministic control arm and paired comparison
 
@@ -380,9 +422,14 @@ shows that this small corpus alone cannot establish incremental LLM value.
 It does not establish prose usefulness, factual correctness, or a latency SLA.
 Both benchmark arms now retain local per-case microsecond durations, the
 content hash of the snapshot they read, and their read-only tool context.
-Once a provider run is permitted, compare only runs with the same corpus,
-selected case IDs, snapshot hash, and tool context (the current baseline has
-no forward registry or diagnostic files configured):
+For issue #284, the opt-in `--synthetic-only` provider mode is independent of
+source-rights issue #280: it requires the exact lock-verified synthetic public
+snapshot and rejects registry or diagnostic context. It still contacts the
+configured provider, so the configured service receives the question and
+synthetic snapshot-derived evidence. It does not clear rights for any
+source-derived context. Compare only runs with the same corpus, selected case
+IDs, snapshot hash, and tool context (the current baseline has no forward
+registry or diagnostic files configured):
 
 ```bash
 uv run edgar-moe research-copilot-compare \
@@ -397,9 +444,9 @@ mismatched identities or tool contexts, missing timings, or embedded answer text
 price estimates, and latency comparisons require matched host/network
 conditions. A blinded, held-out human task review is still needed to test
 whether the LLM adds useful synthesis over direct navigation. Do not send
-source-derived context to a provider or publish a provider comparison while
-the [source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
-is unresolved; no provider run is performed by the baseline or comparator.
+source-derived context to a provider while the
+[source-rights review](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
+is unresolved. The baseline and comparator never contact a provider.
 
 ### Held-out, label-masked task review
 
@@ -411,11 +458,29 @@ Do not tune either arm to these questions after seeing the results. This is a
 publicly inspectable holdout, not an independent external test set. The
 automated structural score is not a human judgment.
 
-Once source rights permit provider use, run *both* benchmark commands with
-`--corpus config/copilot_holdout_cases.json`, the same snapshot and read-only
-tool context, and fresh **private** output directories. Do not compare a
-four-case development run against the eight-case holdout. The following
-commands make no provider calls themselves:
+For a paired provider arm, use the predeclared holdout and exact same synthetic
+snapshot/tool context. The provider command's `--synthetic-only` guard fails
+closed if a registry, diagnostics, alternate snapshot, or alternate snapshot
+lock is configured. It may incur provider charges; choose a suitable provider
+spend limit before running it. Do not compare a four-case development run
+against the eight-case holdout. These commands are examples only; they are not
+run by CI:
+
+```bash
+uv run edgar-moe research-copilot-baseline \
+  --corpus config/copilot_holdout_cases.json \
+  --output-dir /tmp/holdout-baseline
+uv run edgar-moe research-copilot-benchmark \
+  --experimental-llm \
+  --corpus config/copilot_holdout_cases.json \
+  --output-dir /tmp/holdout-copilot \
+  --synthetic-only \
+  --max-tool-calls 4 \
+  --max-retries 0
+```
+
+Prepare a masked review only after both complete successfully. This command
+makes no provider calls:
 
 ```bash
 uv run edgar-moe research-copilot-mask-review \
@@ -429,9 +494,12 @@ saved answer envelope, case question, snapshot identity, provider metadata,
 and answer hash. It creates `packet.json` and `mapping.json` in a new
 owner-only directory, with owner-only files; it never prints answer text. Give
 the reviewer **only** `packet.json`. Keep `mapping.json` sealed until the
-reviewer has recorded and finalized all ratings. A/B order is randomly
-balanced, but answer style can still disclose the arm, so this is label
-masking rather than guaranteed blinding.
+reviewer has recorded and finalized all ratings. The packet contains only a
+digest of the paired comparison. The sealed mapping also carries the matching
+structural outcomes, latency summaries, and reported provider-usage counters,
+so these metrics cannot disclose the arm before human scoring. A/B order is
+randomly balanced, but answer style can still disclose the arm, so this is
+label masking rather than guaranteed blinding.
 
 The reviewer creates a private JSON file with `schema_version: 1`,
 `packet_sha256` from the packet-preparation output, `corpus_sha256` from the
@@ -450,14 +518,24 @@ uv run edgar-moe research-copilot-score-masked-review \
   --output /tmp/holdout-score.json
 ```
 
-The scorer requires complete case coverage, exact schemas, and a matching
-packet hash; it refuses overwrites and emits only rubric counts, paired
-quality outcomes, and per-case numeric judgments. The packet, mapping, raw
+The scorer requires complete case coverage, exact schemas, and matching packet
+and comparison hashes; it refuses overwrites and emits per-arm rubric counts,
+paired win/tie/loss outcomes for each rubric dimension, overall paired quality,
+per-case numeric judgments, structural outcome totals, latency summaries, and
+provider usage where reported. The packet, mapping, raw
 review, and score stay private; do not commit or publish them without a
 separate disclosure/rights review. The hashes detect local mismatches, not
 malicious alteration or independent provenance. One reviewer's descriptive
-scores cannot establish general LLM value or investment efficacy. The actual
-provider run and human assessment remain pending while issue #280 is open.
+scores cannot establish general LLM value or investment efficacy. The
+synthetic-only local operator run completed on 2026-10-07 with Qwen2.5 7B
+(`Q4_K_M`) through a cloud-disabled, loopback-only Ollama runtime. Both arms
+completed all eight predeclared cases against the same lock-verified synthetic
+snapshot, without registry or diagnostic context, retries, or model selection
+based on held-out outcomes. Private answers, metrics, and the label-masked
+review packet remain outside Git; human assessment is still pending. Local
+inference incurred no provider API fees and did not change hosted resources.
+Source-derived provider use and publication remain subject to the separate
+source-rights review. Closure of issue #280 alone is not source clearance.
 
 ## Human-review history
 

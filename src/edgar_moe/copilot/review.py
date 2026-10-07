@@ -13,6 +13,7 @@ import orjson
 
 from edgar_moe.utils.timestamps import parse_aware_timestamp
 
+from .benchmark import ensure_private_output_outside_git
 from .policy import validate_agent_identity
 
 
@@ -123,6 +124,7 @@ def verify_copilot_review_history(history: Mapping[str, Any]) -> None:
 def write_copilot_review_history(path: Path, history: Mapping[str, Any]) -> None:
     """Atomically write a verified review history without partial JSON."""
 
+    ensure_private_output_outside_git(path)
     verify_copilot_review_history(history)
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(path.suffix + ".tmp")

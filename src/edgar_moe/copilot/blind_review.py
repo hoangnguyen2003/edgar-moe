@@ -7,18 +7,22 @@ still reveal an arm. This is not a guarantee of perfect reviewer blinding.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import re
 import secrets
+import stat
 from collections.abc import Mapping
 from datetime import datetime
 from pathlib import Path
+from statistics import median
 from typing import Any, cast
 
 import orjson
 
 from edgar_moe.utils.timestamps import parse_aware_timestamp
 
+from .benchmark import ensure_private_output_outside_git
 from .contracts import content_hash
 from .evaluation import EvaluationCorpus
 from .paired import compare_benchmarks
@@ -97,6 +101,7 @@ def prepare_masked_review(
         "snapshot_sha256": comparison["snapshot_sha256"],
         "baseline_report_sha256": comparison["baseline_report_sha256"],
         "copilot_report_sha256": comparison["copilot_report_sha256"],
+        "paired_comparison_sha256": content_hash(comparison),
         "cases": packets,
         "review_instruction": (
             "Score A and B independently against the same task. Labels are randomized; "
@@ -107,6 +112,9 @@ def prepare_masked_review(
         "schema_version": 1,
         "packet_sha256": content_hash(packet),
         "assignments": mapping,
+        # This stays with the sealed A/B mapping so latency, structural outcomes,
+        # and provider usage cannot disclose the arm before human scoring.
+        "paired_comparison": comparison,
     }
     return packet, key
 
@@ -124,10 +132,11 @@ def score_masked_review(
             "snapshot_sha256",
             "baseline_report_sha256",
             "copilot_report_sha256",
+            "paired_comparison_sha256",
             "cases",
             "review_instruction",
         }
-        or set(key) != {"schema_version", "packet_sha256", "assignments"}
+        or set(key) != {"schema_version", "packet_sha256", "assignments", "paired_comparison"}
         or set(review)
         != {"schema_version", "packet_sha256", "corpus_sha256", "reviewer", "reviewed_at", "cases"}
         or packet.get("schema_version") != 1
@@ -167,10 +176,15 @@ def score_masked_review(
         or set(packet_cases) != set(judgments)
     ):
         raise MaskedReviewError("packet, mapping, and review must cover the same cases")
+    paired_comparison = _validate_paired_comparison(packet, key, packet_cases)
 
     counts = {
         arm: {field: 0 for field in _RUBRIC_FIELDS} | {"quality_pass": 0}
         for arm in ("baseline", "copilot")
+    }
+    paired_rubric = {
+        field: {"copilot_only": 0, "baseline_only": 0, "both": 0, "neither": 0}
+        for field in _RUBRIC_FIELDS
     }
     paired = {"copilot_only": 0, "baseline_only": 0, "both": 0, "neither": 0}
     usefulness = {"copilot_higher": 0, "baseline_higher": 0, "tie": 0}
@@ -208,6 +222,17 @@ def score_masked_review(
                 counts[arm][field] += int(rating[field] == "pass")
             quality[arm] = all(rating[field] == "pass" for field in _RUBRIC_FIELDS)
             counts[arm]["quality_pass"] += int(quality[arm])
+        for field in _RUBRIC_FIELDS:
+            baseline_pass = scores["baseline"][field] == "pass"
+            copilot_pass = scores["copilot"][field] == "pass"
+            if baseline_pass and copilot_pass:
+                paired_rubric[field]["both"] += 1
+            elif copilot_pass:
+                paired_rubric[field]["copilot_only"] += 1
+            elif baseline_pass:
+                paired_rubric[field]["baseline_only"] += 1
+            else:
+                paired_rubric[field]["neither"] += 1
         if quality["copilot"] and quality["baseline"]:
             paired["both"] += 1
         elif quality["copilot"]:
@@ -237,22 +262,164 @@ def score_masked_review(
         "corpus_sha256": corpus_hash,
         "packet_sha256": packet_hash,
         "review_sha256": content_hash(review),
+        "paired_comparison_sha256": packet["paired_comparison_sha256"],
         "reviewer": reviewer,
         "reviewed_at": reviewed_datetime.isoformat(),
         "case_count": len(case_scores),
         "rubric_pass_counts": counts,
+        "paired_rubric_outcomes": paired_rubric,
         "paired_quality": paired,
         "usefulness_order": usefulness,
         "cases": case_scores,
+        "paired_comparison": paired_comparison,
         "interpretation": (
-            "Single-reviewer descriptive task scores only. Label masking does not remove "
-            "stylistic unblinding; no independent efficacy or investment claim follows."
+            "Single-reviewer descriptive task scores joined to hash-bound structural and "
+            "runtime summaries. Label masking does not remove stylistic unblinding; latency "
+            "is comparable only under matched host/network conditions; token usage is not a "
+            "price or billing estimate. No independent efficacy or investment claim follows."
         ),
     }
 
 
+def _validate_paired_comparison(
+    packet: Mapping[str, Any], key: Mapping[str, Any], packet_cases: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate sealed benchmark metrics before joining them to human scores."""
+    comparison = key.get("paired_comparison")
+    if not isinstance(comparison, Mapping) or content_hash(comparison) != packet.get(
+        "paired_comparison_sha256"
+    ):
+        raise MaskedReviewError("sealed benchmark comparison does not match the packet digest")
+    expected_fields = {
+        "schema_version",
+        "corpus_id",
+        "corpus_sha256",
+        "snapshot_sha256",
+        "baseline_report_sha256",
+        "copilot_report_sha256",
+        "case_count",
+        "categories",
+        "baseline_latency_us",
+        "copilot_latency_us",
+        "copilot_usage",
+        "cases",
+        "interpretation",
+    }
+    if set(comparison) != expected_fields or comparison.get("schema_version") != 1:
+        raise MaskedReviewError("sealed benchmark comparison schema is invalid")
+    for field in (
+        "corpus_id",
+        "corpus_sha256",
+        "snapshot_sha256",
+        "baseline_report_sha256",
+        "copilot_report_sha256",
+    ):
+        if comparison.get(field) != packet.get(field):
+            raise MaskedReviewError("sealed benchmark comparison identity differs from packet")
+    comparison_cases = _case_map(comparison.get("cases"), "paired comparison")
+    case_ids = list(packet_cases)
+    if list(comparison_cases) != case_ids or comparison.get("case_count") != len(case_ids):
+        raise MaskedReviewError("sealed benchmark comparison cases differ from packet")
+
+    categories = {
+        "both_pass": 0,
+        "baseline_only": 0,
+        "copilot_only": 0,
+        "neither_or_missing": 0,
+    }
+    baseline_durations: list[int] = []
+    copilot_durations: list[int] = []
+    for case_id, case in comparison_cases.items():
+        if set(case) != {
+            "case_id",
+            "baseline_pass",
+            "copilot_pass",
+            "baseline_duration_us",
+            "copilot_duration_us",
+            "category",
+        }:
+            raise MaskedReviewError("sealed benchmark comparison case schema is invalid")
+        baseline_pass, copilot_pass = case["baseline_pass"], case["copilot_pass"]
+        baseline_duration = case["baseline_duration_us"]
+        copilot_duration = case["copilot_duration_us"]
+        if (
+            case["case_id"] != case_id
+            or not isinstance(baseline_pass, bool)
+            or not isinstance(copilot_pass, bool)
+            or not _valid_duration(baseline_duration)
+            or not _valid_duration(copilot_duration)
+        ):
+            raise MaskedReviewError("sealed benchmark comparison case values are invalid")
+        if baseline_pass and copilot_pass:
+            category = "both_pass"
+        elif baseline_pass:
+            category = "baseline_only"
+        elif copilot_pass:
+            category = "copilot_only"
+        else:
+            category = "neither_or_missing"
+        if case["category"] != category:
+            raise MaskedReviewError("sealed benchmark comparison category is inconsistent")
+        categories[category] += 1
+        baseline_durations.append(baseline_duration)
+        copilot_durations.append(copilot_duration)
+    if comparison.get("categories") != categories:
+        raise MaskedReviewError("sealed benchmark comparison category totals are inconsistent")
+
+    baseline_latency = _latency_summary(baseline_durations)
+    copilot_latency = _latency_summary(copilot_durations)
+    if (
+        comparison.get("baseline_latency_us") != baseline_latency
+        or comparison.get("copilot_latency_us") != copilot_latency
+    ):
+        raise MaskedReviewError("sealed benchmark latency summaries are inconsistent")
+    usage = _validated_usage(comparison.get("copilot_usage"))
+    if not isinstance(comparison.get("interpretation"), str):
+        raise MaskedReviewError("sealed benchmark interpretation is invalid")
+    return {
+        "case_count": len(case_ids),
+        "categories": categories,
+        "baseline_latency_us": baseline_latency,
+        "copilot_latency_us": copilot_latency,
+        "copilot_usage": usage,
+        "interpretation": comparison["interpretation"],
+    }
+
+
+def _latency_summary(values: list[int]) -> dict[str, int]:
+    ordered = sorted(values)
+    return {
+        "median": round(median(ordered)),
+        "p95_nearest_rank": ordered[math.ceil(len(ordered) * 0.95) - 1],
+    }
+
+
+def _validated_usage(value: object) -> dict[str, int | None] | None:
+    if value is None:
+        return None
+    fields = {"request_count", "duration_ms", "prompt_tokens", "completion_tokens", "total_tokens"}
+    if not isinstance(value, Mapping) or set(value) != fields:
+        raise MaskedReviewError("sealed benchmark usage schema is invalid")
+    result: dict[str, int | None] = {}
+    for field in fields:
+        item = value[field]
+        if item is None and field in {"request_count", "duration_ms"}:
+            raise MaskedReviewError("sealed benchmark usage is missing required counters")
+        if item is not None and (
+            not isinstance(item, int) or isinstance(item, bool) or not 0 <= item <= 1_000_000_000
+        ):
+            raise MaskedReviewError("sealed benchmark usage counter is invalid")
+        result[field] = item
+    return result
+
+
+def _valid_duration(value: object) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and 0 <= value <= 2_000_000_000
+
+
 def write_private_json(path: Path, payload: Mapping[str, Any]) -> None:
     """Create a private JSON file once, without overwriting prior evidence."""
+    ensure_private_output_outside_git(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     try:
@@ -267,7 +434,20 @@ def write_private_json(path: Path, payload: Mapping[str, Any]) -> None:
 
 def read_private_json(path: Path) -> dict[str, Any]:
     try:
-        value = orjson.loads(path.read_bytes())
+        if not hasattr(os, "O_NOFOLLOW"):
+            raise MaskedReviewError("platform cannot securely open private review inputs")
+        descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "rb") as stream:
+            details = os.fstat(stream.fileno())
+            if (
+                not stat.S_ISREG(details.st_mode)
+                or details.st_mode & 0o077
+                or (hasattr(os, "geteuid") and details.st_uid != os.geteuid())
+            ):
+                raise MaskedReviewError("review input must be an owner-only regular file")
+            value = orjson.loads(stream.read())
+    except MaskedReviewError:
+        raise
     except (OSError, orjson.JSONDecodeError) as error:
         raise MaskedReviewError(f"could not read review input: {path.name}") from error
     if not isinstance(value, dict):
@@ -328,7 +508,10 @@ def _case_map(value: object, label: str) -> dict[str, dict[str, Any]]:
 def _parse_rating(value: object) -> dict[str, Any]:
     if not isinstance(value, dict) or set(value) != set(_RUBRIC_FIELDS) | {"usefulness"}:
         raise MaskedReviewError("rating must contain the exact four gates and usefulness")
-    if any(value[field] not in {"pass", "fail"} for field in _RUBRIC_FIELDS):
+    if any(
+        not isinstance(value[field], str) or value[field] not in {"pass", "fail"}
+        for field in _RUBRIC_FIELDS
+    ):
         raise MaskedReviewError("rubric gates must be pass or fail")
     usefulness = value["usefulness"]
     if not isinstance(usefulness, int) or isinstance(usefulness, bool) or not 1 <= usefulness <= 5:

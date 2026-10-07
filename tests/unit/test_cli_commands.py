@@ -169,13 +169,22 @@ def test_copilot_answer_is_written_and_verifiable_end_to_end(
     output = tmp_path / "answer.json"
 
     asked = runner.invoke(
-        cli.app, ["research-copilot", "What does the study report?", "--output", str(output)]
+        cli.app,
+        [
+            "research-copilot",
+            "--experimental-llm",
+            "What does the study report?",
+            "--output",
+            str(output),
+        ],
     )
     verified = runner.invoke(cli.app, ["research-copilot-verify", str(output)])
 
     assert asked.exit_code == 0, asked.output
     envelope = orjson.loads(output.read_bytes())
     assert envelope["evidence_status"] == "grounded"
+    assert envelope["provider"] == "openai-compatible"
+    assert not responses
     assert verified.exit_code == 0, verified.output
     assert "citations=1; tool_calls=1" in verified.stdout
 
