@@ -9,6 +9,29 @@ permissions:
   contents: read
 
 jobs:
+  offline-read-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+      - name: Check offline controller and fixture syntax
+        run: |
+          for module in ops/private-read-admission/*.mjs; do
+            node --check "$module"
+          done
+      - name: Test synthetic admission and observation fixtures without providers
+        # No dependencies, provider credentials, deployments, or scheduled jobs.
+        # The optional local-workerd test explicitly skips without Miniflare.
+        run: >-
+          node --test
+          ops/private-read-admission/admission.test.mjs
+          ops/private-read-admission/executor-process.test.mjs
+          ops/private-read-admission/study-plan.test.mjs
+          ops/private-read-admission/workerd.test.mjs
+
   python:
     runs-on: ubuntu-24.04
     steps:
