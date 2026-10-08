@@ -60,7 +60,18 @@ def _bounded_get(client: httpx.Client, url: str) -> bytes:
 
 
 def _canonical(value: dict[str, Any]) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode()
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
+    ).encode()
+
+
+def _unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise CohortCaptureError("capture JSON contains duplicate fields")
+        result[key] = value
+    return result
 
 
 def _digest(payload: bytes) -> str:
@@ -80,22 +91,23 @@ def _instant(value: str) -> datetime:
 
 
 def load_policy(path: Path = _POLICY) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
+    value = json.loads(path.read_text(encoding="utf-8"), object_pairs_hook=_unique_object)
     if not isinstance(value, dict) or set(value) != _EXPECTED_KEYS:
         raise CohortCaptureError("capture policy has unexpected fields")
-    if (value["schema_version"], value["source"], value["eligible_forms"]) != (
-        1,
-        "sec-edgar-full-index-master",
-        ["10-K", "10-Q"],
+    if (
+        type(value["schema_version"]) is not int
+        or value["schema_version"] != 1
+        or value["source"] != "sec-edgar-full-index-master"
+        or value["eligible_forms"] != ["10-K", "10-Q"]
     ):
         raise CohortCaptureError("capture policy has unsupported source or forms")
     if not isinstance(value["study_id"], str) or not value["study_id"].isascii():
         raise CohortCaptureError("capture policy has invalid study identity")
-    if not isinstance(value["year"], int) or not 1994 <= value["year"] <= 2100:
+    if type(value["year"]) is not int or not 1994 <= value["year"] <= 2100:
         raise CohortCaptureError("capture policy has invalid year")
-    if not isinstance(value["quarter"], int) or value["quarter"] not in (1, 2, 3, 4):
+    if type(value["quarter"]) is not int or value["quarter"] not in (1, 2, 3, 4):
         raise CohortCaptureError("capture policy has invalid quarter")
-    if not isinstance(value["minimum_eligible_rows"], int) or value["minimum_eligible_rows"] < 1:
+    if type(value["minimum_eligible_rows"]) is not int or value["minimum_eligible_rows"] < 1:
         raise CohortCaptureError("capture policy has invalid row floor")
     attestation = value["github_attestation"]
     if (
@@ -248,7 +260,9 @@ def save_capture(
     root: Path = _ARTIFACT_ROOT,
 ) -> None:
     expected = build_commitment(payload, policy, captured_at=_instant(commitment["captured_at"]))
-    if commitment != expected:
+    # Dict equality conflates JSON booleans, integers, and floats; commitments
+    # must preserve the exact canonical JSON identity used by the attestation.
+    if _canonical(commitment) != _canonical(expected):
         raise CohortCaptureError("capture commitment does not match source and policy")
     roster_bytes = build_filer_roster(payload, policy)
     destination = _private_path(directory, root=root)
@@ -269,11 +283,16 @@ def verify_capture(
     destination = _private_path(directory, root=root)
     payload = (destination / "master.idx").read_bytes()
     roster_bytes = (destination / "filer-roster.json").read_bytes()
-    commitment = json.loads((destination / "commitment.json").read_text(encoding="utf-8"))
+    commitment = json.loads(
+        (destination / "commitment.json").read_text(encoding="utf-8"),
+        object_pairs_hook=_unique_object,
+    )
     if not isinstance(commitment, dict) or "captured_at" not in commitment:
         raise CohortCaptureError("capture commitment is invalid")
     expected = build_commitment(payload, policy, captured_at=_instant(commitment["captured_at"]))
-    if commitment != expected or roster_bytes != build_filer_roster(payload, policy):
+    if _canonical(commitment) != _canonical(expected) or roster_bytes != build_filer_roster(
+        payload, policy
+    ):
         raise CohortCaptureError("capture bytes or commitment differ from policy")
     return expected
 

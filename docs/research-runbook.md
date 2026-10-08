@@ -327,6 +327,14 @@ Use the numeric ID after `#issuecomment-` in the returned link to verify it
 python -m scripts.verify_prospective_sec_attestation --live --capture-dir data/artifacts/sec-filer-cohort-2026q3-v1 --comment-id COMMENT_ID --output data/artifacts/sec-filer-cohort-2026q3-v1/github-attestation.json
 ```
 
+The offline capture verifier and writer compare commitments by canonical JSON
+identity, not Python dictionary equality. Boolean/float substitutions for
+integer counts or schema fields fail closed, and duplicate JSON fields in
+policies or commitments are rejected. Whitespace and key order do not change
+the identity. Valid existing commitments retain their original hashes; do not
+rewrite a rejected artifact to make it pass or substitute a recomputed
+commitment for the independently timestamped one.
+
 The verifier first recomputes the private capture and roster, then makes one
 anonymous GitHub API GET. It checks the exact issue/comment URL, designated
 stable author ID, matching commitment JSON, and a server timestamp within the
