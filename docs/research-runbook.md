@@ -335,6 +335,17 @@ the identity. Valid existing commitments retain their original hashes; do not
 rewrite a rejected artifact to make it pass or substitute a recomputed
 commitment for the independently timestamped one.
 
+On POSIX hosts, private capture directories must be owned by the current user
+with no group/other permissions. Verification opens each component relative to
+directory descriptors without following symlinks, and accepts only owner-only,
+single-linked regular files. Reads are bounded to 64 MiB for the index, 16 MiB
+for the roster, and 16 KiB for the commitment. The live command checks for an
+invalid or already-existing destination before contacting SEC; the writer still
+requires an exclusively new capture directory. A preflight is not a reservation:
+a concurrent filesystem change can still make the subsequent save fail. Failed
+or rejected captures are not repaired, overwritten, or removed automatically.
+These checks protect the local evidence boundary, not historical membership.
+
 The verifier first recomputes the private capture and roster, then makes one
 anonymous GitHub API GET. It checks the exact issue/comment URL, designated
 stable author ID, matching commitment JSON, and a server timestamp within the
