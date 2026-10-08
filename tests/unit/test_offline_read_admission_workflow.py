@@ -15,7 +15,7 @@ def test_offline_admission_job_uses_standard_runner_without_provider_inputs() ->
     checkout, node, syntax, tests = job["steps"]
     assert checkout["uses"].startswith("actions/checkout@")
     assert node["uses"].startswith("actions/setup-node@")
-    assert node["with"] == {"node-version": "24"}
+    assert node["with"] == {"node-version": "24", "package-manager-cache": False}
     assert all(set(step) <= {"name", "uses", "with", "run"} for step in job["steps"])
     assert syntax["run"].strip() == (
         'for module in ops/private-read-admission/*.mjs; do\n  node --check "$module"\ndone'
