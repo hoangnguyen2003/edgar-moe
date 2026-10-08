@@ -12,7 +12,10 @@ import hashlib
 import json
 import os
 import re
+import stat
 import sys
+from collections.abc import Iterator
+from contextlib import ExitStack, contextmanager
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +27,7 @@ _POLICY = _ROOT / "config" / "prospective_sec_filer_cohort_v1.json"
 _ARTIFACT_ROOT = _ROOT / "data" / "artifacts"
 _MAX_INDEX_BYTES = 64 * 1024 * 1024
 _MAX_ROSTER_BYTES = 16 * 1024 * 1024
+_MAX_COMMITMENT_BYTES = 16 * 1024
 _EXPECTED_KEYS = {
     "schema_version",
     "study_id",
@@ -238,15 +242,104 @@ def build_commitment(
 
 
 def _private_path(path: Path, *, root: Path) -> Path:
-    destination = path.resolve()
-    if not destination.is_relative_to(root.resolve()):
+    # Resolve the trusted artifact root, not the untrusted capture components.
+    # Resolving the latter would silently accept directory symlink aliases.
+    try:
+        relative = path.absolute().relative_to(root.absolute())
+    except ValueError as error:
+        raise CohortCaptureError("capture output must be under ignored data/artifacts") from error
+    if not relative.parts or ".." in relative.parts:
         raise CohortCaptureError("capture output must be under ignored data/artifacts")
-    return destination
+    return root.resolve() / relative
 
 
-def _write_new(path: Path, payload: bytes) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+def _preflight_new_capture(path: Path, *, root: Path) -> None:
+    destination = _private_path(path, root=root)
+    current = root.resolve()
+    for part in destination.relative_to(current).parts:
+        current /= part
+        try:
+            metadata = current.lstat()
+        except FileNotFoundError:
+            continue
+        if current == destination:
+            raise CohortCaptureError("capture output already exists")
+        if not stat.S_ISDIR(metadata.st_mode):
+            raise CohortCaptureError("capture parent must be a directory, not an alias")
+
+
+@contextmanager
+def _capture_directory(path: Path, *, root: Path, create: bool = False) -> Iterator[int]:
+    destination = _private_path(path, root=root)
+    anchor = root.resolve()
+    if create:
+        anchor.mkdir(parents=True, exist_ok=True)
+    # Descriptor-relative traversal prevents a checked parent from subsequently
+    # being substituted with a symlink before a file is opened or created.
+    with ExitStack() as stack:
+        descriptor = os.open(anchor, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        stack.callback(os.close, descriptor)
+        parts = destination.relative_to(anchor).parts
+        for position, part in enumerate(parts):
+            if create:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=descriptor)
+                except FileExistsError as error:
+                    if position == len(parts) - 1:
+                        raise CohortCaptureError("capture output already exists") from error
+            try:
+                descriptor = os.open(
+                    part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=descriptor
+                )
+            except FileNotFoundError:
+                raise
+            except OSError as error:
+                raise CohortCaptureError("capture directory must not contain aliases") from error
+            stack.callback(os.close, descriptor)
+        metadata = os.fstat(descriptor)
+        if metadata.st_uid != os.getuid() or metadata.st_mode & 0o077:
+            raise CohortCaptureError("capture directory must be owner-only")
+        yield descriptor
+
+
+def _read_private_file(directory_fd: int, name: str, maximum: int) -> bytes:
+    try:
+        descriptor = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
+    except FileNotFoundError:
+        raise
+    except OSError as error:
+        raise CohortCaptureError("capture file must not be an alias") from error
+    with ExitStack() as stack:
+        stack.callback(os.close, descriptor)
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.getuid()
+            or before.st_mode & 0o077
+            or before.st_nlink != 1
+        ):
+            raise CohortCaptureError("capture file must be owner-only, regular, and single-linked")
+        if not 0 < before.st_size <= maximum:
+            raise CohortCaptureError("capture file is empty or exceeds the byte bound")
+        payload = bytearray()
+        while len(payload) <= maximum:
+            chunk = os.read(descriptor, min(65536, maximum + 1 - len(payload)))
+            if not chunk:
+                break
+            payload.extend(chunk)
+        after = os.fstat(descriptor)
+        stable_fields = ("st_size", "st_mtime_ns", "st_ctime_ns", "st_mode", "st_uid", "st_nlink")
+        if len(payload) != before.st_size or any(
+            getattr(before, field) != getattr(after, field) for field in stable_fields
+        ):
+            raise CohortCaptureError("capture file changed while reading")
+    return bytes(payload)
+
+
+def _write_new(directory_fd: int, name: str, payload: bytes) -> None:
+    descriptor = os.open(
+        name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd
+    )
     with os.fdopen(descriptor, "wb") as output:
         output.write(payload)
 
@@ -265,28 +358,28 @@ def save_capture(
     if _canonical(commitment) != _canonical(expected):
         raise CohortCaptureError("capture commitment does not match source and policy")
     roster_bytes = build_filer_roster(payload, policy)
-    destination = _private_path(directory, root=root)
-    if destination.exists():
-        raise CohortCaptureError("capture output already exists")
-    destination.mkdir(parents=True, mode=0o700)
-    _write_new(destination / "master.idx", payload)
-    _write_new(destination / "filer-roster.json", roster_bytes)
-    _write_new(
-        destination / "commitment.json",
-        json.dumps(commitment, indent=2, sort_keys=True).encode() + b"\n",
-    )
+    commitment_bytes = json.dumps(commitment, indent=2, sort_keys=True).encode() + b"\n"
+    if len(commitment_bytes) > _MAX_COMMITMENT_BYTES:
+        raise CohortCaptureError("capture commitment exceeds the byte bound")
+    _preflight_new_capture(directory, root=root)
+    with _capture_directory(directory, root=root, create=True) as directory_fd:
+        _write_new(directory_fd, "master.idx", payload)
+        _write_new(directory_fd, "filer-roster.json", roster_bytes)
+        _write_new(directory_fd, "commitment.json", commitment_bytes)
 
 
 def verify_capture(
     directory: Path, policy: dict[str, Any], *, root: Path = _ARTIFACT_ROOT
 ) -> dict[str, Any]:
-    destination = _private_path(directory, root=root)
-    payload = (destination / "master.idx").read_bytes()
-    roster_bytes = (destination / "filer-roster.json").read_bytes()
-    commitment = json.loads(
-        (destination / "commitment.json").read_text(encoding="utf-8"),
-        object_pairs_hook=_unique_object,
-    )
+    with _capture_directory(directory, root=root) as directory_fd:
+        payload = _read_private_file(directory_fd, "master.idx", _MAX_INDEX_BYTES)
+        roster_bytes = _read_private_file(directory_fd, "filer-roster.json", _MAX_ROSTER_BYTES)
+        commitment = json.loads(
+            _read_private_file(directory_fd, "commitment.json", _MAX_COMMITMENT_BYTES).decode(
+                "utf-8"
+            ),
+            object_pairs_hook=_unique_object,
+        )
     if not isinstance(commitment, dict) or "captured_at" not in commitment:
         raise CohortCaptureError("capture commitment is invalid")
     expected = build_commitment(payload, policy, captured_at=_instant(commitment["captured_at"]))
@@ -311,6 +404,7 @@ def main() -> int:
             commitment = verify_capture(args.output_dir, policy)
         else:
             _check_time(policy, datetime.now(UTC))
+            _preflight_new_capture(args.output_dir, root=_ARTIFACT_ROOT)
             user_agent = os.environ.get("SEC_USER_AGENT", "")
             if "@" not in user_agent:
                 raise CohortCaptureError("SEC_USER_AGENT with contact email is required")
