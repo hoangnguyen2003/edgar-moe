@@ -33,7 +33,7 @@ listing membership or independently available source data.
 
 Before reading data credentials or contacting Alpaca, the screen also rejects a
 master observed after the screen cutoff or a cutoff whose New York day has not
-finished. Its version-4
+finished. Its version-5
 audit records hashes of both CSVs and the master-capture record, the screen
 generation time, and a `research_screen` purpose. A retrospective screen is
 possible only with `--allow-retrospective-diagnostic` **and separate** `--output`
@@ -45,13 +45,34 @@ screen cutoff to precede the **first** walk-forward validation year and binds
 the screened CSV to the checkpoint's requested universe. After building a
 processed dataset, rerun with `--dataset-dir data/processed/<dataset-id>` to
 hash-check its assets and bind its source-manifest digest to that same checkpoint.
-Older audits lack the explicit purpose and fail closed; do not backfill them by
-guessing. Even a passing version-4 trace cannot prove that
+Older audits, including version 4 without retained screening inputs, fail closed;
+do not backfill them from bars fetched later or guess missing hashes. Even a
+passing version-5 replay cannot prove that
 the broad SEC-to-Alpaca master has complete historical membership or that the
 local timestamps were independently witnessed. A current master screened
 against old bars remains subject to retrospective membership/survivorship bias.
 Keep such v2 results as
 development diagnostics, not point-in-time or independent alpha evidence.
+
+New screens also retain their complete parsed daily-bar inputs, source hashes,
+feed/date range, screening parameters and screening-code SHA-256 in one new
+owner-only directory beneath ignored `data/artifacts/universe-screen-inputs/`.
+To choose its location, pass `--screen-inputs-dir data/artifacts/<new-directory>`.
+The directory must not already exist; invalid paths and aliases are rejected
+before credentials/provider access. Directory mode is 0700 and file mode 0600;
+never commit this file or print its rows. A failed capture is not repaired,
+overwritten or removed automatically. Verification checks stable, single-linked
+regular files and reads at most 64 MiB before decoding duplicate-free JSON.
+
+The offline verifier binds those inputs to the audit and exact screening-code
+version, reruns selection, and compares all selected CSV fields, session counts,
+last prices, dollar-volume medians, ranks and exclusion counts. It then binds
+the requested checkpoint roster and optional processed-dataset assets and
+rechecks the file commitments before returning. A matching output hash alone
+cannot replace this replay. Parameter drift, missing inputs or code-version
+drift fail closed. Retain older code/audits for their historical scope; no
+automatic conversion is provided. Normal source-use and chronology holds still
+apply, and successful replay remains explicitly upstream-membership-unverified.
 
 ## 3. Build immutable inputs
 

@@ -370,6 +370,9 @@ def screen_universe(
     minimum_price: Annotated[float, typer.Option(min=0.01)] = 5.0,
     feed: Annotated[str, typer.Option()] = "iex",
     batch_size: Annotated[int, typer.Option(min=1, max=500)] = 200,
+    screen_inputs_dir: Annotated[
+        Path | None, typer.Option(help="New private input directory under data/artifacts.")
+    ] = None,
     allow_retrospective_diagnostic: Annotated[
         bool,
         typer.Option(
@@ -383,6 +386,12 @@ def screen_universe(
     from edgar_moe.data.screen_audit import (
         verify_screen_observation_window,
         verify_source_capture,
+    )
+    from edgar_moe.data.screen_inputs import (
+        SCREEN_COLUMNS,
+        preflight_screen_inputs,
+        screen_algorithm_digest,
+        write_screen_inputs,
     )
     from edgar_moe.data.storage import sha256_file
     from edgar_moe.data.universe import screen_liquid_universe
@@ -405,6 +414,12 @@ def screen_universe(
     start = cutoff - timedelta(days=lookback_days)
     if not allow_retrospective_diagnostic:
         verify_screen_observation_window(observed, cutoff, datetime.now(UTC))
+    if screen_inputs_dir is None:
+        from uuid import uuid4
+
+        screen_inputs_dir = Path("data/artifacts/universe-screen-inputs") / uuid4().hex
+    preflight_screen_inputs(screen_inputs_dir)
+    algorithm_hash = screen_algorithm_digest()
     settings = runtime_settings()
     _require_source_configuration(settings, needs_fred=False)
 
@@ -422,6 +437,8 @@ def screen_universe(
         return combined
 
     bars = asyncio.run(run())
+    if not set(bars).issubset({member.symbol for member in members}):
+        raise ValueError("Screen inputs contain an unknown source symbol")
     if any(sha256_file(path) != digest for path, digest in input_hashes.items()):
         raise ValueError("Source-master inputs changed while fetching screen bars")
     selected, exclusions = screen_liquid_universe(
@@ -439,36 +456,52 @@ def screen_universe(
     generated = datetime.now(UTC)
     if not allow_retrospective_diagnostic:
         verify_screen_observation_window(observed, cutoff, generated)
+    if screen_algorithm_digest() != algorithm_hash or any(
+        sha256_file(path) != digest for path, digest in input_hashes.items()
+    ):
+        raise ValueError("Screen source or algorithm changed before recording inputs")
+    purpose = "retrospective_diagnostic" if allow_retrospective_diagnostic else "research_screen"
+    inputs_hash, inputs_size = write_screen_inputs(
+        screen_inputs_dir,
+        {
+            "schema_version": 1,
+            "provider": "alpaca",
+            "timeframe": "1Day",
+            "feed": feed,
+            "lookback_start": start.isoformat(),
+            "as_of": cutoff.isoformat(),
+            "candidate_count": candidate_count,
+            "minimum_sessions": minimum_sessions,
+            "minimum_price": minimum_price,
+            "captured_at_utc": generated.isoformat().replace("+00:00", "Z"),
+            "screen_algorithm_sha256": algorithm_hash,
+            "source_sha256": input_hashes[source],
+            "source_capture_sha256": input_hashes[source_capture],
+            "mapping_review_sha256": input_hashes[mapping_review],
+            "bars": bars,
+        },
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     temporary_output = output.with_suffix(output.suffix + ".tmp")
-    fieldnames = [
-        "cik",
-        "symbol",
-        "security_id",
-        "company_name",
-        "exchange",
-        "industry_code",
-        "screen_sessions",
-        "screen_last_price",
-        "screen_median_dollar_volume",
-        "screen_liquidity_rank",
-    ]
     with temporary_output.open("w", newline="", encoding="utf-8") as stream:
-        writer = csv.DictWriter(stream, fieldnames=fieldnames)
+        writer = csv.DictWriter(stream, fieldnames=SCREEN_COLUMNS)
         writer.writeheader()
         writer.writerows(selected)
     temporary_output.replace(output)
     audit = {
-        "schema_version": 4,
-        "purpose": (
-            "retrospective_diagnostic" if allow_retrospective_diagnostic else "research_screen"
-        ),
+        "schema_version": 5,
+        "purpose": purpose,
         "as_of": cutoff.isoformat(),
         "lookback_start": start.isoformat(),
         "generated_at_utc": generated.isoformat().replace("+00:00", "Z"),
         "source_universe": str(source),
         "source_sha256": input_hashes[source],
         "source_capture_sha256": input_hashes[source_capture],
+        "mapping_review_sha256": input_hashes[mapping_review],
+        "screen_algorithm_sha256": algorithm_hash,
+        "screen_inputs_path": str(screen_inputs_dir.absolute()),
+        "screen_inputs_sha256": inputs_hash,
+        "screen_inputs_byte_count": inputs_size,
         "screened_universe_sha256": sha256_file(output),
         "source_members": len(members),
         "candidate_count": candidate_count,
@@ -487,9 +520,9 @@ def screen_universe(
 @app.command("verify-universe-screen")
 def verify_universe_screen(
     checkpoint: Annotated[Path, typer.Option(help="Authenticated research checkpoint.")],
-    audit: Annotated[Path, typer.Option(help="Version-4 research screen audit JSON.")] = Path(
-        "data/interim/universe-screen.json"
-    ),
+    audit: Annotated[
+        Path, typer.Option(help="Version-5 replayable research screen audit JSON.")
+    ] = Path("data/interim/universe-screen.json"),
     source_capture: Annotated[Path, typer.Option()] = Path(
         "data/interim/security-master-capture.json"
     ),

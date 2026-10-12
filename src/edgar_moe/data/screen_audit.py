@@ -6,6 +6,8 @@ that the upstream security master was itself historically available.
 
 from __future__ import annotations
 
+import csv
+import hashlib
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -13,8 +15,84 @@ from zoneinfo import ZoneInfo
 
 import orjson
 
-from edgar_moe.data.refresh import load_universe_csv, verify_authenticated_bundle
+from edgar_moe.data.refresh import UniverseMember, load_universe_csv, verify_authenticated_bundle
+from edgar_moe.data.screen_inputs import (
+    SCREEN_COLUMNS,
+    canonical_bytes,
+    decode_json,
+    read_screen_inputs,
+    screen_algorithm_digest,
+)
 from edgar_moe.data.storage import sha256_file
+from edgar_moe.data.universe import screen_liquid_universe
+
+
+def _member_fields(member: UniverseMember) -> dict[str, str]:
+    return {
+        key: "" if value is None else str(value)
+        for key, value in member.model_dump(mode="json").items()
+    }
+
+
+def _replay_screen(
+    audit: dict[str, Any], source: list[UniverseMember], screened_path: Path
+) -> None:
+    """Verify the full selected CSV and exclusions, not just issuer identity."""
+    path = audit.get("screen_inputs_path")
+    if not isinstance(path, str):
+        raise ValueError("Retained screen inputs are required")
+    inputs = read_screen_inputs(
+        Path(path), audit.get("screen_inputs_sha256"), audit.get("screen_inputs_byte_count")
+    )
+    metadata = {key: value for key, value in inputs.items() if key != "bars"}
+    keys = (
+        "feed",
+        "lookback_start",
+        "as_of",
+        "candidate_count",
+        "minimum_sessions",
+        "minimum_price",
+        "screen_algorithm_sha256",
+        "source_sha256",
+        "source_capture_sha256",
+        "mapping_review_sha256",
+    )
+    expected = {key: audit.get(key) for key in keys}
+    expected.update(
+        schema_version=1,
+        provider="alpaca",
+        timeframe="1Day",
+        captured_at_utc=audit.get("generated_at_utc"),
+    )
+    if canonical_bytes(metadata) != canonical_bytes(expected):
+        raise ValueError("Screen inputs differ from the audit policy or source binding")
+    if inputs["screen_algorithm_sha256"] != screen_algorithm_digest():
+        raise ValueError("Screen replay algorithm differs from the recorded version")
+    if not set(inputs["bars"]).issubset({member.symbol for member in source}):
+        raise ValueError("Screen inputs contain an unknown source symbol")
+    selected, exclusions = screen_liquid_universe(
+        source,
+        inputs["bars"],
+        candidate_count=inputs["candidate_count"],
+        minimum_sessions=inputs["minimum_sessions"],
+        minimum_price=inputs["minimum_price"],
+        as_of=date.fromisoformat(inputs["as_of"]),
+    )
+    if len(selected) != inputs["candidate_count"] or canonical_bytes(exclusions) != canonical_bytes(
+        audit.get("exclusions")
+    ):
+        raise ValueError("Screen replay exclusions or selected count differ")
+    with screened_path.open(newline="", encoding="utf-8") as stream:
+        reader = csv.DictReader(stream)
+        rows = list(reader)
+        if reader.fieldnames != list(SCREEN_COLUMNS):
+            raise ValueError("Screen replay CSV columns differ")
+    expected_rows = [
+        {key: "" if item[key] is None else str(item[key]) for key in SCREEN_COLUMNS}
+        for item in selected
+    ]
+    if rows != expected_rows:
+        raise ValueError("Screen replay selected members, ranks or liquidity metrics differ")
 
 
 def _utc_observation(value: Any, label: str) -> datetime:
@@ -118,9 +196,16 @@ def verify_screen_trace(
     processed_dataset_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Fail closed on missing, changed, or retrospective candidate-screen evidence."""
-    audit = orjson.loads(audit_path.read_bytes())
-    if not isinstance(audit, dict) or audit.get("schema_version") != 4:
-        raise ValueError("A version-4 candidate-screen audit is required")
+    audit_bytes = audit_path.read_bytes()
+    audit = decode_json(audit_bytes)
+    if (
+        not isinstance(audit, dict)
+        or type(audit.get("schema_version")) is not int
+        or audit.get("schema_version") != 5
+    ):
+        raise ValueError(
+            "A version-5 candidate-screen audit with retained screen inputs is required"
+        )
     if audit.get("purpose") != "research_screen":
         raise ValueError("Retrospective diagnostics cannot verify a research screen")
     try:
@@ -133,6 +218,8 @@ def verify_screen_trace(
     observed = verify_source_capture(source_capture_path, source_path, mapping_review_path)
     if audit.get("source_capture_sha256") != sha256_file(source_capture_path):
         raise ValueError("Source-master capture differs from the screen audit")
+    if audit.get("mapping_review_sha256") != sha256_file(mapping_review_path):
+        raise ValueError("Mapping review differs from the screen audit")
     generated = _utc_observation(audit.get("generated_at_utc"), "screen generation")
     verify_screen_observation_window(observed, cutoff, generated)
     if generated.date() >= first_validation_start:
@@ -144,15 +231,23 @@ def verify_screen_trace(
     source = load_universe_csv(source_path)
     screened = load_universe_csv(screened_path)
     source_by_cik = {member.cik: member for member in source}
-    if any(source_by_cik.get(member.cik) != member for member in screened):
+    if any(
+        member.cik not in source_by_cik
+        or _member_fields(source_by_cik[member.cik]) != _member_fields(member)
+        for member in screened
+    ):
         raise ValueError("Screened universe contains a member outside the captured source master")
-    if audit.get("source_members") != len(source):
+    if type(audit.get("source_members")) is not int or audit.get("source_members") != len(source):
         raise ValueError("Broad-universe member count differs from its screen audit")
     exclusions = audit.get("exclusions")
     if not isinstance(exclusions, dict) or exclusions.get("selected") != len(screened):
         raise ValueError("Screened member count differs from its screen audit")
+    _replay_screen(audit, source, screened_path)
 
+    checkpoint_hash = sha256_file(checkpoint / "manifest.json")
     manifest = verify_authenticated_bundle(checkpoint)
+    if sha256_file(checkpoint / "manifest.json") != checkpoint_hash:
+        raise ValueError("Checkpoint manifest changed during verification")
     assets = manifest.configuration["assets"]
     requested = assets.get("requested_universe")
     if not isinstance(requested, str):
@@ -171,8 +266,11 @@ def verify_screen_trace(
         "screen_as_of": cutoff.isoformat(),
         "first_validation_start": first_validation_start.isoformat(),
         "candidate_count": len(screened),
-        "source_manifest_sha256": sha256_file(checkpoint / "manifest.json"),
-        "screen_audit_sha256": sha256_file(audit_path),
+        "source_manifest_sha256": checkpoint_hash,
+        "screen_audit_sha256": hashlib.sha256(audit_bytes).hexdigest(),
+        "screen_inputs_sha256": audit["screen_inputs_sha256"],
+        "screen_algorithm_sha256": audit["screen_algorithm_sha256"],
+        "screen_input_replay": "verified",
         "source_capture_sha256": sha256_file(source_capture_path),
         "source_master_observed_at_utc": observed.isoformat().replace("+00:00", "Z"),
         "screen_generated_at_utc": generated.isoformat().replace("+00:00", "Z"),
@@ -182,9 +280,11 @@ def verify_screen_trace(
             "timestamp proof. This check does not establish point-in-time membership."
         ),
     }
+    processed_pins: dict[Path, str] = {}
     if processed_dataset_dir is not None:
         processed_manifest_path = processed_dataset_dir / "manifest.json"
-        processed = orjson.loads(processed_manifest_path.read_bytes())
+        processed_bytes = processed_manifest_path.read_bytes()
+        processed = decode_json(processed_bytes)
         if (
             not isinstance(processed, dict)
             or processed.get("source_manifest_hash") != result["source_manifest_sha256"]
@@ -210,6 +310,24 @@ def verify_screen_trace(
                 raise ValueError("Processed dataset asset escapes its directory")
             if sha256_file(asset) != hashes[name]:
                 raise ValueError("Processed dataset asset hash mismatch")
+            processed_pins[asset] = hashes[name]
         result["processed_dataset_id"] = dataset_id
-        result["processed_manifest_sha256"] = sha256_file(processed_manifest_path)
+        result["processed_manifest_sha256"] = hashlib.sha256(processed_bytes).hexdigest()
+        processed_pins[processed_manifest_path] = result["processed_manifest_sha256"]
+    pinned = {
+        source_path: audit["source_sha256"],
+        source_capture_path: audit["source_capture_sha256"],
+        mapping_review_path: audit["mapping_review_sha256"],
+        screened_path: audit["screened_universe_sha256"],
+        audit_path: result["screen_audit_sha256"],
+        checkpoint / "manifest.json": checkpoint_hash,
+        **processed_pins,
+    }
+    if any(sha256_file(path) != digest for path, digest in pinned.items()):
+        raise ValueError("Screen evidence changed during verification")
+    read_screen_inputs(
+        Path(audit["screen_inputs_path"]),
+        audit["screen_inputs_sha256"],
+        audit["screen_inputs_byte_count"],
+    )
     return result
