@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import os
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,7 +12,8 @@ from typer.testing import CliRunner
 
 import edgar_moe.cli as cli
 from edgar_moe.cli import app
-from edgar_moe.data import alpaca, screen_audit
+from edgar_moe.data import alpaca, screen_audit, screen_inputs
+from edgar_moe.data.refresh import load_universe_csv
 from edgar_moe.data.storage import sha256_file
 
 
@@ -20,7 +23,19 @@ def _fixture(
     source = tmp_path / "source.csv"
     screened = tmp_path / "screened.csv"
     source.write_text("cik,symbol\n1,AAA\n2,BBB\n", encoding="utf-8")
-    screened.write_text("cik,symbol\n1,AAA\n", encoding="utf-8")
+    with screened.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=screen_inputs.SCREEN_COLUMNS)
+        writer.writeheader()
+        writer.writerow(
+            {
+                "cik": "0000000001",
+                "symbol": "AAA",
+                "screen_sessions": 2,
+                "screen_last_price": 10.0,
+                "screen_median_dollar_volume": 1000.0,
+                "screen_liquidity_rank": 1,
+            }
+        )
     review = tmp_path / "mapping-review.json"
     review.write_bytes(
         orjson.dumps(
@@ -52,10 +67,10 @@ def _fixture(
                 {
                     "cik": "0000000001",
                     "symbol": "AAA",
-                    "security_id": None,
-                    "company_name": None,
-                    "exchange": None,
-                    "industry_code": None,
+                    "security_id": "",
+                    "company_name": "",
+                    "exchange": "",
+                    "industry_code": "",
                 }
             ]
         )
@@ -70,24 +85,320 @@ def _fixture(
             }
         ),
     )
+    monkeypatch.setattr(screen_inputs, "_ARTIFACT_ROOT", tmp_path / "artifacts")
+    inputs_path = tmp_path / "artifacts" / "inputs"
+    inputs_hash, inputs_size = screen_inputs.write_screen_inputs(
+        inputs_path,
+        {
+            "schema_version": 1,
+            "provider": "alpaca",
+            "timeframe": "1Day",
+            "feed": "iex",
+            "lookback_start": "2022-09-01",
+            "as_of": "2022-12-30",
+            "candidate_count": 1,
+            "minimum_sessions": 1,
+            "minimum_price": 1.0,
+            "captured_at_utc": "2022-12-31T12:00:00Z",
+            "screen_algorithm_sha256": screen_inputs.screen_algorithm_digest(),
+            "source_sha256": sha256_file(source),
+            "source_capture_sha256": sha256_file(capture),
+            "mapping_review_sha256": sha256_file(review),
+            "bars": {
+                "AAA": [{"t": f"2022-12-{day}", "c": 10, "v": 100} for day in (29, 30)],
+                "BBB": [{"t": f"2022-12-{day}", "c": 10, "v": 50} for day in (29, 30)],
+            },
+        },
+    )
     audit = tmp_path / "screen.json"
     audit.write_bytes(
         orjson.dumps(
             {
-                "schema_version": 4,
+                "schema_version": 5,
                 "purpose": "research_screen",
                 "as_of": "2022-12-30",
                 "lookback_start": "2022-09-01",
                 "generated_at_utc": "2022-12-31T12:00:00Z",
                 "source_sha256": sha256_file(source),
                 "source_capture_sha256": sha256_file(capture),
+                "mapping_review_sha256": sha256_file(review),
+                "screen_inputs_path": str(inputs_path),
+                "screen_inputs_sha256": inputs_hash,
+                "screen_inputs_byte_count": inputs_size,
+                "screen_algorithm_sha256": screen_inputs.screen_algorithm_digest(),
+                "candidate_count": 1,
+                "minimum_sessions": 1,
+                "minimum_price": 1.0,
+                "feed": "iex",
                 "screened_universe_sha256": sha256_file(screened),
                 "source_members": 2,
-                "exclusions": {"selected": 1},
+                "exclusions": {"selected": 1, "below_candidate_cutoff": 1},
             }
         )
     )
     return audit, source, screened, checkpoint, capture, review
+
+
+def test_screen_trace_refuses_legacy_audit_without_retained_bar_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit, source, screened, checkpoint, capture, review = _fixture(tmp_path, monkeypatch)
+    payload = orjson.loads(audit.read_bytes())
+    payload["schema_version"] = 4
+    payload.pop("screen_inputs_path", None)
+    payload.pop("screen_inputs_sha256", None)
+    audit.write_bytes(orjson.dumps(payload))
+    with pytest.raises(ValueError, match="version-5|screen inputs"):
+        screen_audit.verify_screen_trace(
+            audit,
+            source,
+            screened,
+            checkpoint,
+            first_validation_start=date(2023, 1, 1),
+            source_capture_path=capture,
+            mapping_review_path=review,
+        )
+
+
+def _verify_fixture(paths):
+    audit, source, screened, checkpoint, capture, review = paths
+    return screen_audit.verify_screen_trace(
+        audit,
+        source,
+        screened,
+        checkpoint,
+        first_validation_start=date(2023, 1, 1),
+        source_capture_path=capture,
+        mapping_review_path=review,
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "bar_hash",
+        "bar_values_rehashed",
+        "input_metadata",
+        "code_version",
+        "unknown_symbol",
+        "missing_inputs",
+        "exclusions",
+        "fractional_count",
+        "fractional_schema",
+        "price_type",
+        "empty_inputs",
+        "file_alias",
+        "directory_alias",
+        "hardlink",
+        "file_permissions",
+        "directory_permissions",
+        "fifo",
+        "byte_bound",
+        "read_mutation",
+        "duplicate_json",
+    ],
+)
+def test_screen_replay_rejects_input_and_policy_tampering(tmp_path, monkeypatch, mutation):
+    paths = _fixture(tmp_path, monkeypatch)
+    audit, _, _, _, _, _ = paths
+    report = orjson.loads(audit.read_bytes())
+    directory = Path(report["screen_inputs_path"])
+    raw = directory / "daily-bars.json"
+    payload = screen_inputs.decode_json(raw.read_bytes())
+    rehash = False
+    if mutation in {"bar_hash", "bar_values_rehashed"}:
+        payload["bars"]["BBB"][0]["v"] = 999999
+        payload["bars"]["BBB"][1]["v"] = 999999
+        raw.write_bytes(screen_inputs.canonical_bytes(payload) + b"\n")
+        rehash = mutation == "bar_values_rehashed"
+    elif mutation == "input_metadata":
+        payload["feed"] = "sip"
+        raw.write_bytes(screen_inputs.canonical_bytes(payload) + b"\n")
+        rehash = True
+    elif mutation == "code_version":
+        payload["screen_algorithm_sha256"] = "0" * 64
+        report["screen_algorithm_sha256"] = "0" * 64
+        raw.write_bytes(screen_inputs.canonical_bytes(payload) + b"\n")
+        rehash = True
+    elif mutation == "unknown_symbol":
+        payload["bars"]["OTHER"] = payload["bars"]["AAA"]
+        raw.write_bytes(screen_inputs.canonical_bytes(payload) + b"\n")
+        rehash = True
+    elif mutation == "missing_inputs":
+        raw.unlink()
+    elif mutation == "exclusions":
+        report["exclusions"]["below_candidate_cutoff"] = 99
+    elif mutation == "fractional_count":
+        report["source_members"] = 2.0
+    elif mutation == "fractional_schema":
+        report["schema_version"] = 5.0
+    elif mutation == "price_type":
+        payload["minimum_price"] = True
+        report["minimum_price"] = True
+        raw.write_bytes(screen_inputs.canonical_bytes(payload) + b"\n")
+        rehash = True
+    elif mutation == "empty_inputs":
+        raw.write_bytes(b"")
+    elif mutation == "file_alias":
+        target = directory / "elsewhere.json"
+        raw.rename(target)
+        raw.symlink_to(target)
+    elif mutation == "directory_alias":
+        target = directory.with_name("elsewhere")
+        directory.rename(target)
+        directory.symlink_to(target, target_is_directory=True)
+    elif mutation == "hardlink":
+        os.link(raw, directory / "second.json")
+    elif mutation == "file_permissions":
+        raw.chmod(0o644)
+    elif mutation == "directory_permissions":
+        directory.chmod(0o755)
+    elif mutation == "fifo":
+        raw.unlink()
+        os.mkfifo(raw, 0o600)
+    elif mutation == "byte_bound":
+        monkeypatch.setattr(screen_inputs, "_MAX_INPUT_BYTES", 1)
+        monkeypatch.setattr(screen_inputs.os, "read", lambda *_: pytest.fail("unbounded read"))
+    elif mutation == "read_mutation":
+        read = screen_inputs.os.read
+        changed = False
+
+        def mutate(descriptor, maximum):
+            nonlocal changed
+            data = read(descriptor, maximum)
+            if not changed:
+                changed = True
+                with raw.open("ab") as output:
+                    output.write(b" ")
+            return data
+
+        monkeypatch.setattr(screen_inputs.os, "read", mutate)
+    elif mutation == "duplicate_json":
+        encoded = screen_inputs.canonical_bytes(payload)
+        raw.write_bytes(
+            encoded.replace(b'"candidate_count":1', b'"candidate_count":2,"candidate_count":1')
+            + b"\n"
+        )
+        rehash = True
+    if rehash:
+        report["screen_inputs_sha256"] = sha256_file(raw)
+        report["screen_inputs_byte_count"] = raw.stat().st_size
+    audit.write_bytes(orjson.dumps(report))
+    with pytest.raises(ValueError):
+        _verify_fixture(paths)
+
+
+@pytest.mark.parametrize(
+    "target", ["source", "screened", "capture", "review", "audit", "inputs", "manifest"]
+)
+def test_screen_replay_rechecks_evidence_after_checkpoint_verification(
+    tmp_path, monkeypatch, target
+):
+    paths = _fixture(tmp_path, monkeypatch)
+    audit, source, screened, checkpoint, capture, review = paths
+    report = orjson.loads(audit.read_bytes())
+    targets = {
+        "source": source,
+        "screened": screened,
+        "capture": capture,
+        "review": review,
+        "audit": audit,
+        "inputs": Path(report["screen_inputs_path"]) / "daily-bars.json",
+        "manifest": checkpoint / "manifest.json",
+    }
+    verify = screen_audit.verify_authenticated_bundle
+
+    def mutate(path):
+        result = verify(path)
+        with targets[target].open("ab") as output:
+            output.write(b" ")
+        return result
+
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", mutate)
+    with pytest.raises(ValueError, match="changed|hash mismatch|match its size"):
+        _verify_fixture(paths)
+
+
+@pytest.mark.parametrize(
+    "bad_path", ["existing", "outside", "alias_parent", "file_parent", "traversal", "root"]
+)
+def test_screen_input_destination_fails_before_runtime_or_provider(
+    tmp_path, monkeypatch, cleared_source_use_review_for_test, bad_path
+):
+    _, source, _, _, capture, review = _fixture(tmp_path, monkeypatch)
+    root = tmp_path / "artifacts"
+    if bad_path == "existing":
+        destination = root / "inputs"
+    elif bad_path == "outside":
+        destination = tmp_path / "outside"
+    elif bad_path == "alias_parent":
+        (root / "alias").symlink_to(tmp_path, target_is_directory=True)
+        destination = root / "alias" / "new"
+    elif bad_path == "file_parent":
+        (root / "file").write_text("not a directory")
+        destination = root / "file" / "new"
+    elif bad_path == "traversal":
+        destination = root / "parent" / ".." / "new"
+    else:
+        destination = root
+    before = (root / "inputs" / "daily-bars.json").read_bytes()
+    monkeypatch.setattr(
+        cli, "runtime_settings", lambda: pytest.fail("runtime loaded before preflight")
+    )
+    output, audit = tmp_path / "new-screen.csv", tmp_path / "new-audit.json"
+    result = CliRunner().invoke(
+        app,
+        [
+            "screen-universe",
+            "--source",
+            str(source),
+            "--source-capture",
+            str(capture),
+            "--mapping-review",
+            str(review),
+            "--as-of",
+            "2022-12-30",
+            "--output",
+            str(output),
+            "--audit-output",
+            str(audit),
+            "--screen-inputs-dir",
+            str(destination),
+        ],
+    )
+    assert result.exit_code != 0
+    assert isinstance(result.exception, ValueError)
+    assert "Screen input" in str(result.exception)
+    assert not output.exists() and not audit.exists()
+    assert (root / "inputs" / "daily-bars.json").read_bytes() == before
+
+
+def test_screen_trace_rejects_invented_liquidity_even_with_matching_csv_hash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    audit, source, screened, checkpoint, capture, review = _fixture(tmp_path, monkeypatch)
+    with screened.open(newline="", encoding="utf-8") as stream:
+        rows = list(csv.DictReader(stream))
+    rows[0].update(
+        screen_sessions="999", screen_last_price="999", screen_median_dollar_volume="99999999"
+    )
+    with screened.open("w", newline="", encoding="utf-8") as stream:
+        writer = csv.DictWriter(stream, fieldnames=screen_inputs.SCREEN_COLUMNS)
+        writer.writeheader()
+        writer.writerows(rows)
+    payload = orjson.loads(audit.read_bytes())
+    payload["screened_universe_sha256"] = sha256_file(screened)
+    audit.write_bytes(orjson.dumps(payload))
+    with pytest.raises(ValueError, match="replay|screen inputs|version-5"):
+        screen_audit.verify_screen_trace(
+            audit,
+            source,
+            screened,
+            checkpoint,
+            first_validation_start=date(2023, 1, 1),
+            source_capture_path=capture,
+            mapping_review_path=review,
+        )
 
 
 def test_record_source_capture_hashes_reviewed_local_files(
@@ -164,6 +475,7 @@ def test_screen_command_pins_inputs_before_fetching(
     diagnostic: bool,
     bar_problem: str,
 ) -> None:
+    monkeypatch.setattr(screen_inputs, "_ARTIFACT_ROOT", tmp_path / "artifacts")
     source, review, capture = (
         tmp_path / name for name in ("source.csv", "review.json", "capture.json")
     )
@@ -227,6 +539,8 @@ def test_screen_command_pins_inputs_before_fetching(
             str(output),
             "--audit-output",
             str(audit),
+            "--screen-inputs-dir",
+            str(tmp_path / "artifacts" / "inputs"),
             "--as-of",
             "2022-12-30",
             "--candidate-count",
@@ -254,13 +568,42 @@ def test_screen_command_pins_inputs_before_fetching(
     else:
         assert result.exit_code == 0, result.output
         payload = orjson.loads(audit.read_bytes())
-        assert payload["schema_version"] == 4
+        assert payload["schema_version"] == 5
         assert payload["purpose"] == (
             "retrospective_diagnostic" if diagnostic else "research_screen"
         )
         assert payload["source_capture_sha256"] == sha256_file(capture)
         assert payload["source_sha256"] == sha256_file(source)
         assert payload["generated_at_utc"].endswith("Z")
+        if not diagnostic:
+            checkpoint = tmp_path / "fresh-checkpoint"
+            checkpoint.mkdir()
+            (checkpoint / "manifest.json").write_text("{}")
+            (checkpoint / "requested-universe.json").write_bytes(
+                orjson.dumps(
+                    [member.model_dump(mode="json") for member in load_universe_csv(output)]
+                )
+            )
+            monkeypatch.setattr(
+                screen_audit,
+                "verify_authenticated_bundle",
+                lambda _: SimpleNamespace(
+                    configuration={
+                        "assets": {"requested_universe": "requested-universe.json"},
+                        "as_of": "2025-12-31",
+                    }
+                ),
+            )
+            result = screen_audit.verify_screen_trace(
+                audit,
+                source,
+                output,
+                checkpoint,
+                first_validation_start=date(datetime.now(UTC).year + 1, 1, 1),
+                source_capture_path=capture,
+                mapping_review_path=review,
+            )
+            assert result["screen_input_replay"] == "verified"
 
 
 @pytest.mark.parametrize("cutoff", ["2022-12-30", "future"])

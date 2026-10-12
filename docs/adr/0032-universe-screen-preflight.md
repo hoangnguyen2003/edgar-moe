@@ -46,3 +46,16 @@ candidate membership. A reviewed archived master and a new study are still
 needed for [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292);
 source-rights review [#280](https://github.com/hoangnguyen2003/edgar-moe/issues/280)
 also remains open. Frozen v1 and prospective records are unchanged.
+
+## Screening-input replay update (2026-10-12)
+
+The version-4 audit traced output/roster identities but retained no daily-bar
+inputs, so matching hashes could not reproduce selection or liquidity metrics.
+New version-5 audits retain exclusively new private parsed bar inputs with
+parameters, source commitments and screening-code identity. The verifier
+replays every selected row/metric/rank and exclusion count, then rechecks the
+checkpoint/dataset binding and file commitments. Version 4 is not silently
+upgraded: missing original inputs cannot be replaced with later provider data.
+The timing rules and diagnostic prohibition above remain unchanged. This is
+reproducibility/integrity evidence, not independent source availability,
+historical listed-security membership, or non-SEC source-use clearance.
