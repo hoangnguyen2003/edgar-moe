@@ -40,7 +40,7 @@ def screen_liquid_universe(
     minimum_price: float,
     as_of: date | None = None,
 ) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    """Rank a tractable candidate set by trailing observed dollar volume."""
+    """Rank candidates from unambiguous daily sessions and finite liquidity."""
     if candidate_count < 1 or minimum_sessions < 1 or minimum_price <= 0:
         raise ValueError("Screen parameters must be positive")
     exclusions: Counter[str] = Counter()
@@ -50,15 +50,22 @@ def screen_liquid_universe(
             exclusions["fund_or_etp"] += 1
             continue
         observations: list[tuple[str, float, float]] = []
+        seen_sessions: set[date] = set()
         for row in bars.get(member.symbol, []):
             timestamp = str(row.get("t", row.get("timestamp", "")))
-            if as_of is not None and timestamp:
+            if timestamp:
                 try:
                     observed_date = date.fromisoformat(timestamp[:10])
                 except ValueError as exc:
                     raise ValueError("Screen bar has an invalid date") from exc
-                if observed_date > as_of:
+                if as_of is not None and observed_date > as_of:
                     raise ValueError("Screen bars extend beyond the declared cutoff")
+                # Daily bar aliases or overlapping pages must not manufacture
+                # extra sessions or select an arbitrary correction for a day.
+                # Validate before dropping rows with missing price/volume.
+                if observed_date in seen_sessions:
+                    raise ValueError("Screen bars contain a duplicate daily session")
+                seen_sessions.add(observed_date)
             try:
                 raw_close = row.get("c", row.get("close"))
                 raw_volume = row.get("v", row.get("volume"))
@@ -75,7 +82,10 @@ def screen_liquid_universe(
                 and math.isfinite(volume)
                 and volume >= 0
             ):
-                observations.append((timestamp, close, close * volume))
+                dollar_volume = close * volume
+                if not math.isfinite(dollar_volume):
+                    raise ValueError("Screen bar has non-finite dollar volume")
+                observations.append((timestamp, close, dollar_volume))
         observations.sort(key=lambda item: item[0])
         if len(observations) < minimum_sessions:
             exclusions["insufficient_sessions"] += 1
@@ -84,12 +94,15 @@ def screen_liquid_universe(
         if last_price < minimum_price:
             exclusions["minimum_price"] += 1
             continue
+        median_dollar_volume = median(item[2] for item in observations)
+        if not math.isfinite(median_dollar_volume):
+            raise ValueError("Screen median has non-finite dollar volume")
         eligible.append(
             {
                 **member.model_dump(mode="json"),
                 "screen_sessions": len(observations),
                 "screen_last_price": round(last_price, 6),
-                "screen_median_dollar_volume": round(median(item[2] for item in observations), 2),
+                "screen_median_dollar_volume": round(median_dollar_volume, 2),
             }
         )
     eligible.sort(key=lambda item: (-float(item["screen_median_dollar_volume"]), item["symbol"]))
