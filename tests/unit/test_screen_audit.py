@@ -155,12 +155,14 @@ def test_screen_observation_uses_new_york_cutoff_boundary() -> None:
 
 @pytest.mark.parametrize("change_during_fetch", [False, True])
 @pytest.mark.parametrize("diagnostic", [False, True])
+@pytest.mark.parametrize("bar_problem", ["valid", "duplicate", "invalid_date", "overflow"])
 def test_screen_command_pins_inputs_before_fetching(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     cleared_source_use_review_for_test: None,
     change_during_fetch: bool,
     diagnostic: bool,
+    bar_problem: str,
 ) -> None:
     source, review, capture = (
         tmp_path / name for name in ("source.csv", "review.json", "capture.json")
@@ -193,13 +195,24 @@ def test_screen_command_pins_inputs_before_fetching(
         async def daily_bars(self, symbols, start, cutoff, feed):
             if change_during_fetch:
                 review.write_bytes(b"[]")
-            return {
+            result = {
                 symbol: [{"t": f"2022-12-{day:02d}", "c": 10, "v": 100} for day in range(1, 21)]
                 for symbol in symbols
             }
+            for rows in result.values():
+                if bar_problem == "duplicate":
+                    rows[-1] = dict(rows[0])
+                elif bar_problem == "invalid_date":
+                    rows[-1]["t"] = "not-a-date"
+                elif bar_problem == "overflow":
+                    rows[-1].update(c=1e308, v=1e308)
+            return result
 
     monkeypatch.setattr(alpaca, "AlpacaDataClient", FakeMarket)
     output, audit = tmp_path / "screened.csv", tmp_path / "audit.json"
+    if bar_problem != "valid" and not change_during_fetch:
+        output.write_bytes(b"previous synthetic screen")
+        audit.write_bytes(b"previous synthetic audit")
     result = CliRunner().invoke(
         app,
         [
@@ -227,6 +240,17 @@ def test_screen_command_pins_inputs_before_fetching(
         assert result.exit_code != 0
         assert "changed while fetching" in str(result.exception)
         assert not output.exists() and not audit.exists()
+    elif bar_problem != "valid":
+        assert result.exit_code != 0
+        expected = {
+            "duplicate": "duplicate daily session",
+            "invalid_date": "invalid date",
+            "overflow": "non-finite dollar volume",
+        }
+        assert expected[bar_problem] in str(result.exception)
+        assert output.read_bytes() == b"previous synthetic screen"
+        assert audit.read_bytes() == b"previous synthetic audit"
+        assert not output.with_suffix(".csv.tmp").exists()
     else:
         assert result.exit_code == 0, result.output
         payload = orjson.loads(audit.read_bytes())

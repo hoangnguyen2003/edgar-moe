@@ -22,9 +22,18 @@ For a new prospective cutoff, capture the master before that New York day ends,
 then screen only after the day ends. The default screen cutoff is the previous
 New York day, so a master first captured after that cutoff is not eligible.
 
-The screen rejects market bars after its declared cutoff. Before reading data
-credentials or contacting Alpaca, it also rejects a master observed after the
-screen cutoff or a cutoff whose New York day has not finished. Its version-4
+The screen rejects market bars after its declared cutoff, invalid nonempty bar
+dates, and repeated daily dates for the same symbol, including identical rows
+or conflicting corrections. Duplicate rows are not arbitrarily deduplicated:
+they cannot inflate the minimum-session count or silently change liquidity
+ranking. Finite prices and volumes must also produce finite dollar-volume
+values and a finite median. These checks run before CSV/audit writes, preserving
+existing outputs on rejection. They validate screen inputs, not historical
+listing membership or independently available source data.
+
+Before reading data credentials or contacting Alpaca, the screen also rejects a
+master observed after the screen cutoff or a cutoff whose New York day has not
+finished. Its version-4
 audit records hashes of both CSVs and the master-capture record, the screen
 generation time, and a `research_screen` purpose. A retrospective screen is
 possible only with `--allow-retrospective-diagnostic` **and separate** `--output`
