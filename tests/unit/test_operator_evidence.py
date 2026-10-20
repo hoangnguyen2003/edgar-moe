@@ -505,10 +505,16 @@ def test_cli_selects_readiness_profile(tmp_path: Path) -> None:
     assert summary["blocked_checks"] == list(PROVIDER_EVIDENCE_PROFILES["p1"])[3:]
 
 
-def test_cli_builds_verifies_and_refuses_to_overwrite_readiness_report(tmp_path: Path) -> None:
+@pytest.mark.parametrize(("age_days", "expected_status"), [(0, "ready"), (31, "stale")])
+def test_cli_builds_verifies_and_refuses_to_overwrite_readiness_report(
+    tmp_path: Path, age_days: int, expected_status: str
+) -> None:
     packet_path = tmp_path / "packet.json"
     report_path = tmp_path / "readiness.json"
-    packet_path.write_bytes(orjson.dumps(prepare_operator_evidence_packet(_complete_draft())))
+    observed_at = (datetime.now(UTC) - timedelta(days=age_days, hours=1)).isoformat()
+    packet_path.write_bytes(
+        orjson.dumps(prepare_operator_evidence_packet(_complete_draft(observed_at=observed_at)))
+    )
 
     built = subprocess.run(
         [
@@ -525,7 +531,7 @@ def test_cli_builds_verifies_and_refuses_to_overwrite_readiness_report(tmp_path:
     )
     built_summary = json.loads(built.stdout)
     assert built_summary["status"] == "written"
-    assert built_summary["readiness_status"] == "ready"
+    assert built_summary["readiness_status"] == expected_status
     assert not list(tmp_path.glob(".*.staging-*"))
 
     verified = subprocess.run(

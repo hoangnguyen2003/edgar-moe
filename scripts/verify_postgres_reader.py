@@ -1,8 +1,10 @@
 """Verify the effective privileges of the hosted API database role.
 
-This is an operator check, not a migration. It performs harmless read probes and
-attempts writes/DDL inside rolled-back transactions. It never prints the supplied
-connection string and never commits a probe mutation.
+This is an operator check, not a migration. It inspects effective grants in a
+read-only snapshot, then attempts writes/DDL in a separate rolled-back transaction.
+Column writes, grant options, role memberships, unrelated reads, sequence mutation
+and executable security-definer routines are included in the grant inspection.
+It never prints the supplied connection string or commits a probe mutation.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ import psycopg
 from psycopg import Connection, sql
 from psycopg.errors import InsufficientPrivilege
 
+from edgar_moe.forward.auditor_role import AuditorPermissionError, inspect_permissions
 from edgar_moe.forward.failure_context import redact_sensitive_text
 from edgar_moe.forward.reader_role import FORBIDDEN_TABLE_PRIVILEGES, READER_TABLES
 
@@ -56,7 +59,11 @@ def audit_reader_role(database_url: str) -> dict[str, object]:
     if not database_url.strip():
         raise ValueError("EDGAR_MOE_REGISTRY_READ_DATABASE_URL is required")
 
-    with psycopg.connect(database_url) as connection:
+    with psycopg.connect(database_url, connect_timeout=10) as connection:
+        connection.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY")
+        connection.execute("SET LOCAL statement_timeout = '10s'")
+        connection.execute("SET LOCAL lock_timeout = '1s'")
+        connection.execute("SET LOCAL search_path = pg_catalog")
         identity = connection.execute(
             """
             SELECT current_user, current_database(),
@@ -97,6 +104,20 @@ def audit_reader_role(database_url: str) -> dict[str, object]:
                         f"reader role unexpectedly has {privilege} on {table_name}"
                     )
 
+        # Table ACLs and one UPDATE probe do not cover column grants on other
+        # registry tables, SET ROLE memberships, sequences or definer functions.
+        # Reuse the read-only current-database inspection before any write probe.
+        try:
+            permissions = inspect_permissions(connection, profile="registry-reader")
+        except AuditorPermissionError as error:
+            raise ReaderRoleAuditError(f"reader permission inspection failed: {error}") from error
+        connection.rollback()
+
+        # A new bounded transaction is needed: the inspection snapshot above is
+        # deliberately READ ONLY, which would otherwise deny even a writable role.
+        connection.execute("SET LOCAL statement_timeout = '10s'")
+        connection.execute("SET LOCAL lock_timeout = '1s'")
+        connection.execute("SET LOCAL search_path = pg_catalog")
         _assert_denied(
             connection,
             sql.SQL("UPDATE {} SET run_id = run_id WHERE false").format(_table_ref("forward_runs")),
@@ -131,6 +152,7 @@ def audit_reader_role(database_url: str) -> dict[str, object]:
             "select_tables": list(READER_TABLES),
             "forbidden_table_privileges": list(FORBIDDEN_TABLE_PRIVILEGES),
             "write_probes": ["UPDATE", "DELETE", "DDL"],
+            "permission_inspection": permissions,
         }
 
 

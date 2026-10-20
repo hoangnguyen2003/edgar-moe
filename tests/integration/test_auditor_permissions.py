@@ -19,6 +19,13 @@ assert _SPEC is not None and _SPEC.loader is not None
 audit = importlib.util.module_from_spec(_SPEC)
 _SPEC.loader.exec_module(audit)
 
+_READER_SPEC = importlib.util.spec_from_file_location(
+    "verify_postgres_reader", Path(__file__).parents[2] / "scripts/verify_postgres_reader.py"
+)
+assert _READER_SPEC is not None and _READER_SPEC.loader is not None
+reader_audit = importlib.util.module_from_spec(_READER_SPEC)
+_READER_SPEC.loader.exec_module(reader_audit)
+
 
 @pytest.fixture
 def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]], str, str]]:
@@ -26,8 +33,10 @@ def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]],
     if not admin_url:
         pytest.skip("dedicated PostgreSQL auditor fixture is not configured")
     settings = conninfo_to_dict(admin_url)
-    assert settings.get("dbname", "").endswith("_auditor_permission_test")
+    database = settings.get("dbname", "")
+    assert isinstance(database, str) and database.endswith("_auditor_permission_test")
     host = settings.get("host", "")
+    assert isinstance(host, str)
     assert host in {"127.0.0.1", "localhost", "::1"} or host.startswith("/private/tmp/")
     role = "auditor_fixture_" + uuid4().hex
     with psycopg.connect(admin_url, autocommit=True) as admin:
@@ -239,3 +248,43 @@ def test_isolated_owner_default_grants_support_post_restore_reader_check(
             )
         )
     assert audit.audit_auditor_role(dsn, profile="registry-reader")["status"] == "passed"
+
+
+@pytest.mark.parametrize(
+    "grant",
+    [
+        "GRANT INSERT (id) ON public.forward_forecasts TO {}",
+        "GRANT UPDATE (id) ON public.forward_forecasts TO {}",
+        "GRANT UPDATE (id) ON public.forward_forecasts TO PUBLIC",
+        "GRANT REFERENCES (id) ON public.forward_forecasts TO {}",
+        "GRANT SELECT (id) ON public.forward_forecasts TO {} WITH GRANT OPTION",
+        "GRANT SELECT ON public.unrelated_fixture TO {}",
+        "GRANT USAGE ON SEQUENCE public.auditor_fixture_sequence TO {}",
+        "GRANT EXECUTE ON FUNCTION public.auditor_fixture_function() TO {}",
+        "GRANT pg_write_all_data TO {}",
+        "GRANT MAINTAIN ON public.forward_forecasts TO {}",
+    ],
+)
+def test_reader_audit_rejects_effective_privileges_outside_table_write_probes(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+    grant: str,
+) -> None:
+    admin, role, dsn = auditor_database
+    if "MAINTAIN" in grant and admin.info.server_version < 170000:
+        pytest.skip("MAINTAIN privilege requires PostgreSQL 17+")
+    admin.execute(psycopg.sql.SQL("ALTER ROLE {} NOINHERIT").format(psycopg.sql.Identifier(role)))
+    for table in audit.READER_TABLES:
+        admin.execute(
+            psycopg.sql.SQL("GRANT SELECT ON public.{} TO {}").format(
+                psycopg.sql.Identifier(table), psycopg.sql.Identifier(role)
+            )
+        )
+    baseline = reader_audit.audit_reader_role(dsn)
+    assert baseline["status"] == "passed"
+    assert baseline["permission_inspection"]["profile"] == "registry-reader"
+    assert baseline["permission_inspection"]["mutation_probes"] is False
+    admin.execute(psycopg.sql.SQL(grant).format(psycopg.sql.Identifier(role)))
+    with pytest.raises(reader_audit.ReaderRoleAuditError):
+        reader_audit.audit_reader_role(dsn)
+    assert admin.execute("SELECT count(*) FROM public.forward_forecasts").fetchone() == (0,)
+    assert admin.execute("SELECT count(*) FROM public.forward_runs").fetchone() == (0,)
