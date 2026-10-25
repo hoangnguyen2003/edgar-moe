@@ -52,6 +52,7 @@ def test_permission_inspection_has_only_redacted_report_and_read_probes() -> Non
     assert report["identity_redacted"] is True
     assert report["mutation_probes"] is False
     assert report["select_tables"] == ["forward_runs", "forward_artifacts"]
+    assert "no_sequence_reads" in report["checks"]
     assert all(query.startswith(("SELECT", "SHOW", "Composed")) for query in connection.queries)
     assert len([query for query in connection.queries if "LIMIT 0" in query]) == 2
 
@@ -67,7 +68,8 @@ def test_permission_inspection_has_only_redacted_report_and_read_probes() -> Non
         ("has_schema_privilege(current_user, n.oid", "schema_create_allowed"),
         ("c.relname IN", "unrelated_table_read_allowed"),
         ("has_column_privilege", "table_write_or_grant_allowed"),
-        ("has_sequence_privilege", "sequence_mutation_allowed"),
+        ("c.oid, 'SELECT')", "sequence_read_allowed"),
+        ("c.oid, 'USAGE, UPDATE')", "sequence_mutation_allowed"),
         ("p.prosecdef", "security_definer_execution_allowed"),
         ("%s", "required_select_missing"),
     ],
