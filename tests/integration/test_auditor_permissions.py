@@ -99,6 +99,14 @@ def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]],
         ),
         ("GRANT SELECT ON public.unrelated_fixture TO {}", "unrelated_table_read_allowed"),
         (
+            "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO {}",
+            "sequence_read_allowed",
+        ),
+        (
+            "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO PUBLIC",
+            "sequence_read_allowed",
+        ),
+        (
             "GRANT USAGE ON SEQUENCE public.auditor_fixture_sequence TO {}",
             "sequence_mutation_allowed",
         ),
@@ -259,6 +267,8 @@ def test_isolated_owner_default_grants_support_post_restore_reader_check(
         "GRANT REFERENCES (id) ON public.forward_forecasts TO {}",
         "GRANT SELECT (id) ON public.forward_forecasts TO {} WITH GRANT OPTION",
         "GRANT SELECT ON public.unrelated_fixture TO {}",
+        "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO {}",
+        "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO PUBLIC",
         "GRANT USAGE ON SEQUENCE public.auditor_fixture_sequence TO {}",
         "GRANT EXECUTE ON FUNCTION public.auditor_fixture_function() TO {}",
         "GRANT pg_write_all_data TO {}",
