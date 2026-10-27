@@ -1,0 +1,54 @@
+name: Study Linux runtime proof
+
+on:
+  push:
+    branches: [fix/study-linux-runtime-proof-20261027]
+
+permissions:
+  contents: read
+
+jobs:
+  minimal-python-tls:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_PASSWORD: local-ci-only-password
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Assemble reviewed source and install only the minimal hash-pinned dependencies
+        run: |
+          uv run --no-project --python 3.12 python ops/private-read-admission/study-prep-20261027/portable-kernel-v1/build.py --output "$PWD/data/artifacts/linux-runtime-bundle"
+          uv venv --python 3.12 "$RUNNER_TEMP/study-kernel-venv"
+          uv pip install --python "$RUNNER_TEMP/study-kernel-venv/bin/python" --require-hashes -r data/artifacts/linux-runtime-bundle/requirements.lock
+      - name: Exercise actual local TLS and all four kernel routes
+        env:
+          CI_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          "$RUNNER_TEMP/study-kernel-venv/bin/python" -I ops/private-read-admission/study-prep-20261027/linux-runtime-v1/fixture.py --bundle "$PWD/data/artifacts/linux-runtime-bundle" --output "$PWD/data/artifacts/linux-runtime-proof" --container "$CI_POSTGRES_CONTAINER"
+      - name: Retain only allowlisted CI receipts
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: study-linux-runtime-receipts
+          path: |
+            data/artifacts/linux-runtime-proof/fixture-result.json
+            data/artifacts/linux-runtime-proof/reader-result.json
+            data/artifacts/linux-runtime-bundle/source-manifest.json
+          if-no-files-found: warn
+          retention-days: 7
