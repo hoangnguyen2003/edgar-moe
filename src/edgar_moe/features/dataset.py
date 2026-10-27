@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from platform import python_version
 from typing import Any, Protocol
 
 import numpy as np
@@ -495,8 +496,9 @@ def build_research_dataset(
     regime = np.vstack(regime_rows).astype(np.float32)
     target_values = np.asarray(targets, dtype=np.float32)
     daily_returns = build_daily_return_components(bars, security_by_symbol)
+    runtime_python = python_version()
     dataset_identity = {
-        "builder_version": 2,
+        "builder_version": 3,
         "source": source_manifest.dataset_id,
         # The source-system ID is date-scoped and is reused when a checkpoint
         # is refreshed. Include the verified manifest digest so a changed
@@ -504,6 +506,7 @@ def build_research_dataset(
         # a previously registered dataset with the same date/configuration.
         "source_manifest_hash": source_manifest_hash,
         "config": config.model_dump(),
+        "python_runtime": runtime_python,
         "text_encoder": text_encoder.cache_identity,
     }
     dataset_id = f"research-{as_of.isoformat()}-{stable_json_hash(dataset_identity)[:12]}"
@@ -525,6 +528,7 @@ def build_research_dataset(
         attrition=attrition,
         source_manifest_hash=source_manifest_hash,
         provenance={
+            "python_runtime": runtime_python,
             "text_encoder": text_encoder.cache_identity,
             "market_adjustment": "split",
             "market_feed": str(source_manifest.configuration.get("feed", "unknown")),

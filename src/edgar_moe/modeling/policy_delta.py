@@ -20,6 +20,28 @@ import pandas as pd
 
 from edgar_moe.features.dataset import ResearchDataset, dataset_xbrl_fact_policy
 
+LOCKED_TEST_START = date(2025, 1, 1)
+_PYTHON_RUNTIME_PATTERN = re.compile(r"\d+\.\d+\.\d+\Z")
+_PACKAGE_RUNTIME_PATTERN = re.compile(r"\d+\.\d+\.\d+(?:[+.-][0-9A-Za-z.-]+)?\Z")
+_COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}\Z")
+_POSITIVE_INTEGER_PATTERN = re.compile(r"[1-9]\d*\Z")
+_TEXT_ENCODER_FIELDS = frozenset(
+    {
+        "torch",
+        "transformers",
+        "model",
+        "revision",
+        "tokenizer_revision",
+        "chunk_tokens",
+        "pooling",
+        "max_chunks",
+        "batch_size",
+        "device",
+        "sampling",
+        "sentiment",
+    }
+)
+
 
 def compare_feature_policies(
     baseline: ResearchDataset,
@@ -39,6 +61,10 @@ def compare_feature_policies(
         raise ValueError("baseline must use the legacy_v1 XBRL policy")
     if dataset_xbrl_fact_policy(candidate) != "duration_aware_v2":
         raise ValueError("candidate must use the duration_aware_v2 XBRL policy")
+    if test_start != LOCKED_TEST_START:
+        raise ValueError(
+            f"test boundary must match the pinned locked start {LOCKED_TEST_START.isoformat()}"
+        )
     if baseline.dataset_id == candidate.dataset_id:
         raise ValueError("paired dataset identities must differ")
     for digest in (baseline_manifest_sha256, candidate_manifest_sha256):
@@ -54,6 +80,20 @@ def compare_feature_policies(
         and baseline.as_of == candidate.as_of
     )
     same_events = set(baseline_ids) == set(candidate_ids)
+    baseline_python = baseline.provenance.get("python_runtime")
+    candidate_python = candidate.provenance.get("python_runtime")
+    same_python_runtime = bool(
+        _is_pinned_python_runtime(baseline_python)
+        and baseline_python == candidate_python
+        and _is_pinned_python_runtime(candidate_python)
+    )
+    baseline_encoder = baseline.provenance.get("text_encoder")
+    candidate_encoder = candidate.provenance.get("text_encoder")
+    same_text_encoder = bool(
+        _is_pinned_finbert_identity(baseline_encoder)
+        and baseline_encoder == candidate_encoder
+        and _is_pinned_finbert_identity(candidate_encoder)
+    )
     report: dict[str, Any] = {
         "schema_version": 1,
         "comparison_type": "pretest_xbrl_policy_attribution",
@@ -70,6 +110,8 @@ def compare_feature_policies(
         "candidate_pretest_events": len(candidate_ids),
         "same_source_checkpoint": shared_source,
         "same_pretest_event_set": same_events,
+        "same_python_runtime": same_python_runtime,
+        "same_text_encoder": same_text_encoder,
     }
     if not shared_source or not same_events:
         report.update(
@@ -106,6 +148,8 @@ def compare_feature_policies(
         comparisons[name]["exactly_equal"] for name in ("text", "market", "regime")
     )
     fundamentals_changed = not comparisons["fundamental"]["exactly_equal"]
+    same_non_xbrl_inputs = same_timing and same_targets and non_fundamental_same
+    same_runtime = same_python_runtime and same_text_encoder
     report.update(
         {
             "same_pretest_event_timing": same_timing,
@@ -113,14 +157,59 @@ def compare_feature_policies(
             "modalities": comparisons,
             "status": (
                 "isolated_policy_change"
-                if same_timing and same_targets and non_fundamental_same and fundamentals_changed
+                if same_runtime and same_non_xbrl_inputs and fundamentals_changed
                 else "no_observed_fundamental_change"
-                if same_timing and same_targets and non_fundamental_same
+                if same_runtime and same_non_xbrl_inputs
                 else "confounded"
             ),
         }
     )
     return _with_hash(report)
+
+
+def _is_pinned_python_runtime(value: object) -> bool:
+    return isinstance(value, str) and _PYTHON_RUNTIME_PATTERN.fullmatch(value) is not None
+
+
+def _is_pinned_finbert_identity(value: object) -> bool:
+    if not isinstance(value, str) or not value.startswith("finbert-v2:"):
+        return False
+    fields: dict[str, str] = {}
+    for part in value.removeprefix("finbert-v2:").split(":"):
+        key, separator, field_value = part.partition("=")
+        if not separator or not key or not field_value or key in fields:
+            return False
+        fields[key] = field_value
+    if set(fields) != _TEXT_ENCODER_FIELDS:
+        return False
+    if any(
+        _PACKAGE_RUNTIME_PATTERN.fullmatch(fields[name]) is None
+        for name in ("torch", "transformers")
+    ):
+        return False
+    if not fields["model"].strip():
+        return False
+    if any(
+        _COMMIT_PATTERN.fullmatch(fields[name]) is None
+        for name in ("revision", "tokenizer_revision")
+    ):
+        return False
+    if _POSITIVE_INTEGER_PATTERN.fullmatch(fields["chunk_tokens"]) is None:
+        return False
+    if (
+        fields["max_chunks"] != "None"
+        and _POSITIVE_INTEGER_PATTERN.fullmatch(fields["max_chunks"]) is None
+    ):
+        return False
+    if _POSITIVE_INTEGER_PATTERN.fullmatch(fields["batch_size"]) is None:
+        return False
+    if fields["pooling"] != "weighted-cls":
+        return False
+    if fields["device"] not in {"cpu", "mps"}:
+        return False
+    if fields["sampling"] != "uniform-v1":
+        return False
+    return fields["sentiment"] == "negative-neutral-positive"
 
 
 def _pretest_rows(dataset: ResearchDataset, test_start: date) -> tuple[list[int], list[str]]:
@@ -211,6 +300,8 @@ def verify_feature_policy_report(report: Mapping[str, Any]) -> None:
         "candidate_pretest_events",
         "same_source_checkpoint",
         "same_pretest_event_set",
+        "same_python_runtime",
+        "same_text_encoder",
         "status",
         "report_hash",
     }
@@ -280,9 +371,11 @@ def verify_feature_policy_report(report: Mapping[str, Any]) -> None:
         ):
             raise ValueError(f"policy-delta {field} is invalid")
     try:
-        date.fromisoformat(str(report["test_start"]))
+        test_start = date.fromisoformat(str(report["test_start"]))
     except ValueError as error:
         raise ValueError("policy-delta test boundary is invalid") from error
+    if test_start != LOCKED_TEST_START:
+        raise ValueError("policy-delta test boundary differs from the pinned locked start")
     for field in ("baseline_pretest_events", "candidate_pretest_events"):
         count = report.get(field)
         if type(count) is not int or count < 1:
@@ -290,6 +383,11 @@ def verify_feature_policy_report(report: Mapping[str, Any]) -> None:
     for field in ("same_source_checkpoint", "same_pretest_event_set"):
         if type(report.get(field)) is not bool:
             raise ValueError(f"policy-delta {field} is invalid")
+    if any(
+        type(report.get(field)) is not bool
+        for field in ("same_python_runtime", "same_text_encoder")
+    ):
+        raise ValueError("policy-delta runtime flags are invalid")
     if status != "not_comparable" and any(
         type(report.get(field)) is not bool
         for field in ("same_pretest_event_timing", "same_pretest_targets")
@@ -301,6 +399,7 @@ def verify_feature_policy_report(report: Mapping[str, Any]) -> None:
     else:
         if not report["same_source_checkpoint"] or not report["same_pretest_event_set"]:
             raise ValueError("policy-delta comparison lacks shared inputs")
+        same_runtime = report["same_python_runtime"] and report["same_text_encoder"]
         unchanged = (
             report["same_pretest_event_timing"]
             and report["same_pretest_targets"]
@@ -310,9 +409,11 @@ def verify_feature_policy_report(report: Mapping[str, Any]) -> None:
         )
         inferred = (
             "isolated_policy_change"
-            if unchanged and not report["modalities"]["fundamental"]["exactly_equal"]
+            if same_runtime
+            and unchanged
+            and not report["modalities"]["fundamental"]["exactly_equal"]
             else "no_observed_fundamental_change"
-            if unchanged
+            if same_runtime and unchanged
             else "confounded"
         )
         if status != inferred:
