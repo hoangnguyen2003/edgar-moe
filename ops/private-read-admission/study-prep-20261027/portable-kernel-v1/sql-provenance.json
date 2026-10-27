@@ -1,0 +1,11 @@
+{
+  "generation_sources": {
+    "ops/private-read-admission/ledger.mjs": "582546e2df0aba76d5f868b638721f072010ff1a02b161c7d754a3a3439ab5fe",
+    "ops/private-read-admission/worker-prep/config.mjs": "56563f7f21731bcd087db54635b4d765049c9d32784f4337321f44ad885749af",
+    "ops/private-read-admission/worker-prep/operator-audit.mjs": "2111b9ec1d2e33b8b27e786f7d6cd275c5947bc685ffe92ea08f641bb08aef30",
+    "ops/private-read-admission/worker-prep/read-sql.mjs": "541cdeab52cef12067a1a97c82a177a86cc3a1ecd73d9995419ff1d81df4a282"
+  },
+  "schema_version": 1,
+  "scope": "frozen_sql_generation_commitment_only",
+  "source_sha256": "cef3d3be705218c62420172ed03ffc7a0a5201bcdd9834837f7155f9faa591bd"
+}
