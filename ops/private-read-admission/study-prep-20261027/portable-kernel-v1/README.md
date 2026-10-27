@@ -8,12 +8,10 @@ service, admission/observer integration, representative volume or hosted days.
 
 ## Built and measured
 
-The final source candidate is `bundle-07`. `proof-02` measured `bundle-05`;
-the final candidate's **19 runtime/SQL/dependency files are byte-identical**.
-The final builder reads checked-in, hash-pinned SQL text and the dependency lock
-before writing its manifest. It reproduces the exact original SQL-generation
-bytes without importing the old JavaScript preparation modules. The equivalence
-receipt preserves that packaging distinction. It
+The final source candidate is `bundle-08`; `proof-03` measures that exact
+kernel. The self-contained builder verifies the checked-in SQL and dependency
+lock, preserving the original SQL-generation commitment without importing the
+old JavaScript preparation modules. The bundle
 contains **15 application source files** copied byte-for-byte from reviewed main
 commit `3077310593bdaa1f4ac0087d207d565936c73a6f`, the new kernel and the fixed
 SQL contract. The full `ForwardRegistry` implementation is retained rather than
@@ -121,20 +119,20 @@ namespace-package closure. The actual PG run is additional to those unit checks.
 
 ## Evidence and limits
 
-- [Final aggregate proof](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/proof-02/summary.json)
-- [Independent read-only audit](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/independent-proof.json)
-- [Hash-pinned dependencies](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/bundle-07/requirements.lock)
-- [Source manifest](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/bundle-07/source-manifest.json)
-- [Final runtime equivalence](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/bundle-equivalence-self-contained.json)
-- [Verification manifest](../../../../data/artifacts/hosted-read-observations/portable-kernel-20261027/verification-manifest.json)
+Private receipts are retained under ignored
+`data/artifacts/hosted-read-observations/portable-kernel-20261027/`:
 
-Earlier candidate bundles and `proof-01` remain preserved. `proof-01` measured
-`bundle-03`; `bundle-05` includes transaction-start redaction and the
-builder's transitive-source checks and was actually rerun as `proof-02`.
-`bundle-07` makes the SQL/dependency build inputs self-contained;
-its runtime bytes match the measured candidate. The links above are private,
-git-ignored workspace receipts, not public attachments.
-No earlier result is relabeled as the final version.
+- `proof-03/summary.json`: final aggregate capture and per-fixture postflight.
+- `independent-proof-final.json`: independent read-only verification.
+- `bundle-08/requirements.lock` and `bundle-08/source-manifest.json`: exact
+  final runtime/dependency inventory.
+- `verification-manifest.json`: retained packet hashes.
+
+These paths are local evidence references, not public attachments. Earlier
+bundles and captures remain preserved: `proof-01` measured `bundle-03`,
+`proof-02` measured `bundle-05`, and `proof-03` measures `bundle-08` after the
+explicit pooler-host refusal was added. No earlier result is relabeled as the
+final version.
 
 Measurements are local samples after seeding, ANALYZE and baseline collection.
 The kernel interval excludes connection opening, Python startup, HTTP,

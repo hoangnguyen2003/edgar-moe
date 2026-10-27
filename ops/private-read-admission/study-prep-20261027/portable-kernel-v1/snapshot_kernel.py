@@ -170,6 +170,7 @@ class Target:
             elif self.kind == "neon-hosted":
                 valid = (
                     valid
+                    and "-pooler" not in self.host
                     and bool(
                         re.fullmatch(
                             r"ep-[a-z0-9-]+\.c-[0-9]+\.ap-southeast-1\.aws\.neon\.tech", self.host

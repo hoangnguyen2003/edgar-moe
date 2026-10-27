@@ -59,6 +59,7 @@ def connection(value):
         ("scope", "old-p0-scope"),
         ("host", "127.0.0.1"),
         ("host", "postgresql://owner:secret@host/db"),
+        ("host", "ep-invented-unit-fixture-pooler.c-4.ap-southeast-1.aws.neon.tech"),
         ("port", True),
         ("port", 6543),
         ("database", "private_read_pilot_20261012"),
