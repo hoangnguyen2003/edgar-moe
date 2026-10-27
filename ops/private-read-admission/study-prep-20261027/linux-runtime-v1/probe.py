@@ -12,6 +12,7 @@ import json
 import os
 import subprocess
 import sys
+import traceback
 from importlib.metadata import distributions
 from pathlib import Path
 
@@ -187,5 +188,30 @@ if __name__ == "__main__":
             "status": "failed",
             "error_class": type(error).__name__,
         }
+        allowed = {
+            "target_refused",
+            "connection_binding_refused",
+            "sql_binding_refused",
+            "begin_refused",
+            "session_refused",
+            "snapshot_refused",
+            "schema_refused",
+            "fixture_refused",
+            "service_refused",
+            "snapshot_postcheck_refused",
+            "snapshot_changed",
+            "snapshot_deadline",
+            "rollback_refused",
+            "rollback_unconfirmed",
+            "response_refused",
+            "response_size_refused",
+        }
+        if type(error).__name__ == "ReadRefused" and str(error) in allowed:
+            result["fixed_refusal_code"] = str(error)
+        result["source_frames"] = [
+            {"file": Path(frame.filename).name, "line": frame.lineno, "function": frame.name}
+            for frame in traceback.extract_tb(error.__traceback__)
+            if Path(frame.filename).name in {"probe.py", "snapshot_kernel.py"}
+        ]
     print(json.dumps(result, sort_keys=True))
     raise SystemExit(0 if result["status"] == "passed" else 1)
