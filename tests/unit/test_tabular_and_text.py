@@ -66,14 +66,20 @@ def test_finbert_cache_identity_pins_runtime_versions() -> None:
     embedder.runtime_versions = {"torch": "2.13.0", "transformers": "4.57.6"}
     embedder.model_name = "ProsusAI/finbert"
     embedder.model_revision = "revision-123"
+    embedder.tokenizer_revision = "tokenizer-456"
     embedder.chunk_tokens = 510
     embedder.max_chunks = 12
+    embedder.inference_batch_size = 8
+    embedder.device = "cpu"
 
     identity = embedder.cache_identity
 
     assert identity.startswith("finbert-v2:torch=2.13.0:transformers=4.57.6:")
     assert "model=ProsusAI/finbert" in identity
     assert "revision=revision-123" in identity
+    assert "tokenizer_revision=tokenizer-456" in identity
+    assert "batch_size=8" in identity
+    assert "device=cpu" in identity
 
 
 def test_finbert_uniformly_samples_long_filings() -> None:

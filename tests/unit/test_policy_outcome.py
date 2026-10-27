@@ -66,7 +66,16 @@ def _dataset(policy: str, *, locked_value: float) -> ResearchDataset:
         feature_names={name: [name] for name in ("text", "fundamental", "market", "regime")},
         attrition={},
         source_manifest_hash="d" * 64,
-        provenance={"xbrl_fact_policy": policy},
+        provenance={
+            "xbrl_fact_policy": policy,
+            "python_runtime": "3.12.13",
+            "text_encoder": (
+                "finbert-v2:torch=2.14.0:transformers=4.57.6:model=fixture:"
+                f"revision={'a' * 40}:tokenizer_revision={'b' * 40}:"
+                "chunk_tokens=510:pooling=weighted-cls:max_chunks=12:batch_size=16:"
+                "device=cpu:sampling=uniform-v1:sentiment=negative-neutral-positive"
+            ),
+        },
     )
 
 
