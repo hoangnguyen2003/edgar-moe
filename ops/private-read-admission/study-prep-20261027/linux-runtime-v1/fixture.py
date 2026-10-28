@@ -39,6 +39,23 @@ def check_scope(bundle, output, container):
         raise ValueError("fresh_isolated_linux_ci_fixture_required")
 
 
+def capture(connection, contract):
+    # pg_get_* and regclass text depend on search_path. Baseline and postflight
+    # must use the exact reader controls, not the owner's default session.
+    from snapshot_kernel import CONTROL_SQL
+
+    connection.execute("BEGIN")
+    try:
+        for command in CONTROL_SQL:
+            connection.execute(command)
+        return (
+            connection.execute(contract["schema"]).fetchone()[0],
+            connection.execute(contract["fixture"]).fetchall(),
+        )
+    finally:
+        connection.execute("ROLLBACK")
+
+
 def run(bundle, output, container):
     check_scope(bundle, output, container)
     sys.path.insert(0, str(bundle))
@@ -231,8 +248,7 @@ def run(bundle, output, container):
                 )
             )
             contract = json.loads((bundle / "contract.json").read_text())
-            schema = writer.execute(contract["schema"]).fetchone()[0]
-            rows = writer.execute(contract["fixture"]).fetchall()
+            schema, rows = capture(writer, contract)
         # Wait only for local server configuration reload, before the measured
         # reader. This is not a reader retry or a hosted resumption sample.
         for attempt in range(20):
@@ -319,8 +335,7 @@ def run(bundle, output, container):
         assert result.returncode == 0 and probe["status"] == "passed"
         assert len(probe["reads"]) == len(probe["refusals"]) == 4
         with owner(DATABASE) as writer:
-            assert writer.execute(contract["schema"]).fetchone()[0] == schema
-            assert writer.execute(contract["fixture"]).fetchall() == rows
+            assert capture(writer, contract) == (schema, rows)
             assert (
                 writer.execute(
                     "SELECT count(*) FROM pg_stat_activity WHERE usename=%s", (READER,)

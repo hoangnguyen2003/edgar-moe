@@ -59,3 +59,25 @@ def test_guard_accepts_only_the_explicit_generated_ci_shape(tmp_path, monkeypatc
     bundle = tmp_path / "data/artifacts/bundle"
     bundle.mkdir(parents=True)
     assert fixture.check_scope(bundle, bundle.parent / "new", "a" * 64) is None
+
+
+def test_failed_baseline_query_rolls_back_its_transaction(monkeypatch):
+    import sys
+    from types import SimpleNamespace
+
+    monkeypatch.setitem(
+        sys.modules,
+        "snapshot_kernel",
+        SimpleNamespace(CONTROL_SQL=("SET LOCAL search_path=pg_catalog",)),
+    )
+    commands = []
+
+    class Connection:
+        def execute(self, command):
+            commands.append(command)
+            if command == "schema":
+                raise ValueError("query failed")
+
+    with pytest.raises(ValueError, match="query failed"):
+        fixture.capture(Connection(), {"schema": "schema", "fixture": "rows"})
+    assert commands[-1] == "ROLLBACK"
