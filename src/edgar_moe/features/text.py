@@ -68,6 +68,7 @@ class FinBertEmbedder:
         max_chunks: int | None = 12,
         inference_batch_size: int = 16,
         device: str | None = None,
+        revision: str | None = None,
     ) -> None:
         if (
             chunk_tokens < 1
@@ -89,8 +90,13 @@ class FinBertEmbedder:
             "transformers": str(getattr(transformers, "__version__", "unknown")),
         }
         self.model_name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)  # type: ignore[no-untyped-call]
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        revision_options = {"revision": revision} if revision is not None else {}
+        self.tokenizer = AutoTokenizer.from_pretrained(  # type: ignore[no-untyped-call]
+            model_name, **revision_options
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, **revision_options
+        )
         self.model_revision = str(getattr(self.model.config, "_commit_hash", None) or "unresolved")
         tokenizer_metadata = getattr(self.tokenizer, "init_kwargs", {})
         tokenizer_revision = (
