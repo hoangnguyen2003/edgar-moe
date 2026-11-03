@@ -44,6 +44,7 @@ from edgar_moe.forward.operations import (
     rolling_source_start,
     seed_filing_documents,
     source_cutoff,
+    update_filing_cache,
     validate_cutoff,
 )
 from edgar_moe.forward.registry import ForwardRegistry
@@ -219,6 +220,14 @@ def execute(root: Path, record_path: Path, *, resume_output: Path | None = None)
     def seed() -> int:
         if not request.is_file():
             raise ValueError("Request contract is missing before cache seeding")
+        witness_path = output / "seed-witness.json"
+        if witness_path.exists():
+            witness = json.loads(witness_path.read_text())
+            if witness["request_sha256"] != sha256_file(request):
+                raise ValueError("Retained seeding witness belongs to another request")
+            # A retained pre-receipt attempt already completed seeding and then
+            # fetched real filings. Preserve its verified checkpoint copies.
+            return 0
         count = seed_filing_documents(
             raw_root=raw, filing_cache=cached / "sec/filings", cutoff=cutoff
         )
@@ -312,6 +321,9 @@ def execute(root: Path, record_path: Path, *, resume_output: Path | None = None)
             or sha256_file(checkpoint / "manifest.json") != manifest_hash
         ):
             raise ValueError("Completed-checkpoint resume was not immutable and network-free")
+        cached_files = update_filing_cache(
+            checkpoint=checkpoint, filing_cache=output / "filing-cache"
+        )
         write_json(
             output / "refresh-witness.json",
             {
@@ -319,6 +331,7 @@ def execute(root: Path, record_path: Path, *, resume_output: Path | None = None)
                 "manifest_sha256": manifest_hash,
                 "same_request_resumed": True,
                 "completed_resume_network_requests": 0,
+                "new_private_cache_files": cached_files,
                 "provider_responses": dict(stats),
             },
         )
