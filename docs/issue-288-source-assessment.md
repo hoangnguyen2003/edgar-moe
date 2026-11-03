@@ -1,7 +1,7 @@
-# Issue #288: source assessment, 2026-11-02
+# Issue #288: source assessment and live verification
 
 **Status: owner-reported approval bound to a private verification profile on
-2026-11-03; live verification pending.** The owner states that all parties have agreed. No provider
+2026-11-03; live verification completed on that UTC date.** The owner states that all parties have agreed. No provider
 response wording, sender/date or saved approval reference has yet been supplied
 in this checkout. This records the owner's report, not a verified provider
 determination. The owner has authorized completing the original acceptance
@@ -88,7 +88,9 @@ forecast/settlement, diagnostics and artifact components; it does not set the
 general source decision to cleared, monkeypatch a gate, or enable a scheduled
 workflow. The source record is validated before loading credentials. Changed
 inputs or registry/storage targets fail closed. New training and publication
-remain excluded. All output is placed in a new private artifact directory.
+remain excluded. The witnessed run retained output in a new private artifact
+directory. The committed scope is now resume/verify-only for that one existing
+directory and cutoff; it cannot initialize another private cycle.
 
 The verifier interrupts after observed successful SEC responses and persisted
 partial checkpoint work, then resumes the same request. It also verifies that
@@ -107,28 +109,53 @@ If an attempt stops, retain its output and use `--resume-output` with that same
 directory. A verified successful output is checked without running another
 cycle. Provider error messages and credentials are not printed.
 
-## Acceptance evidence still required
+## Live acceptance results, 2026-11-03 UTC
 
-Issue [#288](https://github.com/hoangnguyen2003/edgar-moe/issues/288) remains
-open. PR [#287](https://github.com/hoangnguyen2003/edgar-moe/pull/287) and its
-offline tests establish a code repair, not the following live results:
+PR [#401](https://github.com/hoangnguyen2003/edgar-moe/pull/401) records the
+additional resume repair found during actual verification for
+[#288](https://github.com/hoangnguyen2003/edgar-moe/issues/288).
+After completed seeding, real provider refetches replaced unverified legacy
+checkpoint copies. Resume replayed the older seed cache and raised a file-size
+conflict. Refresh now retains a hash-verified, request-bound seeding receipt
+and skips that completed phase. Failed seeding remains resumable; altered
+receipts are rejected. The regression preserves the original cache bytes.
 
-1. Record the permitted acquisition/use decision against the exact source
-   manifest and dataset/model identities in a reviewed change. Update the
-   runtime and workflow hold only for the scope actually cleared.
-2. Capture the existing forward records' identities and canonical payload
-   hashes before the run. Use the real refresh path and record its request
-   contract before cache seeding.
-3. Interrupt one partial checkpoint after the request exists; retain its
-   evidence and resume that same directory with the same request. Record
-   successful refresh and completed-checkpoint reuse without request changes.
-4. Run forecast and settlement through the production runner. Compare the
-   previous records against the before-run hashes and identify appended records.
-   An empty append is not affirmative evidence of an append.
-5. Retain the new diagnostic and source/dataset manifests with hashes, run
-   identity and timestamps. Keep private payloads private. Close the issue
-   only when these results are observed.
+The witnessed full cycle ran code
+`8d73039559f3e191987ee66111bdffb66360dcce` with cutoff `2026-11-03`.
+Its private evidence is retained at
+`data/artifacts/issue288-private-live-k3m8gsj5/` in the operator workspace.
 
-No provider refresh, model training, forecast, settlement, workflow activation,
-or GitHub issue mutation was performed as part of this assessment. The
-`unresolved` runtime source-use decision remains unchanged.
+| Acceptance item | Observed result |
+| --- | --- |
+| Source/use basis recorded | The owner's statement that all parties agreed is bound to the private source/model/target profile. Provider correspondence has not been independently inspected; there is no general publication or study clearance. |
+| Real request created before cache seeding | Witness retained for 18,143 initial cached files. |
+| Real interruption and same-request resume | Deliberate interruption after 10 issuers and 90 successful SEC responses. The same checkpoint completed after the repair, without deleting or replacing its request. |
+| Refresh completes | All 500 requested issuers checked; 468 eligible issuers; 3,693 eligible filing records; IEX bars/actions for eligible symbols plus the benchmark; four macro series. |
+| Completed checkpoint reuse | Original request and completed manifest unchanged; zero provider requests on reuse. |
+| Actual forward evidence appended | Two successful run records, two artifacts, 25 labels, seven quality checks, one dataset and 11 audit events appended. No new forecasts or model registrations. |
+| Prior records preserved | All 858 pre-existing rows across the eight registry tables retain their canonical before-run hashes. |
+| New diagnostic and manifests retained | New dataset `research-2026-11-03-8b56f15391d1`, ready diagnostic and verified 14-entry live evidence manifest; no missing or invalid entries. |
+| Independent artifact readback | Both private R2 run artifact bodies match their recorded SHA-256 values. |
+| Frozen v1 preserved | Frozen bundle validation passes after the run. No training performed. |
+
+The forecast run had no eligible future-entry events and emitted zero new
+forecasts. This is not a live test of new score emission or scheduled pre-open
+timing. Settlement genuinely appended 25 labels, so the forward append evidence
+is not an empty-run substitute. Scheduled timing remains a separate issue.
+
+Retained identities:
+
+- Request SHA-256: `6a309ea86972656d614bea3b13a15ec3a45a3ff8a708b651ef63b1b505904c44`
+- Source manifest SHA-256: `b28607694206c98cf2e03a11e0183dc7ee83db82d7be6e2fb055ade87ac11c27`
+- Diagnostic SHA-256: `cca01091ad78c6e068ae310762fa4b5fcfbec37197b7dc1337135efc149a4e78`
+- Live evidence manifest SHA-256: `decce22a4c6aaf08e792075f36eb7a4ddd92fd9e118a6ae627ec5b48daf51970`
+- Forecast run: `run-20261103T165241535083Z-d65190890419`
+- Settlement run: `run-20261103T165247281103Z-dfd8e93aa1b7`
+
+Final focused validation passed 55 tests covering the new scope, legacy cache
+resume, frozen text revision, original CLI holds and authenticated pipeline.
+Lint and strict type checks pass. Re-invoking the retained verifier checks the
+successful packet without loading credentials or starting another cycle.
+The general `unresolved` source-use decision, scheduler and publication holds
+remain unchanged. Financial payloads stay private; these are operational
+results, not new public investment-performance claims.

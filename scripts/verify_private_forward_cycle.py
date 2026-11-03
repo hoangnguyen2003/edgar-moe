@@ -12,7 +12,6 @@ import hashlib
 import json
 import os
 import subprocess
-import tempfile
 from collections import Counter
 from datetime import UTC, date, datetime
 from pathlib import Path
@@ -43,7 +42,6 @@ from edgar_moe.forward.operations import (
     find_processed_dataset,
     rolling_source_start,
     seed_filing_documents,
-    source_cutoff,
     update_filing_cache,
     validate_cutoff,
 )
@@ -55,6 +53,8 @@ from edgar_moe.utils.hashing import sha256_file
 SERIES = ("VIXCLS", "DGS10", "DFF", "BAA10Y")
 FINBERT_REVISION = "4556d13015211d73dccd3fdd39d39232506f3e43"
 SCOPE_SHA256 = "0a7cf03033bc7f551a1313f259f086cc57a9c952b2466e8214adef677e6e7e5d"
+APPROVED_CUTOFF = "2026-11-03"
+APPROVED_OUTPUT = "issue288-private-live-k3m8gsj5"
 INPUTS = {
     "config/forward.yaml": "6fee9ade5a98b291cc1a895b10e0213a1d98911ff446252dbe9844b3e15ac318",
     "config/authenticated-free.yaml": "beaf32a8ef6b05218ab5e9d601400ea01dd6669d0ebae060fc1d002f6f6f6beb",
@@ -151,37 +151,46 @@ def target_fingerprints(settings: RuntimeSettings) -> dict[str, str]:
     }
 
 
+def retained_execution(
+    root: Path, record_hash: str, requested_output: Path | None
+) -> tuple[Path, dict[str, Any]]:
+    """This witnessed scope can resume/verify its one cycle, never start another."""
+    output = root / "data/artifacts" / APPROVED_OUTPUT
+    if output.is_symlink() or not output.is_dir():
+        raise ValueError(
+            "The approved retained cycle is absent; a new cycle needs a new reviewed scope"
+        )
+    if requested_output is not None and requested_output.resolve() != output.resolve():
+        raise ValueError("Only the one approved retained output directory is in scope")
+    execution: dict[str, Any] = json.loads((output / "execution.json").read_text())
+    if execution.get("scope_sha256") != record_hash:
+        raise ValueError("Cannot resume under a different scope record")
+    if execution.get("cutoff") != APPROVED_CUTOFF:
+        raise ValueError("Only the witnessed cutoff is in scope")
+    return output, execution
+
+
 def execute(root: Path, record_path: Path, *, resume_output: Path | None = None) -> Path:
     record = read_scope(record_path, root)  # Before credentials, network or model/data loading.
-    os.umask(0o077)
-    parent = root / "data/artifacts"
     record_hash = sha256_file(record_path)
-    if resume_output is None:
-        output = Path(tempfile.mkdtemp(prefix="issue288-private-live-", dir=parent))
-        execution = {
-            "scope_sha256": record_hash,
-            "cutoff": source_cutoff(),
-            "created_utc": datetime.now(UTC).isoformat(),
-        }
-        write_json(output / "execution.json", execution)
-    else:
-        output = resume_output.resolve()
-        if output.parent != parent.resolve() or not output.name.startswith(
-            "issue288-private-live-"
-        ):
-            raise ValueError("Resume output must be this verifier's private artifact directory")
-        execution = json.loads((output / "execution.json").read_text())
-        if execution["scope_sha256"] != record_hash:
-            raise ValueError("Cannot resume under a different scope record")
+    output, execution = retained_execution(root, record_hash, resume_output)
     print(f"PRIVATE_OUTPUT={output}", flush=True)
     result_path = output / "result.json"
     if result_path.exists():
+        result = json.loads(result_path.read_text())
+        if (
+            result.get("status") != "verified"
+            or result.get("existing_records_unchanged") is not True
+            or result.get("cutoff") != APPROVED_CUTOFF
+        ):
+            raise ValueError("The retained result is not a successful verification of this cycle")
         evidence = json.loads((output / "evidence-manifest.json").read_text())
         verify_evidence_manifest(evidence, root=output)
         print(
             "Existing successful verification evidence is unchanged; no new cycle run.", flush=True
         )
         return output
+    os.umask(0o077)
     cutoff = validate_cutoff(execution["cutoff"])
     config = ResearchConfig.from_yaml(root / "config/authenticated-free.yaml")
     # Pydantic accepts this documented BaseSettings runtime keyword, but its

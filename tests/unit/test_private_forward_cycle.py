@@ -40,6 +40,53 @@ def test_scope_record_tampering_is_rejected_before_credentials(scope):
         verifier.read_scope(path, root)
 
 
+def test_historical_scope_cannot_initialize_a_new_cycle(tmp_path):
+    with pytest.raises(ValueError, match="new cycle needs a new reviewed scope"):
+        verifier.retained_execution(tmp_path, verifier.SCOPE_SHA256, None)
+    assert not (tmp_path / "data").exists()
+
+
+@pytest.mark.parametrize("change", ["cutoff", "output", "scope"])
+def test_historical_execution_rejects_another_cutoff_output_or_scope(tmp_path, change):
+    output = tmp_path / "data/artifacts" / verifier.APPROVED_OUTPUT
+    output.mkdir(parents=True)
+    state = {"cutoff": verifier.APPROVED_CUTOFF, "scope_sha256": verifier.SCOPE_SHA256}
+    requested = None
+    if change == "cutoff":
+        state["cutoff"] = "2026-11-04"
+    elif change == "scope":
+        state["scope_sha256"] = "0" * 64
+    else:
+        requested = tmp_path / "another-output"
+    (output / "execution.json").write_text(json.dumps(state))
+    with pytest.raises(ValueError):
+        verifier.retained_execution(tmp_path, verifier.SCOPE_SHA256, requested)
+
+
+def test_successful_reverification_never_loads_credentials(scope, monkeypatch):
+    _, root = scope
+    output = root / "data/artifacts" / verifier.APPROVED_OUTPUT
+    output.mkdir(parents=True)
+    (output / "execution.json").write_text(
+        json.dumps({"cutoff": verifier.APPROVED_CUTOFF, "scope_sha256": verifier.SCOPE_SHA256})
+    )
+    (output / "result.json").write_text(
+        json.dumps(
+            {
+                "status": "verified",
+                "existing_records_unchanged": True,
+                "cutoff": verifier.APPROVED_CUTOFF,
+            }
+        )
+    )
+    evidence = verifier.build_evidence_manifest(["result.json"], root=output)
+    (output / "evidence-manifest.json").write_text(json.dumps(evidence))
+    monkeypatch.setattr(
+        verifier, "RuntimeSettings", lambda **kwargs: pytest.fail("credentials loaded")
+    )
+    assert verifier.execute(root, Path("ops/issue288/private-verification-scope.json")) == output
+
+
 @pytest.mark.parametrize(
     "field",
     [
