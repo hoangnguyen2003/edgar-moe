@@ -110,6 +110,11 @@ def read_scope(record_path: Path, root: Path) -> dict[str, Any]:
 def snapshot(database: RegistryDatabase) -> dict[str, dict[str, str]]:
     result: dict[str, dict[str, str]] = {}
     with database.engine.connect() as connection, connection.begin():
+        if connection.dialect.name == "postgresql":
+            # Neon transaction poolers reject statement_timeout startup options.
+            # Apply the bounds to this snapshot transaction instead, before reads.
+            connection.exec_driver_sql("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+            connection.exec_driver_sql("SET LOCAL statement_timeout = '30s'")
         for name in TABLES:
             table = Base.metadata.tables[name]
             keys = [column.name for column in table.primary_key]
@@ -191,11 +196,7 @@ def execute(root: Path, record_path: Path, *, resume_output: Path | None = None)
     ).strip()
     os.chdir(root)  # The pinned frozen model config intentionally has relative paths.
     readonly = RegistryDatabase(
-        settings.edgar_moe_registry_database_url,
-        read_only=True,
-        statement_timeout_ms=30_000,
-        pool_size=1,
-        max_overflow=0,
+        settings.edgar_moe_registry_database_url, pool_size=1, max_overflow=0
     )
     before_path = output / "registry-before.json"
     if not before_path.exists():

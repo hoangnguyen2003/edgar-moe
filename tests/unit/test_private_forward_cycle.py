@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import shutil
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -84,6 +85,22 @@ def test_registry_comparison_counts_only_new_identities():
         {"forward_forecasts": {"prior": "hash"}},
         {"forward_forecasts": {"prior": "hash", "new": "new-hash"}},
     ) == {"forward_forecasts": 1}
+
+
+def test_postgres_snapshot_sets_transaction_bounds_before_reading(monkeypatch):
+    statements = []
+    connection = SimpleNamespace(
+        dialect=SimpleNamespace(name="postgresql"),
+        begin=lambda: nullcontext(),
+        exec_driver_sql=statements.append,
+    )
+    database = SimpleNamespace(engine=SimpleNamespace(connect=lambda: nullcontext(connection)))
+    monkeypatch.setattr(verifier, "TABLES", ())
+    assert verifier.snapshot(database) == {}
+    assert statements == [
+        "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY",
+        "SET LOCAL statement_timeout = '30s'",
+    ]
 
 
 def test_target_binding_ignores_password_rotation_but_rejects_another_database():
