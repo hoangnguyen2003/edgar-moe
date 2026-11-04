@@ -1,0 +1,117 @@
+name: Manage finite private scheduler observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: PREPARE installs inert signed code; ACTIVATE enables three fixed slots; STOP disables Cron
+        type: choice
+        required: true
+        default: VERIFY_DISABLED
+        options: [VERIFY_DISABLED, PREPARE, ACTIVATE, VERIFY_ACTIVE, STOP]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-forward-scheduler
+  cancel-in-progress: false
+
+jobs:
+  manage:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: scheduler
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Validate finite scope, private profile and signed dispatch contracts
+        run: |
+          python3 - <<'PY'
+          import sys
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from private_scheduler_scope import read_scope
+          read_scope(Path.cwd())
+          PY
+          node --test ops/scheduler/*.test.mjs
+      - name: Materialize the reviewed profile with a supported extension
+        env:
+          STAGE: ${{ inputs.stage }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          text = Path('ops/scheduler/wrangler.private.toml.example').read_text()
+          if os.environ['STAGE'] != 'ACTIVATE':
+              text = text.replace('crons = ["17 7 * * 2-6"]', 'crons = []')
+          Path('ops/scheduler/wrangler.toml').write_text(text)
+          PY
+      - name: Bundle the exact CLI command without credentials or upload
+        if: ${{ inputs.stage == 'PREPARE' || inputs.stage == 'ACTIVATE' || inputs.stage == 'STOP' }}
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx --yes --package=wrangler@4.136.2 wrangler deploy --dry-run --config ops/scheduler/wrangler.toml --outdir "$RUNNER_TEMP/private-scheduler-bundle"
+      - name: Check existing private Worker before writes
+        if: ${{ inputs.stage == 'PREPARE' || inputs.stage == 'ACTIVATE' || inputs.stage == 'STOP' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STAGE: ${{ inputs.stage }}
+        run: |
+          case "$STAGE" in
+            PREPARE) phase=BEFORE_PREPARE ;;
+            ACTIVATE) phase=BEFORE_ACTIVATE ;;
+            STOP) phase=BEFORE_STOP ;;
+          esac
+          node ops/scheduler/manage-private-scheduler.mjs "$phase" reports/private-scheduler-deploy/before.json
+      - name: Install the separate signing key while Cron remains disabled
+        if: ${{ inputs.stage == 'PREPARE' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          SCHEDULER_SIGNATURE_KEY: ${{ secrets.SCHEDULER_SIGNATURE_KEY }}
+        run: node ops/scheduler/manage-private-scheduler.mjs INSTALL_KEY reports/private-scheduler-deploy/key.json
+      - name: Upload only the existing Worker
+        if: ${{ inputs.stage == 'PREPARE' || inputs.stage == 'ACTIVATE' || inputs.stage == 'STOP' }}
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ops/scheduler
+          wranglerVersion: "4.136.2"
+          command: deploy --config wrangler.toml
+          quiet: true
+      - name: Verify trigger state and private secret metadata after deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STAGE: ${{ inputs.stage }}
+        run: |
+          phase=VERIFY_DISABLED
+          if [[ "$STAGE" == 'ACTIVATE' || "$STAGE" == 'VERIFY_ACTIVE' ]]; then phase=VERIFY_ACTIVE; fi
+          node ops/scheduler/manage-private-scheduler.mjs "$phase" reports/private-scheduler-deploy/after.json
+      - name: Validate and hash credential-free deployment receipts
+        id: receipt
+        if: ${{ always() }}
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/private-scheduler-deploy
+          sha256sum reports/private-scheduler-deploy/*.json > reports/private-scheduler-deploy/SHA256SUMS
+      - name: Retain deployment receipts
+        if: ${{ always() && steps.receipt.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: private-scheduler-deploy-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/private-scheduler-deploy/
+          if-no-files-found: error
+          retention-days: 7

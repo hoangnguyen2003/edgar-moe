@@ -1,0 +1,98 @@
+name: Bounded private scheduler observation
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        required: true
+        type: choice
+        options: [cpu]
+        default: cpu
+      scheduled_at:
+        description: Signed Cloudflare nominal timestamp; arbitrary/manual timestamps are refused
+        required: true
+        type: string
+      signature:
+        description: HMAC from the existing private Worker
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edgar-moe-forward-production
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    environment:
+      name: scheduler
+    env:
+      HF_HOME: ${{ github.workspace }}/data/cache/huggingface
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Refuse stale, unsigned or out-of-scope slots before installing dependencies
+        env:
+          SCHEDULER_SIGNATURE_KEY: ${{ secrets.SCHEDULER_SIGNATURE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys
+          from datetime import UTC, datetime
+          from pathlib import Path
+          sys.path.insert(0, 'scripts')
+          from private_scheduler_scope import admit, read_scope
+          read_scope(Path.cwd())
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          admit(event.get('inputs', {}), key=os.environ.get('SCHEDULER_SIGNATURE_KEY', ''),
+                now=datetime.now(UTC), event=os.environ['GITHUB_EVENT_NAME'], ref=os.environ['GITHUB_REF'])
+          if os.environ['GITHUB_RUN_ATTEMPT'] != '1': raise ValueError('Reruns are outside the finite scope')
+          print('Finite signed scheduler slot admitted; no provider access yet.')
+          PY
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+          prune-cache: true
+      - name: Install the locked CPU research runtime
+        run: uv sync --locked --extra research --extra operations
+      # No provider caches or outputs enter public Actions caches/artifacts.
+      - name: Execute the private finite operator path
+        id: cycle
+        continue-on-error: true
+        env:
+          SCHEDULER_SIGNATURE_KEY: ${{ secrets.SCHEDULER_SIGNATURE_KEY }}
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+          EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+          EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+        run: timeout --signal=INT --kill-after=60s 120m uv run python scripts/run_private_scheduler_cycle.py
+      - name: Validate and hash operational receipt only
+        id: receipt
+        if: ${{ always() && steps.cycle.outcome != 'skipped' }}
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/private-scheduler
+          sha256sum reports/private-scheduler/receipt.json > reports/private-scheduler/SHA256SUMS
+      - name: Retain redacted timing receipt
+        if: ${{ always() && steps.receipt.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: private-scheduler-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/private-scheduler/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Preserve cycle failure status
+        if: ${{ always() && steps.cycle.outcome != 'success' }}
+        run: exit 1

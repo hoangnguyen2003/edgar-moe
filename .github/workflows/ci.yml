@@ -429,11 +429,11 @@ jobs:
           package-manager-cache: false
       - name: Test the optional Cloudflare scheduler contract
         run: node --test ops/scheduler/*.test.mjs
-      - name: Dry-run both scheduler profiles with the pinned CLI
+      - name: Dry-run scheduler profiles with the pinned CLI
         env:
           WRANGLER_SEND_METRICS: "false"
         run: |
-          for scheduler_profile in wrangler.prepare.toml.example wrangler.toml.example; do
+          for scheduler_profile in wrangler.prepare.toml.example wrangler.toml.example wrangler.private.toml.example; do
             cp "ops/scheduler/$scheduler_profile" ops/scheduler/wrangler.toml
             npx --yes --package=wrangler@4.136.2 wrangler deploy --dry-run --config ops/scheduler/wrangler.toml --outdir "$RUNNER_TEMP/scheduler-dry-run-$scheduler_profile"
           done
