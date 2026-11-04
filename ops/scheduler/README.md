@@ -297,6 +297,11 @@ metadata only. `STOP` disables Cron while retaining the code and both secrets.
 `PREPARE` never overwrites an existing signing key; investigate a partially
 completed preparation before repeating it. The old preparation verifier expects
 only the original secret and is not a verifier for this two-secret profile.
+If the separate key installation succeeded but the upload failed, first run
+`VERIFY_DISABLED`. `RESUME_PREPARE` then requires both secret names and an empty
+Cron list before uploading inert code; it never reinstalls or replaces a key.
+The pinned CLI's deployment receipt retains bounded, redacted diagnostics so a
+failed upload has a usable cause without printing credentials or account URLs.
 
 The scheduler-side date guard becomes inert after November 7 even if the Cron
 configuration remains present. Run `STOP` after collecting the three receipts.
