@@ -113,8 +113,8 @@ def _validate_validate_job(job: dict[str, Any]) -> list[str]:
 
 def _validate_deploy_job(job: dict[str, Any]) -> list[str]:
     errors, steps = _validate_steps(job, "deploy")
-    if job.get("if") != "${{ inputs.deploy == 'DEPLOY' }}":
-        errors.append("deploy job must require the explicit DEPLOY input")
+    if job.get("if") != "${{ github.ref == 'refs/heads/main' && inputs.deploy == 'DEPLOY' }}":
+        errors.append("deploy job must require main and the explicit DEPLOY input")
     if job.get("needs") != "validate":
         errors.append("deploy job must depend on validate")
     if job.get("timeout-minutes") != 10:

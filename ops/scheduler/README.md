@@ -4,7 +4,15 @@
 adapter for the existing `forward-production.yml` workflow. It is intentionally
 not active by default: the repository keeps the GitHub Actions schedule until a
 maintainer deploys this Worker, observes a successful dispatch, and approves a
-separate cutover PR.
+separate cutover PR. The deployment workflow accepts only the `main` ref and its
+explicit `DEPLOY` input.
+
+The committed configuration explicitly disables `workers.dev`, preview URLs,
+Logpush and persistent observability. Its validator rejects public routes and
+implicit/enabled URL settings. These settings preserve the reviewed private
+Worker boundary during deployment; a `fetch` handler returning 404 does not
+itself disable public routing. See the official [Wrangler configuration
+reference](https://developers.cloudflare.com/workers/wrangler/configuration/).
 
 ## Why this boundary exists
 
@@ -149,3 +157,27 @@ GitHub errors. They do not claim that a Cloudflare account, GitHub token, or
 production cutover has been configured. The separate observation workflow
 verifies one selected GitHub run and explicitly leaves scheduler provenance
 unproven.
+
+## Credential readiness checked 2026-11-04
+
+The existing GET-only verifier ran on released main:
+[run 41771649739](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41771649739).
+The stored credential was refused with HTTP 401 after one request, with zero
+external writes. The receipt passed redaction and its SHA-256 matched its
+artifact manifest:
+`adcd0049eaf2461b0d64a89047491d7e6e95b757931d9bc424835d98d51f9adf`.
+This establishes an authentication failure, not the current Worker state or the
+precise cause of credential invalidity. No deployment or invocation was attempted.
+
+Replace `CLOUDFLARE_API_TOKEN` in the existing GitHub `scheduler` environment with
+a current credential using the reviewed per-Worker Individual Workers Editor
+scope for `edgar-moe-forward-scheduler`. Keep the account identity unchanged and
+keep credential values out of issue comments, logs and Git. Re-run the dormant
+verifier once after replacement. A matching account/Worker and its actual
+configuration must be verified before deployment.
+
+Credential renewal alone does not complete #156. Worker dispatch-secret
+readiness, the reviewed provider-execution path, real scheduler-origin/forecast
+margin evidence, and cutover remain outstanding. The existing nominal
+`07:17 UTC` schedule and source cutoff have not changed; actual recorded margin
+remains the acceptance evidence.
