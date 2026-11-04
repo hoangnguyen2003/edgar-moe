@@ -36,7 +36,7 @@ export default {
  * run on the configured ref. The active-run check is a duplicate guard, not a
  * distributed lock; GitHub Actions concurrency remains the final backstop.
  */
-export async function runScheduledDispatch(env, cron = null) {
+export async function runScheduledDispatch(env, cron = null, inputs = null) {
   const config = validateSchedulerConfig(env);
   const activeRun = await findActiveRun(config);
   if (activeRun !== null) {
@@ -50,7 +50,7 @@ export async function runScheduledDispatch(env, cron = null) {
     return result;
   }
 
-  await dispatchWorkflow(config);
+  await dispatchWorkflow(config, inputs);
   const result = {
     status: "dispatched",
     repository: config.repository,
@@ -128,7 +128,7 @@ async function findActiveRun(config) {
   return active ? { id: active.id, status: active.status } : null;
 }
 
-async function dispatchWorkflow(config) {
+async function dispatchWorkflow(config, inputs = null) {
   const url = new URL(
     `/repos/${config.repository}/actions/workflows/${encodeURIComponent(config.workflow)}/dispatches`,
     GITHUB_API_BASE,
@@ -137,7 +137,7 @@ async function dispatchWorkflow(config) {
     url,
     {
       method: "POST",
-      body: JSON.stringify(buildDispatchPayload(config)),
+      body: JSON.stringify(inputs === null ? buildDispatchPayload(config) : {ref: config.ref, inputs}),
     },
     config.token,
   );

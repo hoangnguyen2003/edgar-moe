@@ -261,3 +261,49 @@ to one standard-library comparison process and makes no network/database/storage
 connections. Missing, malformed and different targets fail closed, retaining
 only hashes and presence/match flags. A match is not reuse of that reference's
 one-cycle authorization and cannot release the general provider-use hold.
+
+### Finite private #156 observation (November 2026)
+
+The new `ops/issue156/private-scheduler-scope.json` records the owner's reported
+permission and personal-project instruction for three private frozen-v1 slots:
+November 5, 6 and 7 at the original **07:17 UTC** (14:17 Vietnam time). This is
+not independently inspected provider correspondence or reuse of #288's one-cycle
+scope. The general production workflow/source/publication holds remain intact.
+
+`forward-private-scheduler.yml` accepts a fresh HMAC over Cloudflare's nominal
+`controller.scheduledTime`, the original cron, workflow, ref and CPU device.
+The Worker has no HTTP trigger. It returns before contacting GitHub outside the
+three dates. GitHub rejects stale/future signatures and reruns, and an atomic R2
+`If-None-Match: *` claim prevents the same slot from executing twice. See the
+[scheduled-event contract](https://developers.cloudflare.com/workers/runtime-apis/handlers/scheduled/)
+and [R2 conditional-write contract](https://developers.cloudflare.com/r2/api/s3/api/).
+
+The dedicated operator checks the reviewed input hashes and private target hashes
+before service access, refreshes the same 500-name source CSV/730-day window/four
+macro series/IEX/SEC forms, and preserves the New York cutoff and frozen v1.
+Existing verified filing bodies and content-keyed embeddings seed the refresh;
+new filings are still fetched. No training or locked-test rescoring occurs.
+Provider payloads, outputs and logs stay in the existing private R2 store. Only
+operational timing/identity/hash receipts enter Actions artifacts. A maximum
+1 GB seed and three 1 GB evidence archives bound new storage below 4 GB; existing
+copies and registry rows are preserved. The raw source and model protocol are
+unchanged; the nominal source cutoff has not been moved earlier.
+
+The `Manage finite private scheduler observation` workflow is main-only and uses
+the existing `scheduler` environment and existing Worker. `PREPARE` installs the
+separate signing key and signed code with an explicit empty Cron list; `ACTIVATE`
+deploys the same reviewed code with the original Cron. `VERIFY_ACTIVE` reads
+metadata only. `STOP` disables Cron while retaining the code and both secrets.
+`PREPARE` never overwrites an existing signing key; investigate a partially
+completed preparation before repeating it. The old preparation verifier expects
+only the original secret and is not a verifier for this two-secret profile.
+
+The scheduler-side date guard becomes inert after November 7 even if the Cron
+configuration remains present. Run `STOP` after collecting the three receipts.
+Deployment, a valid signature, a successful empty cycle or passing synthetic
+tests cannot establish #156's acceptance. Actual nonzero scheduled forecasts and
+recorded `pre_open_schedule_margin >= 5400` are required; inspect all three
+private packets before deciding whether timing is reliable enough to close it.
+If no eligible filings occur, retain the inconclusive receipts and prepare a new
+finite observation scope instead of inventing forecasts or silently extending
+this one.

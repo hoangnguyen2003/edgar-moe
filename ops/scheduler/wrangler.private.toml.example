@@ -1,0 +1,20 @@
+name = "edgar-moe-forward-scheduler"
+main = "private-forward-scheduler.mjs"
+compatibility_date = "2026-09-22"
+workers_dev = false
+preview_urls = false
+logpush = false
+
+[observability]
+enabled = false
+
+# Only three reviewed dates dispatch. All later invocations return before
+# reading credentials or contacting GitHub. The UTC timing remains unchanged.
+[triggers]
+crons = ["17 7 * * 2-6"]
+
+[vars]
+GITHUB_REPOSITORY = "hoangnguyen2003/edgar-moe"
+GITHUB_WORKFLOW = "forward-private-scheduler.yml"
+GITHUB_REF = "main"
+GITHUB_DEVICE = "cpu"
