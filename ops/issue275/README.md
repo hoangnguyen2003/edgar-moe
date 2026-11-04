@@ -42,3 +42,25 @@ Historical membership remains unverified (#292), so results describe only the
 same fixed cohort and cannot establish unbiased historical performance or a
 profitable alpha. V2 remains pending. Any allowlisted aggregate publication needs
 a later separate review.
+
+## Completed private execution (2026-11-04)
+
+The two new datasets each retain 5,961 events. The strict input audit compares
+4,010 eligible pre-2025 events and isolates the XBRL policy change. Its hash
+commitment was pushed in commit `28a11768ebbd2a7145c8b50018e6768d72eabb73`
+before either model roster started. Both full 33-model studies completed,
+with matching text-only/market-only negative controls and zero locked predictions.
+The numerical review recomputed saved OOF metrics and retained paired uncertainty,
+all original cost scenarios and explicit failed hypotheses.
+
+`completion-commitment.json` binds the private reports, selections and OOF archives
+without publishing financial results. All 48 content-chain checks passed; this
+supplements the actual numerical reviews, raw-checkpoint verification and
+chronology/preservation checks recorded in the private closeout. The old pair's
+missing provenance remains unresolved and was not retrospectively rewritten.
+
+Frozen v1, every original dataset asset and the locked artifact remain unchanged.
+All new outputs have owner-only permissions. The execution denied network access,
+made zero provider requests and performed no registry writes. The private
+interpretation remains part of the sealed case; v2 and public aggregates remain
+pending separate review.

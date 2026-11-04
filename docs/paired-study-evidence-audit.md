@@ -89,7 +89,8 @@ Source-specific use evidence and interpretation/publication review are still
 required. The original acceptance also requires an adequately evidenced shared
 checkpoint, pre-test input audit chronology, full paired model/OOF validation,
 cost sensitivity and explicit failed hypotheses. No metadata-only audit can
-stand in for those requirements. Keep v2 pending and #275 open.
+stand in for those requirements. The retained old pair cannot establish #275
+completion. Keep v2 pending; a new case must satisfy the original acceptance.
 
 The synthetic tests cover both the input/outcome contracts and the saved
 evidence chain. They demonstrate that a valid
@@ -104,3 +105,26 @@ Private receipts remain in ignored `data/artifacts/issue275-evidence-audit-20261
 and are not included in the source change. This change does not run provider
 operations, rebuild research, update the public catalog or establish issue
 completion.
+
+## New private case, 2026-11-04
+
+The old pair above remains blocked and unchanged. The separate
+[private-study protocol](../ops/issue275/README.md) records the owner's reported
+agreement and explicit new-study instruction, with a scope bound to the existing
+verified checkpoint. This attestation is not independently inspected provider
+correspondence and does not release general source-use or publication gates.
+
+The new legacy and duration-aware builds have distinct dataset identities and
+complete matching runtime provenance. Their input-audit commitment was pushed
+before model fitting. Both full revised rosters and actual numerical reviews
+completed, with private paired uncertainty, costs and failed hypotheses. The
+[completion commitment](../ops/issue275/completion-commitment.json) contains only
+operational hashes/counts/flags. Its 48 passing content checks are supplemented
+by numerical recomputation, checkpoint verification, input-audit chronology and
+frozen-asset preservation checks; the evidence-only auditor's deliberately
+limited claims have not been broadened.
+
+This fresh case satisfies the private development acceptance for #275. No
+financial results are published here. Historical membership (#292), general
+source-use review and separate aggregate publication remain unresolved; v2 stays
+pending and the study makes no profitable-alpha claim.
