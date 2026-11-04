@@ -1,0 +1,78 @@
+name: Prepare private forward scheduler without Cron
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: "VERIFY reads state only; PREPARE uploads code with Cron disabled"
+        required: true
+        default: VERIFY
+        type: choice
+        options: [VERIFY, PREPARE]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-forward-scheduler
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: scheduler
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Validate the no-Cron profile and offline contracts
+        run: |
+          python3 scripts/validate_scheduler_config.py ops/scheduler/wrangler.prepare.toml.example --prepare
+          node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs ops/scheduler/verify-prepared-scheduler.test.mjs
+      - name: Verify the exact existing dormant Worker before upload
+        if: ${{ inputs.stage == 'PREPARE' }}
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          EXPECTED_WORKER_ID: d8be7a3ac48547e98a48e99f1eb145a1
+          EXPECTED_ACCOUNT_SHA256: d55626b5e28b4d2ac50ff058e39cd722f2779d300ca7db10f76e3e3d7966d386
+        run: node ops/scheduler/verify-dormant-credentials.mjs reports/scheduler-preparation/before.json
+      - name: Upload existing private Worker with no Cron triggers
+        if: ${{ inputs.stage == 'PREPARE' }}
+        uses: cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0 # v4.1.3
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        with:
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: ops/scheduler
+          wranglerVersion: "4.136.2"
+          command: deploy --config wrangler.prepare.toml.example
+          quiet: true
+      - name: Verify private URLs, absent Cron and dispatch-secret metadata
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node ops/scheduler/verify-prepared-scheduler.mjs reports/scheduler-preparation/after.json
+      - name: Validate and hash redacted preparation receipts
+        id: redaction
+        if: ${{ always() }}
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/scheduler-preparation
+          sha256sum reports/scheduler-preparation/*.json > reports/scheduler-preparation/SHA256SUMS
+      - name: Retain preparation receipts
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scheduler-preparation-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/scheduler-preparation/
+          if-no-files-found: error
+          retention-days: 7

@@ -58,6 +58,30 @@ config contains a live cron, and this dormant bootstrap approval does not
 authorize deployment, adding a GitHub dispatch secret, source-backed execution,
 or production cutover. Those remain separate reviewed and approved steps.
 
+### Prepare code before adding the dispatch credential
+
+The manual **Prepare private forward scheduler without Cron** workflow has two
+fixed stages. Its default `VERIFY` stage makes only three bounded GET requests
+against the approved account/Worker: Worker metadata, Cron schedules and secret
+names. It never reads a secret value or invokes the Worker.
+
+After a successful dormant credential check, choose `PREPARE` once. The workflow
+rechecks the exact existing undeployed Worker, uploads the reviewed adapter using
+`wrangler.prepare.toml.example`, and verifies disabled public/preview URLs,
+disabled persistent logging, an empty Cron schedule, and dispatch-secret presence.
+All earlier private/provider copies remain intact. The preparation config must
+pass `validate_scheduler_config.py ... --prepare`; that mode rejects the active
+Cron profile, and the ordinary mode rejects the preparation profile. Missing Cron
+configuration is not equivalent to an explicitly empty Cron list.
+
+After preparation, add a separately scoped GitHub dispatch credential as the
+Worker's `GITHUB_TOKEN` secret. Do not store an Actions job's ephemeral built-in
+token there. Use `VERIFY` for subsequent read-only checks: the initial dormant
+verifier intentionally refuses once code exists. Credential presence does not
+prove validity or scheduler-origin timing. `PREPARE` does not enable Cron or
+change the held provider-execution path; active rollout and live margin evidence
+remain separate steps below.
+
 ### Later active rollout (requires separate approval)
 
 1. Create a fine-grained GitHub token restricted to this repository with only
@@ -181,3 +205,15 @@ readiness, the reviewed provider-execution path, real scheduler-origin/forecast
 margin evidence, and cutover remain outstanding. The existing nominal
 `07:17 UTC` schedule and source cutoff have not changed; actual recorded margin
 remains the acceptance evidence.
+
+### Replacement credential verified 2026-11-04
+
+After the owner replaced the stored token with the specified-Worker Editor token,
+[run 41802437633](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41802437633)
+passed both fixed GET requests on released main. The exact account and Worker
+matched; URLs/logging were disabled and zero versions existed. The redacted
+receipt matched its manifest hash:
+`c944c3c15d2fb1424344c64b415343736109c4c0ef0ce5f5f71c49fe22d88e2b`.
+The prior HTTP 401 receipt remains retained as historical evidence. This fresh
+check establishes read access and the empty Worker boundary, without asserting
+write permission, token expiry, dispatch readiness or the #156 timing acceptance.
