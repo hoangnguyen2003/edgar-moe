@@ -55,7 +55,8 @@ export async function uploadPrivateWorker({stage, source, env, fetchImpl = globa
       report.code_uploaded = true;
       report.module_sha256 = createHash("sha256").update(source).digest("hex");
     }
-    await request(base + "/schedules", "PUT", {schedules: stage === "ACTIVATE" ? [{cron: CRON}] : []});
+    // The PUT request is a bare array; only the GET response wraps `schedules`.
+    await request(base + "/schedules", "PUT", stage === "ACTIVATE" ? [{cron: CRON}] : []);
     report.schedule_updated = true;
     report.cron_requested = stage === "ACTIVATE";
     report.status = "uploaded_pending_state_verification";
