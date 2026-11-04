@@ -59,3 +59,32 @@ def test_reviewed_scope_pins_full_roster_and_original_boundary():
     assert scope["bounds"]["test_start"] == "2025-01-01"
     assert scope["bounds"]["walk_forward_years"] == [2023, 2024]
     assert scope["bounds"]["maximum_candidates"] is None
+
+
+@pytest.mark.parametrize("change", ["controls", "locked", "uncertainty", "costs"])
+def test_report_presence_cannot_substitute_for_numerical_acceptance(change):
+    paired = {
+        "status": "pretest_development_only",
+        "negative_controls_equal": True,
+        "model_count": 33,
+        "locked_test_predictions": 0,
+        "fixed_model_comparisons": [{"delta_interval_95": {"status": "ready"}}],
+    }
+    review = {
+        "portfolio": {
+            "status": "development_only",
+            "models": [{"scenarios": [{"cost_bps": value} for value in [10, 25, 50]]}],
+        },
+        "hypotheses": [{}, {}],
+    }
+    study.require_numerical_acceptance(paired, review)
+    if change == "controls":
+        paired["negative_controls_equal"] = False
+    elif change == "locked":
+        paired["locked_test_predictions"] = 1
+    elif change == "uncertainty":
+        paired["fixed_model_comparisons"][0]["delta_interval_95"]["status"] = "degenerate_resamples"
+    else:
+        review["portfolio"]["status"] = "unavailable_incomplete_return_coverage"
+    with pytest.raises(ValueError):
+        study.require_numerical_acceptance(paired, review)

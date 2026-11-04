@@ -297,6 +297,7 @@ def run(
         orjson.dumps(review, option=orjson.OPT_SORT_KEYS)
     ).hexdigest()
     retain_report(output / "candidate-pretest-review.json", review)
+    require_numerical_acceptance(paired, review)
     evidence = audit_saved_policy_evidence(
         baseline_dataset=output / commitment["datasets"]["baseline"]["path"],
         candidate_dataset=output / commitment["datasets"]["candidate"]["path"],
@@ -314,6 +315,28 @@ def run(
     progress(
         "Full paired study and numerical reviews retained privately; inspect interpretation before closeout"
     )
+
+
+def require_numerical_acceptance(paired: dict[str, Any], review: dict[str, Any]) -> None:
+    """Report presence and metadata alone cannot establish completion."""
+    if (
+        paired["status"] != "pretest_development_only"
+        or paired["negative_controls_equal"] is not True
+    ):
+        raise ValueError("Negative controls do not support an isolated policy comparison")
+    if paired["model_count"] != 33 or paired["locked_test_predictions"] != 0:
+        raise ValueError("Full roster and zero locked predictions required")
+    if any(
+        item["delta_interval_95"]["status"] != "ready" for item in paired["fixed_model_comparisons"]
+    ):
+        raise ValueError("Paired uncertainty is incomplete")
+    if review["portfolio"]["status"] != "development_only":
+        raise ValueError("Pretest cost scenarios are unavailable")
+    for model in review["portfolio"]["models"]:
+        if sorted(item["cost_bps"] for item in model["scenarios"]) != [10, 25, 50]:
+            raise ValueError("All original cost scenarios required")
+    if len(review["hypotheses"]) != 2:
+        raise ValueError("Explicit development hypotheses required")
 
 
 def main() -> None:
