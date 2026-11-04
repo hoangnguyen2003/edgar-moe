@@ -239,3 +239,25 @@ bundled successfully. The workflows now materialize the supported filename,
 require that step before upload, and dry-run the real CLI command. Verification
 also requires an uploaded version before querying script state. This diagnosis
 does not justify broadening the per-Worker token scope or enabling Cron.
+
+### Prepared code and dispatch-secret presence verified
+
+The corrected [preparation run 41808455503](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41808455503)
+on merged commit `f52cca6477d64ba276dd8cc888fc0bb2e7151852` succeeded. Its post-check
+verified an uploaded version, private URLs/logging and an empty Cron schedule.
+Receipt SHA-256: `8da2eb6a2748729d91fea4757948bc7696f53dd2a99ecc7ee8c76e170c5afd53`.
+
+After the owner added the Worker `GITHUB_TOKEN` secret, the read-only
+[verification run 41810126338](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41810126338)
+confirmed its presence while retaining the private/no-Cron state. Receipt
+SHA-256: `6c1e3545bfbbc8dd65695576bd0310724332ee28d9f66a61803d8193a54a6797`.
+Neither check invokes the Worker or proves GitHub credential validity, dispatch
+origin or application forecast margin. The original issue remains open.
+
+Before connecting scheduled execution to existing data, the main-only manual
+**Verify private scheduler runtime target metadata** workflow compares configured
+target hashes to the retained private #288 reference. It passes credentials only
+to one standard-library comparison process and makes no network/database/storage
+connections. Missing, malformed and different targets fail closed, retaining
+only hashes and presence/match flags. A match is not reuse of that reference's
+one-cycle authorization and cannot release the general provider-use hold.
