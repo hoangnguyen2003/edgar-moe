@@ -67,7 +67,18 @@ def test_preparation_workflow_is_main_only_and_read_only_by_default():
     )
     assert steps.index(before) < steps.index(upload) < steps.index(after)
     assert before["if"] == upload["if"] == "${{ inputs.stage == 'PREPARE' }}"
-    assert upload["with"]["command"] == "deploy --config wrangler.prepare.toml.example"
+    assert upload["with"]["command"] == "deploy --config wrangler.toml"
+    materialize = next(
+        s
+        for s in steps
+        if s.get("run")
+        == "cp ops/scheduler/wrangler.prepare.toml.example ops/scheduler/wrangler.toml"
+    )
+    dry_run = next(s for s in steps if "--dry-run" in s.get("run", ""))
+    assert steps.index(materialize) < steps.index(dry_run) < steps.index(before)
+    assert "--config ops/scheduler/wrangler.toml" in dry_run["run"]
+    assert "env" not in materialize
+    assert dry_run["env"] == {"WRANGLER_SEND_METRICS": "false"}
     assert upload["with"]["wranglerVersion"] == "4.136.2"
     assert upload["with"]["quiet"] is True
     assert upload["uses"] == "cloudflare/wrangler-action@953926a2e2182532811c01a25e53647d93bf07c0"

@@ -129,6 +129,13 @@ def _validate_deploy_job(job: dict[str, Any]) -> list[str]:
     if len(wrangler_steps) != 1:
         errors.append("deploy job must use the pinned Wrangler action exactly once")
         return errors
+    copy_steps = [
+        step
+        for step in steps
+        if step.get("run") == "cp ops/scheduler/wrangler.toml.example ops/scheduler/wrangler.toml"
+    ]
+    if len(copy_steps) != 1 or steps.index(copy_steps[0]) > steps.index(wrangler_steps[0]):
+        errors.append("deploy job must materialize the reviewed config before Wrangler")
     with_values = wrangler_steps[0].get("with")
     if not isinstance(with_values, dict):
         return [*errors, "Wrangler action must define inputs"]
@@ -137,7 +144,7 @@ def _validate_deploy_job(job: dict[str, Any]) -> list[str]:
         "accountId": "${{ env.CLOUDFLARE_ACCOUNT_ID }}",
         "workingDirectory": "ops/scheduler",
         "wranglerVersion": "4.136.2",
-        "command": "deploy --config wrangler.toml.example",
+        "command": "deploy --config wrangler.toml",
         "quiet": True,
     }
     for key, value in expected.items():

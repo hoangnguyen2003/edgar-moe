@@ -36,6 +36,12 @@ jobs:
         run: |
           python3 scripts/validate_scheduler_config.py ops/scheduler/wrangler.prepare.toml.example --prepare
           node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs ops/scheduler/verify-prepared-scheduler.test.mjs
+      - name: Materialize the preparation config with a supported extension
+        run: cp ops/scheduler/wrangler.prepare.toml.example ops/scheduler/wrangler.toml
+      - name: Bundle the exact pinned CLI command without credentials or upload
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: npx --yes --package=wrangler@4.136.2 wrangler deploy --dry-run --config ops/scheduler/wrangler.toml --outdir "$RUNNER_TEMP/scheduler-preparation-bundle"
       - name: Verify the exact existing dormant Worker before upload
         if: ${{ inputs.stage == 'PREPARE' }}
         env:
@@ -55,7 +61,7 @@ jobs:
           accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: ops/scheduler
           wranglerVersion: "4.136.2"
-          command: deploy --config wrangler.prepare.toml.example
+          command: deploy --config wrangler.toml
           quiet: true
       - name: Verify private URLs, absent Cron and dispatch-secret metadata
         env:

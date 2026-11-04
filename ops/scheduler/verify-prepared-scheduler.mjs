@@ -1,4 +1,4 @@
-/** Three fixed GETs; verifies inert preparation and secret names, never secret values. */
+/** Four fixed GETs; verifies inert preparation and secret names, never secret values. */
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -38,7 +38,7 @@ export async function verifyPreparedScheduler({accountId, apiToken, expectedAcco
   const report = {
     schema_version: 1, status: "refused", reason: "invalid_configuration", http_status: null,
     worker_name: WORKER, request_count: 0, external_writes: 0, worker_match: false,
-    private_urls_verified: false, cron_disabled: false, dispatch_secret_present: false,
+    private_urls_verified: false, uploaded_version_seen: false, cron_disabled: false, dispatch_secret_present: false,
     dispatch_credential_validity_proven: false, scheduler_invocations: 0,
     data_provider_requests: 0, forecast_margin_proven: false,
   };
@@ -51,6 +51,7 @@ export async function verifyPreparedScheduler({accountId, apiToken, expectedAcco
     const base = `https://api.cloudflare.com/client/v4/accounts/${accountId}`;
     const paths = [
       `/workers/workers/${WORKER_ID}`,
+      `/workers/workers/${WORKER_ID}/versions?page=1&per_page=1`,
       `/workers/scripts/${WORKER}/schedules`,
       `/workers/scripts/${WORKER}/secrets`,
     ];
@@ -76,11 +77,18 @@ export async function verifyPreparedScheduler({accountId, apiToken, expectedAcco
       throw new Refusal("private_worker_boundary_changed");
     }
     report.private_urls_verified = true;
-    const schedules = await get(1);
+    const versions = await get(1);
+    if (!Array.isArray(versions) || versions.length > 1) throw new Refusal("invalid_version_response");
+    if (versions.length === 0) throw new Refusal("worker_has_no_code");
+    if (typeof versions[0]?.id !== "string" || !/^[A-Za-z0-9-]{1,128}$/.test(versions[0].id)) {
+      throw new Refusal("invalid_version_response");
+    }
+    report.uploaded_version_seen = true;
+    const schedules = await get(2);
     if (!Array.isArray(schedules?.schedules)) throw new Refusal("invalid_schedule_response");
     if (schedules.schedules.length !== 0) throw new Refusal("cron_is_enabled");
     report.cron_disabled = true;
-    const secrets = await get(2);
+    const secrets = await get(3);
     if (!Array.isArray(secrets) || secrets.length > 1 || secrets.some(item =>
       item?.name !== "GITHUB_TOKEN" || item.type !== "secret_text" ||
       Object.keys(item).some(key => !["name", "type"].includes(key)))) {
