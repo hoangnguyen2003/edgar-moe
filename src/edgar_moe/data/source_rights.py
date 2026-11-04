@@ -3,6 +3,10 @@
 This is an operational hold, not a legal determination. Clearance must be
 recorded in a reviewed change; there is deliberately no runtime environment
 variable or CLI option that can bypass it.
+
+The separately scoped scripts/verify_private_forward_cycle.py operator path
+binds the owner's reported approvals to one private #288 verification profile.
+It does not release this general CLI/workflow or publication decision.
 """
 
 from __future__ import annotations

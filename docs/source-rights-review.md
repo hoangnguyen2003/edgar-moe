@@ -3,7 +3,22 @@
 Status: **unresolved**, reviewed 2026-09-28. This is a technical inventory and
 list of questions for a provider or qualified rights reviewer, not a legal
 opinion or permission to use, train on, store, or publish any source content.
-Keep issue [#280](https://github.com/hoangnguyen2003/edgar-moe/issues/280) open.
+Issue [#280](https://github.com/hoangnguyen2003/edgar-moe/issues/280) was closed
+on 2026-09-30 without recording source-use clearance; its closure does not
+release this hold. See the [2026-11-02 issue #288 source assessment](issue-288-source-assessment.md)
+for the owner's personal, noncommercial scope, current primary-source findings,
+and the remaining permission question. That assessment does not change the
+runtime decision.
+
+On 2026-11-03 the owner reported that all parties agreed and instructed the
+agent to proceed with private personal verification. The dedicated
+`scripts/verify_private_forward_cycle.py` entrypoint binds that owner attestation
+to the fixed source/model/configuration and private target profile in
+`ops/issue288/private-verification-scope.json`. This reviewed exception is for
+one private #288 cycle; provider correspondence has not been independently
+inspected. It does not release the general CLI, scheduled workflows, new
+studies or public outputs. Its rationale and evidence are recorded in the
+linked assessment.
 
 The production forward workflow now enforces this hold through a failing,
 credential-free prerequisite job. The manual authenticated-data refresh and
@@ -22,8 +37,8 @@ implementing the existing review decision, not a determination of provider
 rights. Existing registry evidence remains readable and its freshness will age
 while ingestion is held. After the required source-use determination, reopen
 the workflows and CLI in a separate reviewed PR that cites the decision and
-updates the schedule-boundary contract. Only then perform the live verification
-in #288.
+updates the schedule-boundary contract. The dedicated owner-attested private
+#288 verification exception above does not reopen those general workflows.
 
 ## Exact research inputs to review
 

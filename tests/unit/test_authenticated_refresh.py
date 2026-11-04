@@ -228,6 +228,99 @@ async def test_failed_seed_preserves_contract_for_same_request_resume(tmp_path: 
     verify_authenticated_bundle(resumed)
 
 
+async def test_partial_resume_does_not_reseed_over_refetched_legacy_cache(tmp_path: Path) -> None:
+    cache = tmp_path / "cache"
+    cached = cache / "CIK0000000001" / "0000000001-25-000001.html.gz"
+    cached.parent.mkdir(parents=True)
+    original = gzip.compress(b"old cache without a verification sidecar")
+    cached.write_bytes(original)
+    raw = tmp_path / "raw"
+    options = {
+        "output_root": raw,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+        "resume": True,
+    }
+
+    def seed() -> int:
+        return seed_filing_documents(raw_root=raw, filing_cache=cache, cutoff="2025-12-31")
+
+    def interrupt(message: str) -> None:
+        if message.startswith("SEC issuers "):
+            raise RuntimeError("interrupted after refetch")
+
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    with pytest.raises(RuntimeError, match="after refetch"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            seed_filings=seed,
+            progress=interrupt,
+            **options,
+        )
+    checkpoint = raw / "2025-12-31"
+    refreshed = checkpoint / "sec/filings" / cached.relative_to(cache)
+    assert refreshed.read_bytes() != original
+    assert cached.read_bytes() == original
+
+    def cannot_reseed() -> int:
+        raise AssertionError("completed seeding must not replay over refreshed checkpoint files")
+
+    resumed = await refresh_authenticated_to_disk(
+        StreamingFakeSec(),
+        FakeMarket(),
+        FakeMacro(),
+        members,
+        seed_filings=cannot_reseed,
+        **options,
+    )
+    assert cached.read_bytes() == original
+    verify_authenticated_bundle(resumed)
+    index = orjson.loads((resumed / "sec/filing-index.json").read_bytes())
+    assert index[0]["status"] == "ok"
+
+
+async def test_resume_rejects_changed_cache_seeding_receipt(tmp_path: Path) -> None:
+    options = {
+        "output_root": tmp_path,
+        "start": date(2025, 1, 1),
+        "end": date(2025, 12, 31),
+        "as_of": date(2025, 12, 31),
+        "macro_series": ["VIXCLS"],
+        "resume": True,
+    }
+
+    def interrupt(message: str) -> None:
+        if message.startswith("Prepared "):
+            raise RuntimeError("interrupted after seeding")
+
+    members = [UniverseMember(cik="1", symbol="TEST")]
+    with pytest.raises(RuntimeError, match="after seeding"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            seed_filings=lambda: 0,
+            progress=interrupt,
+            **options,
+        )
+    (tmp_path / "2025-12-31/cache-seed.json").write_text("changed")
+    with pytest.raises(ValueError, match="not hash-verified"):
+        await refresh_authenticated_to_disk(
+            StreamingFakeSec(),
+            FakeMarket(),
+            FakeMacro(),
+            members,
+            seed_filings=lambda: 0,
+            **options,
+        )
+
+
 class EligibilitySec(StreamingFakeSec):
     async def complete_submissions(self, cik: str, start=None) -> dict:
         if cik.endswith("2"):
