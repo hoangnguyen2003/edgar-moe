@@ -102,6 +102,19 @@ class FinBertEmbedder:
         tokenizer_revision = (
             tokenizer_metadata.get("_commit_hash") if isinstance(tokenizer_metadata, dict) else None
         )
+        if not tokenizer_revision:
+            # Tokenizer constructors can drop _commit_hash from init_kwargs.
+            # Resolve the actual cached file rather than inventing provenance
+            # from a requested branch/tag or copying today's runtime into old data.
+            from transformers.utils.hub import cached_file, extract_commit_hash
+
+            resolved = cached_file(
+                model_name,
+                "tokenizer_config.json",
+                **revision_options,
+                _raise_exceptions_for_missing_entries=False,
+            )
+            tokenizer_revision = extract_commit_hash(resolved, None)
         self.tokenizer_revision = str(tokenizer_revision or "unresolved")
         self.sentiment_indices = _canonical_sentiment_indices(dict(self.model.config.id2label))
         self.model.eval()
