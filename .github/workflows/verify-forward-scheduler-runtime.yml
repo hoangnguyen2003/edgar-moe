@@ -1,0 +1,54 @@
+name: Verify private scheduler runtime target metadata
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-forward-scheduler-runtime
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    environment:
+      name: scheduler
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Compare target hashes without connecting to any service
+        id: targets
+        continue-on-error: true
+        env:
+          ALPACA_API_KEY: ${{ secrets.ALPACA_API_KEY }}
+          ALPACA_API_SECRET: ${{ secrets.ALPACA_API_SECRET }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          SEC_USER_AGENT: ${{ secrets.SEC_USER_AGENT }}
+          EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ secrets.EDGAR_MOE_REGISTRY_DATABASE_URL }}
+          EDGAR_MOE_R2_ENDPOINT_URL: ${{ secrets.EDGAR_MOE_R2_ENDPOINT_URL }}
+          EDGAR_MOE_R2_BUCKET: ${{ secrets.EDGAR_MOE_R2_BUCKET }}
+          EDGAR_MOE_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_ACCESS_KEY_ID }}
+          EDGAR_MOE_R2_SECRET_ACCESS_KEY: ${{ secrets.EDGAR_MOE_R2_SECRET_ACCESS_KEY }}
+        run: python3 scripts/verify_scheduler_runtime_targets.py --output reports/scheduler-runtime/targets.json
+      - name: Validate and hash the value-free report
+        id: redaction
+        if: ${{ always() }}
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/scheduler-runtime
+          sha256sum reports/scheduler-runtime/targets.json > reports/scheduler-runtime/SHA256SUMS
+      - name: Retain target comparison
+        if: ${{ always() && steps.redaction.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scheduler-runtime-targets-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/scheduler-runtime/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Fail unless targets match the private reference
+        if: ${{ always() && (steps.targets.outcome != 'success' || steps.redaction.outcome != 'success') }}
+        run: exit 1
