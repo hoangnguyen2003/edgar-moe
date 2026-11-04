@@ -20,7 +20,7 @@ EXPECTED_VARS = {
 }
 
 
-def validate_scheduler_config(path: Path) -> list[str]:
+def validate_scheduler_config(path: Path, *, prepare: bool = False) -> list[str]:
     """Return safety violations without reading or printing secret values."""
     try:
         document = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -34,7 +34,7 @@ def validate_scheduler_config(path: Path) -> list[str]:
     errors: list[str] = []
     errors.extend(_validate_identity(document))
     errors.extend(_validate_private_routing(document))
-    errors.extend(_validate_triggers(document))
+    errors.extend(_validate_triggers(document, prepare=prepare))
     errors.extend(_validate_vars(document))
     errors.extend(_validate_no_secret_sections(document))
     return errors
@@ -71,10 +71,15 @@ def _validate_identity(document: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_triggers(document: dict[str, Any]) -> list[str]:
+def _validate_triggers(document: dict[str, Any], *, prepare: bool = False) -> list[str]:
     triggers = document.get("triggers")
-    if not isinstance(triggers, dict) or triggers.get("crons") != [EXPECTED_CRON]:
-        return [f"triggers.crons must contain only {EXPECTED_CRON!r}"]
+    expected = [] if prepare else [EXPECTED_CRON]
+    if not isinstance(triggers, dict) or triggers.get("crons") != expected:
+        return (
+            ["preparation must explicitly disable all Cron triggers"]
+            if prepare
+            else [f"triggers.crons must contain only {EXPECTED_CRON!r}"]
+        )
     return []
 
 
@@ -123,8 +128,11 @@ def main() -> int:
         default=Path("ops/scheduler/wrangler.toml.example"),
         help="scheduler TOML file to validate",
     )
+    parser.add_argument(
+        "--prepare", action="store_true", help="Require the no-Cron preparation profile"
+    )
     args = parser.parse_args()
-    errors = validate_scheduler_config(args.config)
+    errors = validate_scheduler_config(args.config, prepare=args.prepare)
     if errors:
         print("scheduler configuration contract failed", file=sys.stderr)
         print(f"{len(errors)} validation error(s) detected", file=sys.stderr)
