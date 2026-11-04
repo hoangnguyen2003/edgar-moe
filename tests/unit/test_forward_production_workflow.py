@@ -117,14 +117,10 @@ def test_forward_schedule_boundary_contract_passes() -> None:
 
 def test_forward_schedule_boundary_rejects_accidental_schedule_removal(tmp_path: Path) -> None:
     workflow = tmp_path / WORKFLOW.name
-    workflow.write_text(
-        WORKFLOW.read_text(encoding="utf-8").replace(
-            '  schedule:\n    # 07:17 UTC Tuesday-Saturday is after the prior U.S. SEC acceptance window\n    # and leaves at least six hours before the next regular NYSE open.\n    - cron: "17 7 * * 2-6"\n',
-            "",
-            1,
-        ),
-        encoding="utf-8",
-    )
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    trigger = document.get("on", document.get(True))
+    del trigger["schedule"]
+    workflow.write_text(yaml.safe_dump(document), encoding="utf-8")
 
     result = subprocess.run(
         [sys.executable, str(BOUNDARY_SCRIPT), str(workflow)],

@@ -35,7 +35,7 @@ jobs:
         run: node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs
 
   deploy:
-    if: ${{ inputs.deploy == 'DEPLOY' }}
+    if: ${{ github.ref == 'refs/heads/main' && inputs.deploy == 'DEPLOY' }}
     needs: validate
     runs-on: ubuntu-24.04
     timeout-minutes: 10

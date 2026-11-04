@@ -33,9 +33,27 @@ def validate_scheduler_config(path: Path) -> list[str]:
         return ["configuration root must be a TOML table"]
     errors: list[str] = []
     errors.extend(_validate_identity(document))
+    errors.extend(_validate_private_routing(document))
     errors.extend(_validate_triggers(document))
     errors.extend(_validate_vars(document))
     errors.extend(_validate_no_secret_sections(document))
+    return errors
+
+
+def _validate_private_routing(document: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for field in ("workers_dev", "preview_urls", "logpush"):
+        if document.get(field) is not False:
+            errors.append(f"{field} must be explicitly false")
+    observability = document.get("observability")
+    if (
+        not isinstance(observability, dict)
+        or set(observability) != {"enabled"}
+        or observability["enabled"] is not False
+    ):
+        errors.append("observability must remain explicitly disabled")
+    if "route" in document or document.get("routes", []) != []:
+        errors.append("scheduler must not declare public routes")
     return errors
 
 
