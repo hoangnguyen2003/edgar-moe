@@ -224,3 +224,28 @@ def test_scheduler_workflow_refuses_deployment_without_main_guard(tmp_path: Path
         "deploy job must require main and the explicit DEPLOY input"
         in validate_scheduler_workflow(path)
     )
+
+
+@pytest.mark.parametrize("change", ["missing", "wrong_profile", "after_upload"])
+def test_scheduler_workflow_requires_materialized_active_profile(
+    tmp_path: Path, change: str
+) -> None:
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    steps = document["jobs"]["deploy"]["steps"]
+    copy = next(
+        s
+        for s in steps
+        if s.get("run") == "cp ops/scheduler/wrangler.toml.example ops/scheduler/wrangler.toml"
+    )
+    if change == "wrong_profile":
+        copy["run"] = "cp ops/scheduler/wrangler.prepare.toml.example ops/scheduler/wrangler.toml"
+    else:
+        steps.remove(copy)
+        if change == "after_upload":
+            steps.append(copy)
+    path = tmp_path / WORKFLOW.name
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    assert (
+        "deploy job must materialize the reviewed config before Wrangler"
+        in validate_scheduler_workflow(path)
+    )

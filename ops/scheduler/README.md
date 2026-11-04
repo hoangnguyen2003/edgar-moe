@@ -61,15 +61,20 @@ or production cutover. Those remain separate reviewed and approved steps.
 ### Prepare code before adding the dispatch credential
 
 The manual **Prepare private forward scheduler without Cron** workflow has two
-fixed stages. Its default `VERIFY` stage makes only three bounded GET requests
-against the approved account/Worker: Worker metadata, Cron schedules and secret
-names. It never reads a secret value or invokes the Worker.
+fixed stages. Its default `VERIFY` stage makes at most four bounded GET requests
+against the approved account/Worker: Worker metadata, one version page, Cron
+schedules and secret names. An empty Worker is explicitly refused before legacy
+script/secret reads. It never reads a secret value or invokes the Worker.
 
 After a successful dormant credential check, choose `PREPARE` once. The workflow
 rechecks the exact existing undeployed Worker, uploads the reviewed adapter using
 `wrangler.prepare.toml.example`, and verifies disabled public/preview URLs,
 disabled persistent logging, an empty Cron schedule, and dispatch-secret presence.
-All earlier private/provider copies remain intact. The preparation config must
+Both deployment workflows copy their reviewed example to `wrangler.toml` before
+running Wrangler. The pinned CLI ignores the `.toml.example` extension; a plain
+TOML parser passing is insufficient. Preparation runs a credential-free CLI dry
+run before any provider read/write, and CI dry-runs both profiles. All earlier
+private/provider copies remain intact. The preparation config must
 pass `validate_scheduler_config.py ... --prepare`; that mode rejects the active
 Cron profile, and the ordinary mode rejects the preparation profile. Missing Cron
 configuration is not equivalent to an explicitly empty Cron list.
@@ -217,3 +222,20 @@ receipt matched its manifest hash:
 The prior HTTP 401 receipt remains retained as historical evidence. This fresh
 check establishes read access and the empty Worker boundary, without asserting
 write permission, token expiry, dispatch readiness or the #156 timing acceptance.
+
+### First preparation attempt and filename diagnosis
+
+[Run 41805845042](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41805845042)
+passed the exact dormant-Worker check but failed the quiet Wrangler upload step.
+The independent read-only [check 41806186559](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/41806186559)
+verified matching Worker/private URLs and absent Cron, then received HTTP 404
+from the legacy secret-list endpoint. Both receipts remain retained; this was
+not preparation completion.
+
+A local credential-free Wrangler 4.136.2 dry run reproduced the configuration
+loading failure with `.toml.example`: the CLI fell back to the repository name
+and could not find an entry point. The exact same bytes copied to `wrangler.toml`
+bundled successfully. The workflows now materialize the supported filename,
+require that step before upload, and dry-run the real CLI command. Verification
+also requires an uploaded version before querying script state. This diagnosis
+does not justify broadening the per-Worker token scope or enabling Cron.
