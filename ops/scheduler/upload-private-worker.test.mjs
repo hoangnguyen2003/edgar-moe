@@ -35,7 +35,7 @@ test("inert upload uses only the existing Worker's API and strictly inherits bot
     {name: "SCHEDULER_SIGNATURE_KEY", type: "inherit", version_id: "latest"},
   ]);
   assert.equal(metadata.observability.enabled, false);
-  assert.deepEqual(JSON.parse(calls[5].init.body), {schedules: []});
+  assert.deepEqual(JSON.parse(calls[5].init.body), []);
   assert.equal(JSON.stringify(result).includes(env.CLOUDFLARE_API_TOKEN), false);
 });
 
@@ -49,9 +49,9 @@ test("unexpected bindings stop before any write", async () => {
 test("activation changes only the exact original Cron and STOP never rewrites code", async () => {
   const {result, calls} = await upload("ACTIVATE");
   assert.equal(result.status, "uploaded_pending_state_verification");
-  assert.deepEqual(JSON.parse(calls[5].init.body), {schedules: [{cron: "17 7 * * 2-6"}]});
+  assert.deepEqual(JSON.parse(calls[5].init.body), [{cron: "17 7 * * 2-6"}]);
   const stopped = await upload("STOP");
   assert.equal(stopped.result.code_uploaded, false);
   assert.equal(stopped.result.external_writes, 1);
-  assert.deepEqual(JSON.parse(stopped.calls[3].init.body), {schedules: []});
+  assert.deepEqual(JSON.parse(stopped.calls[3].init.body), []);
 });
