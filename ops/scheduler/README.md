@@ -302,6 +302,16 @@ If the separate key installation succeeded but the upload failed, first run
 Cron list before uploading inert code; it never reinstalls or replaces a key.
 The pinned CLI's deployment receipt retains bounded, redacted diagnostics so a
 failed upload has a usable cause without printing credentials or account URLs.
+Run 41828873912 exposed a pinned-CLI failure reading dashboard metadata. Source
+inspection found that a dashboard-modified Worker makes that CLI read account
+domain records along with service bindings/routes before uploading. The private
+workflow now uses Wrangler only for credential-free bundling and uses the
+[Worker-scoped upload API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)
+for the existing Worker. That API explicitly accepts Individual Workers Editor.
+It refuses unexpected existing bindings and strictly inherits the two secret
+bindings; no secret values are downloaded. Trigger updates address that same
+Worker only. `STOP` updates the empty Cron list without rewriting code. No
+account-wide permission expansion is required.
 
 The scheduler-side date guard becomes inert after November 7 even if the Cron
 configuration remains present. Run `STOP` after collecting the three receipts.

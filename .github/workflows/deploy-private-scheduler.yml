@@ -84,7 +84,8 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: node ops/scheduler/deploy-private-scheduler.mjs reports/private-scheduler-deploy/upload.json
+          STAGE: ${{ inputs.stage }}
+        run: node ops/scheduler/upload-private-worker.mjs "$RUNNER_TEMP/private-scheduler-bundle" reports/private-scheduler-deploy/upload.json
       - name: Verify trigger state and private secret metadata after deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
