@@ -21,7 +21,7 @@ def test_standalone_dependencies_are_hash_pinned_without_research_or_deployment_
     assert raw.startswith("--require-hashes\n")
     for line in raw.splitlines()[1:]:
         assert "==" in line and "--hash=sha256:" in line
-    assert "fastapi==" in raw and "psycopg-binary==" in raw
+    assert "fastapi==" in raw and "psycopg-binary==" in raw and "certifi==" in raw
     for unexpected in ("torch==", "transformers==", "boto3==", "httpx==", "vercel=="):
         assert unexpected not in raw
 

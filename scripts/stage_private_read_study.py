@@ -18,6 +18,7 @@ EXTRA = {
     "ops/private-read-study/vercel.json": "vercel.json",
 }
 DIRECT = (
+    "certifi",
     "fastapi",
     "sqlalchemy",
     "psycopg",

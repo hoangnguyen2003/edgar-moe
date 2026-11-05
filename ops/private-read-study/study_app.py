@@ -91,6 +91,7 @@ class StudyConfig:
                     "total_read_attempts": 360,
                 }
                 or target["kind"] != "neon-hosted"
+                or any(name.startswith("PG") for name in env)
                 or not re.fullmatch(r"study290_[a-z0-9_]{8,40}", target["database"])
                 or not re.fullmatch(r"study290_reader_[a-z0-9_]{8,32}", target["role"])
                 or parsed.scheme not in {"postgres", "postgresql"}
@@ -147,6 +148,14 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
     target_values = dict(config.policy["target"])
     target_values["fixture"] = tuple(tuple(row) for row in target_values["fixture"])
     target = Target(**target_values)
+    # Serverless images need an explicit CA bundle: libpq's default otherwise
+    # expects ~/.postgresql/root.crt, which this deployment does not provision.
+    # The bundle is a hash-pinned runtime dependency, never an environment path.
+    tls_options: dict[str, str] = {}
+    if target.kind == "neon-hosted":
+        import certifi
+
+        tls_options["sslrootcert"] = certifi.where()
     observer = None
     engine = None
     result = None
@@ -156,6 +165,7 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
             autocommit=True,
             connect_timeout=5,
             application_name="study290_observer",
+            **tls_options,
         )
         observer.execute("SET statement_timeout='3s'")
         observer.execute("SET lock_timeout='500ms'")
@@ -176,7 +186,10 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
             "postgresql+psycopg://",
             poolclass=NullPool,
             creator=lambda: psycopg.connect(
-                config.database_url, connect_timeout=5, application_name="study290_reader"
+                config.database_url,
+                connect_timeout=5,
+                application_name="study290_reader",
+                **tls_options,
             ),
         )
         with engine.connect() as connection:

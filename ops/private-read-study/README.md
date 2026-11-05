@@ -28,11 +28,23 @@ deployments, and the owner's active **Hobby** plan. No application request,
 deployment or project mutation occurred. Private account/project identifiers and
 credentials are retained only in ignored owner-only preflight files.
 
-The attempted Neon project-metadata request was rejected **before execution** by
-automatic approval review because it would reuse an archived #361 API credential
-without fresh authorization. The new one-GET preflight plan has no database
-connection, provider-row read or mutation. Fresh owner authorization is pending;
-neither the old credential's current validity nor current Neon quota is claimed.
+After fresh owner authorization, fixed-target Neon metadata checks verified the
+intended PostgreSQL 18 project in Singapore. The owner then supplied the current
+organization Billing page: **Free Plan**, 1 GB storage, 100 compute hours and ten
+branches per project. The organization-details API returned HTTP 404, so its
+response is not used as plan evidence. Project inventory returned four existing
+branches and four idle endpoints, three of them disabled.
+
+Actual schema-only creation checks exposed two constraints that the general
+branch count did not establish. Neon requires a read-write endpoint to load a
+schema-only branch. With the required endpoint fixed at 0.25 CU and default
+scale-to-zero, both documented schema-only initialization modes returned
+`ROOT_BRANCHES_LIMIT_EXCEEDED`. The setup did not fall back to cloning data or
+remove an existing branch. An attempted fresh empty project in the same bound
+organization was also refused with HTTP 404. Current access therefore does not
+establish a usable new isolated target. Fresh account access or an owner-created
+empty Free-plan project is needed before continuing setup. No database
+connection, successful resource creation, deployment or observation occurred.
 
 ## Proposed workload and hosting scope
 
@@ -43,8 +55,20 @@ declared capacity assumption, not measured user traffic or an alpha result.
 Keep ordinary small expert dictionaries and the real status/page/fixed-filter/
 performance methods; include the 5,000-pair uncertainty branch. The older
 120k/60k wide-row local experiment remains a separate stress case, not a baseline
-to pool with this profile. A real local generation/size/hash review and current
-included storage/compute headroom must precede setup writes.
+to pool with this profile.
+
+The declared volume has now passed an actual disposable local PostgreSQL 18
+check: 10,000 invented forecasts and 5,000 labels across twenty filing quarters,
+using 10,706,944 bytes for public table/index relations. Half the fictional
+issuers are labeled in every quarter, exercising the real uncertainty branch
+across twenty nonempty calendar months. All four real application routes passed,
+as did a second performance read. Fifteen SELECT query shapes have redacted
+`EXPLAIN (ANALYZE, BUFFERS)` plans after planner statistics were prepared. Each
+reader closed; postflight found zero reader sessions and unchanged fixture/schema.
+Only the newly created local cluster was removed. These five route samples are
+not a hosted observation, percentile baseline, provider-start/resume proof or SLO.
+The source/hash-bound operational packet is retained in ignored owner-only
+artifacts. Current included headroom must still be checked before live setup.
 
 The intended deployment is a **new protected preview** in the existing separate
 Vercel project, never a deployment from the public repository root or a production
@@ -68,7 +92,10 @@ not deployment and does not prove current hosted compatibility.
 
 The service receives only a dedicated SELECT-only native Postgres URL and new
 study bearer. It rejects old pilot names, writer-environment fallback, poolers,
-host overrides, unverified TLS and disabled channel binding. Its separately
+libpq environment overrides, unverified TLS and disabled channel binding. Both
+hosted connections explicitly use the hash-pinned `certifi` CA bundle; a
+serverless image does not need an operator-created `~/.postgresql/root.crt`.
+No environment-selected CA path or weaker TLS mode is accepted. Its separately
 bound policy fixes an absolute **168-hour** window and complete kernel target/
 schema/fixture/SQL hashes. Before/after that window it refuses without a database
 connection. All paths authenticate; no public health/docs/CORS route or arbitrary
@@ -125,6 +152,6 @@ and fixed bounded EXPLAIN tool. Small samples can justify **no SLO decision**;
 do not manufacture an alert threshold. Source/publication holds, frozen v1 and
 append-only forward records remain unchanged.
 
-No hosted observation, representative-volume setup, provider attribution or
-issue completion is claimed by these source tests. The seven-day window and
-live configuration remain unbound until the preflight and concrete setup pass.
+No hosted observation, hosted representative-volume setup, provider attribution
+or issue completion is claimed. The seven-day window and live configuration
+remain unbound until the target, provider attribution and concrete setup pass.
