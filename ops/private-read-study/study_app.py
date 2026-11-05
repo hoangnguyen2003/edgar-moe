@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import BoundedSemaphore
-from time import perf_counter_ns
+from time import monotonic, perf_counter_ns, sleep
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -35,6 +35,26 @@ WINDOW = timedelta(days=7)
 
 class StudyRefusal(ValueError):
     """Fixed reason codes; never include URLs, rows or driver error text."""
+
+
+def confirm_reader_absence(
+    check: Callable[[], int],
+    *,
+    clock: Callable[[], float] = monotonic,
+    pause: Callable[[float], None] = sleep,
+) -> None:
+    """Allow remote backend shutdown to settle, requiring observed absence.
+
+    Poll for at most one second. Each in-flight metadata query also retains
+    the observer's three-second statement timeout. No read or connection is
+    retried, and a backend still present at the deadline remains a refusal.
+    """
+    deadline = clock() + 1.0
+    while check() != 0:
+        remaining = deadline - clock()
+        if remaining <= 0:
+            raise StudyRefusal("reader_absence_unconfirmed")
+        pause(min(0.025, remaining))
 
 
 def canonical(value: Any) -> bytes:
@@ -199,8 +219,7 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
             result = read_snapshot(connection, target, contract, route)
         engine.dispose()
         engine = None
-        if other_sessions() != 0:
-            raise StudyRefusal("reader_absence_unconfirmed")
+        confirm_reader_absence(other_sessions)
         observer.close()
         if not observer.closed:
             raise StudyRefusal("observer_close_unconfirmed")

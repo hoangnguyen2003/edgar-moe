@@ -243,3 +243,29 @@ def test_unconfirmed_closure_or_unsafe_timing_is_not_a_success():
         assert r.status_code == 503
         assert "sentinel" not in r.text
         assert "x-study-read-timing" not in r.headers
+
+
+def test_remote_backend_cleanup_must_be_observed_before_success():
+    check = Mock(side_effect=[1, 1, 0])
+    pauses = []
+    elapsed = [0.0]
+
+    def advance(seconds):
+        pauses.append(seconds)
+        elapsed[0] += seconds
+
+    study.confirm_reader_absence(check, clock=lambda: elapsed[0], pause=advance)
+    assert check.call_count == 3
+    assert 0 < sum(pauses) <= 1
+
+
+def test_persistent_backend_is_refused_without_retrying_an_application_read():
+    check = Mock(return_value=1)
+    elapsed = [0.0]
+
+    def advance(seconds):
+        elapsed[0] += seconds
+
+    with pytest.raises(study.StudyRefusal, match="^reader_absence_unconfirmed$"):
+        study.confirm_reader_absence(check, clock=lambda: elapsed[0], pause=advance)
+    assert elapsed[0] == pytest.approx(1.0)
