@@ -184,6 +184,50 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
 
+  private-read-study-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Stage the standalone credential-free study bundle
+        run: python3 scripts/stage_private_read_study.py --destination "$GITHUB_WORKSPACE/data/artifacts/ci-private-read-study-source"
+      - name: Install only the hash-pinned standalone dependencies
+        run: uv pip install --python 3.12 --target "$RUNNER_TEMP/study-dependencies" --require-hashes --requirements data/artifacts/ci-private-read-study-source/requirements.txt
+      - name: Import the real staged application closure without any database connection
+        env:
+          STUDY_DEPENDENCIES: ${{ runner.temp }}/study-dependencies
+        run: |
+          uv run --no-project --python 3.12 python -I - <<'PY'
+          import hashlib, json, os, pathlib, sys
+          bundle = pathlib.Path('data/artifacts/ci-private-read-study-source').resolve()
+          sys.path[:0] = [os.environ['STUDY_DEPENDENCIES'], str(bundle)]
+          import psycopg
+          connections = []
+          def forbidden(*args, **kwargs):
+              connections.append(True)
+              raise AssertionError('Source-only CI must not connect to any database')
+          psycopg.connect = forbidden
+          import snapshot_kernel
+          import index
+          assert index.app.openapi_url is None
+          assert not connections
+          manifest = json.loads((bundle / 'study-source-manifest.json').read_text())
+          for item in manifest['files']:
+              raw = (bundle / item['path']).read_bytes()
+              assert len(raw) == item['bytes']
+              assert hashlib.sha256(raw).hexdigest() == item['sha256']
+          assert manifest['credentials_included'] is False
+          assert manifest['policy_bound'] is False
+          print('Hash-pinned source closure imports on Linux; zero database/provider connections.')
+          PY
+
   postgres-reader-role:
     runs-on: ubuntu-24.04
     services:
