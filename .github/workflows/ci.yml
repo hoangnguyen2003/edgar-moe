@@ -208,7 +208,9 @@ jobs:
           import hashlib, json, os, pathlib, sys
           bundle = pathlib.Path('data/artifacts/ci-private-read-study-source').resolve()
           sys.path[:0] = [os.environ['STUDY_DEPENDENCIES'], str(bundle)]
+          import certifi
           import psycopg
+          assert pathlib.Path(certifi.where()).is_file()
           connections = []
           def forbidden(*args, **kwargs):
               connections.append(True)
