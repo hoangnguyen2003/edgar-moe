@@ -1,6 +1,6 @@
 # Separate personal-portfolio hosted read study (#290)
 
-Status: **source preparation, not an active hosted study**. The new service and
+Status: **isolated setup verified, not an active hosted study**. The new service and
 observer do not reopen the expired #361 pilot, reset its ledger, or touch #156's
 active scheduler. The public application continues serving its synthetic fixture
 and withholding prospective research routes.
@@ -60,6 +60,38 @@ only after absence is actually observed. Persistent sessions still refuse; no
 application read or connection is retried. These are setup reads, not a hosted
 HTTP observation week. The measurement policy and observer remain inactive.
 
+Four further native setup reads captured fifteen parameter-free, redacted
+`EXPLAIN (ANALYZE, BUFFERS)` plans for the real status/page/filter/performance
+SELECTs. All four routes passed, the fixture/schema stayed unchanged, and the
+postflight reader count was zero. These plans were warm (all shared-block reads
+were zero); their execution times ranged up to 12.736 ms. They are database-plan
+evidence, not hosted request latency percentiles or cold-start evidence.
+
+A new, empty Vercel project on the existing Hobby account now runs the unbound
+service in Singapore, protected on **all** deployments. It has a fresh application
+bearer and platform automation bypass, but **no database URL or study policy**.
+The first CLI deployment automatically became this new project's production
+deployment; its alias is protected, and no existing project's alias changed.
+Three setup requests verified platform sign-in (302), application authentication
+(401), and refusal of authenticated unconfigured reads (503), with no-store
+responses. The eventual study deployment must explicitly select preview.
+
+The provider events API returned the three request records but no runtime log
+entries for this setup. Function start type remains **unobserved**. The existing
+OAuth CLI credential was refused when minting a project-scoped automation token
+(403, `Cannot create tokens for this app.`). The local helper is prepared to take
+a new temporary classic setup token through hidden Terminal input, request an
+eight-day token for only this new project, verify access, and revoke only the
+specifically named temporary bootstrap token. It does not enable the observer.
+The project scope and expiry still require final inspection before any credential
+is placed in the observation environment. No CLI refresh credential is exported.
+
+Before activation, complete provider start/resume capture, bind a fresh whole-hour
+168-hour policy and matching database-reader expiry, deploy the SELECT-only URL
+only to the protected study service, and verify the HTTP path. The current reader
+has only a provisional one-day setup expiry. There are **zero hosted measurement
+days**; neither setup HTTP responses nor native route reads count toward the week.
+
 ## Proposed workload and hosting scope
 
 For this personal portfolio, the proposed planning workload is **10,000 invented
@@ -84,10 +116,10 @@ not a hosted observation, percentile baseline, provider-start/resume proof or SL
 The source/hash-bound operational packet is retained in ignored owner-only
 artifacts. Current included headroom must still be checked before live setup.
 
-The intended deployment is a **new protected preview** in the existing separate
-Vercel project, never a deployment from the public repository root or a production
-alias change. A fresh synthetic-only Neon branch/database/reader must be bound
-before activation. Existing databases, branches, roles, old deployments, P0
+The intended study deployment is a **new protected preview** in the new isolated
+Vercel project, staged from the minimal service bundle. Its synthetic-only Neon
+database/reader must be bound to the study window before activation. Existing
+databases, branches, roles, old deployments, P0
 namespaces, records and retained copies stay unchanged. Do not copy provider
 research rows into the study or reuse the expired pilot role/allowance. If that
 isolated target is unavailable under current included allowances, stop before
