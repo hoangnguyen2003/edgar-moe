@@ -41,10 +41,24 @@ schema-only branch. With the required endpoint fixed at 0.25 CU and default
 scale-to-zero, both documented schema-only initialization modes returned
 `ROOT_BRANCHES_LIMIT_EXCEEDED`. The setup did not fall back to cloning data or
 remove an existing branch. An attempted fresh empty project in the same bound
-organization was also refused with HTTP 404. Current access therefore does not
-establish a usable new isolated target. Fresh account access or an owner-created
-empty Free-plan project is needed before continuing setup. No database
-connection, successful resource creation, deployment or observation occurred.
+organization was also refused with HTTP 404 under the saved access.
+
+The owner then completed fresh organization-scoped sign-in. API checks confirmed
+the Free plan and a separate empty PostgreSQL 18 project was created in Singapore,
+with one endpoint fixed at 0.25 CU and default scale-to-zero. It contains the
+invented fixture below and a dedicated SELECT-only reader with a two-connection
+limit. Existing project data, roles, branches and endpoint settings stayed
+unchanged. This new setup does not extend the old pilot.
+
+Five native setup reads now passed all four real routes, including a repeated
+performance read, using verified TLS and required channel binding. Postflight
+confirmed unchanged schema/fixture and zero remaining reader sessions. An earlier
+attempt refused when remote backend cleanup had not finished at the first
+post-close check; that failure remains retained. The adapter now polls for up to
+one second, with the observer query timeout still enforced, and returns success
+only after absence is actually observed. Persistent sessions still refuse; no
+application read or connection is retried. These are setup reads, not a hosted
+HTTP observation week. The measurement policy and observer remain inactive.
 
 ## Proposed workload and hosting scope
 
