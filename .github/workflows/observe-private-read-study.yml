@@ -1,0 +1,70 @@
+name: Bounded private hosted read study
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: portfolio-private-study290-observation
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    # Missing flag is dormant. Enabling requires a freshly bound seven-day
+    # study, SELECT-only credential, hosting/plan review and a private preview.
+    if: ${{ github.ref == 'refs/heads/main' && vars.ISSUE290_STUDY_ENABLED == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment:
+      name: hosted-read-study
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Observe one paired fixed-route read without database credentials
+        id: probe
+        continue-on-error: true
+        env:
+          STUDY_DEPLOYMENT_URL: ${{ secrets.STUDY_DEPLOYMENT_URL }}
+          STUDY_BEARER_TOKEN: ${{ secrets.STUDY_BEARER_TOKEN }}
+          STUDY_PLATFORM_BYPASS: ${{ secrets.STUDY_PLATFORM_BYPASS }}
+          STUDY_DEPLOYMENT_HOST_SHA256: ${{ vars.STUDY_DEPLOYMENT_HOST_SHA256 }}
+          STUDY_POLICY_SHA256: ${{ vars.STUDY_POLICY_SHA256 }}
+          STUDY_STARTS_AT: ${{ vars.STUDY_STARTS_AT }}
+          STUDY_EXPIRES_AT: ${{ vars.STUDY_EXPIRES_AT }}
+        run: python3 scripts/observe_private_read_study.py --output reports/private-read-study/observation.json
+      - name: Validate and hash the body-free operational receipt
+        id: receipt
+        if: ${{ always() }}
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/private-read-study
+          sha256sum reports/private-read-study/observation.json > reports/private-read-study/SHA256SUMS
+      - name: Retain the observation including failed attempts
+        if: ${{ always() && steps.receipt.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: private-read-study-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/private-read-study/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Preserve failure status
+        if: ${{ always() && steps.probe.outcome != 'success' }}
+        run: exit 1
+
+  stop-failed-study:
+    if: ${{ failure() && needs.observe.result == 'failure' }}
+    needs: observe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions:
+      actions: write
+    steps:
+      # This job receives no study, provider or database credential.
+      - name: Disable this observer after a failed probe or receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable observe-private-read-study.yml --repo "$GITHUB_REPOSITORY"
