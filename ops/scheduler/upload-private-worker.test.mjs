@@ -11,7 +11,7 @@ const secrets = ["GITHUB_TOKEN", "SCHEDULER_SIGNATURE_KEY"].map(name => ({name, 
 const bindings = [...secrets, ...["GITHUB_REPOSITORY", "GITHUB_WORKFLOW", "GITHUB_REF", "GITHUB_DEVICE"].map(name => ({name, type: "plain_text"}))];
 async function upload(stage = "RESUME_PREPARE", overrides = {}) {
   const calls = [];
-  const results = [worker, {schedules: stage === "STOP" ? [{cron: "17 7 * * 2-6"}] : []}, secrets, {bindings}, {}, {}];
+  const results = [worker, {schedules: stage === "STOP" ? [{cron: "17 7 * * TUE-SAT"}] : []}, secrets, {bindings}, {}, {}];
   const result = await uploadPrivateWorker({stage, source: "export default {fetch(){}}", env,
     expectedAccountSha256: createHash("sha256").update(JSON.stringify(account)).digest("hex"),
     fetchImpl: async (url, init) => {
@@ -49,7 +49,7 @@ test("unexpected bindings stop before any write", async () => {
 test("activation changes only the exact original Cron and STOP never rewrites code", async () => {
   const {result, calls} = await upload("ACTIVATE");
   assert.equal(result.status, "uploaded_pending_state_verification");
-  assert.deepEqual(JSON.parse(calls[5].init.body), [{cron: "17 7 * * 2-6"}]);
+  assert.deepEqual(JSON.parse(calls[5].init.body), [{cron: "17 7 * * TUE-SAT"}]);
   const stopped = await upload("STOP");
   assert.equal(stopped.result.code_uploaded, false);
   assert.equal(stopped.result.external_writes, 1);

@@ -1,0 +1,93 @@
+name: Verify finite scheduler acceptance and closeout
+
+on:
+  workflow_run:
+    workflows: [Bounded private scheduler observation]
+    types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: "47 11 * * *"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: issue156-private-closeout
+  cancel-in-progress: false
+
+jobs:
+  report:
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository)) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      eligible: ${{ steps.evaluate.outputs.eligible }}
+      finished: ${{ steps.evaluate.outputs.finished }}
+      body: ${{ steps.evaluate.outputs.body }}
+      body_sha256: ${{ steps.evaluate.outputs.body_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Evaluate original acceptance against actual scheduled receipts only
+        id: evaluate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/closeout_private_scheduler.py --output-dir reports/private-scheduler-closeout
+      - name: Validate redaction and hash operational evidence
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/private-scheduler-closeout
+          sha256sum reports/private-scheduler-closeout/* > reports/private-scheduler-closeout/SHA256SUMS
+      - name: Retain complete or incomplete acceptance report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: private-scheduler-closeout-${{ github.run_id }}
+          path: reports/private-scheduler-closeout/
+          if-no-files-found: error
+          retention-days: 90
+
+  close-verified-issue:
+    if: ${{ needs.report.result == 'success' && needs.report.outputs.eligible == 'true' }}
+    needs: report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    permissions:
+      issues: write
+    steps:
+      - name: Close only issue 156 after all three real margin observations pass
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_BODY: ${{ needs.report.outputs.body }}
+          VERIFIED_SHA256: ${{ needs.report.outputs.body_sha256 }}
+        run: |
+          python3 - <<'PY'
+          import base64, hashlib, json, os, subprocess, tempfile
+          from pathlib import Path
+          repo = 'hoangnguyen2003/edgar-moe'
+          body = base64.b64decode(os.environ['VERIFIED_BODY'], validate=True)
+          if hashlib.sha256(body).hexdigest() != os.environ['VERIFIED_SHA256']:
+              raise ValueError('Verified closeout body digest mismatch')
+          status = subprocess.check_output(['gh','issue','view','156','--repo',repo,'--json','state'], text=True)
+          if json.loads(status)['state'] == 'OPEN':
+              with tempfile.TemporaryDirectory() as folder:
+                  path = Path(folder) / 'closeout.md'
+                  path.write_bytes(body)
+                  subprocess.run(['gh','issue','comment','156','--repo',repo,'--body-file',str(path)], check=True)
+                  subprocess.run(['gh','issue','close','156','--repo',repo,'--reason','completed'], check=True)
+          PY
+
+  stop-finished-scope:
+    if: ${{ needs.report.result == 'success' && needs.report.outputs.finished == 'true' }}
+    needs: report
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions:
+      actions: write
+    steps:
+      - name: Stop only the finite private Worker and this closeout workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh workflow run deploy-private-scheduler.yml --repo "$GITHUB_REPOSITORY" --ref main -f stage=STOP
+          gh workflow disable closeout-private-scheduler.yml --repo "$GITHUB_REPOSITORY"

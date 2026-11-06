@@ -6,7 +6,7 @@ import {pathToFileURL} from "node:url";
 import {managePrivateScheduler} from "./manage-private-scheduler.mjs";
 
 const WORKER = "edgar-moe-forward-scheduler";
-const CRON = "17 7 * * 2-6";
+const CRON = "17 7 * * TUE-SAT";
 const VARS = {GITHUB_REPOSITORY: "hoangnguyen2003/edgar-moe",
   GITHUB_WORKFLOW: "forward-private-scheduler.yml", GITHUB_REF: "main", GITHUB_DEVICE: "cpu"};
 const SECRETS = ["GITHUB_TOKEN", "SCHEDULER_SIGNATURE_KEY"];
