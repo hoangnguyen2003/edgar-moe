@@ -1,8 +1,8 @@
 /** Finite private #156 slots. No public trigger; signatures bind the Cron timestamp. */
 import { runScheduledDispatch, validateSchedulerConfig } from "./cloudflare-forward-scheduler.mjs";
 
-export const DATES = ["2026-11-05", "2026-11-06", "2026-11-07"];
-export const CRON = "17 7 * * 2-6";
+export const DATES = ["2026-11-07", "2026-11-10", "2026-11-11"];
+export const CRON = "17 7 * * TUE-SAT";
 const WORKFLOW = "forward-private-scheduler.yml";
 
 export async function privateInputs(controller, env, now = Date.now()) {

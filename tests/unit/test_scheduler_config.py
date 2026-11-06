@@ -249,3 +249,39 @@ def test_scheduler_workflow_requires_materialized_active_profile(
         "deploy job must materialize the reviewed config before Wrangler"
         in validate_scheduler_workflow(path)
     )
+
+
+def test_cloudflare_weekdays_match_github_including_saturday():
+    import tomllib
+    from datetime import date, timedelta
+
+    # Independent interpretation of each provider's documented weekday numbers.
+    # Cloudflare: Sunday=1..Saturday=7; GitHub: Sunday=0..Saturday=6.
+    names = dict(zip(("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"), range(1, 8), strict=True))
+
+    def cf_days(expression):
+        lo, hi = expression.split()[-1].split("-")
+        return set(
+            range(
+                names[lo] if lo in names else int(lo), (names[hi] if hi in names else int(hi)) + 1
+            )
+        )
+
+    github = yaml.safe_load(Path(".github/workflows/forward-production.yml").read_text())
+    trigger = github.get("on", github.get(True))
+    assert trigger["schedule"][0]["cron"] == "17 7 * * 2-6"
+    for path in (CONFIG, Path("ops/scheduler/wrangler.private.toml.example")):
+        cron = tomllib.loads(path.read_text())["triggers"]["crons"][0]
+        assert cron.split()[:4] == ["17", "7", "*", "*"]
+        for offset in range(7):
+            day = date(2026, 11, 1) + timedelta(days=offset)
+            github_day = (day.weekday() + 1) % 7
+            assert (github_day + 1 in cf_days(cron)) == (2 <= github_day <= 6)
+    assert 7 not in cf_days("17 7 * * 2-6")  # Original Cloudflare expression misses Saturday.
+
+
+def test_cloudflare_validator_refuses_ambiguous_copied_github_weekdays(tmp_path):
+    p = tmp_path / "copied.toml"
+    p.write_text(CONFIG.read_text().replace("TUE-SAT", "2-6"))
+    result = subprocess.run([sys.executable, str(SCRIPT), str(p)], capture_output=True, text=True)
+    assert result.returncode == 1

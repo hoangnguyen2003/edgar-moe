@@ -12,7 +12,7 @@ enabled = false
 # repository's GitHub schedule remains the live trigger until a separate PR
 # removes that schedule after a successful cutover.
 [triggers]
-crons = ["17 7 * * 2-6"]
+crons = ["17 7 * * TUE-SAT"]
 
 [vars]
 GITHUB_REPOSITORY = "hoangnguyen2003/edgar-moe"

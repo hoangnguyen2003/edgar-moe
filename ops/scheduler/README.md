@@ -322,3 +322,57 @@ private packets before deciding whether timing is reliable enough to close it.
 If no eligible filings occur, retain the inconclusive receipts and prepare a new
 finite observation scope instead of inventing forecasts or silently extending
 this one.
+
+### Corrected provider calendar and fresh finite scope (2026-11-06)
+
+Read-only provider verification confirmed that the November 4 private deployment
+was active, but no signed private workflow run was recorded for November 5 or 6.
+That does not establish why those two invocations failed. The original deployment
+receipts are preserved. Its Cron was stopped before preparing the correction.
+
+A definite configuration error was found independently: Cloudflare numbers
+weekdays **1=Sunday through 7=Saturday**, while GitHub uses **0=Sunday through
+6=Saturday**. Copying `17 7 * * 2-6` into Cloudflare schedules Monday–Friday and
+excludes Saturday. Cloudflare profiles, validation, HMAC admission and provider
+state checks now use **`17 7 * * TUE-SAT`**. The existing GitHub expression stays
+unchanged. Both now mean Tuesday–Saturday at **07:17 UTC**; this correction does
+not move the nominal time, New York cutoff, input universe or filing-coverage
+configuration. See [Cloudflare's documented weekday dialect](https://developers.cloudflare.com/workers/configuration/cron-triggers/).
+
+The old source-scope record is preserved. The fresh operator plan is
+[`private-scheduler-scope-20261106.json`](../issue156/private-scheduler-scope-20261106.json),
+prepared under the current instruction to resolve the issue autonomously and
+carrying forward the existing owner-reported private-use permission. It allows
+only **November 7, 10 and 11, 2026 at 07:17 UTC** (14:17 Vietnam time), using a
+new atomic claim namespace. These are fresh observations, never backdated or
+replayed missing runs. Source families, frozen inputs, private destinations,
+CPU-only inference, no-publication/general-source-hold boundary and maximum
+three cycles remain the same. The provider-date guard is inert afterward.
+
+Each cycle now caps **all** workflow/evidence uploads together below 1 GB,
+including a reservation for its small atomic claim. Counting deduplicated
+attempts conservatively bounds new writes; the existing seed is downloaded and
+never copied back. Three cycles fit within the prior 4 GB allocation. This is
+not an account-wide storage or third-party permission determination.
+
+`closeout-private-scheduler.yml` needs no provider/database credentials. It
+checks actual main-branch attempt-one workflow metadata, flat artifact inventories,
+receipt hashes, source-scope identity, signed scheduled timestamps, nonzero
+forecast counts, unchanged existing rows/cutoff/coverage, consistent recording
+and entry clocks, durable private-evidence hashes, and at least **5,400 seconds**
+of pre-open margin for **every one of the three distinct dates**. Old scopes,
+manual timestamps, reruns, duplicate slots, missing artifacts, empty forecasts
+and short or inconsistent margins cannot satisfy acceptance.
+
+Only after all three real observations pass and the redacted report is uploaded
+does a separate `issues: write` job post the verified operational evidence and
+mark issue 156 completed. It cannot release general ingestion/publication holds
+or close another issue. An `actions: write` cleanup job requests `STOP` for this
+private Worker and disables the closeout workflow after the scope finishes or
+expires; the finite date guard independently prevents later source-backed work.
+Failed/incomplete observations retain their report and leave the issue open.
+Overdue missing slots and failed margin evidence also fail the closeout job
+after artifact retention, so missing scheduler delivery is visible in Actions
+instead of silently counting calendar time as successful observation.
+This is limited operational validation for a personal portfolio, not a claim
+of a production latency SLO. No synthetic fixture is accepted as live evidence.

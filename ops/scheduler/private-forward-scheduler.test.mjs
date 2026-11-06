@@ -4,7 +4,7 @@ import test from "node:test";
 import scheduler, {CRON, privateInputs, dispatchPrivate} from "./private-forward-scheduler.mjs";
 
 const key = "12".repeat(32);
-const stamp = "2026-11-05T07:17:00.000Z";
+const stamp = "2026-11-07T07:17:00.000Z";
 const controller = {cron: CRON, scheduledTime: Date.parse(stamp)};
 const env = {GITHUB_TOKEN: "test-never-log-this-token", GITHUB_REPOSITORY: "hoangnguyen2003/edgar-moe",
   GITHUB_WORKFLOW: "forward-private-scheduler.yml", GITHUB_REF: "main", GITHUB_DEVICE: "cpu",
@@ -19,7 +19,7 @@ test("real controller time is bound to the exact interoperable HMAC message", as
 });
 
 test("outside the three dates returns before credentials or GitHub requests", async () => {
-  assert.deepEqual(await dispatchPrivate({cron: CRON, scheduledTime: Date.parse("2026-11-10T07:17:00.000Z")}, {}),
+  assert.deepEqual(await dispatchPrivate({cron: CRON, scheduledTime: Date.parse("2026-11-12T07:17:00.000Z")}, {}),
     {status: "skipped", reason: "outside_private_window"});
 });
 

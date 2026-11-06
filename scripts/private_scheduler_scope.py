@@ -9,10 +9,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-SCOPE_SHA256 = "170919346e419f02bed6bf8f61b4c62d7cce1dd4e8bfc5e5ca2efab9835ec824"
+SCOPE_SHA256 = "0e5d81c5e005be948fa8deb71f1466248ab4620de4b43529b3ab3a609d83ad95"
+SCOPE_ID = "issue156-20261106"
 WORKFLOW = "forward-private-scheduler.yml"
-CRON = "17 7 * * 2-6"
-DATES = ("2026-11-05", "2026-11-06", "2026-11-07")
+CRON = "17 7 * * TUE-SAT"
+DATES = ("2026-11-07", "2026-11-10", "2026-11-11")
 
 
 def message(scheduled_at: str) -> bytes:
@@ -38,7 +39,7 @@ def admit(inputs: dict[str, Any], *, key: str, now: datetime, event: str, ref: s
 
 
 def read_scope(root: Path) -> dict[str, Any]:
-    path = root / "ops/issue156/private-scheduler-scope.json"
+    path = root / "ops/issue156/private-scheduler-scope-20261106.json"
     if hashlib.sha256(path.read_bytes()).hexdigest() != SCOPE_SHA256:
         raise ValueError("Reviewed private scheduler scope changed")
     record: dict[str, Any] = json.loads(path.read_text())

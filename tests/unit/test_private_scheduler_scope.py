@@ -21,7 +21,7 @@ scope = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(scope)
 
 
-def signed(stamp="2026-11-05T07:17:00.000Z"):
+def signed(stamp="2026-11-07T07:17:00.000Z"):
     key = "12" * 32
     return key, {
         "device": "cpu",
@@ -32,7 +32,7 @@ def signed(stamp="2026-11-05T07:17:00.000Z"):
 
 def test_signed_slot_requires_real_time_main_ref_and_expected_workflow_context():
     key, inputs = signed()
-    now = datetime(2026, 11, 5, 7, 18, tzinfo=UTC)
+    now = datetime(2026, 11, 7, 7, 18, tzinfo=UTC)
     assert (
         scope.admit(
             inputs, key=key, now=now, event="workflow_dispatch", ref="refs/heads/main"
@@ -54,7 +54,7 @@ def test_signed_slot_requires_real_time_main_ref_and_expected_workflow_context()
         } | changes
         with pytest.raises(ValueError):
             scope.admit(inputs, **kwargs)
-    for stamp in ("2026-11-08T07:17:00.000Z", "2026-11-05T07:18:00.000Z"):
+    for stamp in ("2026-11-08T07:17:00.000Z", "2026-11-07T07:18:00.000Z"):
         key, altered = signed(stamp)
         with pytest.raises(ValueError):
             scope.admit(altered, key=key, now=now, event="workflow_dispatch", ref="refs/heads/main")
@@ -68,7 +68,7 @@ def test_scope_binds_private_destinations_frozen_inputs_and_finite_limits(tmp_pa
     assert record["private_cache_seed"]["size_bytes"] < 1_000_000_000
     destination = tmp_path / "ops/issue156"
     destination.mkdir(parents=True)
-    (destination / "private-scheduler-scope.json").write_text(json.dumps(record) + " ")
+    (destination / "private-scheduler-scope-20261106.json").write_text(json.dumps(record) + " ")
     with pytest.raises(ValueError, match="scope changed"):
         scope.read_scope(tmp_path)
 

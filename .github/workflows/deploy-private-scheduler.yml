@@ -51,7 +51,7 @@ jobs:
           from pathlib import Path
           text = Path('ops/scheduler/wrangler.private.toml.example').read_text()
           if os.environ['STAGE'] != 'ACTIVATE':
-              text = text.replace('crons = ["17 7 * * 2-6"]', 'crons = []')
+              text = text.replace('crons = ["17 7 * * TUE-SAT"]', 'crons = []')
           Path('ops/scheduler/wrangler.toml').write_text(text)
           PY
       - name: Bundle the exact CLI command without credentials or upload
