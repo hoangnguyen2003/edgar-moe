@@ -1,0 +1,55 @@
+{
+  "issue": 290,
+  "measurement_days_completed": 0,
+  "setup_evidence_only": true,
+  "files": [
+    {
+      "path": "cloud-reader-query-plans.json",
+      "sha256": "8084dc96f2c32e574d0ad82e18f5d32cf5efdcd806ed4273899b3136d791686a"
+    },
+    {
+      "path": "current-free-hosting-plan.json",
+      "sha256": "679fffbc62e98b721b5dddbaaa01f467342fca08f9b2cfa8a518a729a4665f7f"
+    },
+    {
+      "path": "finalizer-live-archive-proof.json",
+      "sha256": "501adef2e4c5c6c6936d75acafc78b4fed4a3590cbb945c7c6fd7b23b4956380"
+    },
+    {
+      "path": "prepared-hosted-read-proof.json",
+      "sha256": "51f6d6300b844993469fbf7be1d9b88d331183a2eaa4b9319f86ae2a66e7e1f2"
+    },
+    {
+      "path": "prepared-observer-activation.json",
+      "sha256": "d8a9c6d140a795188ce3adb5f5fd7626b924528632578538440d766e01ce8eca"
+    },
+    {
+      "path": "prepared-preview-deployment.json",
+      "sha256": "237abd876e9ae172dc0587f1c81a7299c217b2724fce117eb4dde827a6027f7a"
+    },
+    {
+      "path": "prepared-preview-prewindow-proof.json",
+      "sha256": "401c93315aa9589d161a043a1b972b26a8cbb7d9260b0fb7b80658e20537e840"
+    },
+    {
+      "path": "prepared-workflow-verification.json",
+      "sha256": "802b6aa2813d25461979dc141441b434d0f68a6edbca59e8bf13dd1ba1d664fa"
+    },
+    {
+      "path": "setup-verification-correlated-observation.json",
+      "sha256": "7e5ed3cb725b544ea7531460aaae6e2c4354b544587b2f70ced74affe2c2107f"
+    },
+    {
+      "path": "setup-verification-neon-after.json",
+      "sha256": "b5cad9a73e64f07756c6d10daa1002b04d0cdc16fe355067ccb215b469d71d42"
+    },
+    {
+      "path": "setup-verification-neon-before.json",
+      "sha256": "34033e3391a08465c72e41f1f5ca57c5df11e6862fab4eb162e8ed041a1d1108"
+    },
+    {
+      "path": "staged-source-manifest.json",
+      "sha256": "b57b8beded5dcf96e418010ed5e237602a817c611c848b45c8f409c8e7b51384"
+    }
+  ]
+}

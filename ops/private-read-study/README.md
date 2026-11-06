@@ -241,3 +241,41 @@ The 168-hour policy may start on a UTC minute boundary. Hourly slots are still
 relative to that absolute start; no missing slot is replayed. A manually
 triggered setup verification run must be marked and excluded from scheduled
 measurement totals, with its run ID retained.
+
+## Active free study and automatic report
+
+The corrected preview passed all four real routes, including the original
+performance uncertainty work (about 6.0 seconds of measured preparation and
+8.5 seconds of full HTTP latency on its initial check). The first authenticated
+Actions pair and its provider/database metadata passed. See the
+[redacted activation packet](evidence/activated-study-20261106/).
+The manual verification run `42186545986` is excluded from scheduled totals.
+
+The active policy is **2026-11-06 08:15 UTC through 2026-11-13 08:15 UTC**
+(**15:15 Vietnam time** on those dates). The existing observer targets 168 hourly
+pairs / 336 reads, rotating the four routes. GitHub scheduling can be late or
+miss a slot; actual counts and errors take precedence over this model.
+
+`finalize-private-read-study.yml` checks the absolute end without contacting the
+application, Postgres or either hosting provider. After the window and a
+five-minute in-flight grace, it uses a read-only Actions credential to collect
+**scheduled, main-branch, attempt-one** artifacts from this repository. It
+validates ZIP paths and each receipt hash, excludes manual setup runs, retains
+failed/missing/duplicate hours, and separates collector commit, route, pair
+phase, cache, provider startup, database-pair state and process cohorts.
+
+The final packet contains readable and JSON p50/p95/p99/error summaries, matched
+native local distributions, the original receipts, safe cloud/local query
+plans and setup/source hashes. It is redaction-checked and retained for 90 days.
+Only after successful packet upload does a separate job disable these two study
+workflows. It cannot affect #156 and receives no provider or database secret.
+The app's absolute window and reader password expiry independently stop reads.
+Failures before the end retain their receipts and stop the observer; the final
+report still records incomplete coverage without backfilling it.
+
+This automation neither asserts acceptance nor closes the issue prematurely.
+Coverage and metadata quality require review after seven real days; no alert
+threshold is invented for small tail samples. Bootstrap cache state is not
+separately emitted, so preparation timing is retained without inferring cache
+state from its duration. The dedicated Neon metadata key has no native expiry;
+revoke it after the study. The scoped Vercel token has its owner-set expiry.

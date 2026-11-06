@@ -1,0 +1,33 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "run_id": 42186545986,
+  "run_url": "https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42186545986",
+  "event": "workflow_dispatch",
+  "source_commit": "d4ee8135765a3dce4e939cb61e6f2d3f31072d09",
+  "measurement_sample": false,
+  "excluded_from_scheduled_totals": true,
+  "http_requests": 2,
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "sample_statuses": [
+    200,
+    200
+  ],
+  "platform_cohorts": [
+    "warm",
+    "warm"
+  ],
+  "database_cohort": "provider_active_before_and_after_read_pair",
+  "redaction_validated": true,
+  "artifact_sha256": {
+    "neon-after.json": "b5cad9a73e64f07756c6d10daa1002b04d0cdc16fe355067ccb215b469d71d42",
+    "correlated-observation.json": "7e5ed3cb725b544ea7531460aaae6e2c4354b544587b2f70ced74affe2c2107f",
+    "observation.json": "d830987f0384c3b079f313bfa703b06a1e2a26a8ecc836871f8689e528b7ff51",
+    "neon-before.json": "34033e3391a08465c72e41f1f5ca57c5df11e6862fab4eb162e8ed041a1d1108",
+    "SHA256SUMS": "b10ef4bbf7fe058f984fcce827ef92906b28c8041cd4725cffa23fc04217ab67"
+  },
+  "seven_day_evidence_proven": false,
+  "billing_changes": 0,
+  "observed_at": "2026-11-06T08:21:38.458999+00:00"
+}
