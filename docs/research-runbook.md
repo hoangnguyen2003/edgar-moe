@@ -112,6 +112,15 @@ Review:
 - FRED release coverage;
 - source paths and SHA-256 hashes in `manifest.json`.
 
+The checkpoint's requested-universe asset must have an explicit SHA-256 in its
+manifest. Screen verification hashes the exact roster bytes it parses, rejects
+duplicate JSON fields, includes that digest in the verification receipt, and
+rechecks the roster with the other commitments before returning. A roster
+changed after the checkpoint's initial integrity check fails closed. Legacy
+checkpoints without this hash cannot establish this binding; do not backfill
+missing evidence. These checks strengthen content identity while the historical
+membership and source-availability requirements of #292 remain outstanding.
+
 ## 4. Construct the point-in-time dataset
 
 Run `edgar-moe build-dataset --checkpoint <dated-checkpoint> --embedder finbert --device cpu`. The first FinBERT run downloads model weights and is compute-intensive; later runs reuse the content-addressed embedding cache. Use `--device mps` only after benchmarking it on the target macOS/PyTorch combination; `--device auto` opts into automatic MPS selection when PyTorch reports it available.

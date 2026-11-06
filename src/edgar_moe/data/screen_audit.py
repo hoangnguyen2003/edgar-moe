@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 from datetime import UTC, date, datetime, time, timedelta
 from pathlib import Path
 from typing import Any
@@ -252,12 +253,21 @@ def verify_screen_trace(
     requested = assets.get("requested_universe")
     if not isinstance(requested, str):
         raise ValueError("Checkpoint lacks a requested-universe asset")
+    requested_hash = manifest.hashes.get("requested_universe")
+    if not isinstance(requested_hash, str) or re.fullmatch(r"[a-f0-9]{64}", requested_hash) is None:
+        raise ValueError("Checkpoint lacks a valid requested-universe hash")
     requested_path = (checkpoint.resolve() / requested).resolve()
     if not requested_path.is_relative_to(checkpoint.resolve()):
         raise ValueError("Requested-universe asset escapes the checkpoint")
-    if orjson.loads(requested_path.read_bytes()) != [
-        member.model_dump(mode="json") for member in screened
-    ]:
+    # Bind the bytes compared below to the verified manifest, rather than
+    # trusting an earlier file read by verify_authenticated_bundle. A roster
+    # may have been replaced between that validation and this comparison.
+    requested_bytes = requested_path.read_bytes()
+    if hashlib.sha256(requested_bytes).hexdigest() != requested_hash:
+        raise ValueError("Checkpoint requested-universe asset hash mismatch")
+    if canonical_bytes(decode_json(requested_bytes)) != canonical_bytes(
+        [member.model_dump(mode="json") for member in screened]
+    ):
         raise ValueError("Checkpoint requested universe differs from the screened CSV")
     if cutoff > date.fromisoformat(str(manifest.configuration["as_of"])):
         raise ValueError("Screen cutoff follows the checkpoint as-of date")
@@ -267,6 +277,7 @@ def verify_screen_trace(
         "first_validation_start": first_validation_start.isoformat(),
         "candidate_count": len(screened),
         "source_manifest_sha256": checkpoint_hash,
+        "checkpoint_requested_universe_sha256": requested_hash,
         "screen_audit_sha256": hashlib.sha256(audit_bytes).hexdigest(),
         "screen_inputs_sha256": audit["screen_inputs_sha256"],
         "screen_algorithm_sha256": audit["screen_algorithm_sha256"],
@@ -321,6 +332,7 @@ def verify_screen_trace(
         screened_path: audit["screened_universe_sha256"],
         audit_path: result["screen_audit_sha256"],
         checkpoint / "manifest.json": checkpoint_hash,
+        requested_path: requested_hash,
         **processed_pins,
     }
     if any(sha256_file(path) != digest for path, digest in pinned.items()):
