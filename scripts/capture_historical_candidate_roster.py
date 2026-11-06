@@ -124,7 +124,7 @@ def parse_members(text: str, policy: dict[str, Any]) -> list[dict[str, str]]:
             raise ValueError("Candidate row columns differ")
         # The historical source annotates two dotted tickers with HTML comments.
         # Comments are not part of the symbol; unmatched markup still fails.
-        ticker = _TICKER.fullmatch(re.sub(r"<!--.*?-->", "", cells[0]).strip())
+        ticker = _TICKER.fullmatch(re.sub(r"<!--.*?-->", "", cells[0], flags=re.DOTALL).strip())
         if (
             ticker is None
             or re.fullmatch(r"[0-9]{1,10}", cells[7]) is None

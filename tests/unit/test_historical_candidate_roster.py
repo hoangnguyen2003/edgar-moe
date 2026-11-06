@@ -149,6 +149,16 @@ def test_inline_ticker_comments_preserve_the_dotted_symbol() -> None:
     )
 
 
+@pytest.mark.parametrize("comment", ["<!-- unfinished", "<!-- line\nbreak -->"])
+def test_malformed_or_multiline_row_layout_is_not_partially_accepted(comment):
+    text = HEADER + row("CLS.A", "1", "Synthetic") + "|}\n"
+    text = text.replace("{{NyseSymbol|CLS.A}}", "{{NyseSymbol|CLS.A}} " + comment)
+    policy, value = fixture(text)
+    policy.update(expected_candidates=1, expected_issuers=1)
+    with pytest.raises(ValueError):
+        capture.build_roster(encoded(value), policy)
+
+
 @pytest.mark.parametrize(
     "field,value",
     [
@@ -231,7 +241,7 @@ def test_retained_public_capture_is_code_bound_and_cannot_claim_completion():
         (root / "ops/issue292/historical-candidate-source-20261106.json").read_bytes()
     )
     assert (
-        record["capture_code_sha256"]
+        record["verification_code_sha256"]
         == hashlib.sha256(Path(capture.__file__).read_bytes()).hexdigest()
     )
     assert record["public_roster_rows"] == 0
