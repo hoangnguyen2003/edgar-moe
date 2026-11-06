@@ -41,7 +41,7 @@ jobs:
           python3 scripts/validate_redacted_artifacts.py --root reports/private-scheduler-closeout
           sha256sum reports/private-scheduler-closeout/* > reports/private-scheduler-closeout/SHA256SUMS
       - name: Retain complete or incomplete acceptance report
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: private-scheduler-closeout-${{ github.run_id }}
           path: reports/private-scheduler-closeout/
