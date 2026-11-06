@@ -101,7 +101,7 @@ hosted verification still precede measurement activation.
    the study ends. Its fixed endpoint GET passed and its existing-project GET was denied. Only
    the scoped key is stored in the approved main-only study environment; the
    existing organization key remains local.
-3. Recheck included quota headroom, bind a fresh whole-hour 168-hour policy and
+3. Recheck included quota headroom, bind a fresh minute-aligned 168-hour policy and
    matching SELECT-only reader expiry, deploy the protected preview and verify
    the bound HTTP path. The current reader expiry is provisional; this work does
    not extend the old pilot or change any existing project.

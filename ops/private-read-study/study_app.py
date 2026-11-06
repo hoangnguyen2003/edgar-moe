@@ -31,6 +31,25 @@ ROUTES = {
 }
 SCOPE = "portfolio-hosted-read-study290-v1"
 WINDOW = timedelta(days=7)
+# Only fixed protocol stages cross the authenticated HTTP boundary. Never
+# reflect arbitrary exception messages, driver diagnostics, URLs or row data.
+REFUSAL_CODES = frozenset(
+    {
+        "snapshot_postcheck_refused",
+        "snapshot_deadline",
+        "service_refused",
+        "snapshot_ended_early",
+        "snapshot_changed",
+        "rollback_refused",
+        "rollback_unconfirmed",
+        "read_or_closure_refused",
+        "contract_refused",
+        "preparation_refused",
+        "preparation_cache_not_used",
+        "reader_absence_unconfirmed",
+        "read_acknowledgement_refused",
+    }
+)
 
 
 class StudyRefusal(ValueError):
@@ -88,7 +107,7 @@ class StudyConfig:
             fields = conninfo_to_dict(url)
             allowed = {"host", "port", "dbname", "user", "password", "sslmode", "channel_binding"}
             if (
-                set(policy)
+                set(policy) - {"preparation_inputs_sha256"}
                 != {
                     "scope",
                     "study_id",
@@ -99,6 +118,10 @@ class StudyConfig:
                     "traffic",
                 }
                 or policy["scope"] != SCOPE
+                or (
+                    "preparation_inputs_sha256" in policy
+                    and not re.fullmatch(r"[a-f0-9]{64}", policy["preparation_inputs_sha256"])
+                )
                 or not re.fullmatch(r"portfolio290_[a-z0-9_]{8,40}", policy["study_id"])
                 or start.utcoffset() != timedelta(0)
                 or end.utcoffset() != timedelta(0)
@@ -168,6 +191,15 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
     target_values = dict(config.policy["target"])
     target_values["fixture"] = tuple(tuple(row) for row in target_values["fixture"])
     target = Target(**target_values)
+    preparation_sha = config.policy.get("preparation_inputs_sha256")
+    if route == "performance" and preparation_sha is not None:
+        from study_preparation import prepare
+
+        try:
+            prepare(bundle, preparation_sha)
+        except Exception:
+            raise StudyRefusal("preparation_refused") from None
+    prepared = perf_counter_ns()
     # Serverless images need an explicit CA bundle: libpq's default otherwise
     # expects ~/.postgresql/root.crt, which this deployment does not provision.
     # The bundle is a hash-pinned runtime dependency, never an environment path.
@@ -217,6 +249,11 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
             if other_sessions() != 1:
                 raise StudyRefusal("reader_presence_unconfirmed")
             result = read_snapshot(connection, target, contract, route)
+            if route == "performance" and preparation_sha is not None:
+                from study_preparation import cache_used
+
+                if not cache_used(result):
+                    raise StudyRefusal("preparation_cache_not_used")
         engine.dispose()
         engine = None
         confirm_reader_absence(other_sessions)
@@ -226,7 +263,8 @@ def read(config: StudyConfig, route: str, bundle: Path) -> ReadResult:
         return ReadResult(
             result["body"],
             {
-                "observer_connect": (observer_connected - started) // 1000,
+                "preparation": (prepared - started) // 1000,
+                "observer_connect": (observer_connected - prepared) // 1000,
                 "reader_connect": (reader_connected - observer_connected) // 1000,
                 "integrity": result["integrity_us"],
                 "service": result["service_us"],
@@ -314,6 +352,7 @@ def create_app(
                     and result.backend_absence_verified is True
                     and set(result.timing_us)
                     == {
+                        "preparation",
                         "observer_connect",
                         "reader_connect",
                         "integrity",
@@ -335,9 +374,13 @@ def create_app(
                     + ["process=" + ("first" if first else "subsequent")]
                 )
                 response.headers["X-Study-Policy-SHA256"] = config.policy_sha256
-            except Exception:
+            except Exception as error:
                 stopped = True
                 response = JSONResponse({"error": "read_unavailable"}, status_code=503)
+                reason = str(error) if isinstance(error, StudyRefusal) else "read_refused"
+                response.headers["X-Study-Refusal"] = (
+                    reason if reason in REFUSAL_CODES else "read_refused"
+                )
             finally:
                 gate.release()
         for name in ("Cache-Control", "CDN-Cache-Control", "Vercel-CDN-Cache-Control"):

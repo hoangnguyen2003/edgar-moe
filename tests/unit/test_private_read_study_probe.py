@@ -138,3 +138,13 @@ def test_missing_origin_timing_cannot_be_counted_as_successful_measurement(monke
     )
     report = probe.request(probe.Configuration.load(environment()), "status")
     assert report["status"] == "failed" and report["reason"] == "origin_timing_refused"
+
+
+def test_minute_aligned_window_still_requires_exactly_seven_days():
+    env = environment() | {
+        "STUDY_STARTS_AT": "2026-11-06T08:15:00Z",
+        "STUDY_EXPIRES_AT": "2026-11-13T08:15:00Z",
+    }
+    assert probe.Configuration.load(env).starts_at.minute == 15
+    with pytest.raises(probe.Refusal):
+        probe.Configuration.load(env | {"STUDY_EXPIRES_AT": "2026-11-13T08:16:00Z"})
