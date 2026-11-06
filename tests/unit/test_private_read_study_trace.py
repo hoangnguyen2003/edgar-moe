@@ -70,6 +70,44 @@ def trace(*, cold=True):
     }
 
 
+def rest_trace(*, cold=True):
+    original = trace(cold=cold)
+    resources = []
+    for name in ("vercel.edge-network", "vercel.serverless-runtime"):
+        attrs = dict(
+            original["spans"][0]["resourceAttributes"],
+            **{
+                "service.name": name,
+                "vercel.is_session_trace": "true",
+                "vercel.should_store_trace": "true",
+            },
+        )
+        resources.append({"name": name, "attributes": attrs})
+    spans = []
+    for item in original["spans"]:
+        spans.append(
+            {
+                "spanId": item["spanId"],
+                "parentSpanId": item["parentSpanId"],
+                "name": item["name"],
+                "resource": item["serviceName"],
+                "library": {"name": item["serviceName"]},
+                "attributes": {"vercel.request_id": REQUEST} if item.get("isRoot") else {},
+                "startTime": [1793935635, 813000000],
+                "endTime": [1793935635, 815500000],
+                "duration": [0, 2500000],
+            }
+        )
+    return {
+        "trace": {
+            "traceId": "a" * 32,
+            "rootSpanId": original["rootSpanId"],
+            "spans": spans,
+            "resources": resources,
+        }
+    }
+
+
 @pytest.mark.parametrize("cold", [True, False])
 def test_provider_startup_spans_distinguish_cold_and_warm_without_leaking_payload(cold):
     report = probe.summarize_trace(trace(cold=cold), target(), REQUEST, "status")
@@ -125,14 +163,14 @@ def test_ingestion_retry_only_repeats_metadata_get_and_never_application_read(mo
         calls.append((url, body))
         if len(calls) < 3:
             raise probe.Refusal("trace_not_ready")
-        return trace()
+        return rest_trace()
 
     monkeypatch.setattr(probe.ProviderTrace, "api", api)
     monkeypatch.setattr(probe.time, "sleep", waits.append)
     result = target().capture(REQUEST, "status")
     assert result["classification"] == "cold" and waits == [10, 10]
     assert len(calls) == 3 and all(body is None for _, body in calls)
-    assert all(url.startswith("https://vercel.com/api/observability-api/") for url, _ in calls)
+    assert all(url.startswith("https://api.vercel.com/v1/projects/traces?") for url, _ in calls)
 
 
 def test_permission_error_is_not_retried_or_printed(monkeypatch):
@@ -243,3 +281,43 @@ def test_historical_prewarming_or_outside_startup_is_not_called_request_cold(tim
     document["spans"][2]["timestamp"] = timestamp
     with pytest.raises(probe.Refusal, match="trace_startup_outside_request"):
         probe.summarize_trace(document, target(), REQUEST, "status")
+
+
+@pytest.mark.parametrize("cold", [True, False])
+def test_project_rest_otel_resources_and_time_tuples_keep_identity_and_provenance(cold):
+    normalized = probe.normalize_project_trace(rest_trace(cold=cold))
+    result = probe.summarize_trace(normalized, target(), REQUEST, "status")
+    assert result["classification"] == ("cold" if cold else "warm")
+    assert result["completion_basis"] == "recorded_session_closed_tree"
+    assert result["provider_partial_flag"] is None
+    assert "sentinel" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        lambda d: d["trace"].update(partial=True),
+        lambda d: d["trace"].update(truncated=True),
+        lambda d: d["trace"]["resources"][0]["attributes"].update(
+            **{"vercel.should_store_trace": "false"}
+        ),
+        lambda d: d["trace"]["spans"][0].update(resource="foreign"),
+        lambda d: d["trace"]["spans"][0]["library"].update(name="application"),
+        lambda d: d["trace"]["spans"][0].update(duration=[0, 1_000_000_000]),
+        lambda d: d["trace"]["spans"][0].update(duration=[0, float("nan")]),
+        lambda d: d["trace"]["spans"][0].update(endTime=[1793935600, 0]),
+        lambda d: d["trace"]["spans"][0].update(duration=[1, 0]),
+    ],
+)
+def test_project_rest_partial_unrecorded_or_inconsistent_spans_refuse(mutation):
+    document = rest_trace()
+    mutation(document)
+    with pytest.raises(probe.Refusal):
+        probe.normalize_project_trace(document)
+
+
+def test_empty_rest_trace_is_ingestion_pending_and_dashboard_host_is_not_a_credential_destination():
+    with pytest.raises(probe.Refusal, match="trace_not_ready"):
+        probe.normalize_project_trace({"trace": None})
+    with pytest.raises(probe.Refusal, match="trace_destination_refused"):
+        target().api("https://vercel.com/api/observability-api/v1/traces/requests/example")

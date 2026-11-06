@@ -126,7 +126,7 @@ class ProviderTrace:
         # Only two provider metadata destinations; redirects and ambient proxies
         # cannot move this project-scoped credential to another host.
         parsed = urlsplit(url)
-        if parsed.scheme != "https" or parsed.hostname not in {"api.vercel.com", "vercel.com"}:
+        if parsed.scheme != "https" or parsed.hostname != "api.vercel.com":
             raise Refusal("trace_destination_refused")
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         req = urllib.request.Request(
@@ -170,22 +170,121 @@ class ProviderTrace:
     def capture(self, request_id: str, route: str) -> dict[str, Any]:
         if not re.fullmatch(r"[A-Za-z0-9_-]{10,160}", request_id):
             raise Refusal("trace_request_identity_refused")
-        url = (
-            "https://vercel.com/api/observability-api/v1/traces/requests/"
-            + request_id
-            + "?"
-            + urlencode({"teamId": self.team_id, "projectId": self.project_id})
+        url = "https://api.vercel.com/v1/projects/traces?" + urlencode(
+            {"teamId": self.team_id, "projectId": self.project_id, "requestId": request_id}
         )
         # Provider ingestion is asynchronous. Retry only its metadata GET after
         # 404, never replay the HTTP application read or a failed credential.
         for attempt in range(3):
             try:
-                return summarize_trace(self.api(url), self, request_id, route)
+                return summarize_trace(
+                    normalize_project_trace(self.api(url)), self, request_id, route
+                )
             except Refusal as error:
                 if str(error) != "trace_not_ready" or attempt == 2:
                     raise
                 time.sleep(10)
         raise Refusal("trace_not_ready")
+
+
+def otel_nanoseconds(value: Any) -> int:
+    if (
+        not isinstance(value, list)
+        or len(value) != 2
+        or any(type(part) is not int for part in value)
+        or not 0 <= value[0] <= 4_102_444_800
+        or not 0 <= value[1] < 1_000_000_000
+    ):
+        raise Refusal("trace_time_tuple_refused")
+    return int(value[0]) * 1_000_000_000 + int(value[1])
+
+
+def normalize_project_trace(document: dict[str, Any]) -> dict[str, Any]:
+    """Normalize the documented project REST API, never a dashboard API fallback.
+
+    REST returns OTEL resources and time tuples, not the dashboard's flattened
+    rows or partial flag. Require recorded session resources, finite bounded
+    spans, consistent start/end/duration, and a closed tree checked below.
+    The receipt states this structural basis; no provider partial flag is invented.
+    """
+    trace = document.get("trace")
+    if trace is None or (isinstance(trace, dict) and trace.get("spans") == []):
+        raise Refusal("trace_not_ready")
+    if not isinstance(trace, dict):
+        raise Refusal("trace_contract_refused")
+    for item in (document, trace, document.get("meta", {}), trace.get("meta", {})):
+        if isinstance(item, dict) and (
+            item.get("partial") is True or item.get("truncated") is True
+        ):
+            raise Refusal("trace_incomplete")
+    resources = trace.get("resources")
+    spans = trace.get("spans")
+    if (
+        not re.fullmatch(r"[a-f0-9]{32}", trace.get("traceId", ""))
+        or not isinstance(resources, list)
+        or not 1 <= len(resources) <= 8
+        or not isinstance(spans, list)
+        or not 1 <= len(spans) <= 128
+    ):
+        raise Refusal("trace_contract_refused")
+    by_resource: dict[str, dict[str, Any]] = {}
+    for resource in resources:
+        if not isinstance(resource, dict):
+            raise Refusal("trace_resource_refused")
+        name, attrs = resource.get("name"), resource.get("attributes")
+        if (
+            not isinstance(name, str)
+            or name in by_resource
+            or not isinstance(attrs, dict)
+            or attrs.get("service.name") != name
+            or attrs.get("vercel.is_session_trace") not in (True, "true")
+            or attrs.get("vercel.should_store_trace") not in (True, "true")
+        ):
+            raise Refusal("trace_recorded_session_refused")
+        by_resource[name] = attrs
+    normalized = []
+    for span in spans:
+        if not isinstance(span, dict):
+            raise Refusal("trace_contract_refused")
+        resource = span.get("resource")
+        if not isinstance(resource, str) or resource not in by_resource:
+            raise Refusal("trace_resource_refused")
+        if not isinstance(span.get("library"), dict) or span["library"].get("name") != resource:
+            raise Refusal("trace_provider_library_refused")
+        start = otel_nanoseconds(span.get("startTime"))
+        end = otel_nanoseconds(span.get("endTime"))
+        duration = otel_nanoseconds(span.get("duration"))
+        if end < start or abs(end - start - duration) > 1_000_000:
+            raise Refusal("trace_duration_inconsistent")
+        attrs = span.get("attributes")
+        if not isinstance(attrs, dict):
+            raise Refusal("trace_contract_refused")
+        normalized.append(
+            {
+                "spanId": span.get("spanId"),
+                "parentSpanId": span.get("parentSpanId"),
+                "isRoot": span.get("spanId") == trace.get("rootSpanId"),
+                "name": span.get("name"),
+                "requestId": attrs.get("vercel.request_id"),
+                "deploymentId": by_resource[resource].get("vercel.deployment_id"),
+                "resourceAttributes": by_resource[resource],
+                "serviceName": resource,
+                "durationMs": duration / 1_000_000,
+                "timestamp": datetime.fromtimestamp(start // 1_000_000_000, UTC)
+                .replace(microsecond=(start % 1_000_000_000) // 1000)
+                .isoformat(),
+            }
+        )
+    return {
+        "rootSpanId": trace.get("rootSpanId"),
+        "spans": normalized,
+        "meta": {
+            "partial": False,
+            "spanCount": len(normalized),
+            "completionBasis": "recorded_session_closed_tree",
+            "providerPartialFlag": None,
+        },
+    }
 
 
 def summarize_trace(
@@ -284,7 +383,7 @@ def summarize_trace(
     classification = "cold" if names else "warm"
     return {
         "status": "passed",
-        "source": "vercel_free_session_trace",
+        "source": "vercel_project_trace_rest",
         "classification": classification,
         "basis": "provider_startup_spans"
         if names
@@ -296,7 +395,9 @@ def summarize_trace(
         "invocation_ms": invocation["durationMs"],
         "request_sha256": hashlib.sha256(request_id.encode()).hexdigest(),
         "provider_span_count": len(spans),
-        "partial": False,
+        "trace_tree_validated": True,
+        "completion_basis": meta.get("completionBasis", "provider_partial_flag"),
+        "provider_partial_flag": meta.get("providerPartialFlag", meta.get("partial")),
         "raw_provider_payload_retained": False,
     }
 

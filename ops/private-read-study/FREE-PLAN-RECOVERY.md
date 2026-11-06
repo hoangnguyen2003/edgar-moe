@@ -51,6 +51,30 @@ two proofs and SHA-256 checksums. It contains no hosted measurement days. The
 collector source hash identifies the version used for the live setup; the
 subsequent request-interval/prewarming guard is covered by regression tests.
 
+## Project-token compatibility verification
+
+The dashboard gateway used by the current CLI rejects a project-scoped token
+with HTTP 403, although that token can create a tracing session. The documented
+[`GET /v1/projects/traces`](https://github.com/vercel/sdk/blob/main/src/funcs/projectsGetProjectTrace.ts)
+works with the same project token and returned the existing cold trace without
+another application request. The collector now uses only this project REST API;
+it never falls back to an account token or dashboard endpoint.
+
+REST returns OTEL resource references and time tuples. The adapter verifies the
+recorded-session flags, resource identity, start/end/duration consistency and
+closed parent tree before applying the same fixed-target/startup checks. REST
+has no dashboard partial flag: receipts explicitly report that flag as null and
+state their structural completion basis. This does not invent the paid start-type
+enum or infer a cold start from latency.
+
+The [project-token setup packet](evidence/project-token-rest-20261106/) records
+actual cold and warm provider traces from at most two new unbound requests. Both
+intentionally returned 503 with no database policy/connection. They are setup
+proofs, not successful hosted database samples or observation days. The original
+gateway refusal is retained separately. The two isolated provider credentials
+and their approved encrypted destinations are now prepared; final binding and
+hosted verification still precede measurement activation.
+
 ## Free alternatives evaluated
 
 | Option | Finding / dependency | Decision |
@@ -70,12 +94,13 @@ subsequent request-interval/prewarming guard is covered by regression tests.
    created study project**. Verify actual scope/expiry and trace-session/lookup
    access before placing it in the `hosted-read-study` environment. Never export
    the CLI OAuth refresh credential or an account-wide bootstrap token to CI.
-2. Provision and verify a separate Neon project-scoped metadata key for **only
+2. A separate Neon project-scoped metadata key is now provisioned and verified for **only
    the new synthetic study project**. Such keys can modify their project; they
    are not read-only credentials. Keep the key in the fixed endpoint-metadata
    steps, outside the HTTP probe and hosted application. Arrange revocation when
-   the study ends. This scoped key has not been issued; the existing organization
-   key remains local and must not be exported to CI.
+   the study ends. Its fixed endpoint GET passed and its existing-project GET was denied. Only
+   the scoped key is stored in the approved main-only study environment; the
+   existing organization key remains local.
 3. Recheck included quota headroom, bind a fresh whole-hour 168-hour policy and
    matching SELECT-only reader expiry, deploy the protected preview and verify
    the bound HTTP path. The current reader expiry is provisional; this work does
