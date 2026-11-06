@@ -1,0 +1,70 @@
+{
+  "issue": 290,
+  "measurement_sample": false,
+  "database_credentials_deployed": false,
+  "database_connections": 0,
+  "billing_changes": 0,
+  "application_requests": 2,
+  "collector_sha256": "f454e62a20ec6bb100f80d84c4e71a11dcb1d6a9a3392e693f988cf4b90ffcf3",
+  "samples": [
+    {
+      "status": "failed",
+      "route": "status",
+      "http_status": 503,
+      "edge_cache": "unknown",
+      "origin_timing": null,
+      "platform_start_type": "unobserved",
+      "database_resume": "unobserved",
+      "reason": "http_error",
+      "http_elapsed_us": 2065513,
+      "setup_expected_refusal": true,
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_free_session_trace",
+        "classification": "cold",
+        "basis": "provider_startup_spans",
+        "vm_start_observed": true,
+        "python_spawn_observed": true,
+        "user_code_init_observed": true,
+        "startup_ms": {
+          "Start VM": 386,
+          "Spawn Python": 56.982116,
+          "Init User Code": 1008.000001
+        },
+        "invocation_ms": 1159.037396,
+        "request_sha256": "5aecf22c3fda214b39111ef02e75d7cf08aad3b9044933b0cb34db9286a6e231",
+        "provider_span_count": 9,
+        "partial": false,
+        "raw_provider_payload_retained": false
+      }
+    },
+    {
+      "status": "failed",
+      "route": "status",
+      "http_status": 503,
+      "edge_cache": "unknown",
+      "origin_timing": null,
+      "platform_start_type": "unobserved",
+      "database_resume": "unobserved",
+      "reason": "http_error",
+      "http_elapsed_us": 217331,
+      "setup_expected_refusal": true,
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_free_session_trace",
+        "classification": "warm",
+        "basis": "complete_provider_invocation_without_startup",
+        "vm_start_observed": false,
+        "python_spawn_observed": false,
+        "user_code_init_observed": false,
+        "startup_ms": {},
+        "invocation_ms": 4.508822,
+        "request_sha256": "2ce4b7a3e0511f446a117ce0c630059c748a3144d0c974a4092085bd7ad15c53",
+        "provider_span_count": 6,
+        "partial": false,
+        "raw_provider_payload_retained": false
+      }
+    }
+  ],
+  "observed_at": "2026-11-06T03:37:57.655342+00:00"
+}

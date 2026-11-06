@@ -1,6 +1,8 @@
 # Separate personal-portfolio hosted read study (#290)
 
-Status: **isolated setup verified, not an active hosted study**. The new service and
+Status: **isolated setup and free provider tracing verified; not an active hosted study**.
+See [the November 6 free-plan recovery](FREE-PLAN-RECOVERY.md) for the verified
+Hobby cold/warm metadata path, credential dependencies and alternatives reviewed. The new service and
 observer do not reopen the expired #361 pilot, reset its ledger, or touch #156's
 active scheduler. The public application continues serving its synthetic fixture
 and withholding prospective research routes.
@@ -77,7 +79,9 @@ Three setup requests verified platform sign-in (302), application authentication
 responses. The eventual study deployment must explicitly select preview.
 
 The provider events API returned the three request records but no runtime log
-entries for this setup. Function start type remains **unobserved**. The existing
+entries for this setup. Function start type was **unobserved in that initial events-API check**.
+The November 6 session-trace verification now supplies provider startup evidence
+without the paid invocation-event query; see the recovery note above. The existing
 OAuth CLI credential was refused when minting a project-scoped automation token
 (403, `Cannot create tokens for this app.`). The local helper is prepared to take
 a new temporary classic setup token through hidden Terminal input, request an
@@ -184,9 +188,11 @@ so the external probe validates the client policy and any forwarded CDN policy
 without requiring that internal header. See [Vercel's cache contract](https://vercel.com/docs/caching/cdn-cache).
 
 `process=first` means only the first admitted read in that app process. It is
-**not** Vercel cold-start evidence. Provider runtime start-type evidence and
-Neon pre/post endpoint-state evidence must be collected/correlated separately;
-missing evidence remains `unobserved`. Do not infer cold/resume from latency or
+**not** Vercel cold-start evidence. Provider startup evidence now comes from complete, matching free session traces,
+with request-time boot/init distinguished from complete invocations without
+startup. Neon endpoint metadata is captured in separate steps before/after the
+read pair; its idle-to-active label is pair-level evidence. Missing evidence
+remains `unobserved` and failed metadata stops this observer. Do not infer cold/resume from latency or
 the 30-second pause. The existing public synthetic cache baseline is a separate
 environment/cohort and cannot supply missing private database-read days.
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import time
@@ -18,7 +19,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 
 ROUTES = ("status", "forecasts", "ticker-filter", "performance")
 CACHE = {"HIT", "MISS", "BYPASS", "STALE", "PRERENDER", "REVALIDATED"}
@@ -92,6 +93,214 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
+@dataclass(frozen=True, repr=False)
+class ProviderTrace:
+    """Separate, short-lived project credential; never a database credential."""
+
+    token: str = field(repr=False)
+    user_id: str = field(repr=False)
+    team_id: str = field(repr=False)
+    project_id: str = field(repr=False)
+    deployment_id: str = field(repr=False)
+
+    @classmethod
+    def load(cls, env: dict[str, str]) -> ProviderTrace:
+        try:
+            values = [
+                env["STUDY_TRACE_" + key]
+                for key in ("TOKEN", "USER_ID", "TEAM_ID", "PROJECT_ID", "DEPLOYMENT_ID")
+            ]
+            if any(not re.fullmatch(r"[A-Za-z0-9_.-]{10,512}", v) for v in values):
+                raise ValueError()
+            if (
+                not values[2].startswith("team_")
+                or not values[3].startswith("prj_")
+                or not values[4].startswith("dpl_")
+            ):
+                raise ValueError()
+            return cls(*values)
+        except Exception:
+            raise Refusal("trace_configuration_refused") from None
+
+    def api(self, url: str, body: dict[str, str] | None = None) -> dict[str, Any]:
+        # Only two provider metadata destinations; redirects and ambient proxies
+        # cannot move this project-scoped credential to another host.
+        parsed = urlsplit(url)
+        if parsed.scheme != "https" or parsed.hostname not in {"api.vercel.com", "vercel.com"}:
+            raise Refusal("trace_destination_refused")
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+        req = urllib.request.Request(
+            url,
+            data=None if body is None else json.dumps(body).encode(),
+            headers={
+                "Authorization": "Bearer " + self.token,
+                "Content-Type": "application/json",
+                "x-vercel-observability-query-reason": "cli/traces-get",
+            },
+        )
+        try:
+            with opener.open(req, timeout=10) as response:
+                raw = response.read(1_048_577)
+                if len(raw) > 1_048_576:
+                    raise Refusal("trace_size_refused")
+                document = json.loads(raw)
+                if not isinstance(document, dict):
+                    raise Refusal("trace_contract_refused")
+                return document
+        except urllib.error.HTTPError as error:
+            status = error.code
+            error.close()
+            raise Refusal("trace_not_ready" if status == 404 else "trace_api_refused") from None
+        except Refusal:
+            raise
+        except Exception:
+            raise Refusal("trace_transport_refused") from None
+
+    def session_cookie(self, origin: str) -> str:
+        result = self.api(
+            "https://api.vercel.com/v1/projects/traces/session?"
+            + urlencode({"teamId": self.team_id}),
+            {"projectId": self.project_id, "hostname": urlsplit(origin).hostname or ""},
+        )
+        token = result.get("token")
+        if not isinstance(token, str) or not re.fullmatch(r"[A-Za-z0-9_.-]{20,4096}", token):
+            raise Refusal("trace_session_refused")
+        return "_vercel_tracing=" + token + "; _vercel_session=" + self.user_id
+
+    def capture(self, request_id: str, route: str) -> dict[str, Any]:
+        if not re.fullmatch(r"[A-Za-z0-9_-]{10,160}", request_id):
+            raise Refusal("trace_request_identity_refused")
+        url = (
+            "https://vercel.com/api/observability-api/v1/traces/requests/"
+            + request_id
+            + "?"
+            + urlencode({"teamId": self.team_id, "projectId": self.project_id})
+        )
+        # Provider ingestion is asynchronous. Retry only its metadata GET after
+        # 404, never replay the HTTP application read or a failed credential.
+        for attempt in range(3):
+            try:
+                return summarize_trace(self.api(url), self, request_id, route)
+            except Refusal as error:
+                if str(error) != "trace_not_ready" or attempt == 2:
+                    raise
+                time.sleep(10)
+        raise Refusal("trace_not_ready")
+
+
+def summarize_trace(
+    document: dict[str, Any], target: ProviderTrace, request_id: str, route: str
+) -> dict[str, Any]:
+    """Allowlist provider evidence; no raw attributes, headers, URLs or IDs escape."""
+    spans = document.get("spans")
+    meta = document.get("meta")
+    if (
+        not isinstance(meta, dict)
+        or meta.get("partial") is not False
+        or not isinstance(spans, list)
+        or not 1 <= len(spans) <= 128
+        or meta.get("spanCount") != len(spans)
+    ):
+        raise Refusal("trace_incomplete")
+    by_id: dict[str, dict[str, Any]] = {}
+    for span in spans:
+        if not isinstance(span, dict):
+            raise Refusal("trace_contract_refused")
+        identity = span.get("spanId")
+        resource = span.get("resourceAttributes")
+        duration = span.get("durationMs")
+        if (
+            not isinstance(identity, str)
+            or not re.fullmatch(r"[a-f0-9]{16}", identity)
+            or identity in by_id
+            or not isinstance(resource, dict)
+            or resource.get("vercel.project_id") != target.project_id
+            or resource.get("vercel.owner_id") != target.team_id
+            or resource.get("vercel.deployment_id") != target.deployment_id
+            or span.get("deploymentId") != target.deployment_id
+            or not isinstance(duration, (int, float))
+            or isinstance(duration, bool)
+            or not math.isfinite(duration)
+            or not 0 <= duration <= 120_000
+        ):
+            raise Refusal("trace_identity_or_duration_refused")
+        by_id[identity] = span
+    roots = [span for span in spans if span.get("isRoot") is True]
+    if (
+        len(roots) != 1
+        or document.get("rootSpanId") != roots[0]["spanId"]
+        or roots[0].get("requestId") != request_id
+        or roots[0].get("name") != "GET /v1/" + route
+        or roots[0].get("serviceName") != "vercel.edge-network"
+    ):
+        raise Refusal("trace_request_identity_refused")
+    root_id = roots[0]["spanId"]
+    for identity in by_id:
+        seen = set()
+        while identity != root_id:
+            if identity in seen or identity not in by_id:
+                raise Refusal("trace_ancestry_refused")
+            seen.add(identity)
+            identity = by_id[identity].get("parentSpanId", "")
+    runtime = [
+        s
+        for s in spans
+        if s.get("serviceName") == "vercel.serverless-runtime"
+        and s["resourceAttributes"].get("service.name") == "vercel.serverless-runtime"
+    ]
+    invocations = [s for s in runtime if s.get("name") == "Invoke Function"]
+    if len(invocations) != 1:
+        raise Refusal("trace_invocation_ambiguous")
+    invocation = invocations[0]
+    startup_names = {"Start VM", "Spawn Python", "Init User Code"}
+    if any(s.get("name") not in startup_names | {"Invoke Function", "waitUntil"} for s in runtime):
+        raise Refusal("trace_runtime_schema_changed")
+    startup = [s for s in runtime if s.get("name") in startup_names]
+    if any(s.get("parentSpanId") != invocation["spanId"] for s in startup):
+        raise Refusal("trace_startup_ancestry_refused")
+    try:
+        root_start = datetime.fromisoformat(roots[0]["timestamp"].replace("Z", "+00:00"))
+        root_end = root_start + timedelta(milliseconds=roots[0]["durationMs"])
+        if root_start.utcoffset() != timedelta(0):
+            raise ValueError()
+        for item in [invocation, *startup]:
+            began = datetime.fromisoformat(item["timestamp"].replace("Z", "+00:00"))
+            ended = began + timedelta(milliseconds=item["durationMs"])
+            # Millisecond timestamp rounding permits five milliseconds only.
+            # Historical prewarming must not become request-time cold evidence.
+            if (
+                began.utcoffset() != timedelta(0)
+                or began < root_start - timedelta(milliseconds=5)
+                or ended > root_end + timedelta(milliseconds=5)
+            ):
+                raise ValueError()
+    except Exception:
+        raise Refusal("trace_startup_outside_request") from None
+    names = {s["name"] for s in startup}
+    if len(names) != len(startup):
+        raise Refusal("trace_startup_ambiguous")
+    # Report provider-observed boot/init separately; do not invent the paid
+    # functionStartType enum or substitute our process-first application marker.
+    classification = "cold" if names else "warm"
+    return {
+        "status": "passed",
+        "source": "vercel_free_session_trace",
+        "classification": classification,
+        "basis": "provider_startup_spans"
+        if names
+        else "complete_provider_invocation_without_startup",
+        "vm_start_observed": "Start VM" in names,
+        "python_spawn_observed": "Spawn Python" in names,
+        "user_code_init_observed": "Init User Code" in names,
+        "startup_ms": {s["name"]: s["durationMs"] for s in startup},
+        "invocation_ms": invocation["durationMs"],
+        "request_sha256": hashlib.sha256(request_id.encode()).hexdigest(),
+        "provider_span_count": len(spans),
+        "partial": False,
+        "raw_provider_payload_retained": False,
+    }
+
+
 def timing_header(value: str | None, cache: str) -> dict[str, Any] | None:
     if cache not in {"MISS", "BYPASS"} or not value or len(value) > 512:
         return None
@@ -113,7 +322,9 @@ def timing_header(value: str | None, cache: str) -> dict[str, Any] | None:
     return result if set(result) == TIMINGS | {"process"} else None
 
 
-def request(config: Configuration, route: str) -> dict[str, Any]:
+def request(
+    config: Configuration, route: str, *, trace_cookie: str | None = None
+) -> dict[str, Any]:
     if route not in ROUTES:
         raise Refusal("route_refused")
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
@@ -125,6 +336,8 @@ def request(config: Configuration, route: str) -> dict[str, Any]:
             "Accept": "application/json",
         },
     )
+    if trace_cookie is not None:
+        req.add_header("Cookie", trace_cookie)
     started = time.perf_counter_ns()
     report: dict[str, Any] = {
         "status": "failed",
@@ -138,6 +351,10 @@ def request(config: Configuration, route: str) -> dict[str, Any]:
     try:
         with opener.open(req, timeout=20) as response:
             report["http_status"] = response.status
+            if trace_cookie is not None:
+                report["_provider_request_id"] = response.headers.get("x-vercel-id", "").rsplit(
+                    "::", 1
+                )[-1]
             raw = response.read(MAX_BODY + 1)
             if len(raw) > MAX_BODY:
                 raise Refusal("response_size_refused")
@@ -171,15 +388,18 @@ def request(config: Configuration, route: str) -> dict[str, Any]:
                 or type(body.get("matured_count")) is not int
             ):
                 raise Refusal("response_contract_refused")
-            report.update(
-                status="passed",
-                body_bytes=len(raw),
-                origin_timing=timing_header(
-                    response.headers.get("x-study-read-timing"), report["edge_cache"]
-                ),
+            timings = timing_header(
+                response.headers.get("x-study-read-timing"), report["edge_cache"]
             )
+            if timings is None:
+                raise Refusal("origin_timing_refused")
+            report.update(status="passed", body_bytes=len(raw), origin_timing=timings)
     except urllib.error.HTTPError as error:
         report.update(reason="http_error", http_status=error.code)
+        if trace_cookie is not None:
+            report["_provider_request_id"] = error.headers.get("x-vercel-id", "").rsplit("::", 1)[
+                -1
+            ]
         error.close()
     except Refusal as error:
         report["reason"] = str(error)
@@ -189,34 +409,55 @@ def request(config: Configuration, route: str) -> dict[str, Any]:
     return report
 
 
-def observe(config: Configuration, *, now: datetime | None = None) -> dict[str, Any]:
+def observe(
+    config: Configuration, *, now: datetime | None = None, trace: ProviderTrace | None = None
+) -> dict[str, Any]:
     now = now or datetime.now(UTC)
     if not config.starts_at <= now < config.expires_at:
         raise Refusal("outside_absolute_study_window")
     slot = int((now - config.starts_at).total_seconds() // 3600)
     route = ROUTES[slot % len(ROUTES)]
-    first = request(config, route)
+    cookie = trace.session_cookie(config.origin) if trace else None
+    first = request(config, route, trace_cookie=cookie) if trace else request(config, route)
     first["phase"] = "first"
     samples = [first]
     if first["status"] == "passed":
         time.sleep(30)
         if datetime.now(UTC) < config.expires_at:
-            paired = request(config, route)
+            paired = (
+                request(config, route, trace_cookie=cookie) if trace else request(config, route)
+            )
             paired["phase"] = "paired"
             samples.append(paired)
+    if trace:
+        for sample in samples:
+            request_id = sample.pop("_provider_request_id", "")
+            try:
+                evidence = trace.capture(request_id, route)
+                sample["provider_trace"] = evidence
+                sample["platform_start_type"] = evidence["classification"]
+            except Refusal as error:
+                sample["provider_trace"] = {"status": "refused", "reason": str(error)}
     return {
-        "schema_version": 1,
+        "schema_version": 2,
         "scope": "separate_portfolio_study290_observation",
         "observed_at": now.isoformat(),
         "hourly_slot": slot,
         "host_sha256": config.host_sha256,
         "policy_sha256": config.policy_sha256,
         "status": "passed"
-        if len(samples) == 2 and all(sample["status"] == "passed" for sample in samples)
+        if len(samples) == 2
+        and all(
+            sample["status"] == "passed"
+            and (trace is None or sample.get("provider_trace", {}).get("status") == "passed")
+            for sample in samples
+        )
         else "degraded",
         "samples": samples,
         "maximum_http_requests": 2,
         "automatic_retries": 0,
+        "provider_trace_enabled": trace is not None,
+        "maximum_trace_metadata_get_attempts_per_sample": 3 if trace else 0,
         "database_credentials_in_probe": False,
         "response_bodies_retained": False,
         "seven_day_evidence_proven": False,
@@ -231,7 +472,9 @@ def main() -> int:
     try:
         if os.environ.get("GITHUB_RUN_ATTEMPT", "1") != "1":
             raise Refusal("rerun_refused")
-        report = observe(Configuration.load(dict(os.environ)))
+        env = dict(os.environ)
+        trace = ProviderTrace.load(env) if env.get("STUDY_TRACE_ENABLED") == "true" else None
+        report = observe(Configuration.load(env), trace=trace)
     except Exception as error:
         report = {
             "schema_version": 1,
