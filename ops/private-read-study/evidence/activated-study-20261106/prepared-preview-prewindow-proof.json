@@ -1,0 +1,36 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "protected_preview_identity_verified": true,
+  "deployment_target": null,
+  "ready_state": "READY",
+  "configured_regions": [
+    "sin1"
+  ],
+  "checks": [
+    {
+      "check": "platform_protection",
+      "http_status": 302,
+      "expected_status": 302
+    },
+    {
+      "check": "application_authentication",
+      "http_status": 401,
+      "expected_status": 401
+    },
+    {
+      "check": "absolute_future_window",
+      "http_status": 425,
+      "expected_status": 425
+    }
+  ],
+  "application_requests": 3,
+  "database_connections": 0,
+  "policy_starts_at": "2026-11-06T08:15:00+00:00",
+  "policy_expires_at": "2026-11-13T08:15:00+00:00",
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "measurement_sample": false,
+  "observed_at": "2026-11-06T08:09:49.975762+00:00"
+}
