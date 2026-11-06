@@ -25,10 +25,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Capture endpoint state without waking Postgres
+        env:
+          STUDY_NEON_METADATA_KEY: ${{ secrets.STUDY_NEON_METADATA_KEY }}
+          STUDY_NEON_PROJECT_ID: ${{ secrets.STUDY_NEON_PROJECT_ID }}
+          STUDY_NEON_ENDPOINT_ID: ${{ secrets.STUDY_NEON_ENDPOINT_ID }}
+        run: python3 scripts/capture_private_read_study_neon_state.py --output reports/private-read-study/neon-before.json
       - name: Observe one paired fixed-route read without database credentials
         id: probe
         continue-on-error: true
         env:
+          STUDY_TRACE_ENABLED: "true"
+          STUDY_TRACE_TOKEN: ${{ secrets.STUDY_TRACE_TOKEN }}
+          STUDY_TRACE_USER_ID: ${{ secrets.STUDY_TRACE_USER_ID }}
+          STUDY_TRACE_TEAM_ID: ${{ secrets.STUDY_TRACE_TEAM_ID }}
+          STUDY_TRACE_PROJECT_ID: ${{ secrets.STUDY_TRACE_PROJECT_ID }}
+          STUDY_TRACE_DEPLOYMENT_ID: ${{ secrets.STUDY_TRACE_DEPLOYMENT_ID }}
           STUDY_DEPLOYMENT_URL: ${{ secrets.STUDY_DEPLOYMENT_URL }}
           STUDY_BEARER_TOKEN: ${{ secrets.STUDY_BEARER_TOKEN }}
           STUDY_PLATFORM_BYPASS: ${{ secrets.STUDY_PLATFORM_BYPASS }}
@@ -37,12 +49,28 @@ jobs:
           STUDY_STARTS_AT: ${{ vars.STUDY_STARTS_AT }}
           STUDY_EXPIRES_AT: ${{ vars.STUDY_EXPIRES_AT }}
         run: python3 scripts/observe_private_read_study.py --output reports/private-read-study/observation.json
+      - name: Capture endpoint state after the reads
+        if: ${{ always() }}
+        id: neon_after
+        env:
+          STUDY_NEON_METADATA_KEY: ${{ secrets.STUDY_NEON_METADATA_KEY }}
+          STUDY_NEON_PROJECT_ID: ${{ secrets.STUDY_NEON_PROJECT_ID }}
+          STUDY_NEON_ENDPOINT_ID: ${{ secrets.STUDY_NEON_ENDPOINT_ID }}
+        run: python3 scripts/capture_private_read_study_neon_state.py --output reports/private-read-study/neon-after.json
+      - name: Correlate provider state with the read pair
+        if: ${{ always() && steps.neon_after.outcome == 'success' }}
+        run: >-
+          python3 scripts/capture_private_read_study_neon_state.py
+          --annotate reports/private-read-study/observation.json
+          --before reports/private-read-study/neon-before.json
+          --after reports/private-read-study/neon-after.json
+          --output reports/private-read-study/correlated-observation.json
       - name: Validate and hash the body-free operational receipt
         id: receipt
         if: ${{ always() }}
         run: |
           python3 scripts/validate_redacted_artifacts.py --root reports/private-read-study
-          sha256sum reports/private-read-study/observation.json > reports/private-read-study/SHA256SUMS
+          sha256sum reports/private-read-study/*.json > reports/private-read-study/SHA256SUMS
       - name: Retain the observation including failed attempts
         if: ${{ always() && steps.receipt.outcome == 'success' }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

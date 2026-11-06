@@ -126,3 +126,15 @@ def test_failed_first_read_is_not_retried_or_followed_by_a_warm_sample(monkeypat
     assert report["seven_day_evidence_proven"] is False
     with pytest.raises(probe.Refusal):
         probe.observe(config, now=config.expires_at + timedelta(seconds=1))
+
+
+def test_missing_origin_timing_cannot_be_counted_as_successful_measurement(monkeypatch):
+    response = Response({"available": True})
+    del response.headers["x-study-read-timing"]
+    monkeypatch.setattr(
+        probe.urllib.request,
+        "build_opener",
+        lambda *a: type("Opener", (), {"open": lambda *a, **kw: response})(),
+    )
+    report = probe.request(probe.Configuration.load(environment()), "status")
+    assert report["status"] == "failed" and report["reason"] == "origin_timing_refused"

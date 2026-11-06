@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "scope": "portfolio_study290_neon_endpoint_state",
+  "status": "passed",
+  "capture_started_at": "2026-11-06T03:43:49.694406+00:00",
+  "observed_at": "2026-11-06T03:43:50.304976+00:00",
+  "project_sha256": "704a426c95d0ba5bcf4847a14d389ed04c03c377636624a441da8d5b2fa81d63",
+  "endpoint_sha256": "663b3a8444606b8a9f62e0864ff1edbc1213e02c26f2daa605c80fbc3ccd5393",
+  "current_state": "idle",
+  "pending_state": null,
+  "disabled": false,
+  "database_connections": 0,
+  "automatic_retries": 0,
+  "provider_payload_retained": false,
+  "setup_verification_only": true,
+  "new_api_keys_created": 0,
+  "organization_key_exported": false,
+  "observer_enabled": false
+}
