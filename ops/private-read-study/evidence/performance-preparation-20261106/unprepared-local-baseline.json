@@ -1,0 +1,7030 @@
+{
+  "status": "passed",
+  "provider_requests": 0,
+  "database_kind": "disposable_local_PostgreSQL18_Unix_socket",
+  "hosted_days": 0,
+  "fixture": {
+    "profile": "portfolio290_500_issuers_20_quarters_half_labeled_v1",
+    "forecast_count": 10000,
+    "label_count": 5000,
+    "payload_sha256": "d6d852a89cf6221704b045775e85134cba94d3c0871677e8a5321d39e3562f7d",
+    "provider_requests": 0,
+    "synthetic_only": true,
+    "claim": "declared planning volume, not measured production traffic"
+  },
+  "local_select_only_query_plans": [
+    {
+      "routes": [
+        "forecasts",
+        "performance",
+        "status"
+      ],
+      "sql_sha256": "ed6fb1456b981d4af32de64b2a05344d24ebb18446fdb2246bca095d9255cd43",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.848,
+        "Actual Total Time": 0.848,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 715,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 10000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.002,
+            "Actual Total Time": 0.617,
+            "Plan Rows": 10000,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 715,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.239,
+      "execution_ms": 0.876
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "bdf6f81b80285932cead69276ed422dca394a398d88718535f9d0eca1bfb5665",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.328,
+        "Actual Total Time": 0.328,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 157,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 5000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.001,
+            "Actual Total Time": 0.21,
+            "Plan Rows": 5000,
+            "Plan Width": 29,
+            "Shared Hit Blocks": 157,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.091,
+      "execution_ms": 0.331
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "cdda41070e273ab050ef500fe1c1d3cff86f13e6c202ab13bf19ee3fb4781304",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.002,
+        "Actual Total Time": 0.002,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 1,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.001,
+            "Actual Total Time": 0.001,
+            "Plan Rows": 1,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 1,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.06,
+      "execution_ms": 0.005
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "7bea826a82412e55ee81a3c18b71d2351518931dea18373911f0f0650693e184",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.005,
+        "Actual Total Time": 0.005,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 40.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.002,
+            "Actual Total Time": 0.004,
+            "Plan Rows": 40,
+            "Plan Width": 26,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.109,
+      "execution_ms": 0.007
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "faf0ae92b95b4d049efbbdd6153ca55b88c2ce0e0ca3ec9474fc43b91b5272b5",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.011,
+        "Actual Total Time": 0.012,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 5,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.011,
+            "Actual Total Time": 0.011,
+            "Plan Rows": 40,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 5,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 40.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.002,
+                "Actual Total Time": 0.004,
+                "Plan Rows": 40,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.042,
+      "execution_ms": 0.016
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "5da38a50a5db416c3f7898569246aab2fffcb558b983a2a62c52215bdc9cdd74",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.005,
+        "Actual Total Time": 0.005,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 5,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.005,
+            "Actual Total Time": 0.005,
+            "Plan Rows": 40,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 5,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 40.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.001,
+                "Actual Total Time": 0.002,
+                "Plan Rows": 40,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.011,
+      "execution_ms": 0.008
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "e1a97cff19d96625971f754a75c181e409c5e19c0c803aca4ad0cece2d6e2515",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 0.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.005,
+        "Actual Total Time": 0.005,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 0.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.005,
+            "Actual Total Time": 0.005,
+            "Plan Rows": 1,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 0.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.005,
+                "Actual Total Time": 0.005,
+                "Plan Rows": 1,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.032,
+      "execution_ms": 0.009
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "47182c3e717a1024f19f22165fabf7a83b3dfb01724e877553a98fb5d08d5cc6",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 0.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.001,
+        "Actual Total Time": 0.001,
+        "Plan Rows": 1,
+        "Plan Width": 404,
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Seq Scan",
+        "Plans": []
+      },
+      "planning_ms": 0.094,
+      "execution_ms": 0.002
+    },
+    {
+      "routes": [
+        "status"
+      ],
+      "sql_sha256": "70e0f0899a608bf36806af658fcfb626e98c6cb44015f5232793804a21e02875",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.003,
+        "Actual Total Time": 0.003,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 0.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.003,
+            "Actual Total Time": 0.003,
+            "Plan Rows": 1,
+            "Plan Width": 26,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.011,
+      "execution_ms": 0.005
+    },
+    {
+      "routes": [
+        "forecasts"
+      ],
+      "sql_sha256": "0b2c2061c1372501d109ce45be2c7930225e3e74701b21ae9667fc26ac1b64cb",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 25.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.438,
+        "Actual Total Time": 0.44,
+        "Plan Rows": 25,
+        "Plan Width": 719,
+        "Shared Hit Blocks": 1299,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 25.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.438,
+            "Actual Total Time": 0.439,
+            "Plan Rows": 10000,
+            "Plan Width": 719,
+            "Shared Hit Blocks": 1299,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Incremental Sort",
+            "Plans": [
+              {
+                "Actual Rows": 501.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.006,
+                "Actual Total Time": 0.289,
+                "Plan Rows": 10000,
+                "Plan Width": 719,
+                "Shared Hit Blocks": 1296,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Nested Loop",
+                "Join Type": "Left",
+                "Plans": [
+                  {
+                    "Actual Rows": 501.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.003,
+                    "Actual Total Time": 0.024,
+                    "Plan Rows": 10000,
+                    "Plan Width": 508,
+                    "Shared Hit Blocks": 43,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Backward",
+                    "Plans": []
+                  },
+                  {
+                    "Actual Rows": 0.5,
+                    "Actual Loops": 501,
+                    "Actual Startup Time": 0.0,
+                    "Actual Total Time": 0.0,
+                    "Plan Rows": 1,
+                    "Plan Width": 211,
+                    "Shared Hit Blocks": 1253,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Forward",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.161,
+      "execution_ms": 0.45
+    },
+    {
+      "routes": [
+        "forecasts"
+      ],
+      "sql_sha256": "5524a309aca29dd0b8a43c11e4fa5883c7889f51eb21081ef434f1d21f256f65",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.04,
+        "Actual Total Time": 0.04,
+        "Plan Rows": 1,
+        "Plan Width": 33,
+        "Shared Hit Blocks": 39,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Sorted",
+        "Plans": [
+          {
+            "Actual Rows": 500.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.003,
+            "Actual Total Time": 0.029,
+            "Plan Rows": 500,
+            "Plan Width": 57,
+            "Shared Hit Blocks": 39,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Index Scan",
+            "Scan Direction": "Forward",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.016,
+      "execution_ms": 0.043
+    },
+    {
+      "routes": [
+        "ticker_filter"
+      ],
+      "sql_sha256": "d5d34a707e39bee47f3bd7eeab9905f44d133f3f31936740f52f7bad39b98a11",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.01,
+        "Actual Total Time": 0.01,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 22,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.005,
+            "Actual Total Time": 0.009,
+            "Plan Rows": 20,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 22,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Bitmap Heap Scan",
+            "Plans": [
+              {
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.003,
+                "Actual Total Time": 0.003,
+                "Plan Rows": 20,
+                "Plan Width": 0,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Bitmap Index Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.012,
+      "execution_ms": 0.014
+    },
+    {
+      "routes": [
+        "ticker_filter"
+      ],
+      "sql_sha256": "6baeacbe5e8de125cc385cab508e5226629d9812a4e7a4a08adaf332d67d91c6",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 20.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.042,
+        "Actual Total Time": 0.043,
+        "Plan Rows": 20,
+        "Plan Width": 719,
+        "Shared Hit Blocks": 82,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.042,
+            "Actual Total Time": 0.042,
+            "Plan Rows": 20,
+            "Plan Width": 719,
+            "Shared Hit Blocks": 82,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.006,
+                "Actual Total Time": 0.036,
+                "Plan Rows": 20,
+                "Plan Width": 719,
+                "Shared Hit Blocks": 82,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Nested Loop",
+                "Join Type": "Left",
+                "Plans": [
+                  {
+                    "Actual Rows": 20.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.003,
+                    "Actual Total Time": 0.005,
+                    "Plan Rows": 20,
+                    "Plan Width": 508,
+                    "Shared Hit Blocks": 22,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Bitmap Heap Scan",
+                    "Plans": [
+                      {
+                        "Actual Rows": 20.0,
+                        "Actual Loops": 1,
+                        "Actual Startup Time": 0.001,
+                        "Actual Total Time": 0.001,
+                        "Plan Rows": 20,
+                        "Plan Width": 0,
+                        "Shared Hit Blocks": 2,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Node Type": "Bitmap Index Scan",
+                        "Plans": []
+                      }
+                    ]
+                  },
+                  {
+                    "Actual Rows": 1.0,
+                    "Actual Loops": 20,
+                    "Actual Startup Time": 0.001,
+                    "Actual Total Time": 0.001,
+                    "Plan Rows": 1,
+                    "Plan Width": 211,
+                    "Shared Hit Blocks": 60,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Forward",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.047,
+      "execution_ms": 0.05
+    },
+    {
+      "routes": [
+        "ticker_filter"
+      ],
+      "sql_sha256": "cf5004939b2aaa4a72fd363524e2ccdff5c8911f9a5e8a7deacac1af778282a1",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 20.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.079,
+        "Actual Total Time": 1.357,
+        "Plan Rows": 20,
+        "Plan Width": 33,
+        "Shared Hit Blocks": 726,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Sorted",
+        "Plans": [
+          {
+            "Actual Rows": 10000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.005,
+            "Actual Total Time": 0.669,
+            "Plan Rows": 6415,
+            "Plan Width": 57,
+            "Shared Hit Blocks": 726,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Index Scan",
+            "Scan Direction": "Forward",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.027,
+      "execution_ms": 1.361
+    },
+    {
+      "routes": [
+        "performance"
+      ],
+      "sql_sha256": "8deffef26957b2d2d70e2fd88054973897bb32a460d624cef8ee7d8b5ab44b7e",
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 5000.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 2.301,
+        "Actual Total Time": 2.386,
+        "Plan Rows": 5000,
+        "Plan Width": 56,
+        "Shared Hit Blocks": 872,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Sort",
+        "Plans": [
+          {
+            "Actual Rows": 5000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.528,
+            "Actual Total Time": 1.703,
+            "Plan Rows": 5000,
+            "Plan Width": 56,
+            "Shared Hit Blocks": 872,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Hash Join",
+            "Join Type": "Inner",
+            "Plans": [
+              {
+                "Actual Rows": 10000.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.001,
+                "Actual Total Time": 0.281,
+                "Plan Rows": 10000,
+                "Plan Width": 48,
+                "Shared Hit Blocks": 715,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              },
+              {
+                "Actual Rows": 5000.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.521,
+                "Actual Total Time": 0.521,
+                "Plan Rows": 5000,
+                "Plan Width": 40,
+                "Shared Hit Blocks": 157,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Hash",
+                "Plans": [
+                  {
+                    "Actual Rows": 5000.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.001,
+                    "Actual Total Time": 0.282,
+                    "Plan Rows": 5000,
+                    "Plan Width": 40,
+                    "Shared Hit Blocks": 157,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Seq Scan",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.038,
+      "execution_ms": 2.496
+    }
+  ],
+  "relation_bytes": 10706944,
+  "planner_statistics": "ANALYZE completed during local fixture setup before reader checks",
+  "quantiles_us": {
+    "status": {
+      "service": {
+        "n": 100,
+        "p50": 3567,
+        "p95": 3829,
+        "p99": 3841
+      },
+      "lifecycle": {
+        "n": 100,
+        "p50": 93716,
+        "p95": 95865,
+        "p99": 96382
+      }
+    },
+    "forecasts": {
+      "service": {
+        "n": 100,
+        "p50": 3044,
+        "p95": 3333,
+        "p99": 3380
+      },
+      "lifecycle": {
+        "n": 100,
+        "p50": 93392,
+        "p95": 95289,
+        "p99": 96371
+      }
+    },
+    "ticker_filter": {
+      "service": {
+        "n": 100,
+        "p50": 3576,
+        "p95": 3765,
+        "p99": 3926
+      },
+      "lifecycle": {
+        "n": 100,
+        "p50": 93981,
+        "p95": 95896,
+        "p99": 96411
+      }
+    },
+    "performance": {
+      "service": {
+        "n": 100,
+        "p50": 17183,
+        "p95": 28906,
+        "p99": 29600
+      },
+      "lifecycle": {
+        "n": 100,
+        "p50": 107732,
+        "p95": 119784,
+        "p99": 121168
+      }
+    }
+  },
+  "warm_samples_per_route": 100,
+  "total_native_read_samples": 404,
+  "database_is_not_resumed_between_samples": true,
+  "percentile_method": "nearest_rank",
+  "http_measurements": false,
+  "provider_serverless_cold_start_proven": false,
+  "environment": {
+    "os": "Darwin",
+    "architecture": "arm64",
+    "transport": "local Unix socket; no TLS; fresh connections via NullPool",
+    "fixture_clock": "2026-11-05T16:15:27.810654+00:00",
+    "matched_declared_profile": true
+  },
+  "source_sha256": {
+    "run-local-benchmark-20261106.py": "a520ef2f6a36ecec5d8d4863305785573741eec2dc38a6d729069617e85175d3",
+    "portfolio_fixture.py": "2043c27bad2f5f98e844db1cb2289589659ffbece8077454a590eafc3709a365",
+    "study_app.py": "f636dace5709fa9445e8efd1150f3a4490ea1e1f376b041a1b37abd17ec1436d",
+    "snapshot_kernel.py": "8e567cf783a88307dcc0f48fc8778f8a631241c9df5a7022510cffc6bef803b0"
+  },
+  "routes": [
+    {
+      "route": "status",
+      "cohort": "initial_route",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 2529,
+        "reader_connect": 2905,
+        "integrity": 83224,
+        "service": 7472,
+        "snapshot": 91065,
+        "lifecycle": 97096
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "initial_route",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1477,
+        "reader_connect": 2844,
+        "integrity": 83602,
+        "service": 3518,
+        "snapshot": 87487,
+        "lifecycle": 92349
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "initial_route",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1597,
+        "reader_connect": 2597,
+        "integrity": 83199,
+        "service": 3816,
+        "snapshot": 87360,
+        "lifecycle": 92155
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "initial_route",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2668,
+        "integrity": 84066,
+        "service": 1439169,
+        "snapshot": 1523723,
+        "lifecycle": 1528578
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1569,
+        "reader_connect": 2683,
+        "integrity": 82361,
+        "service": 3830,
+        "snapshot": 86461,
+        "lifecycle": 91268
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1530,
+        "reader_connect": 2604,
+        "integrity": 84336,
+        "service": 2882,
+        "snapshot": 87532,
+        "lifecycle": 92189
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1532,
+        "reader_connect": 2539,
+        "integrity": 82339,
+        "service": 3426,
+        "snapshot": 86091,
+        "lifecycle": 90701
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1371,
+        "reader_connect": 2505,
+        "integrity": 82953,
+        "service": 16640,
+        "snapshot": 99884,
+        "lifecycle": 104283
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1534,
+        "reader_connect": 2448,
+        "integrity": 83058,
+        "service": 3645,
+        "snapshot": 86970,
+        "lifecycle": 91503
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1506,
+        "reader_connect": 2477,
+        "integrity": 83193,
+        "service": 3131,
+        "snapshot": 86685,
+        "lifecycle": 91211
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1546,
+        "reader_connect": 2456,
+        "integrity": 84578,
+        "service": 3546,
+        "snapshot": 88473,
+        "lifecycle": 93015
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1361,
+        "reader_connect": 2450,
+        "integrity": 86027,
+        "service": 27305,
+        "snapshot": 113692,
+        "lifecycle": 118092
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1643,
+        "reader_connect": 2491,
+        "integrity": 84739,
+        "service": 3691,
+        "snapshot": 88686,
+        "lifecycle": 93408
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1522,
+        "reader_connect": 2428,
+        "integrity": 82372,
+        "service": 2940,
+        "snapshot": 85659,
+        "lifecycle": 90133
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1448,
+        "reader_connect": 2478,
+        "integrity": 82649,
+        "service": 3462,
+        "snapshot": 86412,
+        "lifecycle": 90864
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1496,
+        "reader_connect": 2679,
+        "integrity": 83907,
+        "service": 16451,
+        "snapshot": 100660,
+        "lifecycle": 105414
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1609,
+        "reader_connect": 2446,
+        "integrity": 83472,
+        "service": 3531,
+        "snapshot": 87282,
+        "lifecycle": 91893
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1537,
+        "reader_connect": 2470,
+        "integrity": 83822,
+        "service": 2987,
+        "snapshot": 87110,
+        "lifecycle": 91695
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1681,
+        "reader_connect": 2708,
+        "integrity": 84223,
+        "service": 3624,
+        "snapshot": 88171,
+        "lifecycle": 93164
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1507,
+        "reader_connect": 2502,
+        "integrity": 83496,
+        "service": 16674,
+        "snapshot": 100465,
+        "lifecycle": 105023
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1471,
+        "reader_connect": 2572,
+        "integrity": 84047,
+        "service": 3482,
+        "snapshot": 87789,
+        "lifecycle": 92367
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1586,
+        "reader_connect": 2330,
+        "integrity": 84426,
+        "service": 3367,
+        "snapshot": 88120,
+        "lifecycle": 92576
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1507,
+        "reader_connect": 2495,
+        "integrity": 82889,
+        "service": 3540,
+        "snapshot": 86727,
+        "lifecycle": 91252
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1407,
+        "reader_connect": 2494,
+        "integrity": 83216,
+        "service": 16436,
+        "snapshot": 99958,
+        "lifecycle": 104397
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1540,
+        "reader_connect": 2537,
+        "integrity": 84097,
+        "service": 3409,
+        "snapshot": 87755,
+        "lifecycle": 92395
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1501,
+        "reader_connect": 2477,
+        "integrity": 84753,
+        "service": 3003,
+        "snapshot": 88085,
+        "lifecycle": 92603
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1613,
+        "reader_connect": 2534,
+        "integrity": 84168,
+        "service": 3503,
+        "snapshot": 87982,
+        "lifecycle": 92663
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1353,
+        "reader_connect": 2567,
+        "integrity": 84372,
+        "service": 17049,
+        "snapshot": 101752,
+        "lifecycle": 106300
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1484,
+        "reader_connect": 2534,
+        "integrity": 85223,
+        "service": 3764,
+        "snapshot": 89254,
+        "lifecycle": 93805
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1588,
+        "reader_connect": 2542,
+        "integrity": 84140,
+        "service": 2953,
+        "snapshot": 87422,
+        "lifecycle": 92098
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1460,
+        "reader_connect": 2596,
+        "integrity": 83522,
+        "service": 3420,
+        "snapshot": 87236,
+        "lifecycle": 91827
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1457,
+        "reader_connect": 2478,
+        "integrity": 84539,
+        "service": 16633,
+        "snapshot": 101490,
+        "lifecycle": 105971
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1603,
+        "reader_connect": 2651,
+        "integrity": 86633,
+        "service": 3584,
+        "snapshot": 90479,
+        "lifecycle": 95254
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1602,
+        "reader_connect": 2477,
+        "integrity": 83876,
+        "service": 2952,
+        "snapshot": 87133,
+        "lifecycle": 91767
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1363,
+        "reader_connect": 2464,
+        "integrity": 84039,
+        "service": 3534,
+        "snapshot": 87896,
+        "lifecycle": 92285
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1557,
+        "reader_connect": 2570,
+        "integrity": 85218,
+        "service": 27412,
+        "snapshot": 112966,
+        "lifecycle": 117650
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1566,
+        "reader_connect": 2571,
+        "integrity": 83252,
+        "service": 3621,
+        "snapshot": 87151,
+        "lifecycle": 91829
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1455,
+        "reader_connect": 2502,
+        "integrity": 84246,
+        "service": 2764,
+        "snapshot": 87319,
+        "lifecycle": 91817
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1434,
+        "reader_connect": 2461,
+        "integrity": 85537,
+        "service": 3683,
+        "snapshot": 89531,
+        "lifecycle": 93963
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1642,
+        "reader_connect": 2523,
+        "integrity": 84583,
+        "service": 16706,
+        "snapshot": 101584,
+        "lifecycle": 106341
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1654,
+        "reader_connect": 2621,
+        "integrity": 83029,
+        "service": 3502,
+        "snapshot": 86793,
+        "lifecycle": 91599
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1531,
+        "reader_connect": 2599,
+        "integrity": 83218,
+        "service": 2946,
+        "snapshot": 86496,
+        "lifecycle": 91174
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1520,
+        "reader_connect": 2547,
+        "integrity": 84188,
+        "service": 3438,
+        "snapshot": 87933,
+        "lifecycle": 92540
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1659,
+        "reader_connect": 2691,
+        "integrity": 84526,
+        "service": 17187,
+        "snapshot": 102070,
+        "lifecycle": 106996
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1548,
+        "reader_connect": 2401,
+        "integrity": 84888,
+        "service": 3444,
+        "snapshot": 88592,
+        "lifecycle": 93094
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1536,
+        "reader_connect": 2504,
+        "integrity": 83541,
+        "service": 3031,
+        "snapshot": 86900,
+        "lifecycle": 91491
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1598,
+        "reader_connect": 2476,
+        "integrity": 84098,
+        "service": 3477,
+        "snapshot": 87898,
+        "lifecycle": 92523
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1488,
+        "reader_connect": 2466,
+        "integrity": 84912,
+        "service": 16690,
+        "snapshot": 101905,
+        "lifecycle": 106395
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1728,
+        "reader_connect": 2547,
+        "integrity": 84373,
+        "service": 3571,
+        "snapshot": 88215,
+        "lifecycle": 93028
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1583,
+        "reader_connect": 2545,
+        "integrity": 84876,
+        "service": 3243,
+        "snapshot": 88423,
+        "lifecycle": 93094
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1425,
+        "reader_connect": 2608,
+        "integrity": 83961,
+        "service": 3481,
+        "snapshot": 87751,
+        "lifecycle": 92324
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1439,
+        "reader_connect": 2472,
+        "integrity": 84721,
+        "service": 16804,
+        "snapshot": 101839,
+        "lifecycle": 106395
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1668,
+        "reader_connect": 2634,
+        "integrity": 84708,
+        "service": 3555,
+        "snapshot": 88520,
+        "lifecycle": 93362
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1534,
+        "reader_connect": 2526,
+        "integrity": 85179,
+        "service": 2926,
+        "snapshot": 88456,
+        "lifecycle": 93094
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1538,
+        "reader_connect": 2474,
+        "integrity": 86870,
+        "service": 3747,
+        "snapshot": 90980,
+        "lifecycle": 95584
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1608,
+        "reader_connect": 2544,
+        "integrity": 85503,
+        "service": 16690,
+        "snapshot": 102509,
+        "lifecycle": 107225
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1495,
+        "reader_connect": 2486,
+        "integrity": 84093,
+        "service": 3553,
+        "snapshot": 87910,
+        "lifecycle": 92431
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1531,
+        "reader_connect": 2498,
+        "integrity": 83689,
+        "service": 3006,
+        "snapshot": 87001,
+        "lifecycle": 91574
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2612,
+        "integrity": 83526,
+        "service": 3544,
+        "snapshot": 87410,
+        "lifecycle": 92152
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1544,
+        "reader_connect": 2471,
+        "integrity": 85139,
+        "service": 28435,
+        "snapshot": 113963,
+        "lifecycle": 118589
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1587,
+        "reader_connect": 2638,
+        "integrity": 84487,
+        "service": 3469,
+        "snapshot": 88210,
+        "lifecycle": 92973
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1523,
+        "reader_connect": 2394,
+        "integrity": 83871,
+        "service": 2954,
+        "snapshot": 87138,
+        "lifecycle": 91603
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1543,
+        "reader_connect": 2515,
+        "integrity": 84753,
+        "service": 3568,
+        "snapshot": 88628,
+        "lifecycle": 93223
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1549,
+        "reader_connect": 2530,
+        "integrity": 84724,
+        "service": 17178,
+        "snapshot": 102214,
+        "lifecycle": 106857
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2616,
+        "integrity": 84092,
+        "service": 3615,
+        "snapshot": 87960,
+        "lifecycle": 92663
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1411,
+        "reader_connect": 2444,
+        "integrity": 85301,
+        "service": 3001,
+        "snapshot": 88641,
+        "lifecycle": 93052
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1590,
+        "reader_connect": 2636,
+        "integrity": 85741,
+        "service": 3458,
+        "snapshot": 89505,
+        "lifecycle": 94277
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1345,
+        "reader_connect": 2486,
+        "integrity": 84756,
+        "service": 17095,
+        "snapshot": 102145,
+        "lifecycle": 106500
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1587,
+        "reader_connect": 2591,
+        "integrity": 84932,
+        "service": 3500,
+        "snapshot": 88695,
+        "lifecycle": 93455
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1643,
+        "reader_connect": 2549,
+        "integrity": 85634,
+        "service": 3040,
+        "snapshot": 88991,
+        "lifecycle": 93717
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1673,
+        "reader_connect": 2454,
+        "integrity": 84174,
+        "service": 3763,
+        "snapshot": 88244,
+        "lifecycle": 92958
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1584,
+        "reader_connect": 2498,
+        "integrity": 83972,
+        "service": 17136,
+        "snapshot": 101398,
+        "lifecycle": 106004
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1519,
+        "reader_connect": 2516,
+        "integrity": 83604,
+        "service": 3698,
+        "snapshot": 87589,
+        "lifecycle": 92169
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1487,
+        "reader_connect": 2660,
+        "integrity": 84626,
+        "service": 2965,
+        "snapshot": 87897,
+        "lifecycle": 92612
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1470,
+        "reader_connect": 2503,
+        "integrity": 84939,
+        "service": 3496,
+        "snapshot": 88757,
+        "lifecycle": 93262
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1425,
+        "reader_connect": 2639,
+        "integrity": 84926,
+        "service": 16988,
+        "snapshot": 102213,
+        "lifecycle": 106811
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1476,
+        "reader_connect": 2546,
+        "integrity": 82896,
+        "service": 3550,
+        "snapshot": 86701,
+        "lifecycle": 91265
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1513,
+        "reader_connect": 2454,
+        "integrity": 85006,
+        "service": 3333,
+        "snapshot": 88653,
+        "lifecycle": 93161
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1545,
+        "reader_connect": 2623,
+        "integrity": 84762,
+        "service": 3587,
+        "snapshot": 88644,
+        "lifecycle": 93346
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1635,
+        "reader_connect": 2429,
+        "integrity": 86148,
+        "service": 16931,
+        "snapshot": 103393,
+        "lifecycle": 108000
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2495,
+        "integrity": 84222,
+        "service": 3749,
+        "snapshot": 88227,
+        "lifecycle": 92769
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1510,
+        "reader_connect": 2573,
+        "integrity": 84585,
+        "service": 2894,
+        "snapshot": 87791,
+        "lifecycle": 92411
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1752,
+        "reader_connect": 2442,
+        "integrity": 84326,
+        "service": 3503,
+        "snapshot": 88131,
+        "lifecycle": 92851
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1497,
+        "reader_connect": 2452,
+        "integrity": 84863,
+        "service": 28300,
+        "snapshot": 113513,
+        "lifecycle": 118033
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1664,
+        "reader_connect": 2438,
+        "integrity": 84331,
+        "service": 3618,
+        "snapshot": 88194,
+        "lifecycle": 92815
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1524,
+        "reader_connect": 2523,
+        "integrity": 84096,
+        "service": 2841,
+        "snapshot": 87245,
+        "lifecycle": 91837
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2466,
+        "integrity": 86482,
+        "service": 3439,
+        "snapshot": 90249,
+        "lifecycle": 94782
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1655,
+        "reader_connect": 2473,
+        "integrity": 83626,
+        "service": 16935,
+        "snapshot": 100892,
+        "lifecycle": 105590
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1494,
+        "reader_connect": 2534,
+        "integrity": 85410,
+        "service": 3419,
+        "snapshot": 89094,
+        "lifecycle": 93716
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1742,
+        "reader_connect": 2569,
+        "integrity": 84178,
+        "service": 2879,
+        "snapshot": 87373,
+        "lifecycle": 92231
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1467,
+        "reader_connect": 2493,
+        "integrity": 85718,
+        "service": 3404,
+        "snapshot": 89429,
+        "lifecycle": 93918
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1339,
+        "reader_connect": 2441,
+        "integrity": 85977,
+        "service": 17235,
+        "snapshot": 103485,
+        "lifecycle": 107807
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1682,
+        "reader_connect": 2491,
+        "integrity": 84525,
+        "service": 3348,
+        "snapshot": 88157,
+        "lifecycle": 92891
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1391,
+        "reader_connect": 2582,
+        "integrity": 84392,
+        "service": 3092,
+        "snapshot": 87810,
+        "lifecycle": 92323
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1573,
+        "reader_connect": 2529,
+        "integrity": 84733,
+        "service": 3422,
+        "snapshot": 88468,
+        "lifecycle": 93100
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1479,
+        "reader_connect": 2613,
+        "integrity": 84034,
+        "service": 17088,
+        "snapshot": 101420,
+        "lifecycle": 106114
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1747,
+        "reader_connect": 2693,
+        "integrity": 85397,
+        "service": 3838,
+        "snapshot": 89497,
+        "lifecycle": 94460
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1630,
+        "reader_connect": 2442,
+        "integrity": 85256,
+        "service": 3062,
+        "snapshot": 88619,
+        "lifecycle": 93216
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1511,
+        "reader_connect": 2670,
+        "integrity": 85488,
+        "service": 3540,
+        "snapshot": 89351,
+        "lifecycle": 94094
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1512,
+        "reader_connect": 2397,
+        "integrity": 85852,
+        "service": 17061,
+        "snapshot": 103220,
+        "lifecycle": 107696
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1679,
+        "reader_connect": 2532,
+        "integrity": 83886,
+        "service": 3722,
+        "snapshot": 87872,
+        "lifecycle": 92651
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1408,
+        "reader_connect": 2553,
+        "integrity": 85066,
+        "service": 3009,
+        "snapshot": 88388,
+        "lifecycle": 92901
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1368,
+        "reader_connect": 2623,
+        "integrity": 85372,
+        "service": 3692,
+        "snapshot": 89371,
+        "lifecycle": 93909
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1593,
+        "reader_connect": 2556,
+        "integrity": 85954,
+        "service": 17114,
+        "snapshot": 103354,
+        "lifecycle": 108045
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1573,
+        "reader_connect": 2593,
+        "integrity": 85912,
+        "service": 3418,
+        "snapshot": 89595,
+        "lifecycle": 94288
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2428,
+        "integrity": 84900,
+        "service": 3054,
+        "snapshot": 88277,
+        "lifecycle": 92793
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1596,
+        "reader_connect": 2448,
+        "integrity": 85031,
+        "service": 15180,
+        "snapshot": 100552,
+        "lifecycle": 105188
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1658,
+        "reader_connect": 2516,
+        "integrity": 84428,
+        "service": 16594,
+        "snapshot": 101346,
+        "lifecycle": 106079
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1520,
+        "reader_connect": 2575,
+        "integrity": 83839,
+        "service": 3744,
+        "snapshot": 87824,
+        "lifecycle": 92449
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1339,
+        "reader_connect": 2451,
+        "integrity": 86026,
+        "service": 3380,
+        "snapshot": 89764,
+        "lifecycle": 94118
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1626,
+        "reader_connect": 2677,
+        "integrity": 84672,
+        "service": 3550,
+        "snapshot": 88543,
+        "lifecycle": 93381
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1525,
+        "reader_connect": 2465,
+        "integrity": 85667,
+        "service": 17125,
+        "snapshot": 103087,
+        "lifecycle": 107658
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1565,
+        "reader_connect": 2683,
+        "integrity": 86011,
+        "service": 3740,
+        "snapshot": 90017,
+        "lifecycle": 94784
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1419,
+        "reader_connect": 2403,
+        "integrity": 84990,
+        "service": 3172,
+        "snapshot": 88492,
+        "lifecycle": 92911
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1450,
+        "reader_connect": 2395,
+        "integrity": 85732,
+        "service": 3503,
+        "snapshot": 89537,
+        "lifecycle": 93951
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1473,
+        "reader_connect": 2616,
+        "integrity": 83911,
+        "service": 17413,
+        "snapshot": 101640,
+        "lifecycle": 106304
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1566,
+        "reader_connect": 2568,
+        "integrity": 85076,
+        "service": 3482,
+        "snapshot": 88842,
+        "lifecycle": 93525
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1518,
+        "reader_connect": 2465,
+        "integrity": 84433,
+        "service": 3021,
+        "snapshot": 87780,
+        "lifecycle": 92305
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1474,
+        "reader_connect": 2554,
+        "integrity": 84525,
+        "service": 3495,
+        "snapshot": 88328,
+        "lifecycle": 92897
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1569,
+        "reader_connect": 2456,
+        "integrity": 85983,
+        "service": 16842,
+        "snapshot": 103137,
+        "lifecycle": 107699
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1579,
+        "reader_connect": 2537,
+        "integrity": 84986,
+        "service": 3434,
+        "snapshot": 88693,
+        "lifecycle": 93357
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1505,
+        "reader_connect": 2548,
+        "integrity": 84953,
+        "service": 3073,
+        "snapshot": 88377,
+        "lifecycle": 93033
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1349,
+        "reader_connect": 2503,
+        "integrity": 85192,
+        "service": 3666,
+        "snapshot": 89182,
+        "lifecycle": 93594
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1518,
+        "reader_connect": 2548,
+        "integrity": 85721,
+        "service": 17159,
+        "snapshot": 103190,
+        "lifecycle": 107806
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1591,
+        "reader_connect": 2513,
+        "integrity": 85222,
+        "service": 3616,
+        "snapshot": 89110,
+        "lifecycle": 93780
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1466,
+        "reader_connect": 2697,
+        "integrity": 86040,
+        "service": 3051,
+        "snapshot": 89387,
+        "lifecycle": 94102
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1458,
+        "reader_connect": 2444,
+        "integrity": 84138,
+        "service": 3503,
+        "snapshot": 87944,
+        "lifecycle": 92408
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1640,
+        "reader_connect": 2531,
+        "integrity": 85362,
+        "service": 16908,
+        "snapshot": 102559,
+        "lifecycle": 107329
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1621,
+        "reader_connect": 2600,
+        "integrity": 86421,
+        "service": 3558,
+        "snapshot": 90241,
+        "lifecycle": 95013
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1580,
+        "reader_connect": 2586,
+        "integrity": 84628,
+        "service": 13844,
+        "snapshot": 98792,
+        "lifecycle": 103535
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1675,
+        "reader_connect": 2605,
+        "integrity": 85218,
+        "service": 3636,
+        "snapshot": 89166,
+        "lifecycle": 93981
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1578,
+        "reader_connect": 2507,
+        "integrity": 85025,
+        "service": 16590,
+        "snapshot": 101903,
+        "lifecycle": 106573
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1680,
+        "reader_connect": 2590,
+        "integrity": 84901,
+        "service": 3589,
+        "snapshot": 88742,
+        "lifecycle": 93561
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1640,
+        "reader_connect": 2540,
+        "integrity": 84879,
+        "service": 2809,
+        "snapshot": 88008,
+        "lifecycle": 92721
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1447,
+        "reader_connect": 2523,
+        "integrity": 84538,
+        "service": 3582,
+        "snapshot": 88425,
+        "lifecycle": 92967
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1507,
+        "reader_connect": 2602,
+        "integrity": 86147,
+        "service": 16825,
+        "snapshot": 103269,
+        "lifecycle": 107912
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1467,
+        "reader_connect": 2523,
+        "integrity": 84871,
+        "service": 3543,
+        "snapshot": 88657,
+        "lifecycle": 93165
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1690,
+        "reader_connect": 2490,
+        "integrity": 85695,
+        "service": 3163,
+        "snapshot": 89173,
+        "lifecycle": 93891
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1621,
+        "reader_connect": 2571,
+        "integrity": 85296,
+        "service": 3656,
+        "snapshot": 89301,
+        "lifecycle": 94017
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1516,
+        "reader_connect": 2550,
+        "integrity": 85369,
+        "service": 16847,
+        "snapshot": 102517,
+        "lifecycle": 107136
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1600,
+        "reader_connect": 2594,
+        "integrity": 86406,
+        "service": 3621,
+        "snapshot": 90283,
+        "lifecycle": 95006
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1518,
+        "reader_connect": 2540,
+        "integrity": 85339,
+        "service": 3087,
+        "snapshot": 88773,
+        "lifecycle": 93392
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1510,
+        "reader_connect": 2484,
+        "integrity": 85299,
+        "service": 3832,
+        "snapshot": 89466,
+        "lifecycle": 94020
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1464,
+        "reader_connect": 2673,
+        "integrity": 83962,
+        "service": 16972,
+        "snapshot": 101221,
+        "lifecycle": 105900
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1700,
+        "reader_connect": 2701,
+        "integrity": 84757,
+        "service": 3730,
+        "snapshot": 88758,
+        "lifecycle": 93695
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1600,
+        "reader_connect": 2559,
+        "integrity": 85851,
+        "service": 2978,
+        "snapshot": 89166,
+        "lifecycle": 93869
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1496,
+        "reader_connect": 2564,
+        "integrity": 85034,
+        "service": 3582,
+        "snapshot": 88926,
+        "lifecycle": 93521
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1537,
+        "reader_connect": 2459,
+        "integrity": 85587,
+        "service": 17706,
+        "snapshot": 103607,
+        "lifecycle": 108163
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1525,
+        "reader_connect": 2523,
+        "integrity": 84517,
+        "service": 3484,
+        "snapshot": 88248,
+        "lifecycle": 92845
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1472,
+        "reader_connect": 2574,
+        "integrity": 84965,
+        "service": 3036,
+        "snapshot": 88305,
+        "lifecycle": 92905
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1550,
+        "reader_connect": 2615,
+        "integrity": 85143,
+        "service": 3571,
+        "snapshot": 89021,
+        "lifecycle": 93738
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1530,
+        "reader_connect": 2498,
+        "integrity": 84325,
+        "service": 28906,
+        "snapshot": 113613,
+        "lifecycle": 118185
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1392,
+        "reader_connect": 2466,
+        "integrity": 85106,
+        "service": 3572,
+        "snapshot": 88927,
+        "lifecycle": 93314
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1343,
+        "reader_connect": 2540,
+        "integrity": 85986,
+        "service": 2884,
+        "snapshot": 89218,
+        "lifecycle": 93682
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2553,
+        "integrity": 86251,
+        "service": 3467,
+        "snapshot": 90049,
+        "lifecycle": 94698
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1564,
+        "reader_connect": 2403,
+        "integrity": 86087,
+        "service": 17579,
+        "snapshot": 103983,
+        "lifecycle": 108491
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1540,
+        "reader_connect": 2613,
+        "integrity": 85136,
+        "service": 3716,
+        "snapshot": 89110,
+        "lifecycle": 93790
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1556,
+        "reader_connect": 2430,
+        "integrity": 87017,
+        "service": 2973,
+        "snapshot": 90328,
+        "lifecycle": 94853
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1461,
+        "reader_connect": 2585,
+        "integrity": 86772,
+        "service": 3524,
+        "snapshot": 90596,
+        "lifecycle": 95182
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1407,
+        "reader_connect": 2623,
+        "integrity": 85120,
+        "service": 16687,
+        "snapshot": 102119,
+        "lifecycle": 106711
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1541,
+        "reader_connect": 2616,
+        "integrity": 86570,
+        "service": 3483,
+        "snapshot": 90316,
+        "lifecycle": 95009
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1390,
+        "reader_connect": 2558,
+        "integrity": 84885,
+        "service": 3340,
+        "snapshot": 88526,
+        "lifecycle": 93011
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1492,
+        "reader_connect": 2460,
+        "integrity": 85477,
+        "service": 3538,
+        "snapshot": 89332,
+        "lifecycle": 93813
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1577,
+        "reader_connect": 2640,
+        "integrity": 85573,
+        "service": 16947,
+        "snapshot": 102831,
+        "lifecycle": 107596
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1494,
+        "reader_connect": 2520,
+        "integrity": 84390,
+        "service": 3509,
+        "snapshot": 88147,
+        "lifecycle": 92688
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2659,
+        "integrity": 85308,
+        "service": 3089,
+        "snapshot": 88735,
+        "lifecycle": 93494
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1515,
+        "reader_connect": 2508,
+        "integrity": 86611,
+        "service": 3600,
+        "snapshot": 90513,
+        "lifecycle": 95072
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1553,
+        "reader_connect": 2578,
+        "integrity": 84619,
+        "service": 17246,
+        "snapshot": 102155,
+        "lifecycle": 106863
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1604,
+        "reader_connect": 2538,
+        "integrity": 86793,
+        "service": 3716,
+        "snapshot": 90764,
+        "lifecycle": 95452
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1615,
+        "reader_connect": 2398,
+        "integrity": 84162,
+        "service": 3048,
+        "snapshot": 87525,
+        "lifecycle": 92089
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1551,
+        "reader_connect": 2618,
+        "integrity": 85109,
+        "service": 3432,
+        "snapshot": 88837,
+        "lifecycle": 93540
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1571,
+        "reader_connect": 2311,
+        "integrity": 85253,
+        "service": 17340,
+        "snapshot": 102896,
+        "lifecycle": 107310
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1617,
+        "reader_connect": 2624,
+        "integrity": 85336,
+        "service": 3438,
+        "snapshot": 89019,
+        "lifecycle": 93784
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1546,
+        "reader_connect": 2411,
+        "integrity": 84271,
+        "service": 2973,
+        "snapshot": 87569,
+        "lifecycle": 92060
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1610,
+        "reader_connect": 2635,
+        "integrity": 85466,
+        "service": 3640,
+        "snapshot": 89434,
+        "lifecycle": 94235
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1566,
+        "reader_connect": 2519,
+        "integrity": 86427,
+        "service": 28349,
+        "snapshot": 115135,
+        "lifecycle": 119784
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1756,
+        "reader_connect": 2731,
+        "integrity": 85990,
+        "service": 3839,
+        "snapshot": 90087,
+        "lifecycle": 95120
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1546,
+        "reader_connect": 2630,
+        "integrity": 86483,
+        "service": 2989,
+        "snapshot": 89799,
+        "lifecycle": 94524
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1580,
+        "reader_connect": 2727,
+        "integrity": 86383,
+        "service": 3641,
+        "snapshot": 90346,
+        "lifecycle": 95205
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1530,
+        "reader_connect": 2631,
+        "integrity": 86813,
+        "service": 17282,
+        "snapshot": 104423,
+        "lifecycle": 109127
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1559,
+        "reader_connect": 2535,
+        "integrity": 85323,
+        "service": 3391,
+        "snapshot": 88975,
+        "lifecycle": 93619
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1532,
+        "reader_connect": 2483,
+        "integrity": 85719,
+        "service": 2902,
+        "snapshot": 88936,
+        "lifecycle": 93486
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1462,
+        "reader_connect": 2535,
+        "integrity": 85143,
+        "service": 3597,
+        "snapshot": 89053,
+        "lifecycle": 93673
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1418,
+        "reader_connect": 2459,
+        "integrity": 85828,
+        "service": 17375,
+        "snapshot": 103494,
+        "lifecycle": 107949
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1596,
+        "reader_connect": 2498,
+        "integrity": 84667,
+        "service": 3494,
+        "snapshot": 88406,
+        "lifecycle": 93005
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1458,
+        "reader_connect": 2396,
+        "integrity": 85278,
+        "service": 3219,
+        "snapshot": 88826,
+        "lifecycle": 93219
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1695,
+        "reader_connect": 2533,
+        "integrity": 85100,
+        "service": 3583,
+        "snapshot": 88990,
+        "lifecycle": 93762
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1482,
+        "reader_connect": 2506,
+        "integrity": 84983,
+        "service": 16540,
+        "snapshot": 101804,
+        "lifecycle": 106331
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1585,
+        "reader_connect": 2580,
+        "integrity": 84523,
+        "service": 3349,
+        "snapshot": 88120,
+        "lifecycle": 92823
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1468,
+        "reader_connect": 2434,
+        "integrity": 86450,
+        "service": 3016,
+        "snapshot": 89766,
+        "lifecycle": 94198
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1524,
+        "reader_connect": 2526,
+        "integrity": 83878,
+        "service": 3531,
+        "snapshot": 87733,
+        "lifecycle": 92362
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1513,
+        "reader_connect": 2713,
+        "integrity": 85489,
+        "service": 17589,
+        "snapshot": 103400,
+        "lifecycle": 108205
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1708,
+        "reader_connect": 2436,
+        "integrity": 84205,
+        "service": 3386,
+        "snapshot": 87853,
+        "lifecycle": 92517
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1515,
+        "reader_connect": 2528,
+        "integrity": 84728,
+        "service": 3050,
+        "snapshot": 88146,
+        "lifecycle": 92737
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1503,
+        "reader_connect": 2551,
+        "integrity": 84517,
+        "service": 3765,
+        "snapshot": 88612,
+        "lifecycle": 93244
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1499,
+        "reader_connect": 2519,
+        "integrity": 85861,
+        "service": 17358,
+        "snapshot": 103526,
+        "lifecycle": 108084
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1524,
+        "reader_connect": 2374,
+        "integrity": 85478,
+        "service": 3567,
+        "snapshot": 89302,
+        "lifecycle": 93731
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1484,
+        "reader_connect": 2536,
+        "integrity": 85401,
+        "service": 3003,
+        "snapshot": 88715,
+        "lifecycle": 93281
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1499,
+        "reader_connect": 2617,
+        "integrity": 85218,
+        "service": 3576,
+        "snapshot": 89110,
+        "lifecycle": 93772
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1631,
+        "reader_connect": 2329,
+        "integrity": 86120,
+        "service": 28875,
+        "snapshot": 115355,
+        "lifecycle": 119892
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1579,
+        "reader_connect": 2598,
+        "integrity": 87224,
+        "service": 3657,
+        "snapshot": 91150,
+        "lifecycle": 95865
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1511,
+        "reader_connect": 2678,
+        "integrity": 86816,
+        "service": 2800,
+        "snapshot": 89944,
+        "lifecycle": 94684
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1327,
+        "reader_connect": 2440,
+        "integrity": 85807,
+        "service": 3471,
+        "snapshot": 89594,
+        "lifecycle": 93917
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1590,
+        "reader_connect": 2564,
+        "integrity": 85592,
+        "service": 17115,
+        "snapshot": 103015,
+        "lifecycle": 107721
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1540,
+        "reader_connect": 2685,
+        "integrity": 85973,
+        "service": 3744,
+        "snapshot": 89960,
+        "lifecycle": 94710
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1371,
+        "reader_connect": 2560,
+        "integrity": 84699,
+        "service": 3033,
+        "snapshot": 88043,
+        "lifecycle": 92533
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1356,
+        "reader_connect": 2524,
+        "integrity": 85672,
+        "service": 3618,
+        "snapshot": 89612,
+        "lifecycle": 94027
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1520,
+        "reader_connect": 2604,
+        "integrity": 85379,
+        "service": 17047,
+        "snapshot": 102733,
+        "lifecycle": 107462
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1549,
+        "reader_connect": 2545,
+        "integrity": 83976,
+        "service": 3779,
+        "snapshot": 88010,
+        "lifecycle": 92631
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1566,
+        "reader_connect": 2456,
+        "integrity": 85510,
+        "service": 3146,
+        "snapshot": 88993,
+        "lifecycle": 93551
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1354,
+        "reader_connect": 2650,
+        "integrity": 84824,
+        "service": 3555,
+        "snapshot": 88719,
+        "lifecycle": 93320
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1481,
+        "reader_connect": 2648,
+        "integrity": 85210,
+        "service": 17105,
+        "snapshot": 102624,
+        "lifecycle": 107328
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1381,
+        "reader_connect": 2557,
+        "integrity": 85328,
+        "service": 3509,
+        "snapshot": 89110,
+        "lifecycle": 93594
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1599,
+        "reader_connect": 2654,
+        "integrity": 85397,
+        "service": 3105,
+        "snapshot": 88840,
+        "lifecycle": 93653
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1538,
+        "reader_connect": 2471,
+        "integrity": 85401,
+        "service": 3579,
+        "snapshot": 89306,
+        "lifecycle": 93838
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1580,
+        "reader_connect": 2505,
+        "integrity": 86104,
+        "service": 16966,
+        "snapshot": 103391,
+        "lifecycle": 108059
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1518,
+        "reader_connect": 2511,
+        "integrity": 86816,
+        "service": 3248,
+        "snapshot": 90321,
+        "lifecycle": 94882
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1423,
+        "reader_connect": 2606,
+        "integrity": 85117,
+        "service": 3081,
+        "snapshot": 88533,
+        "lifecycle": 93094
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1512,
+        "reader_connect": 2488,
+        "integrity": 85701,
+        "service": 3596,
+        "snapshot": 89618,
+        "lifecycle": 94159
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1483,
+        "reader_connect": 2530,
+        "integrity": 84640,
+        "service": 17332,
+        "snapshot": 102256,
+        "lifecycle": 106832
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1484,
+        "reader_connect": 2540,
+        "integrity": 85034,
+        "service": 3704,
+        "snapshot": 89009,
+        "lifecycle": 93606
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1577,
+        "reader_connect": 2535,
+        "integrity": 86772,
+        "service": 2982,
+        "snapshot": 90079,
+        "lifecycle": 94746
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1355,
+        "reader_connect": 2641,
+        "integrity": 87608,
+        "service": 3541,
+        "snapshot": 91471,
+        "lifecycle": 96056
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1497,
+        "reader_connect": 2352,
+        "integrity": 85254,
+        "service": 28844,
+        "snapshot": 114479,
+        "lifecycle": 118919
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1629,
+        "reader_connect": 2596,
+        "integrity": 85061,
+        "service": 3497,
+        "snapshot": 88821,
+        "lifecycle": 93615
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1507,
+        "reader_connect": 2431,
+        "integrity": 85457,
+        "service": 2874,
+        "snapshot": 88655,
+        "lifecycle": 93128
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1598,
+        "reader_connect": 2646,
+        "integrity": 87367,
+        "service": 3509,
+        "snapshot": 91180,
+        "lifecycle": 95973
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1613,
+        "reader_connect": 2518,
+        "integrity": 85261,
+        "service": 17339,
+        "snapshot": 102932,
+        "lifecycle": 107592
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1509,
+        "reader_connect": 2501,
+        "integrity": 85010,
+        "service": 3531,
+        "snapshot": 88805,
+        "lifecycle": 93344
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1378,
+        "reader_connect": 2512,
+        "integrity": 85369,
+        "service": 3058,
+        "snapshot": 88736,
+        "lifecycle": 93153
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1669,
+        "reader_connect": 2598,
+        "integrity": 86545,
+        "service": 3528,
+        "snapshot": 90377,
+        "lifecycle": 95171
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1497,
+        "reader_connect": 2492,
+        "integrity": 84489,
+        "service": 17288,
+        "snapshot": 102081,
+        "lifecycle": 106619
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1514,
+        "reader_connect": 2435,
+        "integrity": 85710,
+        "service": 3334,
+        "snapshot": 89311,
+        "lifecycle": 93789
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1507,
+        "reader_connect": 2499,
+        "integrity": 84205,
+        "service": 3195,
+        "snapshot": 87720,
+        "lifecycle": 92276
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1529,
+        "reader_connect": 2533,
+        "integrity": 85982,
+        "service": 3753,
+        "snapshot": 90054,
+        "lifecycle": 94660
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1444,
+        "reader_connect": 2341,
+        "integrity": 85229,
+        "service": 17269,
+        "snapshot": 102782,
+        "lifecycle": 107107
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1363,
+        "reader_connect": 2361,
+        "integrity": 84551,
+        "service": 3645,
+        "snapshot": 88453,
+        "lifecycle": 92721
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1533,
+        "reader_connect": 2645,
+        "integrity": 85809,
+        "service": 2944,
+        "snapshot": 89084,
+        "lifecycle": 93791
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1550,
+        "reader_connect": 2517,
+        "integrity": 85277,
+        "service": 3511,
+        "snapshot": 89117,
+        "lifecycle": 93725
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1395,
+        "reader_connect": 2407,
+        "integrity": 85161,
+        "service": 17666,
+        "snapshot": 103124,
+        "lifecycle": 107471
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1626,
+        "reader_connect": 2538,
+        "integrity": 84529,
+        "service": 3515,
+        "snapshot": 88302,
+        "lifecycle": 93000
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1567,
+        "reader_connect": 2672,
+        "integrity": 84887,
+        "service": 3065,
+        "snapshot": 88299,
+        "lifecycle": 93105
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1509,
+        "reader_connect": 2902,
+        "integrity": 86832,
+        "service": 3728,
+        "snapshot": 90873,
+        "lifecycle": 95896
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2606,
+        "integrity": 86435,
+        "service": 17285,
+        "snapshot": 104013,
+        "lifecycle": 108734
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1573,
+        "reader_connect": 2570,
+        "integrity": 85610,
+        "service": 3562,
+        "snapshot": 89435,
+        "lifecycle": 94156
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1629,
+        "reader_connect": 2498,
+        "integrity": 85928,
+        "service": 3098,
+        "snapshot": 89359,
+        "lifecycle": 94038
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1504,
+        "reader_connect": 2340,
+        "integrity": 86627,
+        "service": 3623,
+        "snapshot": 90569,
+        "lifecycle": 94952
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1377,
+        "reader_connect": 2420,
+        "integrity": 85241,
+        "service": 29149,
+        "snapshot": 114728,
+        "lifecycle": 119091
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1575,
+        "reader_connect": 2449,
+        "integrity": 86171,
+        "service": 3600,
+        "snapshot": 90022,
+        "lifecycle": 94584
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1602,
+        "reader_connect": 2646,
+        "integrity": 86117,
+        "service": 2902,
+        "snapshot": 89358,
+        "lifecycle": 94154
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1605,
+        "reader_connect": 2357,
+        "integrity": 85409,
+        "service": 3701,
+        "snapshot": 89413,
+        "lifecycle": 93910
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1549,
+        "reader_connect": 2478,
+        "integrity": 85619,
+        "service": 17497,
+        "snapshot": 103401,
+        "lifecycle": 107955
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1378,
+        "reader_connect": 2616,
+        "integrity": 85021,
+        "service": 3415,
+        "snapshot": 88701,
+        "lifecycle": 93240
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1381,
+        "reader_connect": 2487,
+        "integrity": 86152,
+        "service": 3044,
+        "snapshot": 89518,
+        "lifecycle": 93940
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1469,
+        "reader_connect": 2297,
+        "integrity": 84998,
+        "service": 3579,
+        "snapshot": 88900,
+        "lifecycle": 93224
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1477,
+        "reader_connect": 2500,
+        "integrity": 85157,
+        "service": 17324,
+        "snapshot": 102795,
+        "lifecycle": 107406
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1640,
+        "reader_connect": 2549,
+        "integrity": 84924,
+        "service": 3663,
+        "snapshot": 88863,
+        "lifecycle": 93596
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1656,
+        "reader_connect": 2522,
+        "integrity": 84942,
+        "service": 3276,
+        "snapshot": 88527,
+        "lifecycle": 93255
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1578,
+        "reader_connect": 2482,
+        "integrity": 85403,
+        "service": 3675,
+        "snapshot": 89407,
+        "lifecycle": 93994
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1541,
+        "reader_connect": 2577,
+        "integrity": 85009,
+        "service": 17406,
+        "snapshot": 102745,
+        "lifecycle": 107447
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1590,
+        "reader_connect": 2816,
+        "integrity": 87594,
+        "service": 3510,
+        "snapshot": 91372,
+        "lifecycle": 96329
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1553,
+        "reader_connect": 2417,
+        "integrity": 86578,
+        "service": 3084,
+        "snapshot": 90013,
+        "lifecycle": 94537
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1644,
+        "reader_connect": 2672,
+        "integrity": 86133,
+        "service": 3515,
+        "snapshot": 89968,
+        "lifecycle": 94831
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1560,
+        "reader_connect": 2544,
+        "integrity": 87790,
+        "service": 17323,
+        "snapshot": 105449,
+        "lifecycle": 110113
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1594,
+        "reader_connect": 2586,
+        "integrity": 85478,
+        "service": 3538,
+        "snapshot": 89285,
+        "lifecycle": 94053
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1574,
+        "reader_connect": 2789,
+        "integrity": 85513,
+        "service": 2970,
+        "snapshot": 88807,
+        "lifecycle": 93742
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1417,
+        "reader_connect": 2574,
+        "integrity": 85934,
+        "service": 3578,
+        "snapshot": 89836,
+        "lifecycle": 94359
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1508,
+        "reader_connect": 2528,
+        "integrity": 86370,
+        "service": 17558,
+        "snapshot": 104257,
+        "lifecycle": 108848
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1602,
+        "reader_connect": 2572,
+        "integrity": 85969,
+        "service": 3539,
+        "snapshot": 89777,
+        "lifecycle": 94489
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1561,
+        "reader_connect": 2570,
+        "integrity": 86141,
+        "service": 3132,
+        "snapshot": 89601,
+        "lifecycle": 94288
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1530,
+        "reader_connect": 2552,
+        "integrity": 85903,
+        "service": 3625,
+        "snapshot": 89844,
+        "lifecycle": 94477
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1578,
+        "reader_connect": 2626,
+        "integrity": 85294,
+        "service": 29027,
+        "snapshot": 114682,
+        "lifecycle": 119454
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1567,
+        "reader_connect": 2536,
+        "integrity": 86226,
+        "service": 3659,
+        "snapshot": 90144,
+        "lifecycle": 94782
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1564,
+        "reader_connect": 2425,
+        "integrity": 84994,
+        "service": 2936,
+        "snapshot": 88257,
+        "lifecycle": 92834
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1489,
+        "reader_connect": 2486,
+        "integrity": 85567,
+        "service": 3831,
+        "snapshot": 89751,
+        "lifecycle": 94288
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1380,
+        "reader_connect": 2572,
+        "integrity": 85548,
+        "service": 16969,
+        "snapshot": 102844,
+        "lifecycle": 107368
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1519,
+        "reader_connect": 2585,
+        "integrity": 85477,
+        "service": 3532,
+        "snapshot": 89271,
+        "lifecycle": 93899
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1486,
+        "reader_connect": 2580,
+        "integrity": 85079,
+        "service": 3061,
+        "snapshot": 88451,
+        "lifecycle": 93063
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1525,
+        "reader_connect": 2528,
+        "integrity": 85400,
+        "service": 3635,
+        "snapshot": 89387,
+        "lifecycle": 93979
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1544,
+        "reader_connect": 2475,
+        "integrity": 87373,
+        "service": 17360,
+        "snapshot": 105046,
+        "lifecycle": 109621
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1521,
+        "reader_connect": 2613,
+        "integrity": 85975,
+        "service": 3562,
+        "snapshot": 89811,
+        "lifecycle": 94486
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2502,
+        "integrity": 86947,
+        "service": 3329,
+        "snapshot": 90603,
+        "lifecycle": 95186
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1517,
+        "reader_connect": 2556,
+        "integrity": 84997,
+        "service": 3587,
+        "snapshot": 88904,
+        "lifecycle": 93545
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1517,
+        "reader_connect": 2495,
+        "integrity": 86135,
+        "service": 17255,
+        "snapshot": 103676,
+        "lifecycle": 108235
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1558,
+        "reader_connect": 2611,
+        "integrity": 85052,
+        "service": 3431,
+        "snapshot": 88741,
+        "lifecycle": 93453
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1717,
+        "reader_connect": 2530,
+        "integrity": 85305,
+        "service": 3193,
+        "snapshot": 88870,
+        "lifecycle": 93680
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1374,
+        "reader_connect": 2469,
+        "integrity": 86457,
+        "service": 3926,
+        "snapshot": 90747,
+        "lifecycle": 95167
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1592,
+        "reader_connect": 2618,
+        "integrity": 86086,
+        "service": 17437,
+        "snapshot": 103875,
+        "lifecycle": 108679
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1521,
+        "reader_connect": 2543,
+        "integrity": 86078,
+        "service": 3744,
+        "snapshot": 90092,
+        "lifecycle": 94698
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1380,
+        "reader_connect": 2587,
+        "integrity": 85690,
+        "service": 3137,
+        "snapshot": 89158,
+        "lifecycle": 93670
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1586,
+        "reader_connect": 2600,
+        "integrity": 86672,
+        "service": 3757,
+        "snapshot": 90794,
+        "lifecycle": 95559
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1627,
+        "reader_connect": 2759,
+        "integrity": 86788,
+        "service": 17352,
+        "snapshot": 104448,
+        "lifecycle": 109397
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1575,
+        "reader_connect": 2564,
+        "integrity": 86587,
+        "service": 3581,
+        "snapshot": 90442,
+        "lifecycle": 95110
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1622,
+        "reader_connect": 2431,
+        "integrity": 85744,
+        "service": 3060,
+        "snapshot": 89113,
+        "lifecycle": 93688
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1462,
+        "reader_connect": 2502,
+        "integrity": 87683,
+        "service": 3838,
+        "snapshot": 91873,
+        "lifecycle": 96411
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1523,
+        "reader_connect": 2446,
+        "integrity": 85425,
+        "service": 28701,
+        "snapshot": 114533,
+        "lifecycle": 119095
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1535,
+        "reader_connect": 2827,
+        "integrity": 86826,
+        "service": 3558,
+        "snapshot": 90641,
+        "lifecycle": 95600
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1533,
+        "reader_connect": 2538,
+        "integrity": 86589,
+        "service": 2910,
+        "snapshot": 89829,
+        "lifecycle": 94450
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1483,
+        "reader_connect": 2467,
+        "integrity": 86352,
+        "service": 3755,
+        "snapshot": 90477,
+        "lifecycle": 95000
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1663,
+        "reader_connect": 2700,
+        "integrity": 86317,
+        "service": 16904,
+        "snapshot": 103537,
+        "lifecycle": 108485
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1624,
+        "reader_connect": 2594,
+        "integrity": 86291,
+        "service": 3465,
+        "snapshot": 90038,
+        "lifecycle": 94832
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1513,
+        "reader_connect": 2598,
+        "integrity": 86399,
+        "service": 2982,
+        "snapshot": 89695,
+        "lifecycle": 94362
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1568,
+        "reader_connect": 2489,
+        "integrity": 86291,
+        "service": 3616,
+        "snapshot": 90214,
+        "lifecycle": 94845
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1515,
+        "reader_connect": 2602,
+        "integrity": 85401,
+        "service": 16722,
+        "snapshot": 102424,
+        "lifecycle": 107101
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1528,
+        "reader_connect": 2519,
+        "integrity": 85667,
+        "service": 3731,
+        "snapshot": 89658,
+        "lifecycle": 94232
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1530,
+        "reader_connect": 2502,
+        "integrity": 86726,
+        "service": 3378,
+        "snapshot": 90429,
+        "lifecycle": 95017
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1634,
+        "reader_connect": 2449,
+        "integrity": 85790,
+        "service": 3581,
+        "snapshot": 89685,
+        "lifecycle": 94304
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1657,
+        "reader_connect": 2461,
+        "integrity": 86491,
+        "service": 17147,
+        "snapshot": 103934,
+        "lifecycle": 108599
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2500,
+        "integrity": 86296,
+        "service": 3829,
+        "snapshot": 90419,
+        "lifecycle": 94990
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1572,
+        "reader_connect": 2575,
+        "integrity": 87189,
+        "service": 2922,
+        "snapshot": 90451,
+        "lifecycle": 95177
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1391,
+        "reader_connect": 2495,
+        "integrity": 85163,
+        "service": 3509,
+        "snapshot": 88997,
+        "lifecycle": 93434
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1467,
+        "reader_connect": 2580,
+        "integrity": 87781,
+        "service": 17526,
+        "snapshot": 105607,
+        "lifecycle": 110209
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1560,
+        "reader_connect": 2350,
+        "integrity": 85066,
+        "service": 3774,
+        "snapshot": 89087,
+        "lifecycle": 93497
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1503,
+        "reader_connect": 2419,
+        "integrity": 87384,
+        "service": 3028,
+        "snapshot": 90721,
+        "lifecycle": 95184
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1479,
+        "reader_connect": 2454,
+        "integrity": 85737,
+        "service": 3618,
+        "snapshot": 89683,
+        "lifecycle": 94154
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1580,
+        "reader_connect": 2372,
+        "integrity": 86045,
+        "service": 17103,
+        "snapshot": 103465,
+        "lifecycle": 108011
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1626,
+        "reader_connect": 2486,
+        "integrity": 85782,
+        "service": 3725,
+        "snapshot": 89778,
+        "lifecycle": 94410
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1577,
+        "reader_connect": 2434,
+        "integrity": 87574,
+        "service": 3104,
+        "snapshot": 91022,
+        "lifecycle": 95568
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1681,
+        "reader_connect": 2610,
+        "integrity": 85703,
+        "service": 3535,
+        "snapshot": 89562,
+        "lifecycle": 94485
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1637,
+        "reader_connect": 2556,
+        "integrity": 86934,
+        "service": 28296,
+        "snapshot": 115591,
+        "lifecycle": 120365
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1598,
+        "reader_connect": 2619,
+        "integrity": 90149,
+        "service": 3841,
+        "snapshot": 94236,
+        "lifecycle": 99022
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1308,
+        "reader_connect": 2391,
+        "integrity": 85577,
+        "service": 2976,
+        "snapshot": 88874,
+        "lifecycle": 93130
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1440,
+        "reader_connect": 2655,
+        "integrity": 86711,
+        "service": 3631,
+        "snapshot": 90650,
+        "lifecycle": 95289
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1504,
+        "reader_connect": 2553,
+        "integrity": 86825,
+        "service": 17083,
+        "snapshot": 104213,
+        "lifecycle": 108845
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1533,
+        "reader_connect": 2634,
+        "integrity": 85648,
+        "service": 3651,
+        "snapshot": 89548,
+        "lifecycle": 94247
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1557,
+        "reader_connect": 2453,
+        "integrity": 85966,
+        "service": 3003,
+        "snapshot": 89308,
+        "lifecycle": 93863
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1379,
+        "reader_connect": 2750,
+        "integrity": 86513,
+        "service": 3581,
+        "snapshot": 90412,
+        "lifecycle": 95096
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1466,
+        "reader_connect": 2515,
+        "integrity": 85713,
+        "service": 16903,
+        "snapshot": 102956,
+        "lifecycle": 107508
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1533,
+        "reader_connect": 2634,
+        "integrity": 86475,
+        "service": 3521,
+        "snapshot": 90261,
+        "lifecycle": 94959
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1523,
+        "reader_connect": 2497,
+        "integrity": 87287,
+        "service": 3088,
+        "snapshot": 90707,
+        "lifecycle": 95287
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1363,
+        "reader_connect": 2521,
+        "integrity": 86043,
+        "service": 3448,
+        "snapshot": 89804,
+        "lifecycle": 94235
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1515,
+        "reader_connect": 2716,
+        "integrity": 85508,
+        "service": 17104,
+        "snapshot": 102919,
+        "lifecycle": 107732
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1523,
+        "reader_connect": 2465,
+        "integrity": 85146,
+        "service": 3573,
+        "snapshot": 88978,
+        "lifecycle": 93474
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1493,
+        "reader_connect": 2688,
+        "integrity": 87033,
+        "service": 3119,
+        "snapshot": 90475,
+        "lifecycle": 95182
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1389,
+        "reader_connect": 2364,
+        "integrity": 86525,
+        "service": 3503,
+        "snapshot": 90334,
+        "lifecycle": 94626
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1516,
+        "reader_connect": 2476,
+        "integrity": 85518,
+        "service": 17251,
+        "snapshot": 103082,
+        "lifecycle": 107649
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1545,
+        "reader_connect": 2557,
+        "integrity": 84694,
+        "service": 3650,
+        "snapshot": 88586,
+        "lifecycle": 93230
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1497,
+        "reader_connect": 2532,
+        "integrity": 86623,
+        "service": 3081,
+        "snapshot": 90016,
+        "lifecycle": 94594
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1496,
+        "reader_connect": 2492,
+        "integrity": 86247,
+        "service": 3655,
+        "snapshot": 90221,
+        "lifecycle": 94778
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1550,
+        "reader_connect": 2500,
+        "integrity": 85712,
+        "service": 17244,
+        "snapshot": 103266,
+        "lifecycle": 107887
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1606,
+        "reader_connect": 2586,
+        "integrity": 85422,
+        "service": 3715,
+        "snapshot": 89391,
+        "lifecycle": 94087
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1562,
+        "reader_connect": 2501,
+        "integrity": 86019,
+        "service": 3049,
+        "snapshot": 89428,
+        "lifecycle": 94019
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1593,
+        "reader_connect": 2542,
+        "integrity": 85495,
+        "service": 3703,
+        "snapshot": 89515,
+        "lifecycle": 94232
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1504,
+        "reader_connect": 2558,
+        "integrity": 86138,
+        "service": 29846,
+        "snapshot": 116419,
+        "lifecycle": 121154
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1594,
+        "reader_connect": 2632,
+        "integrity": 85815,
+        "service": 3768,
+        "snapshot": 89845,
+        "lifecycle": 94638
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1562,
+        "reader_connect": 2737,
+        "integrity": 86186,
+        "service": 3068,
+        "snapshot": 89583,
+        "lifecycle": 94447
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1580,
+        "reader_connect": 2526,
+        "integrity": 84650,
+        "service": 3583,
+        "snapshot": 88588,
+        "lifecycle": 93293
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1477,
+        "reader_connect": 2474,
+        "integrity": 86030,
+        "service": 17526,
+        "snapshot": 103867,
+        "lifecycle": 108397
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1638,
+        "reader_connect": 2526,
+        "integrity": 85551,
+        "service": 3515,
+        "snapshot": 89332,
+        "lifecycle": 94033
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1389,
+        "reader_connect": 2633,
+        "integrity": 87741,
+        "service": 2987,
+        "snapshot": 91048,
+        "lifecycle": 95632
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1524,
+        "reader_connect": 2622,
+        "integrity": 86015,
+        "service": 3720,
+        "snapshot": 90063,
+        "lifecycle": 94780
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1554,
+        "reader_connect": 2512,
+        "integrity": 85523,
+        "service": 17182,
+        "snapshot": 103024,
+        "lifecycle": 107647
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1516,
+        "reader_connect": 2503,
+        "integrity": 86129,
+        "service": 3568,
+        "snapshot": 89978,
+        "lifecycle": 94552
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1489,
+        "reader_connect": 2600,
+        "integrity": 85457,
+        "service": 3087,
+        "snapshot": 88863,
+        "lifecycle": 93501
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1652,
+        "reader_connect": 2528,
+        "integrity": 86733,
+        "service": 3498,
+        "snapshot": 90527,
+        "lifecycle": 95235
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1545,
+        "reader_connect": 2509,
+        "integrity": 85567,
+        "service": 17183,
+        "snapshot": 103051,
+        "lifecycle": 107679
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1411,
+        "reader_connect": 2521,
+        "integrity": 85297,
+        "service": 3500,
+        "snapshot": 89051,
+        "lifecycle": 93542
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1525,
+        "reader_connect": 2678,
+        "integrity": 86419,
+        "service": 3150,
+        "snapshot": 89915,
+        "lifecycle": 94669
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1520,
+        "reader_connect": 2422,
+        "integrity": 87008,
+        "service": 3664,
+        "snapshot": 91010,
+        "lifecycle": 95503
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1515,
+        "reader_connect": 2490,
+        "integrity": 86641,
+        "service": 17331,
+        "snapshot": 104289,
+        "lifecycle": 108833
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1469,
+        "reader_connect": 2552,
+        "integrity": 86671,
+        "service": 3799,
+        "snapshot": 90732,
+        "lifecycle": 95274
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1386,
+        "reader_connect": 2457,
+        "integrity": 88018,
+        "service": 3222,
+        "snapshot": 91576,
+        "lifecycle": 95974
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1535,
+        "reader_connect": 2899,
+        "integrity": 86291,
+        "service": 3467,
+        "snapshot": 90078,
+        "lifecycle": 95089
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1516,
+        "reader_connect": 2542,
+        "integrity": 85197,
+        "service": 17125,
+        "snapshot": 102620,
+        "lifecycle": 107235
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1361,
+        "reader_connect": 2665,
+        "integrity": 86383,
+        "service": 3462,
+        "snapshot": 90105,
+        "lifecycle": 94665
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1571,
+        "reader_connect": 2471,
+        "integrity": 85448,
+        "service": 2983,
+        "snapshot": 88749,
+        "lifecycle": 93369
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1303,
+        "reader_connect": 2425,
+        "integrity": 84533,
+        "service": 3548,
+        "snapshot": 88408,
+        "lifecycle": 92701
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1592,
+        "reader_connect": 2523,
+        "integrity": 86932,
+        "service": 29165,
+        "snapshot": 116460,
+        "lifecycle": 121168
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1706,
+        "reader_connect": 2544,
+        "integrity": 86351,
+        "service": 3735,
+        "snapshot": 90339,
+        "lifecycle": 95127
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1562,
+        "reader_connect": 2539,
+        "integrity": 85397,
+        "service": 2939,
+        "snapshot": 88647,
+        "lifecycle": 93317
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1481,
+        "reader_connect": 2641,
+        "integrity": 86600,
+        "service": 3542,
+        "snapshot": 90461,
+        "lifecycle": 95122
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1494,
+        "reader_connect": 2413,
+        "integrity": 86262,
+        "service": 17378,
+        "snapshot": 103976,
+        "lifecycle": 108426
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1496,
+        "reader_connect": 2541,
+        "integrity": 86665,
+        "service": 3909,
+        "snapshot": 90843,
+        "lifecycle": 95413
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1546,
+        "reader_connect": 2758,
+        "integrity": 85543,
+        "service": 3044,
+        "snapshot": 88960,
+        "lifecycle": 93891
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1557,
+        "reader_connect": 2511,
+        "integrity": 87011,
+        "service": 3698,
+        "snapshot": 91020,
+        "lifecycle": 95665
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1508,
+        "reader_connect": 2542,
+        "integrity": 85936,
+        "service": 16895,
+        "snapshot": 103133,
+        "lifecycle": 107755
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1613,
+        "reader_connect": 2753,
+        "integrity": 86403,
+        "service": 3491,
+        "snapshot": 90140,
+        "lifecycle": 95032
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1500,
+        "reader_connect": 2415,
+        "integrity": 86130,
+        "service": 3063,
+        "snapshot": 89546,
+        "lifecycle": 94006
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1624,
+        "reader_connect": 2480,
+        "integrity": 85271,
+        "service": 3523,
+        "snapshot": 89095,
+        "lifecycle": 93768
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1529,
+        "reader_connect": 2516,
+        "integrity": 86380,
+        "service": 16974,
+        "snapshot": 103677,
+        "lifecycle": 108279
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1493,
+        "reader_connect": 2671,
+        "integrity": 87604,
+        "service": 3652,
+        "snapshot": 91512,
+        "lifecycle": 96218
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1367,
+        "reader_connect": 2649,
+        "integrity": 85612,
+        "service": 3065,
+        "snapshot": 89031,
+        "lifecycle": 93587
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1523,
+        "reader_connect": 2580,
+        "integrity": 85654,
+        "service": 3716,
+        "snapshot": 89706,
+        "lifecycle": 94368
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1499,
+        "reader_connect": 2388,
+        "integrity": 85733,
+        "service": 17760,
+        "snapshot": 103792,
+        "lifecycle": 108285
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1632,
+        "reader_connect": 2602,
+        "integrity": 87636,
+        "service": 3413,
+        "snapshot": 91303,
+        "lifecycle": 96068
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1519,
+        "reader_connect": 2487,
+        "integrity": 84624,
+        "service": 2939,
+        "snapshot": 87878,
+        "lifecycle": 92420
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1626,
+        "reader_connect": 2564,
+        "integrity": 87594,
+        "service": 3472,
+        "snapshot": 91402,
+        "lifecycle": 96148
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1495,
+        "reader_connect": 2464,
+        "integrity": 86198,
+        "service": 17799,
+        "snapshot": 104313,
+        "lifecycle": 108847
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1676,
+        "reader_connect": 2770,
+        "integrity": 85955,
+        "service": 3637,
+        "snapshot": 89838,
+        "lifecycle": 94796
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1553,
+        "reader_connect": 2417,
+        "integrity": 88423,
+        "service": 3077,
+        "snapshot": 91852,
+        "lifecycle": 96371
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1355,
+        "reader_connect": 2564,
+        "integrity": 85793,
+        "service": 3477,
+        "snapshot": 89572,
+        "lifecycle": 94069
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1547,
+        "reader_connect": 2630,
+        "integrity": 86604,
+        "service": 29600,
+        "snapshot": 116614,
+        "lifecycle": 121415
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1750,
+        "reader_connect": 2774,
+        "integrity": 87547,
+        "service": 3525,
+        "snapshot": 91327,
+        "lifecycle": 96382
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1516,
+        "reader_connect": 2577,
+        "integrity": 87213,
+        "service": 3096,
+        "snapshot": 90642,
+        "lifecycle": 95289
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1508,
+        "reader_connect": 2574,
+        "integrity": 85547,
+        "service": 3685,
+        "snapshot": 89575,
+        "lifecycle": 94244
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1542,
+        "reader_connect": 2444,
+        "integrity": 84539,
+        "service": 17149,
+        "snapshot": 102006,
+        "lifecycle": 106550
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1684,
+        "reader_connect": 2613,
+        "integrity": 86998,
+        "service": 3660,
+        "snapshot": 90922,
+        "lifecycle": 95763
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1448,
+        "reader_connect": 2439,
+        "integrity": 86962,
+        "service": 3091,
+        "snapshot": 90391,
+        "lifecycle": 94857
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1495,
+        "reader_connect": 2746,
+        "integrity": 85090,
+        "service": 3564,
+        "snapshot": 88954,
+        "lifecycle": 93757
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1545,
+        "reader_connect": 2470,
+        "integrity": 87179,
+        "service": 16986,
+        "snapshot": 104464,
+        "lifecycle": 109048
+      }
+    },
+    {
+      "route": "status",
+      "cohort": "warm_local_process",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1571,
+        "reader_connect": 2537,
+        "integrity": 84932,
+        "service": 3454,
+        "snapshot": 88644,
+        "lifecycle": 93302
+      }
+    },
+    {
+      "route": "forecasts",
+      "cohort": "warm_local_process",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1519,
+        "reader_connect": 2501,
+        "integrity": 86189,
+        "service": 3266,
+        "snapshot": 89772,
+        "lifecycle": 94337
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "cohort": "warm_local_process",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1514,
+        "reader_connect": 2475,
+        "integrity": 87217,
+        "service": 3556,
+        "snapshot": 91099,
+        "lifecycle": 95641
+      }
+    },
+    {
+      "route": "performance",
+      "cohort": "warm_local_process",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 1457,
+        "reader_connect": 2591,
+        "integrity": 87190,
+        "service": 17432,
+        "snapshot": 104945,
+        "lifecycle": 109571
+      }
+    }
+  ],
+  "schema_and_fixture_unchanged": true,
+  "reader_sessions_after": 0,
+  "role_connection_limit": 2,
+  "declared_portfolio_planning_volume": true,
+  "neon_tls_proven": false,
+  "new_local_cluster_removed": true
+}

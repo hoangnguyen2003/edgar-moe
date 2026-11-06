@@ -60,6 +60,7 @@ def result():
         {
             key: 123
             for key in (
+                "preparation",
                 "observer_connect",
                 "reader_connect",
                 "integrity",
@@ -190,7 +191,10 @@ def test_libpq_environment_overrides_refuse_before_any_reader(name):
     reader.assert_not_called()
 
 
-def test_hosted_connection_supplies_ca_bundle_and_redacts_tls_failure(tmp_path, monkeypatch):
+@pytest.mark.parametrize("prepared", [False, True])
+def test_hosted_connection_supplies_ca_bundle_and_redacts_tls_failure(
+    tmp_path, monkeypatch, prepared
+):
     import certifi
     import psycopg
 
@@ -216,11 +220,23 @@ def test_hosted_connection_supplies_ca_bundle_and_redacts_tls_failure(tmp_path, 
         sample_now=NOW.isoformat(),
     )
     p["contract_sha256"] = hashlib.sha256((tmp_path / "contract.json").read_bytes()).hexdigest()
+    if prepared:
+        p["preparation_inputs_sha256"] = "f" * 64
     config = study.StudyConfig.load(p, environment(p))
-    connector = Mock(side_effect=psycopg.OperationalError("sentinel-sensitive-tls-detail"))
+    order = []
+    preparation = Mock()
+    preparation.prepare.side_effect = lambda *args: order.append("preparation")
+    monkeypatch.setitem(sys.modules, "study_preparation", preparation)
+
+    def refuse_connection(*args, **kwargs):
+        order.append("connect")
+        raise psycopg.OperationalError("sentinel-sensitive-tls-detail")
+
+    connector = Mock(side_effect=refuse_connection)
     monkeypatch.setattr(psycopg, "connect", connector)
     with pytest.raises(study.StudyRefusal, match="^read_or_closure_refused$"):
-        study.read(config, "status", tmp_path)
+        study.read(config, "performance" if prepared else "status", tmp_path)
+    assert order == (["preparation", "connect"] if prepared else ["connect"])
     assert connector.call_count == 1
     assert connector.call_args.kwargs["sslrootcert"] == certifi.where()
     assert connector.call_args.kwargs["connect_timeout"] == 5
@@ -269,3 +285,27 @@ def test_persistent_backend_is_refused_without_retrying_an_application_read():
     with pytest.raises(study.StudyRefusal, match="^reader_absence_unconfirmed$"):
         study.confirm_reader_absence(check, clock=lambda: elapsed[0], pause=advance)
     assert elapsed[0] == pytest.approx(1.0)
+
+
+def test_only_fixed_failure_stages_are_exposed_and_reader_is_not_replayed():
+    for error, expected in (
+        (study.StudyRefusal("snapshot_postcheck_refused"), "snapshot_postcheck_refused"),
+        (study.StudyRefusal(URL), "read_refused"),
+        (RuntimeError("snapshot_postcheck_refused"), "read_refused"),
+    ):
+        reader = Mock(side_effect=error)
+        c = client(reader)
+        r = c.get("/v1/performance")
+        assert r.status_code == 503
+        assert r.headers["x-study-refusal"] == expected
+        assert c.get("/v1/performance").json() == {"error": "study_stopped"}
+        assert reader.call_count == 1
+
+
+def test_optional_preparation_policy_requires_a_pinned_digest():
+    p = policy() | {"preparation_inputs_sha256": "f" * 64}
+    assert study.StudyConfig.load(p, environment(p)).policy == p
+    for digest in ("", "../some-file", "F" * 64):
+        p = policy() | {"preparation_inputs_sha256": digest}
+        with pytest.raises(study.StudyRefusal):
+            study.StudyConfig.load(p, environment(p))

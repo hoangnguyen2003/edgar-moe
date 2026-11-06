@@ -24,6 +24,7 @@ from urllib.parse import urlencode, urlsplit
 ROUTES = ("status", "forecasts", "ticker-filter", "performance")
 CACHE = {"HIT", "MISS", "BYPASS", "STALE", "PRERENDER", "REVALIDATED"}
 TIMINGS = {
+    "preparation_us",
     "observer_connect_us",
     "reader_connect_us",
     "integrity_us",
@@ -69,7 +70,6 @@ class Configuration:
                 or parsed.fragment
                 or start.utcoffset() != timedelta(0)
                 or end.utcoffset() != timedelta(0)
-                or start.minute
                 or start.second
                 or start.microsecond
                 or end - start != timedelta(days=7)
@@ -497,6 +497,24 @@ def request(
             report.update(status="passed", body_bytes=len(raw), origin_timing=timings)
     except urllib.error.HTTPError as error:
         report.update(reason="http_error", http_status=error.code)
+        stage = error.headers.get("x-study-refusal", "")
+        if stage in {
+            "snapshot_postcheck_refused",
+            "snapshot_deadline",
+            "service_refused",
+            "snapshot_ended_early",
+            "snapshot_changed",
+            "rollback_refused",
+            "rollback_unconfirmed",
+            "read_or_closure_refused",
+            "contract_refused",
+            "preparation_refused",
+            "preparation_cache_not_used",
+            "reader_absence_unconfirmed",
+            "read_acknowledgement_refused",
+            "read_refused",
+        }:
+            report["refusal_stage"] = stage
         if trace_cookie is not None:
             report["_provider_request_id"] = error.headers.get("x-vercel-id", "").rsplit("::", 1)[
                 -1

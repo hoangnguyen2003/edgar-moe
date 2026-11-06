@@ -1,0 +1,15 @@
+{
+  "issue": 290,
+  "http_requests": 1,
+  "phase": "setup_diagnostic",
+  "measurement_sample": false,
+  "automatic_retries": 0,
+  "body_retained": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "host_sha256": "2efc487e5e3e7558104c9b23098261929ce5396b12c3d4df98bd19719d530f52",
+  "http_status": 503,
+  "refusal_stage": "snapshot_postcheck_refused",
+  "http_elapsed_us": 8937193,
+  "observed_at": "2026-11-06T06:16:48.285941+00:00"
+}

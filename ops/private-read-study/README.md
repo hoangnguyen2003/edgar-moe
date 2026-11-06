@@ -204,6 +204,40 @@ and fixed bounded EXPLAIN tool. Small samples can justify **no SLO decision**;
 do not manufacture an alert threshold. Source/publication holds, frozen v1 and
 append-only forward records remain unchanged.
 
-No hosted observation, hosted representative-volume setup, provider attribution
-or issue completion is claimed. The seven-day window and live configuration
-remain unbound until the target, provider attribution and concrete setup pass.
+Live setup receipts and the active window, when enabled, are recorded separately.
+Setup checks are not seven-day observations and do not establish issue completion.
+
+## Synthetic performance preparation
+
+A free-preview setup attempt returned HTTP 503 at `snapshot_postcheck_refused`.
+The original 5,000-pair / 1,000-draw uncertainty bootstrap took longer than the
+unchanged five-second idle-transaction limit on hosted compute. The separate
+study adapter now supports a policy-pinned `study-preparation.json` containing
+only the already public invented inputs. No final interval is packaged.
+
+For the performance route, the **original frozen algorithm executes during the
+HTTP request before either database connection opens**. Its existing bounded
+process cache is then used by the real same-snapshot registry read. The kernel
+must report exactly one cache hit and no cache miss; otherwise the adapter
+refuses. The fixture, schema, SQL, DTO, bootstrap count/seed and all database
+limits remain unchanged. Exact float/time/order equality with the SELECT-only
+fixture was checked before deployment. Inputs are serialized during staging
+rather than regenerated on Linux, avoiding platform `sin`/`cos` rounding drift.
+
+`preparation_us` retains this CPU cost. It is included in `lifecycle_us` and
+client HTTP time, and excluded from connection/query/snapshot time. Initial
+performance preparation and subsequent cache reuse must be reported separately;
+the lower snapshot service time must never be advertised as total latency.
+The adapter adds preparation overhead even on warm requests. This is a distinct
+instrumented synthetic cohort, not a claim that the original public application
+has this optimization or that arbitrary changing datasets can be preloaded.
+
+The matched native local baseline now also uses this adapter. It has 100 warm
+samples per route plus four initial-route samples, a disposable PostgreSQL 18
+Unix socket without TLS, and fifteen bounded SELECT plans. It must remain
+separate from hosted HTTP/TLS/provider-start and database-resume cohorts.
+
+The 168-hour policy may start on a UTC minute boundary. Hourly slots are still
+relative to that absolute start; no missing slot is replayed. A manually
+triggered setup verification run must be marked and excluded from scheduled
+measurement totals, with its run ID retained.

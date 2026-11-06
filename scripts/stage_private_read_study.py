@@ -14,6 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[1]
 EXTRA = {
     "ops/private-read-study/study_app.py": "study_app.py",
+    "ops/private-read-study/study_preparation.py": "study_preparation.py",
     "ops/private-read-study/index.py": "index.py",
     "ops/private-read-study/vercel.json": "vercel.json",
 }
@@ -74,6 +75,14 @@ def stage(destination: Path) -> dict[str, Any]:
     spec.loader.exec_module(builder)
     # Resolve new files and dependency closure before the builder creates anything.
     additions = {target: (ROOT / source).read_bytes() for source, target in EXTRA.items()}
+    prep_spec = importlib.util.spec_from_file_location(
+        "public_study_preparation", ROOT / "ops/private-read-study/study_preparation.py"
+    )
+    if not prep_spec or not prep_spec.loader:
+        raise ValueError("Public synthetic preparation module missing")
+    preparation = importlib.util.module_from_spec(prep_spec)
+    prep_spec.loader.exec_module(preparation)
+    additions["study-preparation.json"] = preparation.synthetic_inputs()
     additions["requirements.txt"] = requirements(ROOT / "uv.lock")
     additions[".python-version"] = b"3.12\n"
     for path in EXTRA:
