@@ -1,0 +1,97 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "credential_scope": "new_study_project_only",
+  "application_requests": 2,
+  "database_connections": 0,
+  "billing_changes": 0,
+  "measurement_sample": false,
+  "observer_enabled": false,
+  "collector_sha256": "22f990742ffc398522197a79e88ec522a64720aec86e474167f8ff184681f6e5",
+  "samples": [
+    {
+      "status": "failed",
+      "route": "status",
+      "http_status": 503,
+      "edge_cache": "unknown",
+      "origin_timing": null,
+      "platform_start_type": "unobserved",
+      "database_resume": "unobserved",
+      "reason": "http_error",
+      "http_elapsed_us": 1695885,
+      "unbound_expected_refusal": true,
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_project_trace_rest",
+        "classification": "cold",
+        "basis": "provider_startup_spans",
+        "vm_start_observed": true,
+        "python_spawn_observed": true,
+        "user_code_init_observed": true,
+        "startup_ms": {
+          "Start VM": 351.0,
+          "Spawn Python": 28.619773,
+          "Init User Code": 680.999999
+        },
+        "invocation_ms": 771.184521,
+        "request_sha256": "daa217cbf32ac291ee90b3dbb348c911f6f1ef59673a18b6e7a9b70c21312023",
+        "provider_span_count": 9,
+        "trace_tree_validated": true,
+        "completion_basis": "recorded_session_closed_tree",
+        "provider_partial_flag": null,
+        "raw_provider_payload_retained": false
+      }
+    },
+    {
+      "status": "failed",
+      "route": "status",
+      "http_status": 503,
+      "edge_cache": "unknown",
+      "origin_timing": null,
+      "platform_start_type": "unobserved",
+      "database_resume": "unobserved",
+      "reason": "http_error",
+      "http_elapsed_us": 215687,
+      "unbound_expected_refusal": true,
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_project_trace_rest",
+        "classification": "warm",
+        "basis": "complete_provider_invocation_without_startup",
+        "vm_start_observed": false,
+        "python_spawn_observed": false,
+        "user_code_init_observed": false,
+        "startup_ms": {},
+        "invocation_ms": 2.979798,
+        "request_sha256": "f1993dd4ba86b7e10e80c3e9907cb069fd09660dfd5cb89bd6eb39b6a6992f6e",
+        "provider_span_count": 6,
+        "trace_tree_validated": true,
+        "completion_basis": "recorded_session_closed_tree",
+        "provider_partial_flag": null,
+        "raw_provider_payload_retained": false
+      }
+    }
+  ],
+  "existing_cold_request_trace": {
+    "status": "passed",
+    "source": "vercel_project_trace_rest",
+    "classification": "cold",
+    "basis": "provider_startup_spans",
+    "vm_start_observed": true,
+    "python_spawn_observed": true,
+    "user_code_init_observed": true,
+    "startup_ms": {
+      "Start VM": 409.0,
+      "Spawn Python": 37.065392,
+      "Init User Code": 676.999999
+    },
+    "invocation_ms": 771.84378,
+    "request_sha256": "d747625bc93656fa42b115a3255650d1decda0db7aebfd615b429c2639788bdb",
+    "provider_span_count": 9,
+    "trace_tree_validated": true,
+    "completion_basis": "recorded_session_closed_tree",
+    "provider_partial_flag": null,
+    "raw_provider_payload_retained": false
+  },
+  "observed_at": "2026-11-06T05:43:34.404155+00:00"
+}
