@@ -79,10 +79,11 @@ def _fixture(
         screen_audit,
         "verify_authenticated_bundle",
         lambda _: SimpleNamespace(
+            hashes={"requested_universe": sha256_file(checkpoint / "requested-universe.json")},
             configuration={
                 "assets": {"requested_universe": "requested-universe.json"},
                 "as_of": "2025-12-31",
-            }
+            },
         ),
     )
     monkeypatch.setattr(screen_inputs, "_ARTIFACT_ROOT", tmp_path / "artifacts")
@@ -588,10 +589,13 @@ def test_screen_command_pins_inputs_before_fetching(
                 screen_audit,
                 "verify_authenticated_bundle",
                 lambda _: SimpleNamespace(
+                    hashes={
+                        "requested_universe": sha256_file(checkpoint / "requested-universe.json")
+                    },
                     configuration={
                         "assets": {"requested_universe": "requested-universe.json"},
                         "as_of": "2025-12-31",
-                    }
+                    },
                 ),
             )
             result = screen_audit.verify_screen_trace(
@@ -844,4 +848,129 @@ def test_screen_trace_fails_closed(
             first_validation_start=date(2023, 1, 1),
             source_capture_path=capture,
             mapping_review_path=review,
+        )
+
+
+def _write_real_checkpoint_manifest(checkpoint: Path, requested_hash: str | None) -> None:
+    (checkpoint / "manifest.json").write_bytes(
+        orjson.dumps(
+            {
+                "dataset_id": "synthetic-universe-checkpoint",
+                "created_at": "2022-12-31T12:00:00Z",
+                "source_versions": {},
+                "row_counts": {},
+                "hashes": {} if requested_hash is None else {"requested_universe": requested_hash},
+                "configuration": {
+                    "assets": {"requested_universe": "requested-universe.json"},
+                    "as_of": "2025-12-31",
+                },
+            }
+        )
+    )
+
+
+@pytest.mark.parametrize("digest", [None, "not-a-sha256"])
+def test_screen_trace_requires_checkpoint_requested_universe_hash(tmp_path, monkeypatch, digest):
+    from edgar_moe.data.refresh import verify_authenticated_bundle
+
+    paths = _fixture(tmp_path, monkeypatch)
+    checkpoint = paths[3]
+    _write_real_checkpoint_manifest(checkpoint, digest)
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", verify_authenticated_bundle)
+    with pytest.raises(ValueError):
+        _verify_fixture(paths)
+
+
+def test_screen_trace_rejects_roster_replacement_after_checkpoint_verification(
+    tmp_path, monkeypatch
+):
+    from edgar_moe.data.refresh import verify_authenticated_bundle
+
+    paths = _fixture(tmp_path, monkeypatch)
+    checkpoint = paths[3]
+    requested = checkpoint / "requested-universe.json"
+    selected_bytes = requested.read_bytes()
+    requested.write_bytes(b"[]")
+    _write_real_checkpoint_manifest(checkpoint, sha256_file(requested))
+
+    def replace_after_verification(path):
+        manifest = verify_authenticated_bundle(path)
+        requested.write_bytes(selected_bytes)
+        return manifest
+
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", replace_after_verification)
+    with pytest.raises(ValueError, match="requested-universe.*hash|changed during verification"):
+        _verify_fixture(paths)
+
+
+def test_screen_trace_rejects_duplicate_fields_in_requested_roster(tmp_path, monkeypatch):
+    from edgar_moe.data.refresh import verify_authenticated_bundle
+
+    paths = _fixture(tmp_path, monkeypatch)
+    checkpoint = paths[3]
+    requested = checkpoint / "requested-universe.json"
+    requested.write_bytes(
+        requested.read_bytes().replace(b'"cik":', b'"cik":"0000000999","cik":', 1)
+    )
+    _write_real_checkpoint_manifest(checkpoint, sha256_file(requested))
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", verify_authenticated_bundle)
+    with pytest.raises(ValueError, match="duplicate"):
+        _verify_fixture(paths)
+
+
+def test_screen_trace_returns_hash_of_the_roster_actually_verified(tmp_path, monkeypatch):
+    from edgar_moe.data.refresh import verify_authenticated_bundle
+
+    paths = _fixture(tmp_path, monkeypatch)
+    checkpoint = paths[3]
+    expected = sha256_file(checkpoint / "requested-universe.json")
+    _write_real_checkpoint_manifest(checkpoint, expected)
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", verify_authenticated_bundle)
+    result = _verify_fixture(paths)
+    assert result["checkpoint_requested_universe_sha256"] == expected
+    assert result["status"] == "screen_trace_verified_upstream_membership_unverified"
+
+
+def test_screen_trace_rechecks_requested_roster_before_returning(tmp_path, monkeypatch):
+    from edgar_moe.data.refresh import verify_authenticated_bundle
+
+    paths = _fixture(tmp_path, monkeypatch)
+    audit, source, screened, checkpoint, capture, review = paths
+    requested = checkpoint / "requested-universe.json"
+    _write_real_checkpoint_manifest(checkpoint, sha256_file(requested))
+    monkeypatch.setattr(screen_audit, "verify_authenticated_bundle", verify_authenticated_bundle)
+    processed = tmp_path / "synthetic-processed"
+    processed.mkdir()
+    names = ("events", "daily_returns", "availability", "features")
+    for name in names:
+        (processed / name).write_bytes(b"synthetic asset")
+    (processed / "manifest.json").write_bytes(
+        orjson.dumps(
+            {
+                "dataset_id": processed.name,
+                "source_manifest_hash": sha256_file(checkpoint / "manifest.json"),
+                "assets": {name: name for name in names},
+                "hashes": {name: sha256_file(processed / name) for name in names},
+            }
+        )
+    )
+    decode = screen_audit.decode_json
+
+    def replace_during_processed_check(raw):
+        payload = decode(raw)
+        if isinstance(payload, dict) and payload.get("dataset_id") == processed.name:
+            requested.write_bytes(b"[]")
+        return payload
+
+    monkeypatch.setattr(screen_audit, "decode_json", replace_during_processed_check)
+    with pytest.raises(ValueError, match="changed during verification"):
+        screen_audit.verify_screen_trace(
+            audit,
+            source,
+            screened,
+            checkpoint,
+            first_validation_start=date(2023, 1, 1),
+            source_capture_path=capture,
+            mapping_review_path=review,
+            processed_dataset_dir=processed,
         )
