@@ -32,6 +32,7 @@ jobs:
           persist-credentials: false
       - name: Evaluate original acceptance against actual scheduled receipts only
         id: evaluate
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: python3 scripts/closeout_private_scheduler.py --output-dir reports/private-scheduler-closeout
@@ -46,6 +47,10 @@ jobs:
           path: reports/private-scheduler-closeout/
           if-no-files-found: error
           retention-days: 90
+
+      - name: Surface overdue or failed live observations after retaining evidence
+        if: ${{ always() && steps.evaluate.outcome != 'success' }}
+        run: exit 1
 
   close-verified-issue:
     if: ${{ needs.report.result == 'success' && needs.report.outputs.eligible == 'true' }}
@@ -78,7 +83,7 @@ jobs:
           PY
 
   stop-finished-scope:
-    if: ${{ needs.report.result == 'success' && needs.report.outputs.finished == 'true' }}
+    if: ${{ always() && needs.report.outputs.finished == 'true' }}
     needs: report
     runs-on: ubuntu-24.04
     timeout-minutes: 1

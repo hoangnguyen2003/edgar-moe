@@ -169,6 +169,17 @@ def evaluate(records: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
     eligible = all(len(rows) == 1 and rows[0]["qualifying"] for rows in observations.values())
     missing = [day for day, rows in observations.items() if not rows]
     duplicates = [day for day, rows in observations.items() if len(rows) > 1]
+    overdue = [
+        day
+        for day in missing
+        if now > datetime.fromisoformat(day + "T07:17:00+00:00") + timedelta(hours=3)
+    ]
+    failed = [
+        day
+        for day, rows in observations.items()
+        if rows and (len(rows) != 1 or not rows[0]["qualifying"])
+    ]
+    attention = bool(overdue or failed)
     expired = now >= datetime.fromisoformat(DATES[-1] + "T07:17:00+00:00") + timedelta(days=1)
     return {
         "issue": 156,
@@ -178,6 +189,9 @@ def evaluate(records: list[dict[str, Any]], now: datetime) -> dict[str, Any]:
         "eligible_to_close": eligible,
         "observations": observations,
         "missing_dates": missing,
+        "overdue_missing_dates": overdue,
+        "failed_dates": failed,
+        "attention_required": attention,
         "duplicate_dates": duplicates,
         "scope_finished": expired or not missing,
         "source_cutoff_rule_changed": False,
@@ -285,7 +299,7 @@ def main() -> int:
                 }
             )
         )
-        return 0
+        return 1 if report["attention_required"] else 0
     except Exception as error:
         print(
             json.dumps(

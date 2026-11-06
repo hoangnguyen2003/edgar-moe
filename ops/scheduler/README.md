@@ -371,5 +371,8 @@ or close another issue. An `actions: write` cleanup job requests `STOP` for this
 private Worker and disables the closeout workflow after the scope finishes or
 expires; the finite date guard independently prevents later source-backed work.
 Failed/incomplete observations retain their report and leave the issue open.
+Overdue missing slots and failed margin evidence also fail the closeout job
+after artifact retention, so missing scheduler delivery is visible in Actions
+instead of silently counting calendar time as successful observation.
 This is limited operational validation for a personal portfolio, not a claim
 of a production latency SLO. No synthetic fixture is accepted as live evidence.

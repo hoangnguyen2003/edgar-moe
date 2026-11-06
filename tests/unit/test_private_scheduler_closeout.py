@@ -191,3 +191,14 @@ def test_candidate_report_and_comment_are_operational_and_redacted(tmp_path):
     (tmp_path / "report.json").write_text(json.dumps(report))
     (tmp_path / "closeout.md").write_text(closeout.closeout_body(report))
     assert validate_redacted_artifacts(tmp_path) == []
+
+
+def test_overdue_missing_delivery_is_flagged_without_replaying_requests():
+    before = datetime(2026, 11, 6, 12, tzinfo=UTC)
+    assert closeout.evaluate([], before)["attention_required"] is False
+    late = datetime(2026, 11, 7, 11, tzinfo=UTC)
+    report = closeout.evaluate([], late)
+    assert report["attention_required"] is True
+    assert report["overdue_missing_dates"] == ["2026-11-07"]
+    assert report["eligible_to_close"] is False
+    assert report["provider_requests"] == report["forecast_or_database_requests"] == 0
