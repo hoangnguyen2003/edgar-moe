@@ -141,3 +141,14 @@ extraction, ambiguous-class exclusions, historical identifier continuity,
 rights-cleared bar joins, selection/exclusion manifests, and dataset/checkpoint
 binding remain separate review gates. The existing v2 catalog remains
 `historical_membership_unverified` regardless of this capture's success.
+
+## November 2026 historical-source finding
+
+The [historical candidate source assessment](../issue-292-historical-candidate-source.md)
+records a separate, actual pre-2023 server-versioned candidate source with 503
+security-label rows and 500 issuer CIKs, plus a reproducible private capture and
+offline verifier. It is an alternative fixed-cohort input, not a revision to
+the SEC prospective experiment or proof of complete listed-security identity.
+Historical class/identifier continuity, reviewed bars and the complete new
+study chain remain required. The original v2 historical-membership status and
+the prospective SEC policy/window are unchanged.
