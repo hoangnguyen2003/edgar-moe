@@ -142,6 +142,14 @@ price-vintage availability, or a completed dataset/study chain. All request
 profiles, IDs, source rows and bars remain private; only operational counts and
 hashes are suitable for the public commitment.
 
+The [SEC's official historical-list index](https://www.sec.gov/rules-regulations/staff-guidance/official-list-section-13f-securities)
+also links a [third-quarter 2022 list](https://www.sec.gov/files/investment/13flist2022q3.pdf).
+Its first two pages identify third-party copyright, a redistribution restriction
+and a Form 13F reporting purpose. They were read and visually inspected only to
+assess source fit; no identifier rows were imported and no broader source-use or
+publication clearance is asserted. The private source digest and assessment
+scope are recorded without publishing its contents.
+
 ## Remaining issue requirements
 
 The strengthened full-roster audit has now processed and independently replayed

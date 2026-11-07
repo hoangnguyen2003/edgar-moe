@@ -1,0 +1,25 @@
+{
+  "captured_requests": 4,
+  "cohort_membership_changed": false,
+  "historical_bars_returned": 3,
+  "historical_identity_master_sha256": "00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef",
+  "historical_market_continuity_verified": false,
+  "inverse_asset_ids_matched": true,
+  "issue_complete": false,
+  "offline_report_sha256": "916886ce3cd5d5a6e4ba9f779f1c55a7e85833c2c0f2835f05a02c7e67d4ba2e",
+  "original_price_vintage_verified": false,
+  "paid_resources": false,
+  "provider_requests_during_replay": 0,
+  "source_capture_hashes": {
+    "asset-by-historical-cusip": "14afc359efc00eb527ca5c848f14dd1a9c1d559918408cc4bce1bac52daabdc3",
+    "asset-by-historical-cusip-request": "afa33f140ae3e0534ffdf68e92dd862fdeac3f5702542889303702492870dfa2",
+    "asset-by-symbol-after": "14afc359efc00eb527ca5c848f14dd1a9c1d559918408cc4bce1bac52daabdc3",
+    "asset-by-symbol-after-request": "2ac94168fe3c14c12126926d2828a114b6eb1da43b9a12c8529155b2afa2b141",
+    "asset-by-symbol-before": "14afc359efc00eb527ca5c848f14dd1a9c1d559918408cc4bce1bac52daabdc3",
+    "asset-by-symbol-before-request": "4f27fa8804c8a5ae3e7110363635f1bc69753a0aa42d05b8ebcfb05ed88e54b7",
+    "historical-bars": "4e2bcd3ffa55c9976c59fb24383b3042e0ffa37c4260cd2e5025282161729e84",
+    "historical-bars-request": "78f1701820fc368225f067d976132eb54da1e50cb340d2885fd1054bba5c247d"
+  },
+  "source_complete_submission_sha256": "60239b01f30a7e41f57fdd639a25b220dce738bcfb49a1cf85f5191724f95f0f",
+  "status": "private_read_resolver_replay_verified"
+}
