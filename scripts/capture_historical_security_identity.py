@@ -389,7 +389,10 @@ def main() -> int:
                 settings = RuntimeSettings(  # type: ignore[call-arg]
                     _env_file=(args.settings_root / ".env", args.settings_root / ".env.local")
                 )
-                if "@" not in settings.sec_user_agent or "example.com" in settings.sec_user_agent:
+                contact = re.search(
+                    r"[A-Za-z0-9_.+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,})", settings.sec_user_agent
+                )
+                if contact is None or contact[1].lower().split(".")[-2:] == ["example", "com"]:
                     raise ValueError("identified_SEC_contact_required")
                 client = httpx.Client(
                     headers={"User-Agent": settings.sec_user_agent},
