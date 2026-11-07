@@ -65,9 +65,13 @@ retry or background scheduler.
 
 ## Remaining issue requirements
 
-The full-source expansion stopped after 55 processed candidates on an SEC read
-timeout; it did not retry the request. Missing/ambiguous identities remain in
-the audit. The 12-row sample must not substitute for full-cohort verification.
+The full-source expansion initially stopped after 55 processed candidates on
+an SEC read timeout. A later manual resume reused every completed source and
+reached 56 candidates before an SEC HTTP 503 stopped it again. Neither run
+automatically retried. Its retained receipts contain 51 anchored identities,
+two unresolved periodic anchors, two unresolved ownership identities and one
+oversized source. Missing/ambiguous identities remain in the audit. The 12-row
+sample must not substitute for full-cohort verification.
 The original checkpoint overlaps only 305 of the historical source's 500
 issuers and cannot inherit a corrected source date or membership claim.
 

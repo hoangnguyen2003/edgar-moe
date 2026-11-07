@@ -4,7 +4,15 @@
   "collector_algorithm_sha256": "22f833dc028f7f1aa41fffc376ecbc89c8a086838be9f153efa85b5e8e5a4075",
   "current_asset_directory_used": false,
   "full_source_expansion_complete": false,
-  "full_source_processed_before_transport_stop": 55,
+  "full_source_last_stop": "SEC_HTTP_503",
+  "full_source_processed_before_transport_stop": 56,
+  "full_source_receipt_set_sha256": "67c56acb55247743fe71f72c2b35e46e93687241b738fab476517778d9bca015",
+  "full_source_statuses": {
+    "ownership_identity_unresolved": 2,
+    "periodic_anchor_unresolved": 2,
+    "pre_cutoff_SEC_identity_anchored": 51,
+    "source_size_unresolved": 1
+  },
   "historical_market_continuity_verified": false,
   "identity_algorithm_sha256": "dcb88058e720fe3743fff170b2787a22fc0cc167f19e764bc628b51a4b1eeded",
   "issue_complete": false,
