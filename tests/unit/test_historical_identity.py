@@ -258,3 +258,162 @@ def test_subject_header_rejects_other_accession_and_multiple_subjects():
     )
     with pytest.raises(IdentityEvidenceError, match="subject_company"):
         ownership_subject(body, cik=CIK, accession=metadata()["accessionNumber"])
+
+
+def cover_row(symbol="OLD", title="Class A Common Stock", context="common"):
+    return (
+        "<tr><td>"
+        + fact("Security12bTitle", title, context)
+        + "</td><td>"
+        + fact("TradingSymbol", symbol, context)
+        + "</td><td>"
+        + fact("SecurityExchangeName", "Synthetic exchange", context)
+        + "</td></tr>"
+    )
+
+
+def test_same_context_multiple_securities_are_bound_by_an_explicit_cover_row():
+    body = (
+        fact("EntityCentralIndexKey", CIK, "issuer")
+        + "<table>"
+        + cover_row()
+        + cover_row(symbol="BOND", title="Senior Notes")
+        + "</table>"
+    ).encode()
+    result = periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert result["security_title"] == "Class A Common Stock"
+    assert (
+        result["registered_class_binding"]
+        == "single_security_row_with_compatible_issuer_period_dimensions"
+    )
+
+
+def test_cover_rows_do_not_override_class_ambiguity_or_cross_context_facts():
+    issuer = fact("EntityCentralIndexKey", CIK, "issuer")
+    for rows in (
+        cover_row() + cover_row(title="Class B Common Stock"),
+        cover_row().replace('contextRef="common">Class A', 'contextRef="other">Class A')
+        + cover_row(symbol="BOND", title="Senior Notes"),
+    ):
+        with pytest.raises(IdentityEvidenceError, match="class_context"):
+            periodic_anchor(
+                (issuer + "<table>" + rows + "</table>").encode(),
+                metadata(),
+                cik=CIK,
+                symbol="OLD",
+                cutoff=CUTOFF,
+            )
+
+
+def test_outer_layout_row_cannot_join_facts_from_nested_rows():
+    body = (
+        fact("EntityCentralIndexKey", CIK, "issuer")
+        + "<table><tr><td>"
+        + fact("TradingSymbol", "OLD")
+        + "</td><td><table><tr><td>"
+        + fact("Security12bTitle", "Class A Common Stock")
+        + fact("SecurityExchangeName", "Synthetic exchange")
+        + "</td></tr></table></td></tr></table>"
+    ).encode()
+    body += fact("Security12bTitle", "Class B Common Stock").encode()
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def colon_cover(title="Class A Common Stock", cusip=CUSIP):
+    return f"<p>Name of issuer: Synthetic issuer</p><p>Title of Class of Securities: {title}</p><p>CUSIP Number: {cusip}</p>".encode()
+
+
+def dimension_context(identifier, axis, member, day="2022-11-01"):
+    return f'<xbrli:context id="{identifier}"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">1</xbrli:identifier><xbrli:segment><xbrldi:explicitMember dimension="{axis}">{member}</xbrldi:explicitMember></xbrli:segment></xbrli:entity><xbrli:period><xbrli:instant>{day}</xbrli:instant></xbrli:period></xbrli:context>'
+
+
+def dimensional_cover(
+    symbol_axis="dei:TradingSymbolAxis",
+    symbol_member="synthetic:SymbolMember",
+    exchange_day="2022-11-01",
+):
+    return (
+        fact("EntityCentralIndexKey", CIK, "issuer")
+        + dimension_context("title", "us-gaap:StatementClassOfStockAxis", "synthetic:ClassAMember")
+        + dimension_context("symbol", symbol_axis, symbol_member)
+        + dimension_context(
+            "exchange", "dei:EntityListingsExchangeAxis", "synthetic:ExchangeMember", exchange_day
+        )
+        + "<table><tr><td>"
+        + fact("Security12bTitle", "Class A Common Stock", "title")
+        + "</td><td>"
+        + fact("TradingSymbol", "OLD", "symbol")
+        + "</td><td>"
+        + fact("SecurityExchangeName", "Synthetic exchange", "exchange")
+        + "</td></tr></table>"
+    ).encode()
+
+
+def test_explicit_security_row_can_bind_compatible_property_axes():
+    assert (
+        periodic_anchor(dimensional_cover(), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)[
+            "security_title"
+        ]
+        == "Class A Common Stock"
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        dimensional_cover(
+            symbol_axis="us-gaap:StatementClassOfStockAxis", symbol_member="synthetic:ClassBMember"
+        ),
+        dimensional_cover(symbol_axis="us-gaap:DebtInstrumentAxis"),
+        dimensional_cover(symbol_axis="synthetic:UnknownAxis"),
+        dimensional_cover(exchange_day="2022-11-02"),
+        dimensional_cover(exchange_day="2023-01-01"),
+        dimensional_cover().replace(b"xbrldi:explicitMember", b"xbrldi:typedMember"),
+    ],
+)
+def test_row_contexts_cannot_mix_classes_periods_or_unknown_axes(body):
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def test_colon_labelled_cover_binds_class_and_spaced_cusip():
+    o = ownership_identity(
+        colon_cover(cusip="123456 78 2"), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF
+    )
+    assert o["cusip"] == CUSIP
+    assert o["security_title"] == "Class A Common Stock"
+    assert join_identity(anchors()[0], o)["security_id"] == "cusip:" + CUSIP
+
+
+def test_narrative_class_or_unbound_colon_fields_cannot_supply_identity():
+    for body in (
+        colon_cover().replace(b"Name of issuer:", b"Item 1(a) Name of issuer:"),
+        colon_cover().replace(b"CUSIP Number:", b"Item 2(e) CUSIP Number:"),
+    ):
+        with pytest.raises(IdentityEvidenceError, match="unbound"):
+            ownership_identity(body, metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    with pytest.raises(IdentityEvidenceError, match="missing_ownership_class"):
+        ownership_identity(
+            colon_cover().replace(b"Title of Class", b"Item 2(d) Title of Class"),
+            metadata("SC 13G"),
+            cik=CIK,
+            cutoff=CUTOFF,
+        )
+
+
+def test_conflicting_colon_covers_preserve_class_and_cusip_ambiguity():
+    with pytest.raises(IdentityEvidenceError, match="ambiguous_ownership_class"):
+        ownership_identity(
+            colon_cover() + colon_cover(title="Class B Common Stock"),
+            metadata("SC 13G"),
+            cik=CIK,
+            cutoff=CUTOFF,
+        )
+    with pytest.raises(IdentityEvidenceError, match="ambiguous_cusip"):
+        ownership_identity(
+            colon_cover() + colon_cover(cusip="234567899"),
+            metadata("SC 13G"),
+            cik=CIK,
+            cutoff=CUTOFF,
+        )

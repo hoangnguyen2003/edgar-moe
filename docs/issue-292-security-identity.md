@@ -23,9 +23,39 @@ insufficient: that list can include holdings reported about another company.
 Class letters, voting
 rights and common/ordinary distinctions must agree. Preferred, depositary,
 unit and ambiguous classes are refused. Both reported acceptance times plus
-seven calendar days must precede the source cutoff. Discovery is limited to
-the preceding two years, at most four periodic and five ownership filings.
+seven calendar days must precede the source cutoff. Current discovery is limited
+to the preceding two years, at most four periodic and ten ownership filings.
 These are explicit coverage bounds, not grounds for dropping unresolved rows.
+
+### Coverage extensions
+
+The extractor also recognizes colon-labelled ownership covers when an explicit
+issuer-name/class/CUSIP sequence is present within a short cover block. Narrative
+Item 2 mentions, unbound labels, multiple classes/CUSIPs and voting/non-voting or
+ordinary/common mismatches still fail closed. Complete-submission subject-CIK
+and accession checks remain mandatory.
+
+Some periodic covers reuse a context for several securities, or give the three
+cover columns separate property-axis contexts. A fallback requires exactly one
+class, symbol and exchange in a single table row, excluding nested rows. Every
+context must identify the same issuer. Separate contexts must have identical,
+valid pre-cutoff periods and only the known stock-class, trading-symbol and
+listing-exchange axes; shared axes cannot disagree. Unknown/typed dimensions,
+debt/class conflicts, multiple matching rows and future periods are refused.
+
+Ownership discovery preserves the newest five attempts. If they fail, it
+inspects up to five further pre-cutoff records, prioritizing other SEC file-number
+series by their pre-cutoff frequency and then recency. Series metadata is only
+a discovery aid; it cannot supply issuer identity. Each accepted filing still
+needs its explicit subject header. The two-year lookback and seven-day lag,
+request/byte/rate caps, source retention and 503-row denominator are unchanged.
+
+An oversized source no longer prevents inspection of the next filing within
+those bounds. Its refusal is retained, the same byte ceiling still applies to
+each alternative, and any successful fallback carries the prior refusal counts.
+If no alternative proves identity, the candidate remains unresolved. Integrity
+errors, exhausted request budgets, missing uncaptured sources and HTTP refusal
+controls cannot use this size-only continuation path.
 
 The SEC archive/submissions responses are observed in November 2026, separately
 from their reported historical acceptance dates. These are not signed historical
@@ -107,9 +137,44 @@ remaining coverage is separate. A separate one-request free-tier probe
 of permanent-UUID bar addressing returned HTTP 400 and zero rows. That negative
 result does not establish market continuity; no fallback request was made.
 
+A subsequent four-request private probe used the documented symbol-based bar
+route: historical CUSIP asset lookup, inverse symbol lookup, raw IEX historical
+bars and a second inverse symbol lookup. Both inverse IDs matched the CUSIP
+lookup, and the bar query returned three records. Current metadata was used only
+as a read resolver after historical identity was established; it did not select
+or replace a cohort member. The query's `asof` was the current lookup date and
+is not represented as a 2022 mapping observation. This demonstrates free read
+addressability for that security, not complete historical continuity, original
+price-vintage availability, or a completed dataset/study chain. All request
+profiles, IDs, source rows and bars remain private; only operational counts and
+hashes are suitable for the public commitment.
+
+The [SEC's official historical-list index](https://www.sec.gov/rules-regulations/staff-guidance/official-list-section-13f-securities)
+also links a [third-quarter 2022 list](https://www.sec.gov/files/investment/13flist2022q3.pdf).
+Its first two pages identify third-party copyright, a redistribution restriction
+and a Form 13F reporting purpose. They were read and visually inspected only to
+assess source fit; no identifier rows were imported and no broader source-use or
+publication clearance is asserted. The private source digest and assessment
+scope are recorded without publishing its contents.
+
 ## Remaining issue requirements
 
-The strengthened full-roster audit has now processed and independently replayed
+The coverage extensions produced **466 anchors across all 503 candidates**, with
+all 433 baseline anchors retained. The remaining 37 cases comprise 15 unresolved
+ownership identities, 21 unresolved periodic anchors and one size-bound source.
+Two of the prior three size-bound cases yielded valid alternative filings; this
+last pass used nine additional SEC reads. All source rows remain private and no
+candidate was dropped. The result SHA-256 is
+`07699851b0b38c498ebd7558117fb67ccde33048e43c4c8f9409fc3b4610d9ae`.
+Full independent offline replay reproduced all 503 results with zero provider
+requests. The row-free
+[`full-coverage-audit-20261107.json`](../ops/issue292/full-coverage-audit-20261107.json)
+binds the result and exact capture/replay code digests. Source pairs, the final
+result, prior result and exact code versions were retained in a separate private
+evidence packet; no earlier capture was rewritten. This result remains source
+evidence, not historical market-continuity or checkpoint/dataset completion.
+
+The earlier subject-header audit processed and independently replayed
 **all 503 candidates**: 433 explicit subject-verified anchors, 41 unresolved
 ownership identities, 25 unresolved periodic anchors and four size-bound source
 refusals. The live run made 1,107 paced SEC requests; offline replay made zero.
@@ -118,8 +183,9 @@ No candidate was removed. The checked-in
 binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
-The 70 unresolved candidates prevent a complete historical security master
-claim. Submissions about other issuers were actually encountered and refused;
+Its 70 unresolved candidates prevented a complete historical security master
+claim; 37 remain after the coverage extensions. Submissions about other issuers
+were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,
 not evidence that satisfies the strengthened subject gate.

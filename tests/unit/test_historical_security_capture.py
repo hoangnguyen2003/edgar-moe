@@ -13,6 +13,7 @@ from scripts.capture_historical_security_identity import (
     RetainedCheckpoint,
     SourceCache,
     choose_filings,
+    choose_ownership_filings,
     digest,
     expand_columns,
     filing_url,
@@ -74,6 +75,34 @@ def test_large_insider_history_is_filtered_before_row_expansion():
     columns = {key: [value] + ["ignored"] * count for key, value in wanted.items() if key != "cik"}
     columns["form"] = ["10-K"] + ["4"] * count
     assert expand_columns(columns, CIK) == [wanted]
+
+
+def test_discovery_keeps_first_five_then_diversifies_only_pre_cutoff_series():
+    newest = [
+        {
+            **row(i, f"2022-12-{20 - i:02}T00:00:00Z", form="SC 13G"),
+            "fileNumber": "005-owner-series",
+        }
+        for i in range(1, 6)
+    ]
+    historical = [
+        {**row(i, "2022-11-01T00:00:00Z", form="SC 13G"), "fileNumber": "005-other-series"}
+        for i in range(6, 16)
+    ]
+    late = {**row(99, "2023-01-01T00:00:00Z", form="SC 13G"), "fileNumber": "005-future"}
+    chosen = choose_ownership_filings(newest + historical + [late], CUTOFF)
+    assert chosen[:5] == newest
+    assert chosen[5]["fileNumber"] == "005-other-series"
+    assert len(chosen) == 10
+    assert late not in chosen
+    assert len({r["accessionNumber"] for r in chosen}) == 10
+
+
+def test_filing_series_metadata_is_retained_without_importing_current_tickers():
+    expected = {**row(), "fileNumber": "005-synthetic"}
+    columns = {key: [value] for key, value in expected.items() if key != "cik"}
+    columns["tickers"] = ["CURRENT"]
+    assert expand_columns(columns, CIK) == [expected]
 
 
 @pytest.mark.parametrize(
@@ -323,3 +352,68 @@ def test_collector_requires_explicit_subject_even_when_submissions_request_match
         assert result["anchor"]["ownership_subject_evidence"]["subject_cik"] == CIK
     else:
         assert result["refusals"] == {"ownership_subject_issuer_mismatch": 1}
+
+
+@pytest.mark.parametrize("leg", ["periodic", "ownership"])
+@pytest.mark.parametrize("next_filing_succeeds", [True, False])
+def test_oversized_source_can_use_next_bounded_filing_without_dropping_member(
+    monkeypatch, leg, next_filing_succeeds
+):
+    periodic_rows = [row(2, "2022-12-01T00:00:00Z"), row(1)]
+    ownership_rows = [row(4, "2022-12-01T00:00:00Z", "SC 13G"), row(3, form="SC 13G")]
+    monkeypatch.setattr(collector, "submissions", lambda *args: periodic_rows + ownership_rows)
+    monkeypatch.setattr(collector, "periodic_anchor", lambda *args, **kwargs: {"periodic": True})
+    monkeypatch.setattr(collector, "ownership_subject", lambda *args, **kwargs: {"checked": True})
+    monkeypatch.setattr(
+        collector, "ownership_identity", lambda *args, **kwargs: {"ownership": True}
+    )
+    monkeypatch.setattr(collector, "join_identity", lambda *args: {"joined": True})
+    attempts = []
+
+    class Retained:
+        def filing(self, filing):
+            attempts.append(filing["accessionNumber"])
+            if leg == "periodic" and (not next_filing_succeeds or filing == periodic_rows[0]):
+                raise IdentityEvidenceError("retained_source_too_large")
+            return b"synthetic bounded periodic source"
+
+    class Cache:
+        def get(self, url):
+            attempts.append(url)
+            if leg == "ownership" and (
+                not next_filing_succeeds or ownership_rows[0]["accessionNumber"] in url
+            ):
+                raise IdentityEvidenceError("source_document_byte_bound")
+            return b"synthetic bounded ownership source"
+
+    member = {"cik": CIK, "symbol_at_snapshot": "OLD", "snapshot_member_key": "synthetic"}
+    result = collector.collect_member(member, Cache(), Retained(), CUTOFF)
+    assert result["snapshot_member_key"] == member["snapshot_member_key"]
+    reason = "retained_source_too_large" if leg == "periodic" else "source_document_byte_bound"
+    if next_filing_succeeds:
+        assert result["status"] == "pre_cutoff_SEC_identity_anchored"
+        assert result["source_size_refusals"] == {reason: 1}
+    else:
+        assert result["status"] == "source_size_unresolved"
+        assert result["refusals"] == {reason: 2}
+    assert len(attempts) == (2 if leg == "periodic" and not next_filing_succeeds else 3)
+
+
+@pytest.mark.parametrize("reason", ["SEC_source_cache_tampered", "source_request_budget_exhausted"])
+def test_alternative_filing_does_not_bypass_integrity_or_request_budget(monkeypatch, reason):
+    monkeypatch.setattr(collector, "submissions", lambda *args: [row(2), row(1)])
+    attempts = []
+
+    class Retained:
+        def filing(self, filing):
+            attempts.append(filing)
+            raise IdentityEvidenceError(reason)
+
+    with pytest.raises(IdentityEvidenceError, match=reason):
+        collector.collect_member(
+            {"cik": CIK, "symbol_at_snapshot": "OLD", "snapshot_member_key": "synthetic"},
+            None,
+            Retained(),
+            CUTOFF,
+        )
+    assert len(attempts) == 1

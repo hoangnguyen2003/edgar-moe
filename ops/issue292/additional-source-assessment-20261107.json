@@ -1,0 +1,16 @@
+{
+  "bytes": 2722777,
+  "http_status": 200,
+  "identifier_mapping_used": false,
+  "issue_complete": false,
+  "mapping_rows_imported": 0,
+  "observed_at": "2026-11-07T14:27:03.498169+00:00",
+  "purpose": "assess_date_and_usage_notice",
+  "reviewed_pages": [
+    1,
+    2
+  ],
+  "sha256": "43f574525527f90481abc8572d315a45610415ebd725e2303f2374a7a67bb1f1",
+  "source_use_review_status": "assessment_only_no_research_or_publication_clearance",
+  "url": "https://www.sec.gov/files/investment/13flist2022q3.pdf"
+}

@@ -73,6 +73,8 @@ def expand_columns(value: Any, cik: str) -> list[dict[str, Any]]:
         raise IdentityEvidenceError("invalid_submissions_columns")
     count = len(value["accessionNumber"])
     required = {"accessionNumber", "form", "acceptanceDateTime", "primaryDocument"}
+    if "fileNumber" in value:
+        required.add("fileNumber")
     if not required <= value.keys() or any(
         not isinstance(value[key], list) or len(value[key]) != count for key in required
     ):
@@ -125,6 +127,44 @@ def filing_url(row: dict[str, Any]) -> str:
     if _SOURCE_URL.fullmatch(url) is None:
         raise IdentityEvidenceError("invalid_SEC_archive_url")
     return url
+
+
+def choose_ownership_filings(rows: list[dict[str, Any]], cutoff: datetime) -> list[dict[str, Any]]:
+    """Keep the latest five, then inspect other pre-cutoff filing series.
+
+    Series frequency only prioritizes discovery. The explicit subject header
+    remains mandatory and current listing/price information is never read.
+    """
+    eligible = choose_filings(rows, OWNERSHIP_FORMS, cutoff, 100000)
+    selected = eligible[:5]
+    seen = {row["accessionNumber"] for row in selected}
+    series = [row.get("fileNumber", "") for row in eligible]
+    if any(not isinstance(value, str) or len(value) > 128 for value in series):
+        raise IdentityEvidenceError("invalid_SEC_filing_series")
+    counts = Counter(value for value in series if value)
+    attempted = {row.get("fileNumber") for row in selected}
+    representatives: dict[str, dict[str, Any]] = {}
+    for row in eligible:
+        number = row.get("fileNumber", "")
+        if number and number not in attempted:
+            representatives.setdefault(number, row)
+    for row in sorted(
+        representatives.values(),
+        key=lambda r: (
+            -counts[r["fileNumber"]],
+            -instant(r["acceptanceDateTime"]).timestamp(),
+            r["accessionNumber"],
+        ),
+    )[:5]:
+        selected.append(row)
+        seen.add(row["accessionNumber"])
+    for row in eligible:
+        if len(selected) >= 10:
+            break
+        if row["accessionNumber"] not in seen:
+            selected.append(row)
+            seen.add(row["accessionNumber"])
+    return selected
 
 
 class SourceCache:
@@ -353,9 +393,15 @@ def collect_member(
     periodic = None
     refusals: Counter[str] = Counter()
     for row in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
-        body = retained.filing(row)
-        if body is None:
-            body = cache.get(filing_url(row))
+        try:
+            body = retained.filing(row)
+            if body is None:
+                body = cache.get(filing_url(row))
+        except IdentityEvidenceError as error:
+            if str(error) not in {"source_document_byte_bound", "retained_source_too_large"}:
+                raise
+            refusals[str(error)] += 1
+            continue
         try:
             periodic = periodic_anchor(body, row, cik=cik, symbol=symbol, cutoff=cutoff)
             break
@@ -364,11 +410,21 @@ def collect_member(
     if periodic is None:
         return {
             "snapshot_member_key": member["snapshot_member_key"],
-            "status": "periodic_anchor_unresolved",
+            "status": "source_size_unresolved"
+            if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+            else "periodic_anchor_unresolved",
             "refusals": dict(refusals),
         }
-    for row in choose_filings(rows, OWNERSHIP_FORMS, cutoff, 5):
-        body = cache.get(filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"}))
+    for row in choose_ownership_filings(rows, cutoff):
+        try:
+            body = cache.get(
+                filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"})
+            )
+        except IdentityEvidenceError as error:
+            if str(error) != "source_document_byte_bound":
+                raise
+            refusals[str(error)] += 1
+            continue
         try:
             subject = ownership_subject(body, cik=cik, accession=row["accessionNumber"])
             result = join_identity(periodic, ownership_identity(body, row, cik=cik, cutoff=cutoff))
@@ -377,12 +433,19 @@ def collect_member(
                 "snapshot_member_key": member["snapshot_member_key"],
                 "status": "pre_cutoff_SEC_identity_anchored",
                 "anchor": result,
+                **(
+                    {"source_size_refusals": dict(refusals)}
+                    if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+                    else {}
+                ),
             }
         except IdentityEvidenceError as error:
             refusals[str(error)] += 1
     return {
         "snapshot_member_key": member["snapshot_member_key"],
-        "status": "ownership_identity_unresolved",
+        "status": "source_size_unresolved"
+        if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+        else "ownership_identity_unresolved",
         "refusals": dict(refusals),
     }
 
