@@ -8,6 +8,7 @@ import pytest
 
 from edgar_moe.data.historical_identity import IdentityEvidenceError
 from edgar_moe.data.screen_inputs import canonical_bytes
+from scripts import capture_historical_security_identity as collector
 from scripts.capture_historical_security_identity import (
     RetainedCheckpoint,
     SourceCache,
@@ -65,6 +66,14 @@ def test_submissions_extract_only_filing_columns_not_present_day_tickers():
     columns["form"] = []
     with pytest.raises(IdentityEvidenceError, match="inconsistent"):
         expand_columns(columns, CIK)
+
+
+def test_large_insider_history_is_filtered_before_row_expansion():
+    wanted = row()
+    count = 100001
+    columns = {key: [value] + ["ignored"] * count for key, value in wanted.items() if key != "cik"}
+    columns["form"] = ["10-K"] + ["4"] * count
+    assert expand_columns(columns, CIK) == [wanted]
 
 
 @pytest.mark.parametrize(
@@ -199,3 +208,118 @@ def test_decompression_is_bounded(monkeypatch):
     monkeypatch.setattr("scripts.capture_historical_security_identity.MAX_DOCUMENT_BYTES", 4)
     with pytest.raises(IdentityEvidenceError, match="too_large"):
         unpack(gzip.compress(b"12345"))
+
+
+def test_new_oversized_source_refusal_has_the_same_receipt_on_offline_replay(fd, monkeypatch):
+    monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
+    monkeypatch.setattr("scripts.capture_historical_security_identity.MAX_DOCUMENT_BYTES", 4)
+    with httpx.Client(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b"12345"))
+    ) as client:
+        live = SourceCache(fd, client, 1)
+        with pytest.raises(IdentityEvidenceError, match="document_byte_bound"):
+            live.get(URL)
+    offline = SourceCache(fd, None, 1)
+    with pytest.raises(IdentityEvidenceError, match="document_byte_bound"):
+        offline.get(URL)
+    assert live.used == offline.used
+    assert len(live.used) == 1
+    assert offline.requests == 0
+
+
+def test_transient_failure_defers_only_that_source_without_retry(fd, monkeypatch):
+    monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
+    calls = []
+
+    def handler(request):
+        calls.append(str(request.url))
+        return httpx.Response(503 if str(request.url) == URL else 200, content=b"{}")
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        cache = SourceCache(fd, client, 10)
+        with pytest.raises(IdentityEvidenceError, match="temporarily_unavailable"):
+            cache.get(URL)
+        with pytest.raises(IdentityEvidenceError, match="deferred_this_run"):
+            cache.get(URL)
+        assert cache.get(URL.replace("0000000001", "0000000002")) == b"{}"
+    assert len(calls) == 2
+    assert cache.consecutive_failures == 0
+    assert len(cache.deferred) == 1
+    assert cache.deferred[digest(URL.encode())]["automatically_retried"] is False
+
+
+@pytest.mark.parametrize("failure", ["503", "timeout"])
+def test_three_consecutive_transient_failures_open_the_circuit(fd, monkeypatch, failure):
+    monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
+    calls = []
+
+    def handler(request):
+        calls.append(request.url)
+        if failure == "timeout":
+            raise httpx.ReadTimeout("synthetic timeout", request=request)
+        return httpx.Response(503)
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        cache = SourceCache(fd, client, 10)
+        for number in (1, 2, 3):
+            with pytest.raises(IdentityEvidenceError, match="temporarily_unavailable"):
+                cache.get(URL.replace("0000000001", f"{number:010}"))
+        with pytest.raises(IdentityEvidenceError, match="circuit_open"):
+            cache.get(URL.replace("0000000001", "0000000004"))
+    assert len(calls) == 3
+    assert len(cache.deferred) == 3
+
+
+def test_retry_after_stops_before_any_independent_request(fd, monkeypatch):
+    monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
+    calls = []
+
+    def handler(request):
+        calls.append(request.url)
+        return httpx.Response(503, headers={"Retry-After": "60"})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        cache = SourceCache(fd, client, 10)
+        with pytest.raises(IdentityEvidenceError, match="temporarily_unavailable"):
+            cache.get(URL)
+        with pytest.raises(IdentityEvidenceError, match="circuit_open"):
+            cache.get(URL.replace("0000000001", "0000000002"))
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "subject,expected",
+    [(CIK, "pre_cutoff_SEC_identity_anchored"), ("0000000002", "ownership_identity_unresolved")],
+)
+def test_collector_requires_explicit_subject_even_when_submissions_request_matches(
+    monkeypatch, subject, expected
+):
+    periodic = (
+        f'<ix:nonNumeric name="dei:EntityCentralIndexKey" contextRef="c">{CIK}</ix:nonNumeric><ix:nonNumeric name="dei:TradingSymbol" contextRef="c">OLD</ix:nonNumeric><ix:nonNumeric name="dei:Security12bTitle" contextRef="c">Common Stock</ix:nonNumeric><ix:nonNumeric name="dei:SecurityExchangeName" contextRef="c">Synthetic exchange</ix:nonNumeric>'
+    ).encode()
+    own = row(2, form="SC 13G")
+    body = (
+        f"<SEC-HEADER>\nACCESSION NUMBER: {own['accessionNumber']}\nSUBJECT COMPANY:\n\tCENTRAL INDEX KEY: {subject}\nFILED BY:\n\tCENTRAL INDEX KEY: {CIK}\n</SEC-HEADER><p>(Name of Issuer)</p><p>Common Stock</p><p>(Title of Class of Securities)</p><p>123456782</p><p>(CUSIP Number)</p>"
+    ).encode()
+    monkeypatch.setattr(collector, "submissions", lambda *args: [row(), own])
+
+    class Retained:
+        def filing(self, _):
+            return periodic
+
+    class Cache:
+        def get(self, url):
+            assert url.endswith(own["accessionNumber"] + ".txt")
+            return body
+
+    result = collector.collect_member(
+        {"cik": CIK, "symbol_at_snapshot": "OLD", "snapshot_member_key": "synthetic"},
+        Cache(),
+        Retained(),
+        CUTOFF,
+    )
+    assert result["status"] == expected
+    if subject == CIK:
+        assert result["anchor"]["ownership_subject_evidence"]["subject_cik"] == CIK
+    else:
+        assert result["refusals"] == {"ownership_subject_issuer_mismatch": 1}

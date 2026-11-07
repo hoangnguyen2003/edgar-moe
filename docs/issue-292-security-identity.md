@@ -16,8 +16,11 @@ estimate of complete-source accuracy or coverage.
 A periodic 10-K/10-Q binds CIK, trading symbol, registered class and exchange
 within the same XBRL context. Combined reports may contain several registrants;
 the symbol's context must identify the requested CIK. Schedule 13G/13D cover
-fields supply a class and a check-digit-valid CUSIP associated with the same
-issuer through the retained SEC submissions record. Class letters, voting
+fields supply a class and a check-digit-valid CUSIP. The complete submission's
+explicit `SUBJECT COMPANY` CIK and accession must match the requested issuer and
+filing. A reporting-owner CIK or presence in an issuer's submissions list is
+insufficient: that list can include holdings reported about another company.
+Class letters, voting
 rights and common/ordinary distinctions must agree. Preferred, depositary,
 unit and ambiguous classes are refused. Both reported acceptance times plus
 seven calendar days must precede the source cutoff. Discovery is limited to
@@ -35,8 +38,9 @@ The original checkpoint manifest and each reused source are hash-verified.
 Live capture uses fixed SEC hosts, an identified contact, no more than two
 requests per second, no redirects/retries, a request budget, a 16 MiB response
 cap and a 1 GiB per-run response ceiling. A source over the document cap is
-retained as a refusal, never silently omitted. HTTP/transport errors stop the
-run. Current tickers in submissions are ignored. Private files use the existing
+retained as a refusal, never silently omitted. The original collector stopped
+on any HTTP/transport error; bounded transient deferral is described below.
+Current tickers in submissions are ignored. Private files use the existing
 owner-only, exclusive, alias-resistant capture primitives.
 
 Completed member receipts survive interruption; resume recomputes them from
@@ -63,7 +67,67 @@ collection must not be reported as complete. An exhausted budget or unavailable
 source requires inspection before another live invocation; there is no automatic
 retry or background scheduler.
 
+## Bounded deferral and independent offline replay
+
+The follow-up collector can continue independent candidates after an isolated
+HTTP 500/502/503/504 or timeout. It records that source's exact URL, observed
+failure and no-body/no-retry flags privately, and reports the member as
+`source_temporarily_unavailable`. The failed URL is not requested again within
+that run, including when another member shares it. Three consecutive transient
+request failures open the circuit before any fourth request. A `Retry-After`
+response opens it immediately. HTTP 403/429 and other errors still stop the run.
+Successful new source requests reset the consecutive-failure counter; cached
+responses do not conceal a continuing service outage. No missing source is
+treated as an exclusion or a successful anchor. Request, response and rate caps
+remain in force.
+
+`scripts/verify_historical_security_identity.py` separately re-extracts a saved
+result with no HTTP client. It verifies the content-addressed result filename,
+source-roster/checkpoint bindings, exact selected order, source bytes/receipts,
+all recomputed member results, counts and false completion flags. A recorded
+unavailable source can reproduce only an unresolved member, after its separate
+private failure receipt is rechecked. A missing source without that bound
+receipt fails verification. Hashes remain traceability evidence, not independent
+authentication against a writer controlling the whole private directory.
+
+```sh
+python -m scripts.verify_historical_security_identity \
+  --directory data/artifacts/historical-identities \
+  --result result-<sha256>.json \
+  --source-capture data/artifacts/historical-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+The original 12-row sample was successfully re-extracted by this independent
+entrypoint with zero provider requests before the explicit subject-CIK check
+was added. Those earlier anchors require revalidation against complete
+submission headers; primary-document bytes alone cannot satisfy the strengthened
+gate. All 12 have since passed the subject check in the full-roster run, whose
+remaining coverage is separate. A separate one-request free-tier probe
+of permanent-UUID bar addressing returned HTTP 400 and zero rows. That negative
+result does not establish market continuity; no fallback request was made.
+
 ## Remaining issue requirements
+
+The strengthened full-roster audit has now processed and independently replayed
+**all 503 candidates**: 433 explicit subject-verified anchors, 41 unresolved
+ownership identities, 25 unresolved periodic anchors and four size-bound source
+refusals. The live run made 1,107 paced SEC requests; offline replay made zero.
+No candidate was removed. The checked-in
+[`full-subject-audit-20261107.json`](../ops/issue292/full-subject-audit-20261107.json)
+binds the complete private result and original capture/verifier code digests.
+The result SHA-256 is
+`00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
+The 70 unresolved candidates prevent a complete historical security master
+claim. Submissions about other issuers were actually encountered and refused;
+104 subject-mismatch attempts are retained among unresolved ownership cases.
+Earlier primary-document-only anchor counts below are historical progress,
+not evidence that satisfies the strengthened subject gate.
+
+The capture's code is retained separately from a subsequent receipt-consistency
+fix: a newly oversized live source now records the same refusal receipt that
+offline replay reads. That fix does not change identity extraction or rewrite
+the completed capture.
 
 The full-source expansion initially stopped after 55 processed candidates on
 an SEC read timeout. A later manual resume reused every completed source and
