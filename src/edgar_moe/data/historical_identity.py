@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -137,6 +137,7 @@ def periodic_anchor(
     if not context_issuers and issuers != {cik}:
         raise IdentityEvidenceError("document_issuer_mismatch")
     matches: set[tuple[str, str]] = set()
+    ambiguous = False
     for context_id, fields in grouped.items():
         if fields.get("dei:tradingsymbol") != {symbol}:
             continue
@@ -147,20 +148,129 @@ def periodic_anchor(
         titles = fields.get("dei:security12btitle", set())
         exchanges = fields.get("dei:securityexchangename", set())
         if len(titles) != 1 or len(exchanges) != 1:
-            raise IdentityEvidenceError("ambiguous_registered_class")
+            ambiguous = True
+            continue
         title, exchange = next(iter(titles)), next(iter(exchanges))
         class_signature(title)
         matches.add((title, exchange))
-    if len(matches) != 1:
-        raise IdentityEvidenceError("missing_or_ambiguous_symbol_class_context")
-    title, exchange = next(iter(matches))
+    row_binding: dict[str, str] = {}
+    if len(matches) != 1 or ambiguous:
+        title, exchange = _registered_class_row(soup, cik, symbol, context_issuers, cutoff)
+        row_binding = {
+            "registered_class_binding": "single_security_row_with_compatible_issuer_period_dimensions"
+        }
+    else:
+        title, exchange = next(iter(matches))
     return {
         **source,
         "symbol_at_cutoff": symbol,
         "security_title": title,
         "exchange_at_filing": exchange,
         "document_sha256": hashlib.sha256(payload).hexdigest(),
+        **row_binding,
     }
+
+
+def _registered_class_row(
+    soup: BeautifulSoup,
+    cik: str,
+    symbol: str,
+    context_issuers: dict[str, set[str]],
+    cutoff: datetime,
+) -> tuple[str, str]:
+    """Disambiguate repeated context facts only within one explicit cover row."""
+    names = {"dei:tradingsymbol", "dei:security12btitle", "dei:securityexchangename"}
+    matches: set[tuple[str, str]] = set()
+    for tag in soup.find_all("ix:nonnumeric"):
+        if (
+            str(tag.get("name", "")).lower() != "dei:tradingsymbol"
+            or " ".join(tag.get_text(" ", strip=True).split()) != symbol
+        ):
+            continue
+        row = tag.find_parent("tr")
+        if row is None:
+            continue
+        fields: dict[str, set[str]] = {}
+        contexts: set[str] = set()
+        for fact in row.find_all("ix:nonnumeric"):
+            name = str(fact.get("name", "")).lower()
+            if name not in names or fact.find_parent("tr") is not row:
+                continue
+            contexts.add(str(fact.get("contextref", "")))
+            fields.setdefault(name, set()).add(" ".join(fact.get_text(" ", strip=True).split()))
+        if (
+            set(fields) != names
+            or any(len(values) != 1 for values in fields.values())
+            or fields["dei:tradingsymbol"] != {symbol}
+            or not contexts
+            or "" in contexts
+        ):
+            continue
+        if context_issuers and any(context_issuers.get(context) != {cik} for context in contexts):
+            raise IdentityEvidenceError("symbol_context_issuer_mismatch")
+        if len(contexts) > 1 and not _compatible_cover_contexts(soup, contexts, cutoff):
+            continue
+        title = next(iter(fields["dei:security12btitle"]))
+        exchange = next(iter(fields["dei:securityexchangename"]))
+        class_signature(title)
+        matches.add((title, exchange))
+    if len(matches) != 1:
+        raise IdentityEvidenceError("missing_or_ambiguous_symbol_class_context")
+    return next(iter(matches))
+
+
+def _compatible_cover_contexts(soup: BeautifulSoup, references: set[str], cutoff: datetime) -> bool:
+    """Only known security/ticker/exchange axes; shared axes cannot disagree."""
+    allowed = {
+        "us-gaap:StatementClassOfStockAxis",
+        "dei:TradingSymbolAxis",
+        "dei:EntityListingsExchangeAxis",
+    }
+    periods: set[str] = set()
+    dimensions: dict[str, set[str]] = {}
+    for reference in references:
+        definitions = soup.find_all("xbrli:context", attrs={"id": reference})
+        if len(definitions) != 1:
+            return False
+        context = definitions[0]
+        period = context.find_all("xbrli:period")
+        if len(period) != 1 or context.find_all("xbrldi:typedmember"):
+            return False
+        dates = period[0].find_all(["xbrli:startdate", "xbrli:enddate", "xbrli:instant"])
+        if sorted(node.name for node in dates) not in [
+            ["xbrli:instant"],
+            ["xbrli:enddate", "xbrli:startdate"],
+        ] or len(period[0].find_all(recursive=False)) != len(dates):
+            return False
+        parsed_dates: dict[str, date] = {}
+        for node in dates:
+            value = node.get_text(strip=True)
+            try:
+                parsed = date.fromisoformat(value)
+                if parsed > cutoff.date():
+                    return False
+                parsed_dates[node.name] = parsed
+            except ValueError:
+                return False
+        if (
+            "xbrli:startdate" in parsed_dates
+            and parsed_dates["xbrli:startdate"] > parsed_dates["xbrli:enddate"]
+        ):
+            return False
+        periods.add(re.sub(r">\s+<", "><", str(period[0])))
+        for segment in context.find_all(["xbrli:segment", "xbrli:scenario"]):
+            if any(
+                child.name != "xbrldi:explicitmember" for child in segment.find_all(recursive=False)
+            ):
+                return False
+        local_axes: set[str] = set()
+        for member in context.find_all("xbrldi:explicitmember"):
+            axis = str(member.get("dimension", ""))
+            if axis not in allowed or axis in local_axes:
+                return False
+            local_axes.add(axis)
+            dimensions.setdefault(axis, set()).add(member.get_text(strip=True))
+    return len(periods) == 1 and all(len(values) == 1 for values in dimensions.values())
 
 
 def valid_cusip(value: str) -> bool:
@@ -210,18 +320,51 @@ def ownership_identity(
     source = source_metadata(
         metadata, cik=cik, cutoff=cutoff, forms={"SC 13G", "SC 13G/A", "SC 13D", "SC 13D/A"}
     )
-    text = " ".join(_soup(payload).get_text(" ", strip=True).split())
+    soup = _soup(payload)
+    text = " ".join(soup.get_text(" ", strip=True).split())
     titles = re.findall(
         r"\(\s*Name\s+of\s+Issuer\s*\)(.*?)\(\s*Title\s+of\s+Class\s+of\s+Securities\s*\)",
         text,
         re.I,
     )
+    candidates: set[str] = set()
+    # Some covers use inline colon-labelled fields instead of parenthesized
+    # captions. Require the complete local name/class/CUSIP sequence; a class
+    # mentioned in Item 2 or another narrative is not a cover field.
+    lines = [
+        " ".join(line.split())
+        for line in soup.get_text("\n", strip=True).splitlines()
+        if line.strip()
+    ]
+    for index, line in enumerate(lines):
+        label = re.fullmatch(r"Title\s+of\s+Class\s+of\s+Securities\s*:\s*(.+)", line, re.I)
+        if label is None:
+            continue
+        preceding = lines[max(0, index - 6) : index]
+        following = lines[index + 1 : index + 7]
+        if not any(
+            re.fullmatch(r"Name\s+of\s+Issuer\s*:\s*\S.+", item, re.I) for item in preceding
+        ):
+            raise IdentityEvidenceError("unbound_ownership_cover_class")
+        field = None
+        for item in following:
+            if re.match(r"(?:Name\s+of\s+Issuer|Title\s+of\s+Class|Item\s+[0-9])\b", item, re.I):
+                break
+            match = re.fullmatch(r"CUSIP\s+(?:Number|No\.?)\s*:\s*(.+)", item, re.I)
+            if match:
+                field = match[1]
+                break
+        if field is None:
+            raise IdentityEvidenceError("unbound_ownership_cover_cusip")
+        titles.append(label[1])
+        value = re.sub(r"[\s-]", "", field).upper()
+        if valid_cusip(value):
+            candidates.add(value)
     if not titles:
         raise IdentityEvidenceError("missing_ownership_class")
     signatures = {class_signature(title) for title in titles}
     if len(signatures) != 1:
         raise IdentityEvidenceError("ambiguous_ownership_class")
-    candidates: set[str] = set()
     for label in re.finditer(r"CUSIP\s+(?:Number|No\.?)", text, re.I):
         region = text[max(0, label.start() - 64) : label.end() + 64]
         for match in re.finditer(r"(?<![A-Z0-9])([A-Z0-9]{8}[0-9])(?![A-Z0-9])", region):

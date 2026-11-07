@@ -13,6 +13,7 @@ from scripts.capture_historical_security_identity import (
     RetainedCheckpoint,
     SourceCache,
     choose_filings,
+    choose_ownership_filings,
     digest,
     expand_columns,
     filing_url,
@@ -74,6 +75,34 @@ def test_large_insider_history_is_filtered_before_row_expansion():
     columns = {key: [value] + ["ignored"] * count for key, value in wanted.items() if key != "cik"}
     columns["form"] = ["10-K"] + ["4"] * count
     assert expand_columns(columns, CIK) == [wanted]
+
+
+def test_discovery_keeps_first_five_then_diversifies_only_pre_cutoff_series():
+    newest = [
+        {
+            **row(i, f"2022-12-{20 - i:02}T00:00:00Z", form="SC 13G"),
+            "fileNumber": "005-owner-series",
+        }
+        for i in range(1, 6)
+    ]
+    historical = [
+        {**row(i, "2022-11-01T00:00:00Z", form="SC 13G"), "fileNumber": "005-other-series"}
+        for i in range(6, 16)
+    ]
+    late = {**row(99, "2023-01-01T00:00:00Z", form="SC 13G"), "fileNumber": "005-future"}
+    chosen = choose_ownership_filings(newest + historical + [late], CUTOFF)
+    assert chosen[:5] == newest
+    assert chosen[5]["fileNumber"] == "005-other-series"
+    assert len(chosen) == 10
+    assert late not in chosen
+    assert len({r["accessionNumber"] for r in chosen}) == 10
+
+
+def test_filing_series_metadata_is_retained_without_importing_current_tickers():
+    expected = {**row(), "fileNumber": "005-synthetic"}
+    columns = {key: [value] for key, value in expected.items() if key != "cik"}
+    columns["tickers"] = ["CURRENT"]
+    assert expand_columns(columns, CIK) == [expected]
 
 
 @pytest.mark.parametrize(

@@ -27,6 +27,29 @@ seven calendar days must precede the source cutoff. Discovery is limited to
 the preceding two years, at most four periodic and five ownership filings.
 These are explicit coverage bounds, not grounds for dropping unresolved rows.
 
+### Coverage extensions
+
+The extractor also recognizes colon-labelled ownership covers when an explicit
+issuer-name/class/CUSIP sequence is present within a short cover block. Narrative
+Item 2 mentions, unbound labels, multiple classes/CUSIPs and voting/non-voting or
+ordinary/common mismatches still fail closed. Complete-submission subject-CIK
+and accession checks remain mandatory.
+
+Some periodic covers reuse a context for several securities, or give the three
+cover columns separate property-axis contexts. A fallback requires exactly one
+class, symbol and exchange in a single table row, excluding nested rows. Every
+context must identify the same issuer. Separate contexts must have identical,
+valid pre-cutoff periods and only the known stock-class, trading-symbol and
+listing-exchange axes; shared axes cannot disagree. Unknown/typed dimensions,
+debt/class conflicts, multiple matching rows and future periods are refused.
+
+Ownership discovery preserves the newest five attempts. If they fail, it
+inspects up to five further pre-cutoff records, prioritizing other SEC file-number
+series by their pre-cutoff frequency and then recency. Series metadata is only
+a discovery aid; it cannot supply issuer identity. Each accepted filing still
+needs its explicit subject header. The two-year lookback and seven-day lag,
+request/byte/rate caps, source retention and 503-row denominator are unchanged.
+
 The SEC archive/submissions responses are observed in November 2026, separately
 from their reported historical acceptance dates. These are not signed historical
 timestamps. Filing facts establish identity at their filing dates; a CUSIP or
@@ -106,6 +129,18 @@ gate. All 12 have since passed the subject check in the full-roster run, whose
 remaining coverage is separate. A separate one-request free-tier probe
 of permanent-UUID bar addressing returned HTTP 400 and zero rows. That negative
 result does not establish market continuity; no fallback request was made.
+
+A subsequent four-request private probe used the documented symbol-based bar
+route: historical CUSIP asset lookup, inverse symbol lookup, raw IEX historical
+bars and a second inverse symbol lookup. Both inverse IDs matched the CUSIP
+lookup, and the bar query returned three records. Current metadata was used only
+as a read resolver after historical identity was established; it did not select
+or replace a cohort member. The query's `asof` was the current lookup date and
+is not represented as a 2022 mapping observation. This demonstrates free read
+addressability for that security, not complete historical continuity, original
+price-vintage availability, or a completed dataset/study chain. All request
+profiles, IDs, source rows and bars remain private; only operational counts and
+hashes are suitable for the public commitment.
 
 ## Remaining issue requirements
 
