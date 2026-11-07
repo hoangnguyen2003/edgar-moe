@@ -210,6 +210,23 @@ def test_decompression_is_bounded(monkeypatch):
         unpack(gzip.compress(b"12345"))
 
 
+def test_new_oversized_source_refusal_has_the_same_receipt_on_offline_replay(fd, monkeypatch):
+    monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
+    monkeypatch.setattr("scripts.capture_historical_security_identity.MAX_DOCUMENT_BYTES", 4)
+    with httpx.Client(
+        transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b"12345"))
+    ) as client:
+        live = SourceCache(fd, client, 1)
+        with pytest.raises(IdentityEvidenceError, match="document_byte_bound"):
+            live.get(URL)
+    offline = SourceCache(fd, None, 1)
+    with pytest.raises(IdentityEvidenceError, match="document_byte_bound"):
+        offline.get(URL)
+    assert live.used == offline.used
+    assert len(live.used) == 1
+    assert offline.requests == 0
+
+
 def test_transient_failure_defers_only_that_source_without_retry(fd, monkeypatch):
     monkeypatch.setattr("scripts.capture_historical_security_identity.time.sleep", lambda _: None)
     calls = []

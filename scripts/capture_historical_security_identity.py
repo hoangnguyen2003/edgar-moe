@@ -213,6 +213,7 @@ class SourceCache:
                             "retrieved_at": datetime.now(UTC).isoformat(),
                         }
                         _write_new(self.fd, key + ".json", canonical_bytes(meta) + b"\n")
+                        self.used[key] = meta
                         raise IdentityEvidenceError("source_document_byte_bound") from None
             payload = bytes(body)
             if not payload:

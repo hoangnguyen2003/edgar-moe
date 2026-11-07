@@ -109,6 +109,26 @@ result does not establish market continuity; no fallback request was made.
 
 ## Remaining issue requirements
 
+The strengthened full-roster audit has now processed and independently replayed
+**all 503 candidates**: 433 explicit subject-verified anchors, 41 unresolved
+ownership identities, 25 unresolved periodic anchors and four size-bound source
+refusals. The live run made 1,107 paced SEC requests; offline replay made zero.
+No candidate was removed. The checked-in
+[`full-subject-audit-20261107.json`](../ops/issue292/full-subject-audit-20261107.json)
+binds the complete private result and original capture/verifier code digests.
+The result SHA-256 is
+`00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
+The 70 unresolved candidates prevent a complete historical security master
+claim. Submissions about other issuers were actually encountered and refused;
+104 subject-mismatch attempts are retained among unresolved ownership cases.
+Earlier primary-document-only anchor counts below are historical progress,
+not evidence that satisfies the strengthened subject gate.
+
+The capture's code is retained separately from a subsequent receipt-consistency
+fix: a newly oversized live source now records the same refusal receipt that
+offline replay reads. That fix does not change identity extraction or rewrite
+the completed capture.
+
 The full-source expansion initially stopped after 55 processed candidates on
 an SEC read timeout. A later manual resume reused every completed source and
 reached 56 candidates before an SEC HTTP 503 stopped it again. Neither run
