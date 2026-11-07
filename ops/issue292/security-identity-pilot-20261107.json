@@ -1,0 +1,24 @@
+{
+  "SEC_requests_this_run": 0,
+  "checkpoint_dataset_binding_verified": false,
+  "collector_algorithm_sha256": "22f833dc028f7f1aa41fffc376ecbc89c8a086838be9f153efa85b5e8e5a4075",
+  "current_asset_directory_used": false,
+  "full_source_expansion_complete": false,
+  "full_source_processed_before_transport_stop": 55,
+  "historical_market_continuity_verified": false,
+  "identity_algorithm_sha256": "dcb88058e720fe3743fff170b2787a22fc0cc167f19e764bc628b51a4b1eeded",
+  "issue_complete": false,
+  "live_capture_requests": 22,
+  "market_provider_requests": 0,
+  "offline_replay_exact_member_results_match": true,
+  "processed": 12,
+  "public_provider_rows": false,
+  "result_sha256": "ecd19736220f9bea2239871c53f42d5ab801bb0be2a1920120221311fff56cc1",
+  "schema_version": 1,
+  "source_count": 503,
+  "source_roster_sha256": "9d9637f631c05d2bc4dbb3cb2d865ea44bc99bdb1bd047f7c2326f8e0554f1d6",
+  "source_use_scope": "identified_private_SEC_archival_evidence_only",
+  "statuses": {
+    "pre_cutoff_SEC_identity_anchored": 12
+  }
+}

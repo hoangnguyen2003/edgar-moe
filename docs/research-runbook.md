@@ -26,6 +26,11 @@ security continuity, permission for market/macro inputs, or a complete study
 chain. Its snapshot-member keys must not be substituted for historical security
 identifiers, and the original v2 dataset/master remain unchanged.
 
+The [SEC identity collector](issue-292-security-identity.md) separately replays
+dated issuer/class/CUSIP evidence and retains every unresolved source member.
+Its successful 12-row live sample does not complete full historical membership,
+market continuity or the new checkpoint/dataset study chain.
+
 For a new prospective cutoff, capture the master before that New York day ends,
 then screen only after the day ends. The default screen cutoff is the previous
 New York day, so a master first captured after that cutoff is not eligible.
