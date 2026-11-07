@@ -23,8 +23,8 @@ insufficient: that list can include holdings reported about another company.
 Class letters, voting
 rights and common/ordinary distinctions must agree. Preferred, depositary,
 unit and ambiguous classes are refused. Both reported acceptance times plus
-seven calendar days must precede the source cutoff. Discovery is limited to
-the preceding two years, at most four periodic and five ownership filings.
+seven calendar days must precede the source cutoff. Current discovery is limited
+to the preceding two years, at most four periodic and ten ownership filings.
 These are explicit coverage bounds, not grounds for dropping unresolved rows.
 
 ### Coverage extensions
@@ -49,6 +49,13 @@ series by their pre-cutoff frequency and then recency. Series metadata is only
 a discovery aid; it cannot supply issuer identity. Each accepted filing still
 needs its explicit subject header. The two-year lookback and seven-day lag,
 request/byte/rate caps, source retention and 503-row denominator are unchanged.
+
+An oversized source no longer prevents inspection of the next filing within
+those bounds. Its refusal is retained, the same byte ceiling still applies to
+each alternative, and any successful fallback carries the prior refusal counts.
+If no alternative proves identity, the candidate remains unresolved. Integrity
+errors, exhausted request budgets, missing uncaptured sources and HTTP refusal
+controls cannot use this size-only continuation path.
 
 The SEC archive/submissions responses are observed in November 2026, separately
 from their reported historical acceptance dates. These are not signed historical
@@ -152,7 +159,22 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
-The strengthened full-roster audit has now processed and independently replayed
+The coverage extensions produced **466 anchors across all 503 candidates**, with
+all 433 baseline anchors retained. The remaining 37 cases comprise 15 unresolved
+ownership identities, 21 unresolved periodic anchors and one size-bound source.
+Two of the prior three size-bound cases yielded valid alternative filings; this
+last pass used nine additional SEC reads. All source rows remain private and no
+candidate was dropped. The result SHA-256 is
+`07699851b0b38c498ebd7558117fb67ccde33048e43c4c8f9409fc3b4610d9ae`.
+Full independent offline replay reproduced all 503 results with zero provider
+requests. The row-free
+[`full-coverage-audit-20261107.json`](../ops/issue292/full-coverage-audit-20261107.json)
+binds the result and exact capture/replay code digests. Source pairs, the final
+result, prior result and exact code versions were retained in a separate private
+evidence packet; no earlier capture was rewritten. This result remains source
+evidence, not historical market-continuity or checkpoint/dataset completion.
+
+The earlier subject-header audit processed and independently replayed
 **all 503 candidates**: 433 explicit subject-verified anchors, 41 unresolved
 ownership identities, 25 unresolved periodic anchors and four size-bound source
 refusals. The live run made 1,107 paced SEC requests; offline replay made zero.
@@ -161,8 +183,9 @@ No candidate was removed. The checked-in
 binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
-The 70 unresolved candidates prevent a complete historical security master
-claim. Submissions about other issuers were actually encountered and refused;
+Its 70 unresolved candidates prevented a complete historical security master
+claim; 37 remain after the coverage extensions. Submissions about other issuers
+were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,
 not evidence that satisfies the strengthened subject gate.

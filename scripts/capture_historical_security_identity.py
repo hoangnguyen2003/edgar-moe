@@ -393,9 +393,15 @@ def collect_member(
     periodic = None
     refusals: Counter[str] = Counter()
     for row in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
-        body = retained.filing(row)
-        if body is None:
-            body = cache.get(filing_url(row))
+        try:
+            body = retained.filing(row)
+            if body is None:
+                body = cache.get(filing_url(row))
+        except IdentityEvidenceError as error:
+            if str(error) not in {"source_document_byte_bound", "retained_source_too_large"}:
+                raise
+            refusals[str(error)] += 1
+            continue
         try:
             periodic = periodic_anchor(body, row, cik=cik, symbol=symbol, cutoff=cutoff)
             break
@@ -404,11 +410,21 @@ def collect_member(
     if periodic is None:
         return {
             "snapshot_member_key": member["snapshot_member_key"],
-            "status": "periodic_anchor_unresolved",
+            "status": "source_size_unresolved"
+            if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+            else "periodic_anchor_unresolved",
             "refusals": dict(refusals),
         }
     for row in choose_ownership_filings(rows, cutoff):
-        body = cache.get(filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"}))
+        try:
+            body = cache.get(
+                filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"})
+            )
+        except IdentityEvidenceError as error:
+            if str(error) != "source_document_byte_bound":
+                raise
+            refusals[str(error)] += 1
+            continue
         try:
             subject = ownership_subject(body, cik=cik, accession=row["accessionNumber"])
             result = join_identity(periodic, ownership_identity(body, row, cik=cik, cutoff=cutoff))
@@ -417,12 +433,19 @@ def collect_member(
                 "snapshot_member_key": member["snapshot_member_key"],
                 "status": "pre_cutoff_SEC_identity_anchored",
                 "anchor": result,
+                **(
+                    {"source_size_refusals": dict(refusals)}
+                    if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+                    else {}
+                ),
             }
         except IdentityEvidenceError as error:
             refusals[str(error)] += 1
     return {
         "snapshot_member_key": member["snapshot_member_key"],
-        "status": "ownership_identity_unresolved",
+        "status": "source_size_unresolved"
+        if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+        else "ownership_identity_unresolved",
         "refusals": dict(refusals),
     }
 
