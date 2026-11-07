@@ -174,6 +174,36 @@ def valid_cusip(value: str) -> bool:
     return (10 - total % 10) % 10 == int(value[8])
 
 
+def ownership_subject(payload: bytes, *, cik: str, accession: str) -> dict[str, str]:
+    """Authenticate the requested subject within a complete SEC submission.
+
+    A reporting owner's CIK and inclusion in a submissions list are insufficient.
+    Only the explicit SUBJECT COMPANY block can supply this leg of the join.
+    """
+    if not isinstance(payload, bytes) or not 0 < len(payload) <= MAX_DOCUMENT_BYTES:
+        raise IdentityEvidenceError("empty_or_excessive_document")
+    headers = re.findall(rb"<SEC-HEADER>(.*?)</SEC-HEADER>", payload, re.S | re.I)
+    if len(headers) != 1 or len(headers[0]) > 256 * 1024:
+        raise IdentityEvidenceError("missing_or_ambiguous_SEC_subject_header")
+    header = headers[0].replace(b"\r\n", b"\n")
+    accessions = re.findall(rb"(?m)^ACCESSION NUMBER:\s*([0-9]{10}-[0-9]{2}-[0-9]{6})\s*$", header)
+    if accessions != [accession.encode("ascii")]:
+        raise IdentityEvidenceError("SEC_header_accession_mismatch")
+    subjects = re.findall(rb"(?ms)^SUBJECT COMPANY:\s*\n(.*?)(?=^\S|\Z)", header)
+    if len(subjects) != 1:
+        raise IdentityEvidenceError("missing_or_ambiguous_SEC_subject_company")
+    identifiers = re.findall(rb"CENTRAL INDEX KEY:\s*([0-9]+)", subjects[0])
+    if len(identifiers) != 1 or identifiers[0].decode("ascii").zfill(10) != cik:
+        raise IdentityEvidenceError("ownership_subject_issuer_mismatch")
+    return {
+        "subject_cik": cik,
+        "accession": accession,
+        "SEC_header_sha256": hashlib.sha256(headers[0]).hexdigest(),
+        "complete_submission_sha256": hashlib.sha256(payload).hexdigest(),
+        "subject_identity_basis": "explicit_SEC_SUBJECT_COMPANY_not_reporting_owner",
+    }
+
+
 def ownership_identity(
     payload: bytes, metadata: dict[str, Any], *, cik: str, cutoff: datetime
 ) -> dict[str, Any]:

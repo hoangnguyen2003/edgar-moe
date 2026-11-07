@@ -1,0 +1,25 @@
+{
+  "issue": 292,
+  "scope": "private_historical_SEC_source_verification",
+  "source_rows": 503,
+  "selection_changed": false,
+  "subject_identity_requirement": "complete_SEC_submission_SUBJECT_COMPANY_CIK_and_accession",
+  "earlier_primary_document_anchors": "provisional_until_explicit_subject_revalidation",
+  "owner_reported_permission": "All parties have agreed; private personal portfolio verification",
+  "provider_correspondence_independently_inspected": false,
+  "market_probe": {
+    "purpose": "test_permanent_UUID_addressability_without_ticker_fallback",
+    "requests": 1,
+    "maximum_response_bytes": 131072,
+    "maximum_requested_bars": 5,
+    "http_status": 400,
+    "rows_returned": 0,
+    "response_sha256": "de3f5f1c1edd6b207cb5d0ad893f5d662432c674df1c36913c415322f3ff5c26",
+    "historical_market_continuity_verified": false
+  },
+  "general_source_use_hold_released": false,
+  "publication_released": false,
+  "paid_resources": false,
+  "public_provider_rows": false,
+  "issue_complete": false
+}

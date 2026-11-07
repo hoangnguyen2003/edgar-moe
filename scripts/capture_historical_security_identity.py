@@ -30,6 +30,7 @@ from edgar_moe.data.historical_identity import (
     instant,
     join_identity,
     ownership_identity,
+    ownership_subject,
     periodic_anchor,
 )
 from edgar_moe.data.screen_inputs import canonical_bytes, decode_json
@@ -76,9 +77,14 @@ def expand_columns(value: Any, cik: str) -> list[dict[str, Any]]:
         not isinstance(value[key], list) or len(value[key]) != count for key in required
     ):
         raise IdentityEvidenceError("inconsistent_submissions_columns")
-    if count > 100000:
+    if count > 1000000:
         raise IdentityEvidenceError("excessive_submissions_rows")
-    return [{"cik": cik, **{key: value[key][i] for key in required}} for i in range(count)]
+    eligible = [
+        i for i, form in enumerate(value["form"]) if form in PERIODIC_FORMS | OWNERSHIP_FORMS
+    ]
+    if len(eligible) > 100000:
+        raise IdentityEvidenceError("excessive_eligible_submissions_rows")
+    return [{"cik": cik, **{key: value[key][i] for key in required}} for i in eligible]
 
 
 def choose_filings(
@@ -132,8 +138,47 @@ class SourceCache:
         self.bytes = 0
         self.last_request = 0.0
         self.used: dict[str, dict[str, Any]] = {}
+        self.deferred: dict[str, dict[str, Any]] = {}
+        self.consecutive_failures = 0
 
     def get(self, url: str) -> bytes:
+        key = digest(url.encode())
+        if key in self.deferred:
+            raise IdentityEvidenceError("SEC_source_deferred_this_run")
+        if self.consecutive_failures >= 3:
+            raise IdentityEvidenceError("SEC_transient_circuit_open")
+        previous_requests = self.requests
+        try:
+            payload = self._get(url)
+        except (httpx.HTTPStatusError, httpx.TimeoutException) as error:
+            status = (
+                error.response.status_code if isinstance(error, httpx.HTTPStatusError) else None
+            )
+            if status is not None and status not in {500, 502, 503, 504}:
+                raise
+            self.consecutive_failures += 1
+            if isinstance(error, httpx.HTTPStatusError) and error.response.headers.get(
+                "Retry-After"
+            ):
+                self.consecutive_failures = 3
+            receipt = {
+                "url": url,
+                "source_url_sha256": key,
+                "http_status": status,
+                "timeout": status is None,
+                "observed_at": datetime.now(UTC).isoformat(),
+                "response_body_retained": False,
+                "automatically_retried": False,
+            }
+            self.deferred[key] = receipt
+            encoded = canonical_bytes(receipt) + b"\n"
+            _write_new(self.fd, "unavailable-" + digest(encoded) + ".json", encoded)
+            raise IdentityEvidenceError("SEC_source_temporarily_unavailable") from None
+        if self.requests > previous_requests:
+            self.consecutive_failures = 0
+        return payload
+
+    def _get(self, url: str) -> bytes:
         if _SOURCE_URL.fullmatch(url) is None:
             raise IdentityEvidenceError("unapproved_source_URL")
         key = digest(url.encode())
@@ -322,9 +367,11 @@ def collect_member(
             "refusals": dict(refusals),
         }
     for row in choose_filings(rows, OWNERSHIP_FORMS, cutoff, 5):
-        body = cache.get(filing_url(row))
+        body = cache.get(filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"}))
         try:
+            subject = ownership_subject(body, cik=cik, accession=row["accessionNumber"])
             result = join_identity(periodic, ownership_identity(body, row, cik=cik, cutoff=cutoff))
+            result["ownership_subject_evidence"] = subject
             return {
                 "snapshot_member_key": member["snapshot_member_key"],
                 "status": "pre_cutoff_SEC_identity_anchored",
@@ -408,11 +455,15 @@ def main() -> int:
                     if str(error) not in {
                         "source_document_byte_bound",
                         "retained_source_too_large",
+                        "SEC_source_temporarily_unavailable",
+                        "SEC_source_deferred_this_run",
                     }:
                         raise
                     result = {
                         "snapshot_member_key": member["snapshot_member_key"],
-                        "status": "source_size_unresolved",
+                        "status": "source_temporarily_unavailable"
+                        if str(error).startswith("SEC_source_")
+                        else "source_size_unresolved",
                         "refusals": {str(error): 1},
                     }
                 results.append(result)
@@ -445,6 +496,8 @@ def main() -> int:
                     ),
                     flush=True,
                 )
+                if cache.consecutive_failures >= 3:
+                    raise IdentityEvidenceError("SEC_transient_circuit_open")
             if algorithms != code_identity():
                 raise IdentityEvidenceError("algorithms_changed_during_capture")
             report = {
@@ -454,6 +507,7 @@ def main() -> int:
                 "processed": len(results),
                 "statuses": dict(Counter(row["status"] for row in results)),
                 "SEC_requests_this_run": cache.requests,
+                "deferred_sources_this_run": len(cache.deferred),
                 "current_asset_directory_used": False,
                 "market_provider_requests": 0,
                 "issue_complete": False,
@@ -465,6 +519,7 @@ def main() -> int:
                 "binding": binding,
                 "results": results,
                 "live_sources": cache.used,
+                "unavailable_sources": cache.deferred,
                 "report": report,
             }
             encoded = canonical_bytes(result) + b"\n"

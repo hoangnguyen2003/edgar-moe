@@ -10,6 +10,7 @@ from edgar_moe.data.historical_identity import (
     class_signature,
     join_identity,
     ownership_identity,
+    ownership_subject,
     periodic_anchor,
     valid_cusip,
 )
@@ -219,3 +220,41 @@ def test_rejects_missing_class_and_post_cutoff_ownership_filings():
             cik=CIK,
             cutoff=CUTOFF,
         )
+
+
+def submission_header(subject=CIK, owner="0000000002", accession="0000000001-22-000001"):
+    return (
+        f"<SEC-HEADER>\nACCESSION NUMBER: {accession}\nSUBJECT COMPANY:\n\tCOMPANY DATA:\n\t\tCENTRAL INDEX KEY: {subject}\nFILED BY:\n\tCOMPANY DATA:\n\t\tCENTRAL INDEX KEY: {owner}\n</SEC-HEADER>\n"
+    ).encode()
+
+
+def test_ownership_identity_binds_subject_not_reporting_owner():
+    result = ownership_subject(
+        submission_header() + ownership(), cik=CIK, accession=metadata()["accessionNumber"]
+    )
+    assert result["subject_cik"] == CIK
+    with pytest.raises(IdentityEvidenceError, match="subject_issuer"):
+        ownership_subject(
+            submission_header(subject="0000000002", owner=CIK) + ownership(),
+            cik=CIK,
+            accession=metadata()["accessionNumber"],
+        )
+
+
+def test_bare_primary_document_cannot_prove_subject_issuer():
+    with pytest.raises(IdentityEvidenceError, match="subject_header"):
+        ownership_subject(ownership(), cik=CIK, accession=metadata()["accessionNumber"])
+
+
+def test_subject_header_rejects_other_accession_and_multiple_subjects():
+    with pytest.raises(IdentityEvidenceError, match="accession"):
+        ownership_subject(
+            submission_header(accession="0000000001-22-000002"),
+            cik=CIK,
+            accession=metadata()["accessionNumber"],
+        )
+    body = submission_header().replace(
+        b"FILED BY:", b"SUBJECT COMPANY:\n\tCENTRAL INDEX KEY: 0000000003\nFILED BY:"
+    )
+    with pytest.raises(IdentityEvidenceError, match="subject_company"):
+        ownership_subject(body, cik=CIK, accession=metadata()["accessionNumber"])
