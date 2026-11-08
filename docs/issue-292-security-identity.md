@@ -1,4 +1,4 @@
-# Historical SEC security identity evidence, 2026-11-08
+# Historical SEC security identity evidence, 2026-11-09
 
 The fixed historical [candidate source](issue-292-historical-candidate-source.md)
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
@@ -242,6 +242,58 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
+### Named nonvoting class and incorporated amendment chain
+
+The latest extension accepts one narrowly supported two-class charter format.
+An eligible annual report must explicitly incorporate both the restated
+certificate and its later amendment, with their original forms, dates and
+exhibit numbers. Split formatting links are allowed only when every href in
+the same complete reference row is identical. Additional charter references,
+different links, missing sources and cross-issuer paths fail closed.
+
+Both complete submissions authenticate their filer CIK, legal name, accession,
+dates and exact exhibit filename/type. The only legal-name normalization beyond
+case and punctuation is terminal `Corporation`/`Corp`. The full authorized-shares
+article must state the supported Class A/Class B structure and explicit Class B
+nonvoting rights, retaining statutory voting exceptions. The whole amendment
+must match a share-count-only replacement of the first authorization paragraph;
+different operative text, competing rights, par values, class letters or share
+totals are refused. Both sources retain their raw local acceptance text and
+separate filing-date-plus-14-calendar-day availability bounds.
+
+The ownership cover must already prove the same named Class B and SEC subject,
+with one consistent identifier across the authenticated candidate reports.
+Only its missing nonvoting qualifier can be supplied, and the charter chain
+must be available before that ownership report. The annual registration cover
+independently confirms the same issuer, symbol, named class and par value.
+Neither a generic class nor an explicit conflicting voting qualifier can be
+rewritten. The existing two-year discovery window, report/byte bounds and
+integrity refusals remain in force. The extractor's own code digest is bound
+by both capture and independent replay.
+
+Full offline capture and independent source replay now cover **all 503 rows**:
+**486 verified SEC identity anchors**, **15 unresolved ownership identities**
+and **two unresolved periodic anchors**. All 485 previous complete anchor
+payloads and their source receipts remain identical; one anchor is added.
+Result SHA-256:
+`332d056bbe69e14834903ff0c634f0cc76b357f5cbae3be1e35c7da12889f208`.
+The row-free [`class-charter-audit-20261109.json`](../ops/issue292/class-charter-audit-20261109.json)
+binds the result, code, private evidence chain and verification logs. Both
+503-row runs made zero network requests. Validation: 2,380 full-suite passes,
+36 skips, 85.82% coverage and 265 focused tests; formatting, lint, typing,
+documentation links, public snapshot lock and frozen runtime checks pass.
+
+The separately retained quarterly Section 13F reference was checked against
+the unresolved candidates. Its class descriptions remain discovery leads;
+its exact historical publication/unchanged-byte availability is unverified.
+Two bounded archive index lookups produced a missing capture and a timeout,
+respectively. A separate filed holdings-table lead is retained as corroborating
+research only; a reporting manager's CIK cannot stand in for an issuer's CIK.
+No reference-list or holdings row supplies an adopted identity in this result.
+All source contents and identifiers remain private. Seventeen identities,
+historical market continuity and the new selection/checkpoint/processed-dataset/
+study chain remain incomplete. The publication gate stays closed.
+
 ### Explicit voting rights in cover notes and incorporated charters
 
 A narrow SC 13G cover format links row 11's percentage to an immediately
@@ -273,7 +325,7 @@ The normal two-year discovery window, 64-report ownership cap and exact
 common/ordinary/capital/class/voting comparisons remain in force. This is
 dated issuer/class evidence, not uninterrupted security or market continuity.
 
-The combined full capture processed **all 503 candidates** with **485 verified
+The preceding cover-note/charter capture processed **all 503 candidates** with **485 verified
 SEC identity anchors**, **16 unresolved ownership identities** and **two
 unresolved periodic anchors**. All 483 prior anchors and their identifiers,
 symbols and registered titles remain unchanged. One addition uses an explicit
@@ -301,9 +353,10 @@ The prior SEC-subject conflict and historical continuity are unresolved; these
 documents add no verified anchor. The row-free
 [`fdic-ownership-assessment-20261108.json`](../ops/issue292/fdic-ownership-assessment-20261108.json)
 binds the private documents, complete extracted text and cover inspections.
-All identifiers and source rows remain private. Eighteen identities and the
-new historical selection/checkpoint/processed-dataset/study chain still prevent
-completion of #292; publication holds remain in force.
+All identifiers and source rows remain private. That capture left eighteen
+identities unresolved; the later extension above leaves seventeen. The new
+historical selection/checkpoint/processed-dataset/study chain also remains
+incomplete; publication holds remain in force.
 
 ### Adjacent issuer-field class evidence and remaining refusals
 
@@ -434,7 +487,7 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 18 remain after the latest extensions. Submissions about other issuers
+claim; 17 remain after the latest extensions. Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,

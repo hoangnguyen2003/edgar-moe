@@ -29,6 +29,11 @@ from edgar_moe.data.historical_certificate import (
     certificate_reference,
     registered_certificate_identity,
 )
+from edgar_moe.data.historical_class_charter import (
+    class_charter_references,
+    class_charter_voting_evidence,
+    qualify_class_charter_ownership,
+)
 from edgar_moe.data.historical_governance import (
     governing_reference,
     governing_voting_evidence,
@@ -83,6 +88,9 @@ def code_identity() -> dict[str, str]:
         ),
         "governance_algorithm_sha256": digest(
             (ROOT / "src/edgar_moe/data/historical_governance.py").read_bytes()
+        ),
+        "class_charter_algorithm_sha256": digest(
+            (ROOT / "src/edgar_moe/data/historical_class_charter.py").read_bytes()
         ),
     }
 
@@ -524,6 +532,103 @@ def certificate_fallback(
     return None
 
 
+def class_charter_fallback(
+    rows: list[dict[str, Any]],
+    periodic: dict[str, Any],
+    candidates: list[tuple[dict[str, Any], dict[str, str]]],
+    cache: SourceCache,
+    retained: RetainedCheckpoint,
+    cutoff: datetime,
+    refusals: Counter[str],
+) -> dict[str, Any] | None:
+    if class_signature(periodic["security_title"]) != ("common", "B", "nonvoting"):
+        return None
+    if not candidates or any(
+        class_signature(own["security_title"]) != ("common", "B", "") for own, _ in candidates
+    ):
+        return None
+    if len({own["cusip"] for own, _ in candidates}) != 1:
+        refusals["ambiguous_class_charter_candidate_identifiers"] += 1
+        return None
+    if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}:
+        return None
+    for annual in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
+        if annual["form"] != "10-K":
+            continue
+        body = retained.filing(annual)
+        if body is None:
+            body = cache.get(filing_url(annual))
+        try:
+            references = class_charter_references(body)
+            if references is None:
+                continue
+            index = periodic_anchor(
+                body,
+                annual,
+                cik=periodic["issuer_cik"],
+                symbol=periodic["symbol_at_cutoff"],
+                cutoff=cutoff,
+                maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES,
+            )
+            if class_signature(index["security_title"]) != class_signature(
+                periodic["security_title"]
+            ):
+                raise IdentityEvidenceError("class_charter_index_share_class_mismatch")
+            references = [
+                {
+                    **ref,
+                    **certificate_location(ref["href"], filing_url(annual), periodic["issuer_cik"]),
+                }
+                for ref in references
+            ]
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+            continue
+        sources = [
+            cache.get(
+                filing_url(
+                    {
+                        "cik": periodic["issuer_cik"],
+                        "accessionNumber": ref["accession"],
+                        "primaryDocument": ref["accession"] + ".txt",
+                    }
+                )
+            )
+            for ref in references
+        ]
+        try:
+            evidence = class_charter_voting_evidence(
+                sources,
+                references,
+                cik=periodic["issuer_cik"],
+                expected_title=index["security_title"],
+                cutoff=min(cutoff, instant(index["available_by"])),
+            )
+            own, subject = max(
+                candidates, key=lambda pair: (instant(pair[0]["accepted_at"]), pair[0]["accession"])
+            )
+            anchor = join_identity(
+                periodic, qualify_class_charter_ownership(periodic, own, evidence)
+            )
+            anchor["ownership_subject_evidence"] = subject
+            anchor["class_charter_evidence"] = evidence
+            anchor["class_charter_index_evidence"] = index
+            anchor["class_charter_candidate_commitments"] = sorted(
+                [
+                    {"accession": item["accession"], "document_sha256": item["document_sha256"]}
+                    for item, _ in candidates
+                ],
+                key=lambda item: item["accession"],
+            )
+            anchor["identity_basis"] = (
+                "same_SEC_issuer_explicit_named_class_and_incorporated_nonvoting_charter_chain"
+            )
+            return anchor
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+    return None
+
+
 def governance_fallback(
     rows: list[dict[str, Any]],
     periodic: dict[str, Any],
@@ -736,7 +841,8 @@ def collect_member(
                 if (
                     str(error) == "joined_share_class_mismatch"
                     and own is not None
-                    and class_signature(own["security_title"]) == ("common", "", "")
+                    and class_signature(own["security_title"])
+                    in {("common", "", ""), ("common", "B", "")}
                 ):
                     governing_candidates.append((own, subject))
                 else:
@@ -763,6 +869,19 @@ def collect_member(
             "snapshot_member_key": member["snapshot_member_key"],
             "status": "pre_cutoff_SEC_identity_anchored",
             "anchor": governance,
+        }
+    class_charter = (
+        class_charter_fallback(
+            rows, periodic, governing_candidates, cache, retained, cutoff, refusals
+        )
+        if governing_safe
+        else None
+    )
+    if class_charter is not None:
+        return {
+            "snapshot_member_key": member["snapshot_member_key"],
+            "status": "pre_cutoff_SEC_identity_anchored",
+            "anchor": class_charter,
         }
     return {
         "snapshot_member_key": member["snapshot_member_key"],
