@@ -492,6 +492,132 @@ def test_named_class_evidence_preserves_voting_family_and_other_class_refusals(t
         join_identity(primary, result)
 
 
+def percentage_cover(title="Common Stock", denominator="voting common stock"):
+    header = submission_header().replace(
+        b"\t\tCENTRAL INDEX KEY:",
+        b"\t\tCOMPANY CONFORMED NAME: Synthetic Issuer\n\t\tCENTRAL INDEX KEY:",
+        1,
+    )
+    note = (
+        "<table><tr><td>*</td><td>The calculation of the foregoing percentage is based on "
+        f"1,000,000 shares of {denominator} outstanding\n"
+        "as of September 30, 2022 as reported in Synthetic Issuer's Quarterly Report on "
+        "Form 10-Q, filed with the Securities and Exchange Commission on October 20, 2022."
+        "</td></tr></table>"
+    )
+    cover = (
+        "<table><tr><td>11.</td><td>Percent of class\nrepresented by amount in Row (9)"
+        "</td><td>12.5%*</td></tr></table><p> </p>"
+    )
+    return header + ownership(title=title).replace(
+        b"</html>", (cover + note + "<p>Item 1. Identification</p></html>").encode()
+    )
+
+
+def test_marker_bound_cover_denominator_supplies_an_explicit_voting_qualifier():
+    result = ownership_identity(percentage_cover(), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    assert result["security_title"] == "Voting Common Stock"
+    binding = result["cover_percentage_class_binding"]
+    assert binding["reported_security_title"] == "Common Stock"
+    assert binding["reported_denominator_security_title"] == "voting common stock"
+    assert binding["reported_percentage"] == "12.5"
+    assert binding["reported_outstanding_date"] == "2022-09-30"
+    assert binding["reported_reference_filing_date"] == "2022-10-20"
+    assert binding["footnote_marker"] == "*"
+    primary = periodic_anchor(
+        periodic(title="Voting Common Stock"), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF
+    )
+    assert join_identity(primary, result)["security_id"] == "cusip:" + CUSIP
+
+
+def test_explicit_nonvoting_footnote_and_matching_existing_qualifiers():
+    result = ownership_identity(
+        percentage_cover(denominator="non-voting common stock"),
+        metadata("SC 13G/A"),
+        cik=CIK,
+        cutoff=CUTOFF,
+    )
+    assert class_signature(result["security_title"]) == ("common", "", "nonvoting")
+    result = ownership_identity(
+        percentage_cover(title="Voting Common Stock"), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF
+    )
+    assert result["security_title"] == "Voting Common Stock"
+    assert "cover_percentage_class_binding" not in result
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        (b"Synthetic Issuer's", b"Another Issuer's"),
+        (b"September 30, 2022", b"October 30, 2022"),
+        (b"October 20, 2022", b"December 20, 2022"),
+        (b"September 30, 2022", b"September 99, 2022"),
+        (b"12.5%*", b"112.5%*"),
+        (b"<SEC-HEADER>", b"<missing-header>"),
+        (b"COMPANY CONFORMED NAME: Synthetic Issuer", b"MISSING NAME: Synthetic Issuer"),
+        (b"ACCESSION NUMBER: 0000000001-22-000001", b"ACCESSION NUMBER: 0000000001-22-000002"),
+        (b"CENTRAL INDEX KEY: 0000000001", b"CENTRAL INDEX KEY: 0000000003"),
+    ],
+)
+def test_percentage_qualifier_requires_same_subject_and_valid_reference_dates(before, after):
+    with pytest.raises(IdentityEvidenceError):
+        ownership_identity(
+            percentage_cover().replace(before, after),
+            metadata("SC 13G"),
+            cik=CIK,
+            cutoff=CUTOFF,
+        )
+
+
+@pytest.mark.parametrize(
+    "before,after",
+    [
+        (b"12.5%*", b"12.5%"),
+        (b"<td>*</td>", b"<td>**</td>"),
+        (b"</table><p> </p><table>", b"</table><p>Item 4. Ownership</p><table>"),
+        (b"</table><p> </p><table>", b"</table>Item 4. Ownership<table>"),
+        (b"The calculation of the foregoing percentage", b"Another calculation"),
+        (b"voting common stock", b"common stock"),
+    ],
+)
+def test_unmarked_unlinked_or_generic_denominators_cannot_supply_voting_rights(before, after):
+    result = ownership_identity(
+        percentage_cover().replace(before, after), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF
+    )
+    assert result["security_title"] == "Common Stock"
+    assert "cover_percentage_class_binding" not in result
+
+
+@pytest.mark.parametrize(
+    "title,denominator",
+    [
+        ("Common Stock", "voting ordinary shares"),
+        ("Class A Common Stock", "Class B voting common stock"),
+        ("Class A Common Stock", "voting common stock"),
+        ("Non-voting Common Stock", "voting common stock"),
+    ],
+)
+def test_footnote_cannot_override_family_class_letter_or_explicit_rights(title, denominator):
+    with pytest.raises(IdentityEvidenceError, match="percentage_class_conflicts"):
+        ownership_identity(
+            percentage_cover(title, denominator), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF
+        )
+
+
+@pytest.mark.parametrize("item", ["1", "4"])
+def test_a_body_table_or_second_cover_cannot_borrow_the_cover_class(item):
+    body = percentage_cover()
+    body_table = body.replace(
+        b"<table><tr><td>11.", f"<p>Item {item}. Identification</p><table><tr><td>11.".encode()
+    )
+    with pytest.raises(IdentityEvidenceError, match="unbound_percentage_cover"):
+        ownership_identity(body_table, metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    with pytest.raises(IdentityEvidenceError, match="ambiguous_percentage_cover_binding"):
+        ownership_identity(
+            body + ownership(title="Common Stock"), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF
+        )
+
+
 def test_narrative_class_or_unbound_colon_fields_cannot_supply_identity():
     for body in (
         colon_cover().replace(b"Name of issuer:", b"Item 1(a) Name of issuer:"),

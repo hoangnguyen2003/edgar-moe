@@ -29,6 +29,11 @@ from edgar_moe.data.historical_certificate import (
     certificate_reference,
     registered_certificate_identity,
 )
+from edgar_moe.data.historical_governance import (
+    governing_reference,
+    governing_voting_evidence,
+    qualify_ownership_voting,
+)
 from edgar_moe.data.historical_identity import (
     MAX_DOCUMENT_BYTES,
     MAX_RETAINED_DOCUMENT_BYTES,
@@ -75,6 +80,9 @@ def code_identity() -> dict[str, str]:
         "collector_algorithm_sha256": digest(Path(__file__).read_bytes()),
         "certificate_algorithm_sha256": digest(
             (ROOT / "src/edgar_moe/data/historical_certificate.py").read_bytes()
+        ),
+        "governance_algorithm_sha256": digest(
+            (ROOT / "src/edgar_moe/data/historical_governance.py").read_bytes()
         ),
     }
 
@@ -516,6 +524,107 @@ def certificate_fallback(
     return None
 
 
+def governance_fallback(
+    rows: list[dict[str, Any]],
+    periodic: dict[str, Any],
+    candidates: list[tuple[dict[str, Any], dict[str, str]]],
+    cache: SourceCache,
+    retained: RetainedCheckpoint,
+    cutoff: datetime,
+    refusals: Counter[str],
+) -> dict[str, Any] | None:
+    if class_signature(periodic["security_title"]) != ("common", "", "voting") or not candidates:
+        return None
+    if len({own["cusip"] for own, _ in candidates}) != 1:
+        refusals["ambiguous_governing_candidate_identifiers"] += 1
+        return None
+    if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}:
+        return None
+    for annual in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
+        if annual["form"] != "10-K":
+            continue
+        try:
+            body = retained.filing(annual)
+            if body is None:
+                body = cache.get(filing_url(annual))
+        except IdentityEvidenceError as error:
+            if str(error) not in {"source_document_byte_bound", "retained_source_too_large"}:
+                raise
+            refusals[str(error)] += 1
+            continue
+        try:
+            reference = governing_reference(body)
+            if reference is None:
+                continue
+            index_anchor = periodic_anchor(
+                body,
+                annual,
+                cik=periodic["issuer_cik"],
+                symbol=periodic["symbol_at_cutoff"],
+                cutoff=cutoff,
+                maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES,
+            )
+            if class_signature(index_anchor["security_title"]) != ("common", "", "voting"):
+                raise IdentityEvidenceError("governing_index_share_class_mismatch")
+            location = certificate_location(
+                reference["href"], filing_url(annual), periodic["issuer_cik"]
+            )
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+            continue
+        try:
+            complete = cache.get(
+                filing_url(
+                    {
+                        "cik": periodic["issuer_cik"],
+                        "accessionNumber": location["accession"],
+                        "primaryDocument": location["accession"] + ".txt",
+                    }
+                )
+            )
+        except IdentityEvidenceError as error:
+            if str(error) != "source_document_byte_bound":
+                raise
+            refusals[str(error)] += 1
+            continue
+        try:
+            evidence = governing_voting_evidence(
+                complete,
+                cik=periodic["issuer_cik"],
+                accession=location["accession"],
+                filename=location["filename"],
+                reference=reference,
+                expected_title=index_anchor["security_title"],
+                cutoff=min(cutoff, instant(index_anchor["available_by"])),
+            )
+            own, subject = max(
+                candidates, key=lambda pair: (instant(pair[0]["accepted_at"]), pair[0]["accession"])
+            )
+            qualified = qualify_ownership_voting(periodic, own, evidence)
+            anchor = join_identity(periodic, qualified)
+            anchor["ownership_subject_evidence"] = subject
+            anchor["governing_voting_evidence"] = evidence
+            anchor["governing_index_evidence"] = {
+                **index_anchor,
+                **reference,
+                "source_url": location["url"],
+            }
+            anchor["governing_candidate_commitments"] = sorted(
+                [
+                    {"accession": item["accession"], "document_sha256": item["document_sha256"]}
+                    for item, _ in candidates
+                ],
+                key=lambda item: item["accession"],
+            )
+            anchor["identity_basis"] = (
+                "same_SEC_issuer_single_authorized_common_class_and_explicit_voting_rights_in_incorporated_charter"
+            )
+            return anchor
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+    return None
+
+
 def collect_member(
     member: dict[str, Any], cache: SourceCache, retained: RetainedCheckpoint, cutoff: datetime
 ) -> dict[str, Any]:
@@ -591,6 +700,8 @@ def collect_member(
             else "periodic_anchor_unresolved",
             "refusals": dict(refusals),
         }
+    governing_candidates: list[tuple[dict[str, Any], dict[str, str]]] = []
+    governing_safe = True
     for row in ownership_candidates(rows, cik, cache, retained, cutoff):
         try:
             body = cache.get(
@@ -601,9 +712,13 @@ def collect_member(
                 raise
             refusals[str(error)] += 1
             continue
+        subject_authenticated = False
+        own = None
         try:
             subject = ownership_subject(body, cik=cik, accession=row["accessionNumber"])
-            result = join_identity(periodic, ownership_identity(body, row, cik=cik, cutoff=cutoff))
+            subject_authenticated = True
+            own = ownership_identity(body, row, cik=cik, cutoff=cutoff)
+            result = join_identity(periodic, own)
             result["ownership_subject_evidence"] = subject
             return {
                 "snapshot_member_key": member["snapshot_member_key"],
@@ -617,6 +732,15 @@ def collect_member(
             }
         except IdentityEvidenceError as error:
             refusals[str(error)] += 1
+            if subject_authenticated:
+                if (
+                    str(error) == "joined_share_class_mismatch"
+                    and own is not None
+                    and class_signature(own["security_title"]) == ("common", "", "")
+                ):
+                    governing_candidates.append((own, subject))
+                else:
+                    governing_safe = False
     certificate = certificate_fallback(rows, periodic, cache, retained, cutoff, refusals)
     if certificate is not None:
         return {
@@ -628,6 +752,17 @@ def collect_member(
                 if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
                 else {}
             ),
+        }
+    governance = (
+        governance_fallback(rows, periodic, governing_candidates, cache, retained, cutoff, refusals)
+        if governing_safe
+        else None
+    )
+    if governance is not None:
+        return {
+            "snapshot_member_key": member["snapshot_member_key"],
+            "status": "pre_cutoff_SEC_identity_anchored",
+            "anchor": governance,
         }
     return {
         "snapshot_member_key": member["snapshot_member_key"],
