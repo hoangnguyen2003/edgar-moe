@@ -21,7 +21,7 @@ explicit `SUBJECT COMPANY` CIK and accession must match the requested issuer and
 filing. A reporting-owner CIK or presence in an issuer's submissions list is
 insufficient: that list can include holdings reported about another company.
 Class letters, voting
-rights and common/ordinary distinctions must agree. Preferred, depositary,
+rights and common/ordinary/capital/registered distinctions must agree. Preferred, depositary,
 unit and ambiguous classes are refused. Both reported acceptance times plus
 seven calendar days must precede the source cutoff. Current discovery is limited
 to the preceding two years, at most four periodic and ten ownership filings.
@@ -57,6 +57,43 @@ If no alternative proves identity, the candidate remains unresolved. Integrity
 errors, exhausted request budgets, missing uncaptured sources and HTTP refusal
 controls cannot use this size-only continuation path.
 
+### Literal cover facts, retained documents and linked exhibits
+
+Capital stock and registered shares are recognized as separate equity families;
+neither is an alias for common or ordinary shares. Literal ticker quotation
+marks and an explicit `(NYSE)` suffix are retained as reported typography. A
+dotless class ticker can match its dotted source spelling only when its cover
+title explicitly names the same class letter. No rename, issuer or voting-rights
+inference supplies a missing class.
+
+One identical registered security can have several explicit listing-exchange
+contexts. Those contexts must agree on issuer, title, period and non-exchange
+dimensions. The result retains every reported venue and uses a null primary
+exchange; it does not invent a primary listing. A narrow coupon-bearing
+`Notes due 20xx` context cannot be blended into an equity context. Issuer-specific
+trading-symbol axes require a declared namespace and the exact symbol member;
+unknown and typed dimensions remain refusals.
+
+Already retained, manifest-bound filing documents can be read and checked in
+full up to 64 MiB after decompression. The compressed read cap remains 32 MiB.
+Live responses and ownership documents remain capped at 16 MiB. No prefix-only
+parse can hide a contradictory class later in the filing.
+
+When a primary filing explicitly delegates its Inline XBRL registration cover
+to a numbered exhibit, the collector may read one exact, unique sibling HTML
+link in that accession. It binds the original primary and exhibit hashes.
+External URLs, path traversal, ambiguous links and recursive exhibit discovery
+are refused. The exhibit still needs the same dated issuer/symbol/class proof.
+Inline XBRL document sets can place their shared contexts in a header document,
+as described by the [XBRL International primer, section 2.2](https://www.xbrl.org/specification/inlinexbrl-part0/pwd-2013-05-31/inlinexbrl-part0-pwd-2013-05-31.html).
+For this narrow case, the collector resolves only the exhibit's exact context
+IDs from the explicitly linked primary, preserving namespace declarations. It
+requires a single matching primary issuer, unique context definitions, valid
+pre-cutoff periods and supported dimensions. The anchor binds the context IDs
+and a digest of the namespace-preserving resources, without rewriting either
+captured source. Missing, redefined, conflicting or late contexts fail closed.
+This is a bounded identity extractor, not a complete Inline XBRL validator.
+
 The SEC archive/submissions responses are observed in November 2026, separately
 from their reported historical acceptance dates. These are not signed historical
 timestamps. Filing facts establish identity at their filing dates; a CUSIP or
@@ -78,6 +115,8 @@ the original source bytes rather than trusting saved extraction results.
 Code digests are checked before and after the run. Missing/tampered source
 bytes, changed bindings, invalid CUSIPs, late mappings, reused tickers and
 cross-context joins fail closed. Synthetic tests make no provider requests.
+The independent replay also checks that its extraction and verifier code did
+not change during verification.
 
 ## Reproduction
 
@@ -159,7 +198,40 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
-The coverage extensions produced **466 anchors across all 503 candidates**, with
+The latest extension processed and independently replayed **all 503 candidates**:
+**481 verified SEC identity anchors**, **20 unresolved ownership identities**
+and **two unresolved periodic anchors**. All 466 previous anchors and their
+issuer/security identifiers were retained. No row was excluded or replaced
+using present-day listing status. The result SHA-256 is
+`d4f51de909712c361bbf879ae0ea4c07f818c595f778d982594b99dfcfa666e0`.
+The identity-extension passes used 46 additional SEC reads in total; the final
+full capture and independent replay each used zero network requests. No market
+provider requests or paid resources were used by these extensions.
+
+The row-free
+[`remaining-identity-audit-20261108.json`](../ops/issue292/remaining-identity-audit-20261108.json)
+binds the exact capture and replay code versions separately. A final guard
+against mutually inconsistent shared contexts was added after capture; full
+offline replay reproduced the original result under that stricter code. A
+separate private evidence packet preserves and rehashes 1,273 source receipts
+and their associated bodies, the prior/intermediate/final results, exact code
+versions, replay report and test log. Earlier captures were not rewritten.
+Validation: 2,260 full-suite passes, 36 skips, 85.70% coverage and 145 focused
+identity/capture/replay tests; repository lint, formatting and type checks pass.
+
+Two periodic-source cases were investigated through the FDIC's official public
+securities filing portal. Public quarterly reports establish a possible source
+route, but their issuer details conflict with the retained SEC subject metadata.
+Two public proxy reports supplied no identifier mentions in their extracted
+text. Neither case was forced into a CIK/CUSIP join or counted as verified. The
+public client's actual flag semantics were checked before the bounded public
+downloads; confidential attachments were not requested. The row-free
+[`fdic-source-assessment-20261108.json`](../ops/issue292/fdic-source-assessment-20261108.json)
+records hashes and refusal outcomes. Source documents, extracted text, issuer
+details and request receipts remain private. Finding a public report is not
+evidence that the missing security join or publication permission is established.
+
+The prior coverage extensions produced **466 anchors across all 503 candidates**, with
 all 433 baseline anchors retained. The remaining 37 cases comprise 15 unresolved
 ownership identities, 21 unresolved periodic anchors and one size-bound source.
 Two of the prior three size-bound cases yielded valid alternative filings; this
@@ -184,7 +256,7 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 37 remain after the coverage extensions. Submissions about other issuers
+claim; 22 remain after the latest extensions. Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,

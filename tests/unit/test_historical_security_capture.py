@@ -417,3 +417,90 @@ def test_alternative_filing_does_not_bypass_integrity_or_request_budget(monkeypa
             CUTOFF,
         )
     assert len(attempts) == 1
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        None,
+        "shared_primary_context",
+        "SEC_source_cache_tampered",
+        "source_request_budget_exhausted",
+        "source_document_byte_bound",
+        "different_issuer",
+    ],
+)
+def test_collects_one_explicit_cover_exhibit_and_rechecks_identity(monkeypatch, failure):
+    own = row(2, form="SC 13G")
+    parent = (
+        f'<ix:nonNumeric name="dei:EntityCentralIndexKey" contextRef="issuer">{CIK}</ix:nonNumeric>'
+        '<p>Securities registered pursuant to Section 12(b) of the Act formatted in Inline XBRL: See Exhibit 99.01</p><a href="cover.htm">99.01+</a>'
+    ).encode()
+    issuer = "0000000002" if failure == "different_issuer" else CIK
+    child = (
+        f'<ix:nonNumeric name="dei:EntityCentralIndexKey" contextRef="c">{issuer}</ix:nonNumeric><ix:nonNumeric name="dei:TradingSymbol" contextRef="c">OLD</ix:nonNumeric><ix:nonNumeric name="dei:Security12bTitle" contextRef="c">Common Stock</ix:nonNumeric><ix:nonNumeric name="dei:SecurityExchangeName" contextRef="c">Synthetic exchange</ix:nonNumeric>'
+    ).encode()
+    if failure == "shared_primary_context":
+        child = child.replace(
+            f'<ix:nonNumeric name="dei:EntityCentralIndexKey" contextRef="c">{issuer}</ix:nonNumeric>'.encode(),
+            b"",
+        )
+        parent += (
+            f'<xbrli:context id="c"><xbrli:entity><xbrli:identifier scheme="http://www.sec.gov/CIK">{CIK}</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:instant>2022-09-30</xbrli:instant></xbrli:period></xbrli:context>'
+        ).encode()
+    owner = (
+        f"<SEC-HEADER>\nACCESSION NUMBER: {own['accessionNumber']}\nSUBJECT COMPANY:\n\tCENTRAL INDEX KEY: {CIK}\nFILED BY:\n\tCENTRAL INDEX KEY: {CIK}\n</SEC-HEADER><p>(Name of Issuer)</p><p>Common Stock</p><p>(Title of Class of Securities)</p><p>123456782</p><p>(CUSIP Number)</p>"
+    ).encode()
+    monkeypatch.setattr(collector, "submissions", lambda *args: [row(), own])
+    calls = []
+
+    class Retained:
+        def filing(self, _):
+            return parent
+
+    class Cache:
+        def get(self, url):
+            calls.append(url)
+            if url.endswith("/cover.htm"):
+                if failure in {
+                    "SEC_source_cache_tampered",
+                    "source_request_budget_exhausted",
+                    "source_document_byte_bound",
+                }:
+                    raise IdentityEvidenceError(failure)
+                return child
+            assert url.endswith(own["accessionNumber"] + ".txt")
+            return owner
+
+    def run():
+        return collector.collect_member(
+            {"cik": CIK, "symbol_at_snapshot": "OLD", "snapshot_member_key": "synthetic"},
+            Cache(),
+            Retained(),
+            CUTOFF,
+        )
+
+    if failure in {"SEC_source_cache_tampered", "source_request_budget_exhausted"}:
+        with pytest.raises(IdentityEvidenceError, match=failure):
+            run()
+        assert len(calls) == 1
+    elif failure in {"source_document_byte_bound", "different_issuer"}:
+        result = run()
+        assert result["status"] == (
+            "source_size_unresolved"
+            if failure == "source_document_byte_bound"
+            else "periodic_anchor_unresolved"
+        )
+        assert len(calls) == 1
+    else:
+        result = run()
+        assert result["status"] == "pre_cutoff_SEC_identity_anchored"
+        binding = result["anchor"]["periodic_evidence"]["cover_exhibit_binding"]
+        assert binding["primary_document_sha256"] == digest(parent)
+        assert binding["exhibit_document_sha256"] == digest(child)
+        assert binding["relative_href"] == "cover.htm"
+        if failure == "shared_primary_context":
+            shared = result["anchor"]["periodic_evidence"]["shared_registration_contexts"]
+            assert shared["primary_document_sha256"] == digest(parent)
+            assert shared["context_ids"] == ["c"]
+        assert len(calls) == 2

@@ -209,6 +209,18 @@ def test_full_replay_recomputes_sources_without_network(synthetic_result, monkey
     assert report["processed"] == 1
 
 
+def test_replay_refuses_algorithm_changes_while_sources_are_being_checked(
+    synthetic_result, monkeypatch
+):
+    output, source, value, save = synthetic_result
+    versions = iter(
+        [{"identity_algorithm_sha256": "a" * 64}, {"identity_algorithm_sha256": "b" * 64}]
+    )
+    monkeypatch.setattr(verifier, "code_identity", lambda: next(versions))
+    with pytest.raises(IdentityEvidenceError, match="algorithm_changed"):
+        replay(output, save(value), source, source)
+
+
 @pytest.mark.parametrize(
     "field",
     [

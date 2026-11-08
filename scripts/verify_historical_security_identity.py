@@ -81,6 +81,8 @@ def replay(
     match = re.fullmatch(r"result-([a-f0-9]{64})\.json", result_name)
     if match is None:
         raise IdentityEvidenceError("invalid_result_filename")
+    algorithms = code_identity()
+    verifier_digest = digest(Path(__file__).read_bytes())
     policy = load_policy()
     source = verify_capture(source_capture, policy, root=source_capture.parent)
     with _capture_directory(source_capture, root=source_capture.parent) as fd:
@@ -163,6 +165,8 @@ def replay(
             or report["source_count"] != len(ordered)
         ):
             raise IdentityEvidenceError("invalid_identity_result_report")
+    if code_identity() != algorithms or digest(Path(__file__).read_bytes()) != verifier_digest:
+        raise IdentityEvidenceError("replay_algorithm_changed_during_verification")
     return {
         "status": "offline_source_replay_verified",
         "result_sha256": digest(raw),
@@ -173,8 +177,8 @@ def replay(
         "issue_complete": False,
         "capture_identity_algorithm_sha256": report["identity_algorithm_sha256"],
         "capture_collector_algorithm_sha256": report["collector_algorithm_sha256"],
-        "replay_algorithms": code_identity(),
-        "verifier_sha256": digest(Path(__file__).read_bytes()),
+        "replay_algorithms": algorithms,
+        "verifier_sha256": verifier_digest,
     }
 
 

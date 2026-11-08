@@ -9,13 +9,15 @@ source files or authorize research/publication.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 MAX_DOCUMENT_BYTES = 16 * 1024 * 1024
+MAX_RETAINED_DOCUMENT_BYTES = 64 * 1024 * 1024
 PUBLICATION_LAG_DAYS = 7
 _SYMBOL = re.compile(r"[A-Z][A-Z0-9.-]{0,14}")
 _NAMES = {
@@ -28,6 +30,15 @@ _NAMES = {
 
 class IdentityEvidenceError(ValueError):
     """Static refusal code, suitable for an operational report without rows."""
+
+
+class RegistrationCoverExhibit(IdentityEvidenceError):
+    """The primary filing explicitly delegates its registered-security cover."""
+
+    def __init__(self, relative_href: str, primary_sha256: str):
+        super().__init__("explicit_registration_cover_exhibit_required")
+        self.relative_href = relative_href
+        self.primary_sha256 = primary_sha256
 
 
 def instant(value: Any) -> datetime:
@@ -68,8 +79,10 @@ def source_metadata(
     }
 
 
-def _soup(payload: bytes) -> BeautifulSoup:
-    if not isinstance(payload, bytes) or not 0 < len(payload) <= MAX_DOCUMENT_BYTES:
+def _soup(payload: bytes, maximum: int = MAX_DOCUMENT_BYTES) -> BeautifulSoup:
+    if maximum not in {MAX_DOCUMENT_BYTES, MAX_RETAINED_DOCUMENT_BYTES}:
+        raise IdentityEvidenceError("invalid_document_byte_bound")
+    if not isinstance(payload, bytes) or not 0 < len(payload) <= maximum:
         raise IdentityEvidenceError("empty_or_excessive_document")
     return BeautifulSoup(payload, "html.parser")
 
@@ -81,11 +94,22 @@ def class_signature(value: str) -> tuple[str, str, str]:
         r"\b(PREFERRED|PREFERENCE|DEPOSITARY|DEPOSITORY|WARRANTS?|NOTES?|BONDS?|UNITS?)\b", text
     ):
         raise IdentityEvidenceError("unsupported_security_class")
-    family = "common" if re.search(r"\bCOMMON\s+(?:STOCK|SHARES)\b", text) else ""
-    if re.search(r"\bORDINARY\s+(?:STOCK|SHARES)\b", text):
-        if family:
-            raise IdentityEvidenceError("ambiguous_security_class")
-        family = "ordinary"
+    families = {
+        family
+        for family, pattern in {
+            "common": r"\bCOMMON\s+(?:STOCK|SHARES)\b",
+            "ordinary": r"\bORDINARY\s+(?:STOCK|SHARES)\b",
+            "capital": r"\bCAPITAL\s+STOCK\b",
+            "registered": r"\bREGISTERED\s+SHARES\b",
+        }.items()
+        if re.search(pattern, text)
+    }
+    # A literal cover-field shorthand, not a narrative mention of "common".
+    if re.fullmatch(r"COMMON\s*,\s*\$\s*\d+(?:\.\d+)?\s+PAR\s+VALUE", text):
+        families.add("common")
+    if len(families) != 1:
+        raise IdentityEvidenceError("ambiguous_security_class")
+    family = next(iter(families))
     classes = set(re.findall(r"\bCLASS\s+([A-Z0-9]+)\b", text))
     if not family or len(classes) > 1:
         raise IdentityEvidenceError("ambiguous_security_class")
@@ -95,13 +119,39 @@ def class_signature(value: str) -> tuple[str, str, str]:
     return family, next(iter(classes), ""), voting
 
 
+def _symbol_matches(value: str, expected: str, title: str | None = None) -> bool:
+    """Literal cover typography, plus an explicitly matching dotted class suffix."""
+    text = " ".join(value.split())
+    for opening, closing in (("\u201c", "\u201d"), ('"', '"')):
+        if text.startswith(opening) and text.endswith(closing):
+            text = text[1:-1]
+            break
+    if text in {expected, expected + " (NYSE)"}:
+        return True
+    dotted = re.fullmatch(r"([A-Z]+)\.([A-Z])", expected)
+    if dotted is None or text != dotted[1] + dotted[2] or title is None:
+        return False
+    try:
+        return class_signature(title)[1] == dotted[2]
+    except IdentityEvidenceError:
+        return False
+
+
 def periodic_anchor(
-    payload: bytes, metadata: dict[str, Any], *, cik: str, symbol: str, cutoff: datetime
+    payload: bytes,
+    metadata: dict[str, Any],
+    *,
+    cik: str,
+    symbol: str,
+    cutoff: datetime,
+    maximum_document_bytes: int = MAX_DOCUMENT_BYTES,
+    shared_primary_document: bytes | None = None,
+    shared_cover_href: str | None = None,
 ) -> dict[str, Any]:
     source = source_metadata(metadata, cik=cik, cutoff=cutoff, forms={"10-K", "10-Q"})
     if _SYMBOL.fullmatch(symbol) is None:
         raise IdentityEvidenceError("invalid_snapshot_symbol")
-    soup = _soup(payload)
+    soup = _soup(payload, maximum_document_bytes)
     grouped: dict[str, dict[str, set[str]]] = {}
     issuers: set[str] = set()
     count = 0
@@ -120,6 +170,13 @@ def periodic_anchor(
             issuers.add(value.zfill(10))
         if context and value:
             grouped.setdefault(context, {}).setdefault(name, set()).add(value)
+    shared_binding: dict[str, Any] = {}
+    if shared_primary_document is not None:
+        if shared_cover_href is None or (issuers and issuers != {cik}):
+            raise IdentityEvidenceError("invalid_shared_registration_issuer")
+        shared_binding = _add_shared_registration_contexts(
+            soup, grouped, shared_primary_document, shared_cover_href, cik, symbol, cutoff
+        )
     context_issuers: dict[str, set[str]] = {}
     for context_tag in soup.find_all("xbrli:context"):
         context_id = str(context_tag.get("id", ""))
@@ -137,37 +194,191 @@ def periodic_anchor(
     if not context_issuers and issuers != {cik}:
         raise IdentityEvidenceError("document_issuer_mismatch")
     matches: set[tuple[str, str]] = set()
+    supported_contexts: set[str] = set()
+    reported_symbols: set[str] = set()
+    exchange: str | None
     ambiguous = False
     for context_id, fields in grouped.items():
-        if fields.get("dei:tradingsymbol") != {symbol}:
+        symbols = fields.get("dei:tradingsymbol", set())
+        titles = fields.get("dei:security12btitle", set())
+        if len(symbols) != 1 or not _symbol_matches(
+            next(iter(symbols)), symbol, next(iter(titles)) if len(titles) == 1 else None
+        ):
             continue
+        reported_symbols.update(symbols)
         # Combined reports may contain DEI facts for several registrants.
         # Bind the requested share-class facts to their own issuer context.
         if context_issuers and context_issuers.get(context_id) != {cik}:
             raise IdentityEvidenceError("symbol_context_issuer_mismatch")
-        titles = fields.get("dei:security12btitle", set())
         exchanges = fields.get("dei:securityexchangename", set())
         if len(titles) != 1 or len(exchanges) != 1:
             ambiguous = True
             continue
         title, exchange = next(iter(titles)), next(iter(exchanges))
+        # Some covers give debt its own complete context but repeat the equity
+        # ticker. Never merge its facts into equity or treat debt as a class
+        # alias. Unknown/equity-like titles remain refusals.
+        if re.fullmatch(
+            r"\d+(?:\.\d+)?\s*%\s+(?:SENIOR\s+)?NOTES?\s+DUE\s+20\d{2}",
+            " ".join(title.upper().split()),
+        ):
+            continue
         class_signature(title)
         matches.add((title, exchange))
-    row_binding: dict[str, str] = {}
-    if len(matches) != 1 or ambiguous:
+        supported_contexts.add(context_id)
+    row_binding: dict[str, Any] = {}
+    if (
+        len(matches) > 1
+        and not ambiguous
+        and len({title for title, _ in matches}) == 1
+        and context_issuers
+        and _compatible_cover_contexts(
+            soup, supported_contexts, cutoff, symbol=symbol, allow_exchange_variation=True
+        )
+    ):
+        title = next(iter(matches))[0]
+        exchange = None  # The filing does not identify a primary venue.
+        row_binding = {
+            "registered_class_binding": "same_security_multiple_explicit_listing_contexts",
+            "exchanges_at_filing": sorted({venue for _, venue in matches}),
+        }
+    elif len(matches) != 1 or ambiguous:
+        cover_names = {"dei:tradingsymbol", "dei:security12btitle", "dei:securityexchangename"}
+        if (
+            not any(cover_names & fields.keys() for fields in grouped.values())
+            and issuers == {cik}
+            and all(values == {cik} for values in context_issuers.values())
+        ):
+            href = _registered_cover_exhibit(soup)
+            if href is not None:
+                raise RegistrationCoverExhibit(href, hashlib.sha256(payload).hexdigest())
         title, exchange = _registered_class_row(soup, cik, symbol, context_issuers, cutoff)
         row_binding = {
             "registered_class_binding": "single_security_row_with_compatible_issuer_period_dimensions"
         }
     else:
         title, exchange = next(iter(matches))
+    if reported_symbols and reported_symbols != {symbol}:
+        row_binding["reported_symbols_at_filing"] = sorted(reported_symbols)
     return {
         **source,
         "symbol_at_cutoff": symbol,
         "security_title": title,
         "exchange_at_filing": exchange,
         "document_sha256": hashlib.sha256(payload).hexdigest(),
+        **shared_binding,
         **row_binding,
+    }
+
+
+def _registered_cover_exhibit(soup: BeautifulSoup) -> str | None:
+    text = " ".join(soup.get_text(" ", strip=True).split())
+    references = set(
+        re.findall(
+            r"Securities registered pursuant to Section 12\s*\(b\).{0,160}?"
+            r"formatted in Inline XBRL\s*:\s*See Exhibit\s+([0-9]{1,3}\.[0-9]{1,2})",
+            text,
+            re.I,
+        )
+    )
+    if not references:
+        return None
+    if len(references) != 1:
+        raise IdentityEvidenceError("ambiguous_registration_cover_exhibit")
+    reference = next(iter(references))
+    hrefs: set[str] = set()
+    for link in soup.find_all("a", href=True):
+        label = re.sub(r"\s+", "", link.get_text(" ", strip=True))
+        if re.fullmatch(r"(?:Exhibit)?" + re.escape(reference) + r"[+*\u2020]?", label, re.I):
+            href = str(link.get("href"))
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,180}\.html?", href) is None:
+                raise IdentityEvidenceError("invalid_registration_cover_exhibit_link")
+            hrefs.add(href)
+    if len(hrefs) != 1:
+        raise IdentityEvidenceError("missing_or_ambiguous_registration_cover_exhibit_link")
+    return next(iter(hrefs))
+
+
+def _add_shared_registration_contexts(
+    soup: BeautifulSoup,
+    grouped: dict[str, dict[str, set[str]]],
+    primary: bytes,
+    href: str,
+    cik: str,
+    symbol: str,
+    cutoff: datetime,
+) -> dict[str, Any]:
+    """Resolve only exact IXDS context references from the explicitly linked primary."""
+    parent = _soup(primary, MAX_RETAINED_DOCUMENT_BYTES)
+    parent_issuers: set[str] = set()
+    cover_names = {"dei:tradingsymbol", "dei:security12btitle", "dei:securityexchangename"}
+    for tag in parent.find_all("ix:nonnumeric"):
+        name = str(tag.get("name", "")).lower()
+        if name in cover_names:
+            raise IdentityEvidenceError("shared_primary_has_conflicting_cover_facts")
+        if name == "dei:entitycentralindexkey":
+            value = tag.get_text(strip=True)
+            if not re.fullmatch(r"[0-9]{1,10}", value):
+                raise IdentityEvidenceError("invalid_shared_primary_issuer")
+            parent_issuers.add(value.zfill(10))
+    if parent_issuers != {cik} or _registered_cover_exhibit(parent) != href:
+        raise IdentityEvidenceError("shared_registration_primary_binding_mismatch")
+    references = set()
+    for context, fields in grouped.items():
+        symbols = fields.get("dei:tradingsymbol", set())
+        titles = fields.get("dei:security12btitle", set())
+        if len(symbols) == 1 and _symbol_matches(
+            next(iter(symbols)), symbol, next(iter(titles)) if len(titles) == 1 else None
+        ):
+            references.add(context)
+    if not references or "" in references:
+        raise IdentityEvidenceError("missing_shared_registration_context_reference")
+    if not (
+        _compatible_cover_contexts(parent, references, cutoff, symbol=symbol)
+        or _compatible_cover_contexts(
+            parent, references, cutoff, symbol=symbol, allow_exchange_variation=True
+        )
+    ):
+        raise IdentityEvidenceError("incompatible_shared_registration_contexts")
+    resources: dict[str, str] = {}
+    for reference in sorted(references):
+        definitions = parent.find_all("xbrli:context", attrs={"id": reference})
+        if len(definitions) != 1 or soup.find_all("xbrli:context", attrs={"id": reference}):
+            raise IdentityEvidenceError("conflicting_shared_registration_context")
+        definition = definitions[0]
+        identifiers = definition.find_all("xbrli:identifier")
+        if (
+            len(identifiers) != 1
+            or identifiers[0].get("scheme")
+            not in {"http://www.sec.gov/CIK", "https://www.sec.gov/CIK"}
+            or identifiers[0].get_text(strip=True).zfill(10) != cik
+            or not _compatible_cover_contexts(parent, {reference}, cutoff, symbol=symbol)
+        ):
+            raise IdentityEvidenceError("invalid_shared_registration_context")
+        clone = BeautifulSoup(str(definition), "html.parser").find("xbrli:context")
+        if clone is None:
+            raise IdentityEvidenceError("missing_shared_registration_context")
+        # Keep the parent context's namespace environment; never reinterpret its
+        # QName dimensions under a different namespace in the exhibit.
+        ancestors = [node for node in definition.parents if isinstance(node, Tag)]
+        for ancestor in [*reversed(ancestors), definition]:
+            for key, namespace_value in ancestor.attrs.items():
+                if key == "xmlns" or key.startswith("xmlns:"):
+                    if not isinstance(namespace_value, str):
+                        raise IdentityEvidenceError("invalid_shared_context_namespace")
+                    clone[key] = namespace_value
+        resources[reference] = str(clone)
+        soup.append(clone)
+    encoded = json.dumps(resources, sort_keys=True, separators=(",", ":")).encode()
+    return {
+        "shared_registration_contexts": {
+            "primary_document_sha256": hashlib.sha256(primary).hexdigest(),
+            "relative_href": href,
+            "context_ids": sorted(references),
+            "context_resources_sha256": hashlib.sha256(encoded).hexdigest(),
+            "context_resources_encoding": "sorted_compact_JSON_of_namespace_preserving_context_XML",
+            "basis": "exact_context_references_in_same_explicit_Inline_XBRL_document_set",
+        }
     }
 
 
@@ -182,9 +393,8 @@ def _registered_class_row(
     names = {"dei:tradingsymbol", "dei:security12btitle", "dei:securityexchangename"}
     matches: set[tuple[str, str]] = set()
     for tag in soup.find_all("ix:nonnumeric"):
-        if (
-            str(tag.get("name", "")).lower() != "dei:tradingsymbol"
-            or " ".join(tag.get_text(" ", strip=True).split()) != symbol
+        if str(tag.get("name", "")).lower() != "dei:tradingsymbol" or not _symbol_matches(
+            tag.get_text(" ", strip=True), symbol
         ):
             continue
         row = tag.find_parent("tr")
@@ -201,14 +411,16 @@ def _registered_class_row(
         if (
             set(fields) != names
             or any(len(values) != 1 for values in fields.values())
-            or fields["dei:tradingsymbol"] != {symbol}
+            or not all(_symbol_matches(value, symbol) for value in fields["dei:tradingsymbol"])
             or not contexts
             or "" in contexts
         ):
             continue
         if context_issuers and any(context_issuers.get(context) != {cik} for context in contexts):
             raise IdentityEvidenceError("symbol_context_issuer_mismatch")
-        if len(contexts) > 1 and not _compatible_cover_contexts(soup, contexts, cutoff):
+        if len(contexts) > 1 and not _compatible_cover_contexts(
+            soup, contexts, cutoff, symbol=symbol
+        ):
             continue
         title = next(iter(fields["dei:security12btitle"]))
         exchange = next(iter(fields["dei:securityexchangename"]))
@@ -219,7 +431,14 @@ def _registered_class_row(
     return next(iter(matches))
 
 
-def _compatible_cover_contexts(soup: BeautifulSoup, references: set[str], cutoff: datetime) -> bool:
+def _compatible_cover_contexts(
+    soup: BeautifulSoup,
+    references: set[str],
+    cutoff: datetime,
+    *,
+    symbol: str | None = None,
+    allow_exchange_variation: bool = False,
+) -> bool:
     """Only known security/ticker/exchange axes; shared axes cannot disagree."""
     allowed = {
         "us-gaap:StatementClassOfStockAxis",
@@ -266,11 +485,33 @@ def _compatible_cover_contexts(soup: BeautifulSoup, references: set[str], cutoff
         local_axes: set[str] = set()
         for member in context.find_all("xbrldi:explicitmember"):
             axis = str(member.get("dimension", ""))
-            if axis not in allowed or axis in local_axes:
+            value = member.get_text(strip=True)
+            if axis not in allowed:
+                prefix, _, local = axis.partition(":")
+                declarations = {
+                    str(tag.get("xmlns:" + prefix))
+                    for tag in soup.find_all(True, attrs={"xmlns:" + prefix: True})
+                }
+                if (
+                    local != "TradingSymbolAxis"
+                    or symbol is None
+                    or value != prefix + ":" + symbol + "Member"
+                    or len(declarations) != 1
+                    or not re.fullmatch(r"https?://[A-Za-z0-9./_-]+", next(iter(declarations)))
+                ):
+                    return False
+            if axis in local_axes:
                 return False
             local_axes.add(axis)
-            dimensions.setdefault(axis, set()).add(member.get_text(strip=True))
-    return len(periods) == 1 and all(len(values) == 1 for values in dimensions.values())
+            if not value:
+                return False
+            dimensions.setdefault(axis, set()).add(value)
+        if allow_exchange_variation and "dei:EntityListingsExchangeAxis" not in local_axes:
+            return False
+    return len(periods) == 1 and all(
+        len(values) == 1 or (allow_exchange_variation and axis == "dei:EntityListingsExchangeAxis")
+        for axis, values in dimensions.items()
+    )
 
 
 def valid_cusip(value: str) -> bool:
@@ -402,6 +643,16 @@ def join_identity(periodic: dict[str, Any], ownership: dict[str, Any]) -> dict[s
         "symbol_at_cutoff": periodic["symbol_at_cutoff"],
         "security_title": periodic["security_title"],
         "exchange_at_filing": periodic["exchange_at_filing"],
+        **(
+            {"exchanges_at_filing": periodic["exchanges_at_filing"]}
+            if "exchanges_at_filing" in periodic
+            else {}
+        ),
+        **(
+            {"reported_symbols_at_filing": periodic["reported_symbols_at_filing"]}
+            if "reported_symbols_at_filing" in periodic
+            else {}
+        ),
         "available_by": max(
             instant(periodic["available_by"]), instant(ownership["available_by"])
         ).isoformat(),

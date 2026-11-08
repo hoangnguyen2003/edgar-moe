@@ -25,8 +25,10 @@ import httpx
 
 from edgar_moe.data.historical_identity import (
     MAX_DOCUMENT_BYTES,
+    MAX_RETAINED_DOCUMENT_BYTES,
     PUBLICATION_LAG_DAYS,
     IdentityEvidenceError,
+    RegistrationCoverExhibit,
     instant,
     join_identity,
     ownership_identity,
@@ -350,7 +352,7 @@ class RetainedCheckpoint:
                 relative = marker + relative.split(marker)[1]
         key = "filing:" + row["accessionNumber"]
         self.hashes[key] = record["sha256"]
-        return self.read(relative, key)
+        return self.read(relative, key, maximum=MAX_RETAINED_DOCUMENT_BYTES)
 
 
 def submissions(
@@ -395,6 +397,7 @@ def collect_member(
     for row in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
         try:
             body = retained.filing(row)
+            from_retained = body is not None
             if body is None:
                 body = cache.get(filing_url(row))
         except IdentityEvidenceError as error:
@@ -403,7 +406,51 @@ def collect_member(
             refusals[str(error)] += 1
             continue
         try:
-            periodic = periodic_anchor(body, row, cik=cik, symbol=symbol, cutoff=cutoff)
+            periodic = periodic_anchor(
+                body,
+                row,
+                cik=cik,
+                symbol=symbol,
+                cutoff=cutoff,
+                maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES
+                if from_retained
+                else MAX_DOCUMENT_BYTES,
+            )
+            break
+        except RegistrationCoverExhibit as required:
+            cover_href = required.relative_href
+            primary_sha256 = required.primary_sha256
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+            continue
+        try:
+            cover_body = cache.get(filing_url({**row, "primaryDocument": cover_href}))
+        except IdentityEvidenceError as error:
+            if str(error) != "source_document_byte_bound":
+                raise
+            refusals[str(error)] += 1
+            continue
+        try:
+            try:
+                periodic = periodic_anchor(cover_body, row, cik=cik, symbol=symbol, cutoff=cutoff)
+            except IdentityEvidenceError as error:
+                if str(error) != "document_issuer_mismatch":
+                    raise
+                periodic = periodic_anchor(
+                    cover_body,
+                    row,
+                    cik=cik,
+                    symbol=symbol,
+                    cutoff=cutoff,
+                    shared_primary_document=body,
+                    shared_cover_href=cover_href,
+                )
+            periodic["cover_exhibit_binding"] = {
+                "primary_document_sha256": primary_sha256,
+                "relative_href": cover_href,
+                "exhibit_document_sha256": digest(cover_body),
+                "availability_basis": "explicit_registration_cover_reference_in_same_filing",
+            }
             break
         except IdentityEvidenceError as error:
             refusals[str(error)] += 1
