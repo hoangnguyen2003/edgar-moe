@@ -555,12 +555,9 @@ def ownership_subject(payload: bytes, *, cik: str, accession: str) -> dict[str, 
     }
 
 
-def _issuer_field_class(
-    payload: bytes, metadata: dict[str, Any], cik: str, issuer_field: str, title: str
-) -> tuple[str, dict[str, str] | None]:
-    """Bind a literal class suffix in the adjacent issuer field, never a name guess."""
-    if re.search(r"\bClass\s+[A-Z0-9]+\b", issuer_field, re.I) is None:
-        return title, None
+def _ownership_subject_name(
+    payload: bytes, metadata: dict[str, Any], cik: str
+) -> tuple[bytes, dict[str, str]]:
     subject = ownership_subject(payload, cik=cik, accession=metadata["accessionNumber"])
     header = re.findall(rb"<SEC-HEADER>(.*?)</SEC-HEADER>", payload, re.S | re.I)[0]
     block = re.findall(
@@ -569,22 +566,33 @@ def _issuer_field_class(
     names = re.findall(rb"COMPANY CONFORMED NAME:[ \t]*([^\r\n]+)", block)
     if len(names) != 1:
         raise IdentityEvidenceError("missing_issuer_field_subject_name")
+    return names[0], subject
+
+
+def _normalized_issuer_name(value: str) -> str:
+    return "".join(char for char in value.casefold() if char.isalnum())
+
+
+def _issuer_field_class(
+    payload: bytes, metadata: dict[str, Any], cik: str, issuer_field: str, title: str
+) -> tuple[str, dict[str, str] | None]:
+    """Bind a literal class suffix in the adjacent issuer field, never a name guess."""
+    if re.search(r"\bClass\s+[A-Z0-9]+\b", issuer_field, re.I) is None:
+        return title, None
+    name, subject = _ownership_subject_name(payload, metadata, cik)
     try:
-        subject_name = names[0].decode("utf-8")
+        subject_name = name.decode("utf-8")
     except UnicodeDecodeError as error:
         raise IdentityEvidenceError("invalid_issuer_field_subject_name") from error
 
-    def normalize(value: str) -> str:
-        return "".join(char for char in value.casefold() if char.isalnum())
-
-    if normalize(issuer_field) == normalize(subject_name):
+    if _normalized_issuer_name(issuer_field) == _normalized_issuer_name(subject_name):
         # A class-like word in the actual legal name is not a security qualifier.
         return title, None
     match = re.fullmatch(r"(.+?)\s+Class\s+([A-Z0-9]{1,8})", issuer_field, re.I)
     if (
         match is None
-        or not normalize(subject_name)
-        or normalize(match[1]) != normalize(subject_name)
+        or not _normalized_issuer_name(subject_name)
+        or _normalized_issuer_name(match[1]) != _normalized_issuer_name(subject_name)
     ):
         raise IdentityEvidenceError("issuer_field_class_name_mismatch")
     letter = match[2].upper()
@@ -596,9 +604,128 @@ def _issuer_field_class(
         "reported_issuer_field": issuer_field,
         "reported_security_title": title,
         "class_qualifier": letter,
-        "subject_name_sha256": hashlib.sha256(names[0]).hexdigest(),
+        "subject_name_sha256": hashlib.sha256(name).hexdigest(),
         "SEC_header_sha256": subject["SEC_header_sha256"],
         "basis": "literal_class_suffix_after_matching_SEC_subject_legal_name_in_adjacent_cover_field",
+    }
+
+
+def _percentage_class_note(table: Tag) -> tuple[str, re.Match[str]] | None:
+    """Read one immediately following marker table with a complete class sentence."""
+    note = None
+    for sibling in table.next_siblings:
+        if isinstance(sibling, str) and sibling.strip():
+            return None
+        if isinstance(sibling, Tag) and sibling.get_text(" ", strip=True):
+            note = sibling
+            break
+    if note is None or note.name != "table" or note.find("table") is not None:
+        return None
+    rows = note.find_all("tr")
+    cells = rows[0].find_all("td", recursive=False) if len(rows) == 1 else []
+    if len(cells) != 2 or cells[0].get_text(strip=True) != "*":
+        return None
+    text = " ".join(cells[1].get_text(" ", strip=True).split())
+    # The full sentence binds the class to this percentage and this issuer's
+    # dated periodic report. A stray voting-class mention or voting-power count
+    # elsewhere in the document cannot supply this evidence.
+    date_text = r"[A-Za-z]+\s+[0-9]{1,2},\s+[0-9]{4}"
+    match = re.fullmatch(
+        r"The calculation of the foregoing percentage is based on "
+        r"([1-9][0-9]*(?:,[0-9]{3})*) shares of "
+        r"((?:Class\s+[A-Z0-9]+\s+)?(?:non[ -]?voting|voting)\s+"
+        r"(?:common|ordinary|capital|registered)\s+(?:stock|shares)) outstanding "
+        rf"as of ({date_text}) as reported in (.+?)[’']s "
+        r"(?:Quarterly Report on Form 10-Q|Annual Report on Form 10-K), filed "
+        r"with the Securities and Exchange Commission on "
+        rf"({date_text})\.",
+        text,
+        re.I,
+    )
+    if match is None or len(text) > 2048:
+        return None
+    return text, match
+
+
+def _cover_percentage_voting_class(
+    soup: BeautifulSoup, payload: bytes, metadata: dict[str, Any], cik: str, titles: list[str]
+) -> tuple[str, dict[str, str] | None]:
+    """Read only an adjacent, marker-bound SC 13G cover denominator footnote."""
+    title = titles[0].strip()
+    if metadata["form"] not in {"SC 13G", "SC 13G/A"}:
+        return title, None
+    covers = []
+    for table in soup.find_all("table"):
+        if table.find_parent("table") is not None:
+            continue
+        for row in table.find_all("tr"):
+            if row.find_parent("table") is not table or row.find("table") is not None:
+                continue
+            match = re.fullmatch(
+                r"11\.\s+Percent of class represented by amount in Row\s*\(9\)\s+"
+                r"([0-9]+(?:\.[0-9]+)?)\s*%\s*\*",
+                " ".join(row.get_text(" ", strip=True).split()),
+                re.I,
+            )
+            if match:
+                covers.append((table, match[1]))
+    qualified_notes = [
+        (table, percentage, note)
+        for table, percentage in covers
+        if (note := _percentage_class_note(table)) is not None
+    ]
+    if not qualified_notes:
+        return title, None
+    captions = soup.find_all(
+        string=re.compile(r"^\s*\(Title\s+of\s+Class\s+of\s+Securities\)\s*$", re.I)
+    )
+    if len(covers) != 1 or len(captions) != 1 or len(titles) != 1:
+        raise IdentityEvidenceError("ambiguous_percentage_cover_binding")
+    table, percentage, (text, match) = qualified_notes[0]
+    between = []
+    reached = False
+    for node in captions[0].next_elements:
+        if node is table:
+            reached = True
+            break
+        if isinstance(node, str):
+            between.append(str(node))
+    prelude = " ".join(between)
+    if (
+        not reached
+        or len(prelude) > 65536
+        or re.search(r"\bItem\s+[0-9]\b", prelude, re.I)
+        or float(percentage) > 100
+    ):
+        raise IdentityEvidenceError("unbound_percentage_cover")
+    name, subject = _ownership_subject_name(payload, metadata, cik)
+    try:
+        subject_name = _normalized_issuer_name(name.decode("utf-8"))
+        same_issuer = bool(subject_name) and _normalized_issuer_name(match[4]) == subject_name
+        as_of = datetime.strptime(match[3], "%B %d, %Y").date()
+        filed = datetime.strptime(match[5], "%B %d, %Y").date()
+    except (UnicodeDecodeError, ValueError) as error:
+        raise IdentityEvidenceError("invalid_percentage_class_source") from error
+    if not same_issuer or not as_of <= filed <= instant(metadata["acceptanceDateTime"]).date():
+        raise IdentityEvidenceError("unbound_percentage_class_issuer_or_dates")
+    original, qualified = class_signature(title), class_signature(match[2])
+    if original[:2] != qualified[:2] or (original[2] and original[2] != qualified[2]):
+        raise IdentityEvidenceError("percentage_class_conflicts_with_cover")
+    if original[2]:
+        return title, None
+    canonical = ("Non-voting " if qualified[2] == "nonvoting" else "Voting ") + title
+    return canonical, {
+        "reported_security_title": title,
+        "reported_denominator_security_title": match[2],
+        "reported_percentage": percentage,
+        "reported_outstanding_shares": match[1],
+        "reported_outstanding_date": as_of.isoformat(),
+        "reported_reference_filing_date": filed.isoformat(),
+        "footnote_marker": "*",
+        "footnote_text_sha256": hashlib.sha256(text.encode()).hexdigest(),
+        "subject_name_sha256": hashlib.sha256(name).hexdigest(),
+        "SEC_header_sha256": subject["SEC_header_sha256"],
+        "basis": "adjacent_SC13G_cover_percentage_footnote_explicit_voting_class",
     }
 
 
@@ -687,12 +814,14 @@ def ownership_identity(
             candidates.add(value)
     if len(candidates) != 1:
         raise IdentityEvidenceError("missing_or_ambiguous_cusip")
+    title, percentage_binding = _cover_percentage_voting_class(soup, payload, metadata, cik, titles)
     return {
         **source,
         "cusip": next(iter(candidates)),
-        "security_title": titles[0].strip(),
+        "security_title": title,
         "document_sha256": hashlib.sha256(payload).hexdigest(),
         **({"issuer_field_class_bindings": issuer_class_bindings} if issuer_class_bindings else {}),
+        **({"cover_percentage_class_binding": percentage_binding} if percentage_binding else {}),
     }
 
 

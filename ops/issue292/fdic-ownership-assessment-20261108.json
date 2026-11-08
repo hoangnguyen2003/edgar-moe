@@ -1,0 +1,30 @@
+{
+  "assessment_date": "2026-11-08",
+  "candidate_bank_cases": 1,
+  "complete_text_retained_privately": true,
+  "cover_dates_within_existing_730_day_discovery_window": false,
+  "cover_identifiers_agree": true,
+  "historical_continuity_verified": false,
+  "identifier_check_digits_valid": true,
+  "issue_complete": false,
+  "ownership_report_covers_inspected": 2,
+  "paid_resources": false,
+  "portal_attachment_years": [
+    2012,
+    2013
+  ],
+  "prior_SEC_subject_identity_conflict_resolved": false,
+  "private_assessment_sha256": "9a8c23a44a5efdc20b8c0f8feffdcc6b6913a914a8c943519a0ba6f4f3c97520",
+  "private_preservation_manifest_sha256": "d689c103c2cba5f02ba74874ca52a5809a08fda936a2334506d9d38fc6bcac1b",
+  "private_provider_rows_published": false,
+  "public_FDIC_requests": 2,
+  "same_portal_institution_certificate_as_2022_periodic": true,
+  "schema_version": 1,
+  "source_count": 503,
+  "source_existence_not_join_proof": true,
+  "source_pdf_sha256": [
+    "bf87a3378210fcdf2733e71c9751aae61ac18ab04eb125576e670a39a3fc295a",
+    "c94bf1e4bbbcbf8e562fd4593d8eded6d7491043b38897fe4ee96f760076abf4"
+  ],
+  "verified_identity_anchors_added": 0
+}

@@ -242,6 +242,69 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
+### Explicit voting rights in cover notes and incorporated charters
+
+A narrow SC 13G cover format links row 11's percentage to an immediately
+following `*` footnote. The complete sentence must explicitly name the
+denominator's voting class, the same SEC subject legal name and valid,
+pre-acceptance reference dates. Only a missing voting qualifier can be supplied;
+the equity family and class letter must already agree. Multiple covers,
+unmatched markers, body-section tables, conflicting rights and voting-power
+numbers cannot supply this evidence. The original title, percentage, dates,
+marker and footnote/header/name hashes remain in the private receipt.
+
+A separate fallback handles one generic common-stock title whose registered
+class explicitly says voting. It requires an eligible pre-cutoff annual report's
+unique, complete incorporation reference to an amended and restated charter,
+including its amendments-through date, original form, filing date and exhibit
+number. The annual registration cover must identify the same issuer, symbol,
+class and par value. The exact referenced complete submission must authenticate
+its filer CIK, legal name, accession, dates, filename and exhibit type.
+
+The charter's entire authorized-shares article must state a sole common-stock
+class and exactly one vote per share. Competing classes, other common-stock or
+common-share language elsewhere, additional authorization clauses, conflicting
+par values and unparsed rights are refused. The dated ownership reports must
+supply a single identifier; an authenticated but ambiguous ownership report
+prevents this fallback. The charter must be available before the ownership
+report under a separate filing-date-plus-14-calendar-day, date-only bound.
+Its raw local acceptance text is retained without inventing a UTC timestamp.
+The normal two-year discovery window, 64-report ownership cap and exact
+common/ordinary/capital/class/voting comparisons remain in force. This is
+dated issuer/class evidence, not uninterrupted security or market continuity.
+
+The combined full capture processed **all 503 candidates** with **485 verified
+SEC identity anchors**, **16 unresolved ownership identities** and **two
+unresolved periodic anchors**. All 483 prior anchors and their identifiers,
+symbols and registered titles remain unchanged. One addition uses an explicit
+cover footnote; one uses an incorporated single-class charter. No candidate was
+excluded. Result SHA-256:
+`1c29732a85b69f1d2c1dd1fd770805ae8bc3ae0d77d4e18a367c8523fa18d2c9`.
+
+Independent offline replay reproduced all 503 results under the final, stricter
+guard against common-stock/share language elsewhere in the charter. Capture
+and replay code digests are recorded separately in the row-free
+[`voting-class-audit-20261108.json`](../ops/issue292/voting-class-audit-20261108.json).
+A private packet preserves and rehashes 1,384 source receipts, including five
+size refusals, and their available bodies. A bound follow-up retains the strict
+replay, exact current code and verification logs; the earlier capture and its
+code remain unchanged. Both the full capture and independent replay used zero
+network requests. The governing-exhibit discovery used two SEC reads.
+Validation: 2,357 full-suite passes, 36 skips, 85.79% coverage and 242 focused
+identity/certificate/governance/capture/replay tests; lint, formatting, type
+checks, the public snapshot lock and frozen v1 runtime validation pass.
+
+Two further official public FDIC ownership covers supply consistent dated
+class/identifier candidate evidence for one bank case. The portal reports
+2012/2013 attachment dates, outside the existing two-year discovery window.
+The prior SEC-subject conflict and historical continuity are unresolved; these
+documents add no verified anchor. The row-free
+[`fdic-ownership-assessment-20261108.json`](../ops/issue292/fdic-ownership-assessment-20261108.json)
+binds the private documents, complete extracted text and cover inspections.
+All identifiers and source rows remain private. Eighteen identities and the
+new historical selection/checkpoint/processed-dataset/study chain still prevent
+completion of #292; publication holds remain in force.
+
 ### Adjacent issuer-field class evidence and remaining refusals
 
 Some colon-labelled ownership covers put a literal `Class B` suffix in the
@@ -371,7 +434,7 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 20 remain after the latest extensions. Submissions about other issuers
+claim; 18 remain after the latest extensions. Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,
