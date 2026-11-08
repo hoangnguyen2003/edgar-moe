@@ -389,6 +389,109 @@ def test_colon_labelled_cover_binds_class_and_spaced_cusip():
     assert join_identity(anchors()[0], o)["security_id"] == "cusip:" + CUSIP
 
 
+def class_qualified_cover(
+    issuer="Synthetic Issuer Class B", title="Common Stock", subject_name="Synthetic Issuer"
+):
+    header = submission_header().replace(
+        b"\t\tCENTRAL INDEX KEY:",
+        f"\t\tCOMPANY CONFORMED NAME: {subject_name}\n\t\tCENTRAL INDEX KEY:".encode(),
+        1,
+    )
+    cover = colon_cover(title=title).replace(b"Synthetic issuer", issuer.encode())
+    return header + cover
+
+
+def test_adjacent_issuer_class_suffix_is_bound_to_the_explicit_subject_name():
+    body = class_qualified_cover()
+    result = ownership_identity(body, metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    assert result["security_title"] == "Class B Common Stock"
+    binding = result["issuer_field_class_bindings"][0]
+    assert binding["reported_security_title"] == "Common Stock"
+    assert binding["reported_issuer_field"] == "Synthetic Issuer Class B"
+    assert binding["class_qualifier"] == "B"
+    assert (
+        binding["SEC_header_sha256"]
+        == ownership_subject(body, cik=CIK, accession=metadata()["accessionNumber"])[
+            "SEC_header_sha256"
+        ]
+    )
+    primary = periodic_anchor(
+        periodic(title="Class B Common Stock"), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF
+    )
+    assert join_identity(primary, result)["security_id"] == "cusip:" + CUSIP
+
+
+@pytest.mark.parametrize(
+    "issuer,title,subject_name",
+    [
+        ("Different Issuer Class B", "Common Stock", "Synthetic Issuer"),
+        ("Synthetic Issuer Class B", "Class A Common Stock", "Synthetic Issuer"),
+        ("Synthetic Issuer Class A and Class B", "Common Stock", "Synthetic Issuer"),
+        ("Synthetic Issuer Class B (non-voting)", "Common Stock", "Synthetic Issuer"),
+    ],
+)
+def test_issuer_suffix_cannot_override_subject_class_or_ambiguous_fields(
+    issuer, title, subject_name
+):
+    with pytest.raises(IdentityEvidenceError):
+        ownership_identity(
+            class_qualified_cover(issuer, title, subject_name),
+            metadata("SC 13G"),
+            cik=CIK,
+            cutoff=CUTOFF,
+        )
+
+
+def test_class_suffix_requires_subject_header_accession_and_legal_name():
+    body = class_qualified_cover()
+    for invalid in (
+        body.replace(b"<SEC-HEADER>", b"<not-a-header>"),
+        body.replace(
+            b"COMPANY CONFORMED NAME: Synthetic Issuer", b"MISSING SUBJECT NAME: Synthetic Issuer"
+        ),
+        body.replace(
+            b"ACCESSION NUMBER: 0000000001-22-000001", b"ACCESSION NUMBER: 0000000001-22-000002"
+        ),
+        body.replace(b"CENTRAL INDEX KEY: 0000000001", b"CENTRAL INDEX KEY: 0000000003"),
+    ):
+        with pytest.raises(IdentityEvidenceError):
+            ownership_identity(invalid, metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+
+
+def test_a_class_word_in_the_actual_legal_name_does_not_supply_a_security_class():
+    result = ownership_identity(
+        class_qualified_cover(
+            issuer="Synthetic Issuer Class B", subject_name="Synthetic Issuer Class B"
+        ),
+        metadata("SC 13G"),
+        cik=CIK,
+        cutoff=CUTOFF,
+    )
+    assert result["security_title"] == "Common Stock"
+    assert "issuer_field_class_bindings" not in result
+
+
+def test_a_later_cover_cannot_borrow_an_earlier_cover_issuer_field():
+    body = (
+        class_qualified_cover()
+        + b"<p>Title of Class of Securities: Common Stock</p><p>CUSIP Number: 123456782</p>"
+    )
+    with pytest.raises(IdentityEvidenceError, match="unbound_ownership_cover_class"):
+        ownership_identity(body, metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+
+
+@pytest.mark.parametrize(
+    "title", ["Class B Non-voting Common Stock", "Class B Ordinary Shares", "Class A Common Stock"]
+)
+def test_named_class_evidence_preserves_voting_family_and_other_class_refusals(title):
+    result = ownership_identity(class_qualified_cover(), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    primary = periodic_anchor(
+        periodic(title=title), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF
+    )
+    with pytest.raises(IdentityEvidenceError, match="share_class"):
+        join_identity(primary, result)
+
+
 def test_narrative_class_or_unbound_colon_fields_cannot_supply_identity():
     for body in (
         colon_cover().replace(b"Name of issuer:", b"Item 1(a) Name of issuer:"),

@@ -555,6 +555,53 @@ def ownership_subject(payload: bytes, *, cik: str, accession: str) -> dict[str, 
     }
 
 
+def _issuer_field_class(
+    payload: bytes, metadata: dict[str, Any], cik: str, issuer_field: str, title: str
+) -> tuple[str, dict[str, str] | None]:
+    """Bind a literal class suffix in the adjacent issuer field, never a name guess."""
+    if re.search(r"\bClass\s+[A-Z0-9]+\b", issuer_field, re.I) is None:
+        return title, None
+    subject = ownership_subject(payload, cik=cik, accession=metadata["accessionNumber"])
+    header = re.findall(rb"<SEC-HEADER>(.*?)</SEC-HEADER>", payload, re.S | re.I)[0]
+    block = re.findall(
+        rb"(?ms)^SUBJECT COMPANY:\s*\n(.*?)(?=^\S|\Z)", header.replace(b"\r\n", b"\n")
+    )[0]
+    names = re.findall(rb"COMPANY CONFORMED NAME:[ \t]*([^\r\n]+)", block)
+    if len(names) != 1:
+        raise IdentityEvidenceError("missing_issuer_field_subject_name")
+    try:
+        subject_name = names[0].decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise IdentityEvidenceError("invalid_issuer_field_subject_name") from error
+
+    def normalize(value: str) -> str:
+        return "".join(char for char in value.casefold() if char.isalnum())
+
+    if normalize(issuer_field) == normalize(subject_name):
+        # A class-like word in the actual legal name is not a security qualifier.
+        return title, None
+    match = re.fullmatch(r"(.+?)\s+Class\s+([A-Z0-9]{1,8})", issuer_field, re.I)
+    if (
+        match is None
+        or not normalize(subject_name)
+        or normalize(match[1]) != normalize(subject_name)
+    ):
+        raise IdentityEvidenceError("issuer_field_class_name_mismatch")
+    letter = match[2].upper()
+    signature = class_signature(title)
+    if signature[1] and signature[1] != letter:
+        raise IdentityEvidenceError("issuer_field_security_class_conflict")
+    canonical = title if signature[1] else f"Class {letter} {title}"
+    return canonical, {
+        "reported_issuer_field": issuer_field,
+        "reported_security_title": title,
+        "class_qualifier": letter,
+        "subject_name_sha256": hashlib.sha256(names[0]).hexdigest(),
+        "SEC_header_sha256": subject["SEC_header_sha256"],
+        "basis": "literal_class_suffix_after_matching_SEC_subject_legal_name_in_adjacent_cover_field",
+    }
+
+
 def ownership_identity(
     payload: bytes, metadata: dict[str, Any], *, cik: str, cutoff: datetime
 ) -> dict[str, Any]:
@@ -569,6 +616,7 @@ def ownership_identity(
         re.I,
     )
     candidates: set[str] = set()
+    issuer_class_bindings: list[dict[str, str]] = []
     # Some covers use inline colon-labelled fields instead of parenthesized
     # captions. Require the complete local name/class/CUSIP sequence; a class
     # mentioned in Item 2 or another narrative is not a cover field.
@@ -583,10 +631,22 @@ def ownership_identity(
             continue
         preceding = lines[max(0, index - 6) : index]
         following = lines[index + 1 : index + 7]
-        if not any(
-            re.fullmatch(r"Name\s+of\s+Issuer\s*:\s*\S.+", item, re.I) for item in preceding
-        ):
+        start = 0
+        for boundary, item in enumerate(preceding):
+            if re.match(
+                r"(?:Title\s+of\s+Class|CUSIP\s+(?:Number|No\.?)|Item\s+[0-9])\b", item, re.I
+            ):
+                start = boundary + 1
+        preceding = preceding[start:]
+        issuer_fields = [
+            match[1]
+            for item in preceding
+            if (match := re.fullmatch(r"Name\s+of\s+Issuer\s*:\s*(\S.+)", item, re.I))
+        ]
+        if not issuer_fields:
             raise IdentityEvidenceError("unbound_ownership_cover_class")
+        if len(issuer_fields) != 1:
+            raise IdentityEvidenceError("ambiguous_ownership_cover_issuer_fields")
         field = None
         for item in following:
             if re.match(r"(?:Name\s+of\s+Issuer|Title\s+of\s+Class|Item\s+[0-9])\b", item, re.I):
@@ -597,7 +657,12 @@ def ownership_identity(
                 break
         if field is None:
             raise IdentityEvidenceError("unbound_ownership_cover_cusip")
-        titles.append(label[1])
+        title, class_binding = _issuer_field_class(
+            payload, metadata, cik, issuer_fields[0], label[1]
+        )
+        titles.append(title)
+        if class_binding is not None:
+            issuer_class_bindings.append(class_binding)
         value = re.sub(r"[\s-]", "", field).upper()
         if valid_cusip(value):
             candidates.add(value)
@@ -627,6 +692,7 @@ def ownership_identity(
         "cusip": next(iter(candidates)),
         "security_title": titles[0].strip(),
         "document_sha256": hashlib.sha256(payload).hexdigest(),
+        **({"issuer_field_class_bindings": issuer_class_bindings} if issuer_class_bindings else {}),
     }
 
 
