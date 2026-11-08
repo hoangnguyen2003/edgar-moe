@@ -177,6 +177,7 @@ def replay(
         "issue_complete": False,
         "capture_identity_algorithm_sha256": report["identity_algorithm_sha256"],
         "capture_collector_algorithm_sha256": report["collector_algorithm_sha256"],
+        "capture_certificate_algorithm_sha256": report.get("certificate_algorithm_sha256"),
         "replay_algorithms": algorithms,
         "verifier_sha256": verifier_digest,
     }
