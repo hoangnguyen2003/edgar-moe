@@ -1,4 +1,4 @@
-# Historical SEC security identity evidence, 2026-11-07
+# Historical SEC security identity evidence, 2026-11-08
 
 The fixed historical [candidate source](issue-292-historical-candidate-source.md)
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
@@ -24,7 +24,7 @@ Class letters, voting
 rights and common/ordinary/capital/registered distinctions must agree. Preferred, depositary,
 unit and ambiguous classes are refused. Both reported acceptance times plus
 seven calendar days must precede the source cutoff. Current discovery is limited
-to the preceding two years, at most four periodic and ten ownership filings.
+to the preceding two years, at most four periodic and 64 distinct ownership filings.
 These are explicit coverage bounds, not grounds for dropping unresolved rows.
 
 ### Coverage extensions
@@ -43,12 +43,24 @@ valid pre-cutoff periods and only the known stock-class, trading-symbol and
 listing-exchange axes; shared axes cannot disagree. Unknown/typed dimensions,
 debt/class conflicts, multiple matching rows and future periods are refused.
 
-Ownership discovery preserves the newest five attempts. If they fail, it
+The original ownership discovery preserved the newest five attempts. If they failed, it
 inspects up to five further pre-cutoff records, prioritizing other SEC file-number
 series by their pre-cutoff frequency and then recency. Series metadata is only
 a discovery aid; it cannot supply issuer identity. Each accepted filing still
 needs its explicit subject header. The two-year lookback and seven-day lag,
 request/byte/rate caps, source retention and 503-row denominator are unchanged.
+
+The next extension preserves that original ten-report priority and then examines
+further eligible reports in descending pre-cutoff acceptance/accession order,
+up to **64 distinct ownership reports per candidate**. If the initial retained
+history does not yield a valid join, it can inspect that retained submission's
+advertised archive pages overlapping the same two-year window. Archive discovery
+is lazy: a successful initial join makes no extra archive request. Both phases
+share the 64-report cap, skip already attempted accessions, retain the original
+periodic anchor and require the same explicit subject/class/CUSIP checks. The
+source-wide request budget, seven-day publication lag and HTTP/size refusal
+controls still apply. A successful discovery is not a reason to reduce the
+503-row denominator.
 
 An oversized source no longer prevents inspection of the next filing within
 those bounds. Its refusal is retained, the same byte ceiling still applies to
@@ -93,6 +105,38 @@ pre-cutoff periods and supported dimensions. The anchor binds the context IDs
 and a digest of the namespace-preserving resources, without rewriting either
 captured source. Missing, redefined, conflicting or late contexts fail closed.
 This is a bounded identity extractor, not a complete Inline XBRL validator.
+
+### Explicitly incorporated stock certificates
+
+After the ownership discovery phases fail, an annual filing among the four
+eligible periodic candidates can supply an explicit specimen-certificate link.
+Its leaf table row must name the same registered class, with exactly one link;
+the annual cover independently confirms the same issuer, symbol and class.
+The link must stay on the exact issuer's SEC archive path. Historical HTTP links
+are requested over HTTPS at the identical host/path, without redirects.
+
+The collector verifies the original complete submission's accession, one
+explicit `FILER` CIK, supported 8-K/8-K12B form, filing date and exact exhibit
+filename/type. The supported certificate face names that filer immediately
+before the fully-paid/non-assessable class field and contains one unambiguous,
+check-digit-valid labelled CUSIP. Class letters, voting qualifiers and equity
+families must still match. Separate classes or unlabelled identifiers cannot be
+paired by their positions. Only the exact incorporated exhibit is extracted;
+there is no recursive link search or image/OCR inference.
+
+The SEC header's local acceptance string is retained verbatim. A separate
+date-only availability bound uses the reported filing date plus **14 calendar
+days**, and must precede the annual index's availability and cohort cutoff.
+No UTC acceptance time is invented. The evidence binds the full submission,
+header, exact exhibit bytes, annual cover and index-description hashes. It is
+stored separately from ownership-report evidence. Prior size refusals remain
+recorded even when a certificate succeeds; integrity, request-budget and HTTP
+controls still stop the run. The certificate extraction module has its own code
+digest, included in both capture and replay version checks.
+
+A specimen establishes the identifier reported in that filing. The complete
+class/identifier and market continuity needed by the study remains a separate
+requirement.
 
 The SEC archive/submissions responses are observed in November 2026, separately
 from their reported historical acceptance dates. These are not signed historical
@@ -198,7 +242,32 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
-The latest extension processed and independently replayed **all 503 candidates**:
+The latest ownership continuation processed and independently replayed **all
+503 candidates**: **483 verified SEC identity anchors**, **18 unresolved ownership
+identities** and **two unresolved periodic anchors**. Every prior 481 anchor and
+issuer/security identifier was retained. A valid class-specific ownership report
+was found beyond the original ten-report discovery cap, and an explicitly
+incorporated certificate supplied another missing class identifier. The bounded
+exploration used 74 SEC reads: 43 ownership reports, two archive pages, 19 proxy
+submissions, seven annual filings, two linked certificates and one original
+certificate submission. The archive pages added no qualifying records. Sixteen
+complete proxy submissions supplied no CUSIP/known-identifier mentions; three
+were refused at the response-size cap. Final full capture and
+independent replay used zero network requests. The result SHA-256 is
+`0a52e6240af7186d179faf4fbe415519a2156c0cbeae5ad09ab321c20b8dade7`.
+
+The row-free
+[`extended-ownership-audit-20261108.json`](../ops/issue292/extended-ownership-audit-20261108.json)
+binds the exact result, code versions and private source packet. It preserves
+1,324 source receipts and their associated bodies, prior/intermediate/final
+results, exact code, replay report and test log. Full validation
+passed 2,298 tests, with 36 skips and 85.72% coverage; 183 focused tests, repository
+lint/formatting and type checks pass. The 20 unresolved cases, historical market
+continuity and new selection/checkpoint/processed-dataset/study chain remain
+incomplete. No candidate was excluded, no publication gate was promoted, and no
+market-provider requests or paid resources were used.
+
+The previous extension processed and independently replayed **all 503 candidates**:
 **481 verified SEC identity anchors**, **20 unresolved ownership identities**
 and **two unresolved periodic anchors**. All 466 previous anchors and their
 issuer/security identifiers were retained. No row was excluded or replaced
@@ -256,7 +325,7 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 22 remain after the latest extensions. Submissions about other issuers
+claim; 20 remain after the latest extensions. Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,

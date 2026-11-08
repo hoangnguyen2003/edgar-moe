@@ -17,18 +17,25 @@ import re
 import sys
 import time
 from collections import Counter
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 
+from edgar_moe.data.historical_certificate import (
+    certificate_location,
+    certificate_reference,
+    registered_certificate_identity,
+)
 from edgar_moe.data.historical_identity import (
     MAX_DOCUMENT_BYTES,
     MAX_RETAINED_DOCUMENT_BYTES,
     PUBLICATION_LAG_DAYS,
     IdentityEvidenceError,
     RegistrationCoverExhibit,
+    class_signature,
     instant,
     join_identity,
     ownership_identity,
@@ -66,6 +73,9 @@ def code_identity() -> dict[str, str]:
             (ROOT / "src/edgar_moe/data/historical_identity.py").read_bytes()
         ),
         "collector_algorithm_sha256": digest(Path(__file__).read_bytes()),
+        "certificate_algorithm_sha256": digest(
+            (ROOT / "src/edgar_moe/data/historical_certificate.py").read_bytes()
+        ),
     }
 
 
@@ -131,12 +141,16 @@ def filing_url(row: dict[str, Any]) -> str:
     return url
 
 
-def choose_ownership_filings(rows: list[dict[str, Any]], cutoff: datetime) -> list[dict[str, Any]]:
+def choose_ownership_filings(
+    rows: list[dict[str, Any]], cutoff: datetime, *, limit: int = 64
+) -> list[dict[str, Any]]:
     """Keep the latest five, then inspect other pre-cutoff filing series.
 
     Series frequency only prioritizes discovery. The explicit subject header
     remains mandatory and current listing/price information is never read.
     """
+    if type(limit) is not int or not 10 <= limit <= 64:
+        raise IdentityEvidenceError("invalid_ownership_discovery_bound")
     eligible = choose_filings(rows, OWNERSHIP_FORMS, cutoff, 100000)
     selected = eligible[:5]
     seen = {row["accessionNumber"] for row in selected}
@@ -161,7 +175,7 @@ def choose_ownership_filings(rows: list[dict[str, Any]], cutoff: datetime) -> li
         selected.append(row)
         seen.add(row["accessionNumber"])
     for row in eligible:
-        if len(selected) >= 10:
+        if len(selected) >= limit:
             break
         if row["accessionNumber"] not in seen:
             selected.append(row)
@@ -356,35 +370,150 @@ class RetainedCheckpoint:
 
 
 def submissions(
-    cik: str, cache: SourceCache, retained: RetainedCheckpoint, cutoff: datetime
+    cik: str,
+    cache: SourceCache,
+    retained: RetainedCheckpoint,
+    cutoff: datetime,
+    include_retained_archives: bool = False,
 ) -> list[dict[str, Any]]:
     body = retained.submissions(cik)
+    from_retained = body is not None
     if body is None:
         body = cache.get(f"https://data.sec.gov/submissions/CIK{cik}.json")
-        payload = decode_json(body)
-        if str(payload.get("cik", "")).zfill(10) != cik:
-            raise IdentityEvidenceError("SEC_submissions_issuer_mismatch")
-        rows = expand_columns(payload["filings"]["recent"], cik)
-        for descriptor in payload["filings"].get("files", []):
-            # Discover archive pages by their advertised coverage, not current listing status.
-            if (
-                descriptor["filingFrom"] > cutoff.date().isoformat()
-                or descriptor["filingTo"] < (cutoff - timedelta(days=730)).date().isoformat()
-            ):
-                continue
-            name = descriptor["name"]
-            if re.fullmatch(rf"CIK{cik}-submissions-[0-9]{{3}}\.json", name) is None:
-                raise IdentityEvidenceError("invalid_submission_archive_descriptor")
-            rows.extend(
-                expand_columns(
-                    decode_json(cache.get(f"https://data.sec.gov/submissions/{name}")), cik
-                )
-            )
-        return rows
     payload = decode_json(body)
     if str(payload.get("cik", "")).zfill(10) != cik:
-        raise IdentityEvidenceError("retained_submissions_issuer_mismatch")
-    return expand_columns(payload["filings"]["recent"], cik)
+        raise IdentityEvidenceError(
+            "retained_submissions_issuer_mismatch"
+            if from_retained
+            else "SEC_submissions_issuer_mismatch"
+        )
+    rows = expand_columns(payload["filings"]["recent"], cik)
+    if from_retained and not include_retained_archives:
+        return rows
+    for descriptor in payload["filings"].get("files", []):
+        # Discover archive pages by advertised coverage, not current listing status.
+        if (
+            descriptor["filingFrom"] > cutoff.date().isoformat()
+            or descriptor["filingTo"] < (cutoff - timedelta(days=730)).date().isoformat()
+        ):
+            continue
+        name = descriptor["name"]
+        if re.fullmatch(rf"CIK{cik}-submissions-[0-9]{{3}}\.json", name) is None:
+            raise IdentityEvidenceError("invalid_submission_archive_descriptor")
+        rows.extend(
+            expand_columns(decode_json(cache.get(f"https://data.sec.gov/submissions/{name}")), cik)
+        )
+    return rows
+
+
+def ownership_candidates(
+    rows: list[dict[str, Any]],
+    cik: str,
+    cache: SourceCache,
+    retained: RetainedCheckpoint,
+    cutoff: datetime,
+) -> Iterator[dict[str, Any]]:
+    """Discover additional retained archives only after the initial reports fail.
+
+    Keep the established report priority and at most 64 distinct attempts across
+    both phases. A successful consumer stops before fetching any extra archive.
+    """
+    seen: set[str] = set()
+    for row in choose_ownership_filings(rows, cutoff):
+        seen.add(row["accessionNumber"])
+        yield row
+    if len(seen) >= 64:
+        return
+    expanded = submissions(cik, cache, retained, cutoff, True)
+    for row in choose_ownership_filings([*rows, *expanded], cutoff):
+        if row["accessionNumber"] in seen:
+            continue
+        if len(seen) >= 64:
+            return
+        seen.add(row["accessionNumber"])
+        yield row
+
+
+def certificate_fallback(
+    rows: list[dict[str, Any]],
+    periodic: dict[str, Any],
+    cache: SourceCache,
+    retained: RetainedCheckpoint,
+    cutoff: datetime,
+    refusals: Counter[str],
+) -> dict[str, Any] | None:
+    for annual in choose_filings(rows, PERIODIC_FORMS, cutoff, 4):
+        if annual["form"] != "10-K":
+            continue
+        try:
+            body = retained.filing(annual)
+            if body is None:
+                body = cache.get(filing_url(annual))
+        except IdentityEvidenceError as error:
+            if str(error) not in {"source_document_byte_bound", "retained_source_too_large"}:
+                raise
+            refusals[str(error)] += 1
+            continue
+        try:
+            reference = certificate_reference(body, periodic["security_title"])
+            if reference is None:
+                continue
+            index_anchor = periodic_anchor(
+                body,
+                annual,
+                cik=periodic["issuer_cik"],
+                symbol=periodic["symbol_at_cutoff"],
+                cutoff=cutoff,
+                maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES,
+            )
+            if class_signature(index_anchor["security_title"]) != class_signature(
+                periodic["security_title"]
+            ):
+                raise IdentityEvidenceError("certificate_index_share_class_mismatch")
+            location = certificate_location(
+                reference["href"], filing_url(annual), periodic["issuer_cik"]
+            )
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+            continue
+        try:
+            complete = cache.get(
+                filing_url(
+                    {
+                        "cik": periodic["issuer_cik"],
+                        "accessionNumber": location["accession"],
+                        "primaryDocument": location["accession"] + ".txt",
+                    }
+                )
+            )
+        except IdentityEvidenceError as error:
+            if str(error) != "source_document_byte_bound":
+                raise
+            refusals[str(error)] += 1
+            continue
+        try:
+            certificate = registered_certificate_identity(
+                complete,
+                cik=periodic["issuer_cik"],
+                accession=location["accession"],
+                filename=location["filename"],
+                expected_title=periodic["security_title"],
+                cutoff=min(cutoff, instant(index_anchor["available_by"])),
+            )
+            anchor = join_identity(periodic, certificate)
+            anchor["registration_certificate_evidence"] = anchor.pop("ownership_evidence")
+            anchor["certificate_index_evidence"] = {
+                **index_anchor,
+                **reference,
+                "certificate_source_url": location["url"],
+            }
+            anchor["identity_basis"] = (
+                "same_SEC_issuer_and_explicit_registered_class_in_incorporated_stock_certificate"
+            )
+            return anchor
+        except IdentityEvidenceError as error:
+            refusals[str(error)] += 1
+    return None
 
 
 def collect_member(
@@ -462,7 +591,7 @@ def collect_member(
             else "periodic_anchor_unresolved",
             "refusals": dict(refusals),
         }
-    for row in choose_ownership_filings(rows, cutoff):
+    for row in ownership_candidates(rows, cik, cache, retained, cutoff):
         try:
             body = cache.get(
                 filing_url({**row, "primaryDocument": row["accessionNumber"] + ".txt"})
@@ -488,6 +617,18 @@ def collect_member(
             }
         except IdentityEvidenceError as error:
             refusals[str(error)] += 1
+    certificate = certificate_fallback(rows, periodic, cache, retained, cutoff, refusals)
+    if certificate is not None:
+        return {
+            "snapshot_member_key": member["snapshot_member_key"],
+            "status": "pre_cutoff_SEC_identity_anchored",
+            "anchor": certificate,
+            **(
+                {"source_size_refusals": dict(refusals)}
+                if refusals.keys() & {"source_document_byte_bound", "retained_source_too_large"}
+                else {}
+            ),
+        }
     return {
         "snapshot_member_key": member["snapshot_member_key"],
         "status": "source_size_unresolved"

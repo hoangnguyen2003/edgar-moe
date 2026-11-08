@@ -90,7 +90,7 @@ def test_discovery_keeps_first_five_then_diversifies_only_pre_cutoff_series():
         for i in range(6, 16)
     ]
     late = {**row(99, "2023-01-01T00:00:00Z", form="SC 13G"), "fileNumber": "005-future"}
-    chosen = choose_ownership_filings(newest + historical + [late], CUTOFF)
+    chosen = choose_ownership_filings(newest + historical + [late], CUTOFF, limit=10)
     assert chosen[:5] == newest
     assert chosen[5]["fileNumber"] == "005-other-series"
     assert len(chosen) == 10
@@ -103,6 +103,169 @@ def test_filing_series_metadata_is_retained_without_importing_current_tickers():
     columns = {key: [value] for key, value in expected.items() if key != "cik"}
     columns["tickers"] = ["CURRENT"]
     assert expand_columns(columns, CIK) == [expected]
+
+
+def test_extended_ownership_discovery_preserves_priority_and_has_a_hard_bound():
+    eligible = [
+        {**row(i, form="SC 13G"), "fileNumber": f"005-series-{i % 7}"} for i in range(1, 81)
+    ]
+    future = row(90, "2023-01-01T00:00:00Z", form="SC 13G")
+    old = row(91, "2019-11-01T00:00:00Z", form="SC 13G")
+    original = choose_ownership_filings(eligible, CUTOFF, limit=10)
+    extended = choose_ownership_filings([future, *eligible, old], CUTOFF)
+    assert extended[:10] == original
+    assert len(extended) == len({r["accessionNumber"] for r in extended}) == 64
+    assert future not in extended and old not in extended
+    assert choose_ownership_filings(list(reversed(eligible)), CUTOFF) == extended
+
+
+@pytest.mark.parametrize("limit", [True, 0, 9, 65])
+def test_ownership_discovery_rejects_unbounded_or_invalid_limits(limit):
+    with pytest.raises(IdentityEvidenceError, match="invalid_ownership_discovery_bound"):
+        choose_ownership_filings([], CUTOFF, limit=limit)
+
+
+def test_subject_verified_identity_can_be_found_after_ten_wrong_subject_reports(monkeypatch):
+    periodic = (
+        f'<ix:nonNumeric name="dei:EntityCentralIndexKey" contextRef="c">{CIK}</ix:nonNumeric>'
+        '<ix:nonNumeric name="dei:TradingSymbol" contextRef="c">OLD</ix:nonNumeric>'
+        '<ix:nonNumeric name="dei:Security12bTitle" contextRef="c">Common Stock</ix:nonNumeric>'
+        '<ix:nonNumeric name="dei:SecurityExchangeName" contextRef="c">Synthetic exchange</ix:nonNumeric>'
+    ).encode()
+    own = [row(i, form="SC 13G") for i in range(1, 12)]
+    monkeypatch.setattr(collector, "submissions", lambda *args: [row(99), *own])
+    calls = []
+
+    class Retained:
+        def filing(self, _):
+            return periodic
+
+    class Cache:
+        def get(self, url):
+            calls.append(url)
+            record = next(r for r in own if url.endswith(r["accessionNumber"] + ".txt"))
+            subject = CIK if record == own[0] else "0000000002"
+            return (
+                f"<SEC-HEADER>\nACCESSION NUMBER: {record['accessionNumber']}\nSUBJECT COMPANY:\n\tCENTRAL INDEX KEY: {subject}\nFILED BY:\n\tCENTRAL INDEX KEY: {CIK}\n</SEC-HEADER>"
+                "<p>(Name of Issuer)</p><p>Common Stock</p><p>(Title of Class of Securities)</p>"
+                "<p>123456782</p><p>(CUSIP Number)</p>"
+            ).encode()
+
+    result = collector.collect_member(
+        {"cik": CIK, "symbol_at_snapshot": "OLD", "snapshot_member_key": "synthetic"},
+        Cache(),
+        Retained(),
+        CUTOFF,
+    )
+    assert len(calls) == 11
+    assert result["status"] == "pre_cutoff_SEC_identity_anchored"
+    assert result["anchor"]["ownership_evidence"]["accession"] == own[0]["accessionNumber"]
+    assert result["anchor"]["ownership_subject_evidence"]["subject_cik"] == CIK
+
+
+def test_retained_submissions_can_discover_advertised_historical_archives_lazily():
+    recent, archived = row(1, form="SC 13G"), row(2, form="SC 13G")
+
+    def columns(record):
+        return {key: [value] for key, value in record.items() if key != "cik"}
+
+    primary = canonical_bytes(
+        {
+            "cik": CIK,
+            "tickers": ["CURRENT_TICKER_IGNORED"],
+            "filings": {
+                "recent": columns(recent),
+                "files": [
+                    {
+                        "name": f"CIK{CIK}-submissions-001.json",
+                        "filingFrom": "2021-01-01",
+                        "filingTo": "2022-01-01",
+                    },
+                    {
+                        "name": "ignored-future.json",
+                        "filingFrom": "2023-01-01",
+                        "filingTo": "2024-01-01",
+                    },
+                    {
+                        "name": "ignored-old.json",
+                        "filingFrom": "2018-01-01",
+                        "filingTo": "2019-01-01",
+                    },
+                ],
+            },
+        }
+    )
+    calls = []
+
+    class Retained:
+        def submissions(self, cik):
+            assert cik == CIK
+            return primary
+
+    class Cache:
+        def get(self, url):
+            calls.append(url)
+            assert url == f"https://data.sec.gov/submissions/CIK{CIK}-submissions-001.json"
+            return canonical_bytes(columns(archived))
+
+    initial = collector.submissions(CIK, Cache(), Retained(), CUTOFF)
+    assert initial == [recent] and calls == []
+    candidates = collector.ownership_candidates(initial, CIK, Cache(), Retained(), CUTOFF)
+    assert next(candidates) == recent
+    assert calls == []  # A successful first candidate never needs this archive.
+    assert next(candidates) == archived
+    assert list(candidates) == []
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["../other.json", "CIK0000000002-submissions-001.json", "https://elsewhere.invalid/a.json"],
+)
+def test_retained_archive_descriptors_cannot_supply_another_issuer_or_url(name):
+    class Retained:
+        def submissions(self, _):
+            return canonical_bytes(
+                {
+                    "cik": CIK,
+                    "filings": {
+                        "recent": {
+                            key: []
+                            for key in [
+                                "form",
+                                "accessionNumber",
+                                "acceptanceDateTime",
+                                "primaryDocument",
+                            ]
+                        },
+                        "files": [
+                            {"name": name, "filingFrom": "2021-01-01", "filingTo": "2022-01-01"}
+                        ],
+                    },
+                }
+            )
+
+    with pytest.raises(IdentityEvidenceError, match="archive_descriptor"):
+        collector.submissions(CIK, None, Retained(), CUTOFF, True)
+
+
+def test_two_discovery_phases_share_one_64_report_bound_and_do_not_repeat_reports(monkeypatch):
+    initial = [row(i, form="SC 13G") for i in range(1, 61)]
+    expanded = [row(i, form="SC 13G") for i in range(1, 101)]
+    calls = []
+
+    def archives(*args):
+        calls.append(args[-1])
+        return expanded
+
+    monkeypatch.setattr(collector, "submissions", archives)
+    candidates = list(collector.ownership_candidates(initial, CIK, None, None, CUTOFF))
+    assert candidates[:60] == choose_ownership_filings(initial, CUTOFF)
+    assert len(candidates) == len({r["accessionNumber"] for r in candidates}) == 64
+    assert calls == [True]
+    calls.clear()
+    assert len(list(collector.ownership_candidates(expanded, CIK, None, None, CUTOFF))) == 64
+    assert calls == []
 
 
 @pytest.mark.parametrize(
@@ -362,7 +525,15 @@ def test_oversized_source_can_use_next_bounded_filing_without_dropping_member(
     periodic_rows = [row(2, "2022-12-01T00:00:00Z"), row(1)]
     ownership_rows = [row(4, "2022-12-01T00:00:00Z", "SC 13G"), row(3, form="SC 13G")]
     monkeypatch.setattr(collector, "submissions", lambda *args: periodic_rows + ownership_rows)
-    monkeypatch.setattr(collector, "periodic_anchor", lambda *args, **kwargs: {"periodic": True})
+    monkeypatch.setattr(collector, "certificate_fallback", lambda *args: None)
+    monkeypatch.setattr(
+        collector,
+        "periodic_anchor",
+        lambda *args, **kwargs: {
+            "periodic": True,
+            "security_title": "Common Stock",
+        },
+    )
     monkeypatch.setattr(collector, "ownership_subject", lambda *args, **kwargs: {"checked": True})
     monkeypatch.setattr(
         collector, "ownership_identity", lambda *args, **kwargs: {"ownership": True}
