@@ -242,7 +242,53 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
-The latest ownership continuation processed and independently replayed **all
+### Adjacent issuer-field class evidence and remaining refusals
+
+Some colon-labelled ownership covers put a literal `Class B` suffix in the
+adjacent issuer-name field while their security-title field says only common
+stock. The extractor now binds that suffix only when the rest of the name
+matches the complete submission's explicit subject legal name, ignoring case,
+spacing and punctuation. A class-like word already in the legal name supplies
+no security qualifier. Missing subject names, conflicting classes, multiple
+issuer fields and unsupported suffixes fail closed. A later cover cannot borrow
+an earlier cover's issuer field. Original cover fields and subject-header/name
+hashes are retained. Voting rights and equity-family distinctions still must
+agree; ordinary, common and capital stock are not aliases.
+
+Full capture and independent offline replay again processed **all 503
+candidates** with zero network requests: **483 verified SEC identity anchors**,
+**18 unresolved ownership identities** and **two unresolved periodic anchors**.
+This is **no net coverage gain**: 482 prior anchors remain unchanged, one case
+is newly verified and one prior generic-class match is now unresolved because
+the ownership issuer field explicitly names a class. None of its four eligible
+periodic covers resolves that ambiguity. No candidate was removed. The new
+result SHA-256 is
+`f6efed182dadc8c0b92dae3f695eb149a12dd21a9dc415879244a6724dc22026`.
+
+A separate bounded older-filing probe completed five of seven planned case
+receipts and inspected 45 reports using 51 SEC reads. One same-identifier,
+explicit-class match remains unadmitted candidate evidence. The probe stopped
+on 35 accessions whose retained and archive acceptance timestamps differ by
+five hours. One additional SEC read authenticated an original submission whose
+raw clock text matches the retained metadata, but this does not establish the
+timezone interpretation. Neither timestamp normalization nor anchor promotion
+was applied. The incomplete probe is not evidence of continuous identity.
+An already retained S-1 certificate also supplies no new anchor: its identifier
+field is blank or a placeholder, so certificate acceptance was not extended.
+
+The row-free
+[`issuer-field-class-audit-20261108.json`](../ops/issue292/issuer-field-class-audit-20261108.json)
+binds the result, exact extraction/replay code and private verification logs.
+A separate private packet preserves and rehashes 1,382 source receipts,
+including five size refusals, associated available bodies, prior/current
+results, exact code and diagnostic receipts. Earlier packets remain unchanged.
+Validation: 2,309 full-suite passes, 36 skips, 85.74% coverage and 194 focused
+identity/certificate/capture/replay tests; lint, formatting and type checks pass.
+Twenty identities, historical market continuity and a new
+selection/checkpoint/processed-dataset/study chain remain incomplete. No market
+provider requests, paid resources or publication-gate promotion were used.
+
+The previous ownership continuation processed and independently replayed **all
 503 candidates**: **483 verified SEC identity anchors**, **18 unresolved ownership
 identities** and **two unresolved periodic anchors**. Every prior 481 anchor and
 issuer/security identifier was retained. A valid class-specific ownership report
