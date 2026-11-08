@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from copy import deepcopy
 from datetime import UTC, datetime
+from hashlib import sha256
 
 import pytest
 
 from edgar_moe.data.historical_identity import (
+    MAX_RETAINED_DOCUMENT_BYTES,
     IdentityEvidenceError,
+    RegistrationCoverExhibit,
     class_signature,
     join_identity,
     ownership_identity,
@@ -416,4 +419,317 @@ def test_conflicting_colon_covers_preserve_class_and_cusip_ambiguity():
             metadata("SC 13G"),
             cik=CIK,
             cutoff=CUTOFF,
+        )
+
+
+@pytest.mark.parametrize("title", ["Class C Capital Stock", "Registered Shares"])
+def test_explicit_additional_equity_families_join_only_the_same_family(title):
+    p = periodic_anchor(periodic(title=title), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    o = ownership_identity(ownership(title=title), metadata("SC 13G"), cik=CIK, cutoff=CUTOFF)
+    assert join_identity(p, o)["security_title"] == title
+    with pytest.raises(IdentityEvidenceError, match="share_class"):
+        join_identity(p, {**o, "security_title": "Class C Common Stock"})
+
+
+def test_common_par_value_shorthand_is_not_a_general_common_word_alias():
+    assert class_signature("Common, $1.00 Par Value") == class_signature("Common Stock")
+    for title in ("Common Agreement", "Common Units", "Registered Shares and Ordinary Shares"):
+        with pytest.raises(IdentityEvidenceError):
+            class_signature(title)
+
+
+@pytest.mark.parametrize("reported", ['"OLD"', "\u201cOLD\u201d", "OLD (NYSE)"])
+def test_literal_cover_symbol_typography_retains_the_reported_spelling(reported):
+    p = periodic_anchor(periodic(symbol=reported), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert p["symbol_at_cutoff"] == "OLD"
+    assert p["reported_symbols_at_filing"] == [reported]
+    assert join_identity(p, anchors()[1])["reported_symbols_at_filing"] == [reported]
+
+
+def test_dotted_share_class_spelling_requires_an_explicit_matching_class():
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(periodic(symbol="OLDB"), metadata(), cik=CIK, symbol="OLD.B", cutoff=CUTOFF)
+    p = periodic_anchor(
+        periodic(symbol="OLDB", title="Class B Common Stock"),
+        metadata(),
+        cik=CIK,
+        symbol="OLD.B",
+        cutoff=CUTOFF,
+    )
+    assert p["symbol_at_cutoff"] == "OLD.B"
+    assert p["reported_symbols_at_filing"] == ["OLDB"]
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(
+            periodic(symbol="NEWB", title="Class B Common Stock"),
+            metadata(),
+            cik=CIK,
+            symbol="OLD.B",
+            cutoff=CUTOFF,
+        )
+
+
+def multiple_listing_cover(second_title="Class A Common Stock", second_day="2022-11-01"):
+    return (
+        fact("EntityCentralIndexKey", CIK, "issuer")
+        + dimension_context("one", "dei:EntityListingsExchangeAxis", "synthetic:VenueOne")
+        + dimension_context(
+            "two", "dei:EntityListingsExchangeAxis", "synthetic:VenueTwo", second_day
+        )
+        + "<table>"
+        + cover_row(context="one").replace("Synthetic exchange", "Synthetic venue one")
+        + cover_row(title=second_title, context="two").replace(
+            "Synthetic exchange", "Synthetic venue two"
+        )
+        + "</table>"
+    ).encode()
+
+
+def test_same_security_multiple_explicit_venues_are_preserved_without_guessing_primary():
+    p = periodic_anchor(multiple_listing_cover(), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert p["exchange_at_filing"] is None
+    assert p["exchanges_at_filing"] == ["Synthetic venue one", "Synthetic venue two"]
+    joined = join_identity(p, anchors()[1])
+    assert joined["exchange_at_filing"] is None
+    assert joined["exchanges_at_filing"] == p["exchanges_at_filing"]
+    assert joined["security_id"] == "cusip:" + CUSIP
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        multiple_listing_cover(second_title="Class B Common Stock"),
+        multiple_listing_cover(second_day="2022-11-02"),
+        multiple_listing_cover(second_day="2023-01-01"),
+        multiple_listing_cover().replace(
+            b"dei:EntityListingsExchangeAxis", b"synthetic:UnknownAxis"
+        ),
+        multiple_listing_cover().replace(b"xbrldi:explicitMember", b"xbrldi:typedMember"),
+        multiple_listing_cover().replace(b"synthetic:VenueTwo", b""),
+    ],
+)
+def test_multiple_venues_cannot_hide_class_period_or_dimension_conflicts(body):
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def test_separate_explicit_debt_context_cannot_contaminate_equity_identity():
+    body = (
+        periodic(title="Class A Common Stock")
+        + (
+            dimension_context(
+                "common", "us-gaap:StatementClassOfStockAxis", "synthetic:ClassAMember"
+            )
+            + dimension_context("debt", "us-gaap:StatementClassOfStockAxis", "synthetic:DebtMember")
+            + "<table>"
+            + cover_row(title="3.125% Notes due 2028", context="debt")
+            + "</table>"
+        ).encode()
+    )
+    p = periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert p["security_title"] == "Class A Common Stock"
+    assert join_identity(p, anchors()[1])["security_id"] == "cusip:" + CUSIP
+
+
+def test_only_debt_or_debt_blended_into_equity_context_is_still_refused():
+    for body in (
+        periodic(title="3.125% Notes due 2028"),
+        periodic() + fact("Security12bTitle", "3.125% Notes due 2028").encode(),
+    ):
+        with pytest.raises(IdentityEvidenceError):
+            periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def test_issuer_extension_ticker_axis_requires_declared_namespace_and_exact_member():
+    body = dimensional_cover(
+        symbol_axis="synthetic:TradingSymbolAxis", symbol_member="synthetic:OLDMember"
+    )
+    declared = b'<html xmlns:synthetic="https://issuer.invalid/2022">' + body + b"</html>"
+    assert (
+        periodic_anchor(declared, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)[
+            "security_title"
+        ]
+        == "Class A Common Stock"
+    )
+    for refused in (
+        body,
+        declared.replace(b"synthetic:OLDMember", b"synthetic:OTHERMember"),
+        declared.replace(b"synthetic:TradingSymbolAxis", b"synthetic:DebtInstrumentAxis"),
+        declared.replace(b"https://issuer.invalid/2022", b"not-a-namespace-URI"),
+    ):
+        with pytest.raises(IdentityEvidenceError, match="class_context"):
+            periodic_anchor(refused, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def test_larger_retained_document_is_fully_checked_instead_of_using_a_cover_prefix():
+    body = periodic() + b" " * (16 * 1024 * 1024)
+    with pytest.raises(IdentityEvidenceError, match="excessive_document"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert (
+        periodic_anchor(
+            body,
+            metadata(),
+            cik=CIK,
+            symbol="OLD",
+            cutoff=CUTOFF,
+            maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES,
+        )["security_title"]
+        == "Class A Common Stock, $0.01 par value"
+    )
+    contradictory = body + fact("Security12bTitle", "Class B Common Stock").encode()
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(
+            contradictory,
+            metadata(),
+            cik=CIK,
+            symbol="OLD",
+            cutoff=CUTOFF,
+            maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES,
+        )
+    with pytest.raises(IdentityEvidenceError, match="invalid_document_byte_bound"):
+        periodic_anchor(
+            periodic(),
+            metadata(),
+            cik=CIK,
+            symbol="OLD",
+            cutoff=CUTOFF,
+            maximum_document_bytes=MAX_RETAINED_DOCUMENT_BYTES + 1,
+        )
+
+
+def exhibit_parent(href="cover.htm"):
+    return (
+        fact("EntityCentralIndexKey", CIK, "issuer")
+        + "<p>Securities registered pursuant to Section 12(b) of the Act "
+        + "formatted in Inline XBRL: See Exhibit 99.01</p>"
+        + f'<a href="{href}">99.01+</a>'
+    ).encode()
+
+
+def test_explicit_separate_registration_cover_is_a_request_for_evidence_not_an_anchor():
+    body = exhibit_parent()
+    with pytest.raises(RegistrationCoverExhibit) as caught:
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    assert caught.value.relative_href == "cover.htm"
+    assert caught.value.primary_sha256 == sha256(body).hexdigest()
+
+
+@pytest.mark.parametrize(
+    "href", ["../cover.htm", "https://elsewhere.invalid/cover.htm", "/cover.htm", "cover.htm?q=1"]
+)
+def test_registration_cover_reference_cannot_escape_the_same_filing_directory(href):
+    with pytest.raises(IdentityEvidenceError, match="invalid_registration_cover_exhibit_link"):
+        periodic_anchor(exhibit_parent(href), metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def test_registration_exhibit_cannot_override_existing_structured_class_conflicts():
+    body = exhibit_parent() + fact("Security12bTitle", "Class B Common Stock").encode()
+    with pytest.raises(IdentityEvidenceError, match="class_context"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    body = exhibit_parent() + b'<a href="other.htm">99.01</a>'
+    with pytest.raises(IdentityEvidenceError, match="ambiguous_registration_cover_exhibit_link"):
+        periodic_anchor(body, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+
+
+def shared_cover_documents():
+    context = (
+        '<xbrli:context id="common"><xbrli:entity>'
+        f'<xbrli:identifier scheme="http://www.sec.gov/CIK">{CIK}</xbrli:identifier>'
+        '<xbrli:segment><xbrldi:explicitMember dimension="synthetic:TradingSymbolAxis">'
+        "synthetic:OLDMember</xbrldi:explicitMember></xbrli:segment></xbrli:entity>"
+        "<xbrli:period><xbrli:instant>2022-09-30</xbrli:instant></xbrli:period>"
+        "</xbrli:context>"
+    ).encode()
+    parent = (
+        b'<html xmlns:synthetic="https://issuer.invalid/2022">'
+        + exhibit_parent()
+        + context
+        + b"</html>"
+    )
+    child = (
+        fact("TradingSymbol", "OLD")
+        + fact("Security12bTitle", "Class A Common Stock")
+        + fact("SecurityExchangeName", "Synthetic exchange")
+    ).encode()
+    return parent, child, context
+
+
+def test_explicit_inline_document_set_uses_only_exact_primary_context_references():
+    parent, child, _ = shared_cover_documents()
+    with pytest.raises(IdentityEvidenceError, match="document_issuer_mismatch"):
+        periodic_anchor(child, metadata(), cik=CIK, symbol="OLD", cutoff=CUTOFF)
+    result = periodic_anchor(
+        child,
+        metadata(),
+        cik=CIK,
+        symbol="OLD",
+        cutoff=CUTOFF,
+        shared_primary_document=parent,
+        shared_cover_href="cover.htm",
+    )
+    assert result["document_sha256"] == sha256(child).hexdigest()
+    binding = result["shared_registration_contexts"]
+    assert binding["primary_document_sha256"] == sha256(parent).hexdigest()
+    assert binding["relative_href"] == "cover.htm"
+    assert binding["context_ids"] == ["common"]
+    assert len(binding["context_resources_sha256"]) == 64
+    # Input documents are never rewritten or presented as captured bytes.
+    assert b"xbrli:context" not in child
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        "wrong_parent_issuer",
+        "wrong_child_issuer",
+        "wrong_href",
+        "missing_context",
+        "duplicate_parent_context",
+        "duplicate_child_context",
+        "future_context",
+        "unknown_axis",
+        "typed_axis",
+        "undeclared_namespace",
+        "conflicting_cover",
+        "conflicting_valid_periods",
+    ],
+)
+def test_shared_context_resolution_refuses_conflicting_missing_or_late_evidence(failure):
+    parent, child, context = shared_cover_documents()
+    href = "cover.htm"
+    if failure == "wrong_parent_issuer":
+        parent = parent.replace(CIK.encode(), b"0000000002")
+    elif failure == "wrong_child_issuer":
+        child += fact("EntityCentralIndexKey", "2").encode()
+    elif failure == "wrong_href":
+        href = "other.htm"
+    elif failure == "missing_context":
+        parent = parent.replace(context, b"")
+    elif failure == "duplicate_parent_context":
+        parent += context
+    elif failure == "duplicate_child_context":
+        child += context
+    elif failure == "future_context":
+        parent = parent.replace(b"2022-09-30", b"2023-09-30")
+    elif failure == "unknown_axis":
+        parent = parent.replace(b"synthetic:TradingSymbolAxis", b"synthetic:UnknownAxis")
+    elif failure == "typed_axis":
+        parent = parent.replace(b"xbrldi:explicitMember", b"xbrldi:typedMember")
+    elif failure == "undeclared_namespace":
+        parent = parent.replace(b' xmlns:synthetic="https://issuer.invalid/2022"', b"")
+    elif failure == "conflicting_valid_periods":
+        parent += context.replace(b'id="common"', b'id="other"').replace(
+            b"2022-09-30", b"2022-10-31"
+        )
+        child += child.replace(b'contextRef="common"', b'contextRef="other"')
+    else:
+        parent += fact("Security12bTitle", "Class B Common Stock").encode()
+    with pytest.raises(IdentityEvidenceError):
+        periodic_anchor(
+            child,
+            metadata(),
+            cik=CIK,
+            symbol="OLD",
+            cutoff=CUTOFF,
+            shared_primary_document=parent,
+            shared_cover_href=href,
         )

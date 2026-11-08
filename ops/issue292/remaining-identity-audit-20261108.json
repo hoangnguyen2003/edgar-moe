@@ -1,0 +1,48 @@
+{
+  "SEC_requests_across_identity_extension_passes": 46,
+  "SEC_requests_in_final_full_capture": 0,
+  "anchors_added": 15,
+  "assessment_date": "2026-11-08",
+  "baseline_anchors_lost": 0,
+  "baseline_anchors_retained": 466,
+  "baseline_identifiers_changed": 0,
+  "baseline_result_sha256": "07699851b0b38c498ebd7558117fb67ccde33048e43c4c8f9409fc3b4610d9ae",
+  "capture_collector_algorithm_sha256": "8d76df14bd9990e6fbea71f7a1e0498a8c59def0807b1281605b8879ede98c33",
+  "capture_identity_algorithm_sha256": "0d55d9bef8f9776705127883b959483a846f1f6d5597e55fa79c0e4ea0cc0d06",
+  "checkpoint_dataset_binding_verified": false,
+  "coverage_percent": 85.7,
+  "current_asset_directory_used": false,
+  "full_test_log_sha256": "9825677fb553aee655750b92cabdbb1dca68837ff719f5737c2d015d3406f2cd",
+  "full_test_passes": 2260,
+  "full_test_skips": 36,
+  "historical_market_continuity_verified": false,
+  "identity_extension_request_counts": [
+    37,
+    1,
+    4,
+    4
+  ],
+  "issue_complete": false,
+  "market_provider_requests": 0,
+  "offline_replay_report_sha256": "ea1430ed312dab16a36af275198192fe8b4f25ec01cd903ccaa5d0275634af1a",
+  "paid_resources": false,
+  "private_packet_manifest_sha256": "7d3e081ad8a76eaf1e167fea8760d8225e249fd78d3c92164d6b403ee3e2d6a5",
+  "private_provider_rows_published": false,
+  "processed": 503,
+  "provider_requests": 0,
+  "replay_algorithms": {
+    "collector_algorithm_sha256": "8d76df14bd9990e6fbea71f7a1e0498a8c59def0807b1281605b8879ede98c33",
+    "identity_algorithm_sha256": "a3ea08658577e6816c2d76f291fcbd7428c8f6544dc52982bf1886da8d15c788"
+  },
+  "result_sha256": "d4f51de909712c361bbf879ae0ea4c07f818c595f778d982594b99dfcfa666e0",
+  "source_count": 503,
+  "source_receipts_preserved_for_full_results": 1273,
+  "status": "offline_source_replay_verified",
+  "statuses": {
+    "ownership_identity_unresolved": 20,
+    "periodic_anchor_unresolved": 2,
+    "pre_cutoff_SEC_identity_anchored": 481
+  },
+  "verification_manifest_sha256": "f21de82c2695b2696e89f4dde2983055736077fd96e311e4d317128634104853",
+  "verifier_sha256": "2561ea2065165ea1bf81ea930765e771c45f336f273bbb6803ffe472f4382276"
+}
