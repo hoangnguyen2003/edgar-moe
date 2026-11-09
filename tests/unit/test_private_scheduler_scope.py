@@ -88,3 +88,23 @@ def test_private_workflow_has_no_github_cron_or_public_provider_cache_and_old_ho
     assert "data/private-scheduler" not in raw
     original = yaml.safe_load(Path(".github/workflows/forward-production.yml").read_text())
     assert original["jobs"]["provider-use-review"]["steps"][0]["run"].endswith("exit 1\n")
+
+
+def test_cron_diagnostic_stage_uses_main_branch_scoped_metadata_without_upload_or_secret_writes():
+    doc = yaml.safe_load(Path(".github/workflows/deploy-private-scheduler.yml").read_text())
+    trigger = doc.get("on", doc.get(True))
+    assert "VERIFY_CRON_EVENTS" in trigger["workflow_dispatch"]["inputs"]["stage"]["options"]
+    job = doc["jobs"]["manage"]
+    assert job["if"] == "${{ github.ref == 'refs/heads/main' }}"
+    assert job["environment"]["name"] == "scheduler"
+    diagnostic = next(
+        s for s in job["steps"] if "inspect-private-cron-events.mjs" in s.get("run", "")
+    )
+    assert diagnostic["if"] == "${{ inputs.stage == 'VERIFY_CRON_EVENTS' }}"
+    assert set(diagnostic["env"]) == {"CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ACCOUNT_ID"}
+    for step in job["steps"]:
+        if any(
+            command in step.get("run", "")
+            for command in ("INSTALL_KEY", "upload-private-worker.mjs", "wrangler deploy")
+        ):
+            assert "VERIFY_CRON_EVENTS" not in step["if"]

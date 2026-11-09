@@ -8,7 +8,7 @@ on:
         type: choice
         required: true
         default: VERIFY_DISABLED
-        options: [VERIFY_DISABLED, PREPARE, RESUME_PREPARE, ACTIVATE, VERIFY_ACTIVE, STOP]
+        options: [VERIFY_DISABLED, PREPARE, RESUME_PREPARE, ACTIVATE, VERIFY_ACTIVE, VERIFY_CRON_EVENTS, STOP]
 
 permissions:
   contents: read
@@ -93,8 +93,14 @@ jobs:
           STAGE: ${{ inputs.stage }}
         run: |
           phase=VERIFY_DISABLED
-          if [[ "$STAGE" == 'ACTIVATE' || "$STAGE" == 'VERIFY_ACTIVE' ]]; then phase=VERIFY_ACTIVE; fi
+          if [[ "$STAGE" == 'ACTIVATE' || "$STAGE" == 'VERIFY_ACTIVE' || "$STAGE" == 'VERIFY_CRON_EVENTS' ]]; then phase=VERIFY_ACTIVE; fi
           node ops/scheduler/manage-private-scheduler.mjs "$phase" reports/private-scheduler-deploy/after.json
+      - name: Read retained Cron events without invoking or modifying the Worker
+        if: ${{ inputs.stage == 'VERIFY_CRON_EVENTS' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node ops/scheduler/inspect-private-cron-events.mjs reports/private-scheduler-deploy/cron-events.json
       - name: Validate and hash credential-free deployment receipts
         id: receipt
         if: ${{ always() }}

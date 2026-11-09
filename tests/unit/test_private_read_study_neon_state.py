@@ -104,7 +104,15 @@ def states():
     observation = {
         "status": "passed",
         "observed_at": (now - timedelta(seconds=50)).isoformat(),
-        "samples": [{"database_resume": "unobserved"}, {"database_resume": "unobserved"}],
+        "samples": [
+            {
+                "database_resume": "unobserved",
+                "status": "passed",
+                "http_status": 200,
+                "phase": phase,
+            }
+            for phase in ("first", "paired")
+        ],
     }
     return observation, before, after
 
@@ -120,9 +128,33 @@ def test_idle_transition_is_labeled_at_pair_scope_without_inventing_a_resume_tim
 def test_failed_read_or_missing_transition_does_not_fabricate_successful_resume():
     observation, before, after = states()
     observation["status"] = "degraded"
+    observation["samples"][1]["status"] = "failed"
     report = neon.annotate(observation, before, after)
     assert report["database_lifecycle"]["status"] == "unobserved"
     assert all(s["database_resume"] == "unobserved" for s in report["samples"])
+
+
+def test_platform_trace_failure_does_not_erase_independent_database_pair_evidence():
+    observation, before, after = states()
+    observation["status"] = "degraded"
+    observation["samples"][1]["provider_trace"] = {
+        "status": "refused",
+        "reason": "trace_transport_refused",
+    }
+    observation["samples"][1]["platform_start_type"] = "unobserved"
+    report = neon.annotate(observation, before, after)
+    assert report["status"] == "degraded"
+    assert report["database_lifecycle"]["cohort"] == "provider_idle_to_active_across_read_pair"
+    assert report["samples"][1]["platform_start_type"] == "unobserved"
+    assert report["samples"][1]["provider_trace"]["status"] == "refused"
+    assert report["samples"][1]["database_resume"] == "unobserved"
+
+
+@pytest.mark.parametrize("change", [{"http_status": 503}, {"phase": "first"}, {"status": "failed"}])
+def test_incomplete_or_failed_native_pair_cannot_supply_database_resume(change):
+    observation, before, after = states()
+    observation["samples"][1].update(change)
+    assert neon.annotate(observation, before, after)["database_lifecycle"]["status"] == "unobserved"
 
 
 @pytest.mark.parametrize(

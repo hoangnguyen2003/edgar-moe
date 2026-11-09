@@ -7,11 +7,14 @@ Process-first observations are not relabeled as provider cold starts.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
+import http.client
 import json
 import math
 import os
 import re
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -149,8 +152,46 @@ class ProviderTrace:
                 return document
         except urllib.error.HTTPError as error:
             status = error.code
+            retry_after = error.headers.get("Retry-After") if error.headers is not None else None
             error.close()
-            raise Refusal("trace_not_ready" if status == 404 else "trace_api_refused") from None
+            if status == 404 and not retry_after:
+                reason = "trace_not_ready"
+            elif status in {500, 502, 503, 504} and not retry_after:
+                reason = "trace_temporarily_unavailable"
+            else:
+                reason = "trace_api_refused"
+            raise Refusal(reason) from None
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            raise Refusal("trace_contract_refused") from None
+        except (
+            TimeoutError,
+            ConnectionError,
+            http.client.RemoteDisconnected,
+            http.client.IncompleteRead,
+        ):
+            raise Refusal("trace_temporarily_unavailable") from None
+        except urllib.error.URLError as error:
+            temporary = (
+                isinstance(error.reason, (TimeoutError, ConnectionError))
+                or (
+                    isinstance(error.reason, OSError)
+                    and error.reason.errno
+                    in {
+                        errno.ETIMEDOUT,
+                        errno.ECONNRESET,
+                        errno.ECONNABORTED,
+                        errno.ENETUNREACH,
+                        errno.EHOSTUNREACH,
+                    }
+                )
+                or (
+                    isinstance(error.reason, socket.gaierror)
+                    and error.reason.errno == socket.EAI_AGAIN
+                )
+            )
+            raise Refusal(
+                "trace_temporarily_unavailable" if temporary else "trace_transport_refused"
+            ) from None
         except Refusal:
             raise
         except Exception:
@@ -173,15 +214,19 @@ class ProviderTrace:
         url = "https://api.vercel.com/v1/projects/traces?" + urlencode(
             {"teamId": self.team_id, "projectId": self.project_id, "requestId": request_id}
         )
-        # Provider ingestion is asynchronous. Retry only its metadata GET after
-        # 404, never replay the HTTP application read or a failed credential.
+        # Retry only this idempotent metadata GET for delayed ingestion or
+        # explicitly transient transport/server failures, within the original
+        # three-GET cap. Never replay application reads or session creation.
         for attempt in range(3):
             try:
                 return summarize_trace(
                     normalize_project_trace(self.api(url)), self, request_id, route
                 )
             except Refusal as error:
-                if str(error) != "trace_not_ready" or attempt == 2:
+                if (
+                    str(error) not in {"trace_not_ready", "trace_temporarily_unavailable"}
+                    or attempt == 2
+                ):
                     raise
                 time.sleep(10)
         raise Refusal("trace_not_ready")
