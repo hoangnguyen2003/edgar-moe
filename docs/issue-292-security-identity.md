@@ -242,9 +242,82 @@ scope are recorded without publishing its contents.
 
 ## Remaining issue requirements
 
+### Private filed-class supplement
+
+An append-only offline supplement now corroborates one missing nonvoting
+qualifier. The original collector result continues to contain **486 anchors**.
+The separate supplement preserves those complete anchor payloads and the
+original source binding, retains all **503 rows**, and supplies **487 combined
+SEC identity anchors**. **Fourteen ownership identities and two periodic
+anchors remain unresolved.** Neither result is a historical market master or
+a completed study.
+
+The supplement requires two distinct pre-cutoff report quarters from one
+reporting manager. An immutable private proposal pins the manager's retained
+submissions-index digest, exact filing metadata, information-table filenames
+and full submission hashes. Pre-cutoff amendments, competing originals and
+unread archive coverage for either report period are refused. The current
+index supplies discovery metadata; its present-day ticker/listing fields are
+not read for cohort selection or issuer identity.
+
+Each complete submission authenticates the manager CIK, accession, original
+`13F-HR` form, filing/report dates, XML cover and exact information-table
+document. XML namespaces, live-filing status, reported table-entry count and
+absence of confidential omissions must agree. Entity declarations, unsupported
+document sets, ambiguous fields and excessive document/XML sizes fail closed.
+Every non-derivative row with the exact ownership CUSIP must report the same
+issuer name and literal `COM NON VTG` class. Repeated account rows are retained
+by hashes; calls and puts are excluded. Voting-authority quantities do not
+establish a class's voting rights.
+
+Issuer identity still comes from the separate ownership filing's authenticated
+`SUBJECT COMPANY` CIK and legal name. The holdings manager's CIK remains a
+separate field. Both quarterly references must be available before the chosen
+ownership report under the filing-date-plus-14-calendar-day bound; their raw
+local acceptance strings remain unchanged. The periodic cover must explicitly
+report common nonvoting stock, and the ownership cover must already agree on
+issuer, equity family and absence of a named class. Only its missing nonvoting
+qualifier is supplied. Distinct class letters, ordinary/capital families,
+conflicting names/identifiers, par values or explicit voting qualifiers cannot
+be rewritten.
+
+The supplement first independently replays its baseline, then recomputes the
+additional evidence from the bounded private sources. It has no live mode or
+HTTP client. A second invocation replays the complete supplemented result,
+including its source-receipt set and code digests. The original baseline and
+all prior captures stay unchanged. Supplement SHA-256:
+`8a8d9babf63b259d32639e364bb535f2eb320f4ed4bda11de4ed1d7ebd34beb2`.
+The row-free [`filed-class-supplement-audit-20261109.json`](../ops/issue292/filed-class-supplement-audit-20261109.json)
+binds the original result, proposal, supplement, code, private source packet
+and test/replay logs. Validation: 2,401 full-suite passes, 36 skips, 85.83%
+coverage and 286 focused tests. Formatting, lint, typing, documentation links,
+public snapshot lock and frozen runtime checks pass. Both complete runs made
+zero network requests. The separate identified discovery made two SEC reads.
+
+Private reproduction uses the existing identity cache and a separately
+retained reference proposal; source rows and proposal contents are not public:
+
+```sh
+python -m scripts.enrich_historical_identity_class \
+  --directory data/artifacts/private-identity-capture \
+  --baseline-result result-BASE_SHA256.json \
+  --references private-reference-plan.json \
+  --source-capture data/artifacts/private-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+python -m scripts.enrich_historical_identity_class \
+  --directory data/artifacts/private-identity-capture \
+  --verify class-enrichment-SUPPLEMENT_SHA256.json \
+  --source-capture data/artifacts/private-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+Sixteen identities, historical market continuity and the new
+selection/checkpoint/processed-dataset/study chain remain incomplete. The
+source-use and publication gates stay closed; no paid resources were used.
+
 ### Named nonvoting class and incorporated amendment chain
 
-The latest extension accepts one narrowly supported two-class charter format.
+The preceding extension accepts one narrowly supported two-class charter format.
 An eligible annual report must explicitly incorporate both the restated
 certificate and its later amendment, with their original forms, dates and
 exhibit numbers. Split formatting links are allowed only when every href in
@@ -487,7 +560,7 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 17 remain after the latest extensions. Submissions about other issuers
+claim; 16 remain after the latest extensions. Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,
