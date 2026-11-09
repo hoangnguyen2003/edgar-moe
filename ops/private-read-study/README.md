@@ -279,3 +279,13 @@ threshold is invented for small tail samples. Bootstrap cache state is not
 separately emitted, so preparation timing is retained without inferring cache
 state from its duration. The dedicated Neon metadata key has no native expiry;
 revoke it after the study. The scoped Vercel token has its owner-set expiry.
+
+## November 9 interrupted collection
+
+The observer stopped after a failed platform metadata lookup, despite two
+successful native reads. See the [recovery evidence and unchanged-window
+rules](evidence/recovery-20261109/). A bounded transient metadata retry and
+independent database-pair correlation fix are prepared; activation must use
+the tested code on main. Already missing hourly slots remain missing, and the
+current run cannot attain its predeclared complete-coverage target. Waiting
+alone cannot repair this interruption or replace those observations.

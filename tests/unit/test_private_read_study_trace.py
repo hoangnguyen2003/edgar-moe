@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import copy
+import errno
 import hashlib
 import importlib.util
 import io
 import json
+import ssl
 import sys
 import urllib.error
 from email.message import Message
@@ -185,6 +187,91 @@ def test_permission_error_is_not_retried_or_printed(monkeypatch):
     with pytest.raises(probe.Refusal, match="trace_api_refused"):
         target().capture(REQUEST, "status")
     assert len(calls) == 1
+
+
+def retry_after_headers():
+    headers = Message()
+    headers["Retry-After"] = "60"
+    return headers
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        TimeoutError("sentinel-private-timeout"),
+        urllib.error.URLError(OSError(errno.ECONNRESET, "sentinel-private-reset")),
+        urllib.error.HTTPError(
+            "https://private.invalid", 503, "private", Message(), io.BytesIO(b"private-body")
+        ),
+    ],
+)
+def test_transient_metadata_failures_use_existing_three_get_budget_only(monkeypatch, failure):
+    calls, waits = [], []
+
+    def opened(self, request, **kwargs):
+        calls.append(request)
+        if len(calls) < 3:
+            raise failure
+        return io.BytesIO(json.dumps(rest_trace()).encode())
+
+    monkeypatch.setattr(
+        probe.urllib.request, "build_opener", lambda *a: type("Opener", (), {"open": opened})()
+    )
+    monkeypatch.setattr(probe.time, "sleep", waits.append)
+    report = target().capture(REQUEST, "status")
+    assert report["classification"] == "cold" and waits == [10, 10]
+    assert len(calls) == 3 and all(r.get_method() == "GET" for r in calls)
+    assert "sentinel" not in json.dumps(report)
+
+
+def test_transient_exhaustion_is_bounded_and_session_creation_is_never_retried(monkeypatch):
+    calls = []
+
+    def opened(self, request, **kwargs):
+        calls.append(request)
+        raise TimeoutError("private-timeout")
+
+    monkeypatch.setattr(
+        probe.urllib.request, "build_opener", lambda *a: type("Opener", (), {"open": opened})()
+    )
+    monkeypatch.setattr(probe.time, "sleep", lambda *a: None)
+    with pytest.raises(probe.Refusal, match="trace_temporarily_unavailable"):
+        target().capture(REQUEST, "status")
+    assert len(calls) == 3
+    calls.clear()
+    with pytest.raises(probe.Refusal, match="trace_temporarily_unavailable"):
+        target().session_cookie("https://fixture.vercel.app")
+    assert len(calls) == 1 and calls[0].get_method() == "POST"
+
+
+@pytest.mark.parametrize(
+    "failure",
+    [
+        urllib.error.URLError(ssl.SSLCertVerificationError("private-certificate")),
+        urllib.error.HTTPError(
+            "https://private.invalid", 429, "private", Message(), io.BytesIO(b"private")
+        ),
+        urllib.error.HTTPError(
+            "https://private.invalid", 503, "private", retry_after_headers(), io.BytesIO(b"private")
+        ),
+    ],
+)
+def test_tls_throttling_and_server_retry_after_do_not_trigger_retries(monkeypatch, failure):
+    calls = []
+
+    def opened(self, request, **kwargs):
+        calls.append(request)
+        raise failure
+
+    monkeypatch.setattr(
+        probe.urllib.request, "build_opener", lambda *a: type("Opener", (), {"open": opened})()
+    )
+    monkeypatch.setattr(
+        probe.time, "sleep", lambda *a: pytest.fail("Non-retryable failure repeated")
+    )
+    with pytest.raises(probe.Refusal) as caught:
+        target().capture(REQUEST, "status")
+    assert len(calls) == 1 and "private" not in str(caught.value)
 
 
 def test_redirected_and_large_provider_bodies_cannot_escape(monkeypatch):

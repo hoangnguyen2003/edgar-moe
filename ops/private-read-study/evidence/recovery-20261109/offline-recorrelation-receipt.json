@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "mode": "offline_recorrelation_only",
+  "source_run": 42533739899,
+  "input_sha256": {
+    "observation.json": "9d7ed3aa1b3263bfbc442d28aa49c0233652eedaa9970a113a4fdacf049c87c3",
+    "neon-before.json": "90320389cd3dd0d21eedbb3e77710588ec0262580bf4989756e88c51419013cb",
+    "neon-after.json": "6be52c853f84e20bdf763f2fc3e63de17356b117473f05694b3b4a165c04bdcf"
+  },
+  "correlator_sha256": "e33c1cd86a0ef6ccbca8058642ef44f081e303f18952e7ec9dd6aad3a1862f2b",
+  "result_sha256": "741dd129e2c0b2d7894f8b4fb3c6a7900d15d51757f328b7db7da8da155c89e0",
+  "result_status": "degraded",
+  "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+  "paired_platform_trace": "refused_unobserved",
+  "network_requests": 0,
+  "application_requests": 0,
+  "original_receipts_unchanged": true
+}

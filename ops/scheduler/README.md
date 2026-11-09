@@ -376,3 +376,37 @@ after artifact retention, so missing scheduler delivery is visible in Actions
 instead of silently counting calendar time as successful observation.
 This is limited operational validation for a personal portfolio, not a claim
 of a production latency SLO. No synthetic fixture is accepted as live evidence.
+
+### Read-only missed-Cron diagnosis (November 9)
+
+Closeout run [42504029772](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42504029772)
+reported the November 7 slot overdue with no eligible forecast observation.
+Read-only provider verification run
+[42560486652](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42560486652)
+confirmed the existing private Worker, exact Cron and both secret names.
+Secret presence does not establish credential validity or successful dispatch.
+The current scope cannot satisfy all three dates after missing November 7.
+Neither later observations nor manual replay may replace that date.
+
+The management workflow's new `VERIFY_CRON_EVENTS` stage first performs the
+existing three metadata GETs, then one read-only GraphQL POST for this Worker's
+retained scheduled events. It never uploads code, changes a secret or trigger,
+invokes the Worker, dispatches GitHub work, enables logging, or queries source
+data. The account fingerprint, Worker name, 100-event/64-KiB bounds, 15-second
+timeout, no-redirect/no-retry policy and November 7–11 UTC diagnostic window
+are fixed in `inspect-private-cron-events.mjs`. It uses only the existing scoped
+Cloudflare credential in the main-only `scheduler` environment.
+
+Only normalized event/scheduled times, expected-Cron boolean and allowlisted
+outcomes are retained. Provider errors, account IDs, credentials and unknown
+fields are discarded. Provider permission/schema refusal stays a refusal;
+this stage does not request wider permission. Live query compatibility is
+pending main-branch execution. Empty or capped retained inventories do not
+prove that no invocation occurred. Event success also does not prove a forecast
+was recorded or establish a pre-open margin.
+
+Use actual event evidence to distinguish missed delivery from invocation
+failure or a skipped dispatch before preparing any replacement finite scope.
+The old scope, missed date, original cutoff, source-use hold and filing-coverage
+configuration remain intact. A future scope must use fresh dates and its own
+claim namespace; never silently extend this one or backdate evidence.

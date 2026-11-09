@@ -117,7 +117,18 @@ def annotate(
         ):
             raise ValueError()
         cohort = "unobserved"
-        if observation["status"] == "passed" and after["current_state"] == "active":
+        samples = observation.get("samples", [])
+        native_pair_passed = (
+            len(samples) == 2
+            and [sample.get("phase") for sample in samples] == ["first", "paired"]
+            and all(
+                sample.get("status") == "passed" and sample.get("http_status") == 200
+                for sample in samples
+            )
+        )
+        # Database state evidence is independent of a separate platform-trace
+        # lookup. Keep a failed/missing trace and overall degraded status intact.
+        if native_pair_passed and after["current_state"] == "active":
             if before["current_state"] == "idle":
                 cohort = "provider_idle_to_active_across_read_pair"
             elif before["current_state"] == "active":
