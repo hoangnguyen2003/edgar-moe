@@ -410,3 +410,21 @@ failure or a skipped dispatch before preparing any replacement finite scope.
 The old scope, missed date, original cutoff, source-use hold and filing-coverage
 configuration remain intact. A future scope must use fresh dates and its own
 claim namespace; never silently extend this one or backdate evidence.
+
+The first live Cron-events query (run
+[42563859289](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42563859289))
+passed all existing resource checks, then returned `metadata_query_refused`.
+It made one GraphQL read, zero external writes and zero Worker invocations.
+The original receipt did not retain enough detail to distinguish query
+compatibility, authorization or dataset availability, so none is asserted as
+the verified live cause.
+
+The follow-up aligns the account variable with the lowercase `string` scalar
+in Cloudflare's [core query examples](https://developers.cloudflare.com/analytics/graphql-api/getting-started/querying-basics/)
+and maps in-memory [documented error families](https://developers.cloudflare.com/analytics/graphql-api/errors/)
+to a small sorted category set. Messages, arbitrary paths, account values and
+unknown payload fields are still discarded. At most 16 errors and 4,096
+characters per message are examined. A refusal remains a refusal, makes no
+additional request and never broadens permissions, narrows a time range
+silently, or retries a provider suggestion. Successful live compatibility
+still requires a fresh, bounded main-branch diagnostic.

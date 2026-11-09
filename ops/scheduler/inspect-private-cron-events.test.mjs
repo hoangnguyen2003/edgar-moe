@@ -16,6 +16,11 @@ async function inspect(body, override = {}) {
     expectedAccountSha256: createHash("sha256").update(JSON.stringify(account)).digest("hex"),
     fetchImpl: async (url, init) => {
       calls.push({url, init});
+      // Cloudflare's core Analytics schema uses the custom `string` scalar,
+      // not the conventional GraphQL `String`. Model that provider boundary.
+      if (/\$account:\s*String\b/.test(JSON.parse(init.body).query)) {
+        return new Response(JSON.stringify({errors: [{message: "unknown type String"}]}));
+      }
       return new Response(JSON.stringify(body));
     }, ...override});
   const serialized = JSON.stringify(report);
@@ -105,5 +110,42 @@ test("transport, auth, malformed and oversized bodies are never retried", async 
     assert.equal(calls, 1);
     assert.equal(report.request_count, 1);
     assert.doesNotMatch(JSON.stringify(report), /private-error|not-json/);
+  }
+});
+
+test("provider query refusals retain only bounded diagnostic categories without retries", async () => {
+  for (const [message, expected] of [
+    ["unknown type String", "query_contract_refused"],
+    ["Cannot query field private-field on type private-type", "query_contract_refused"],
+    ["not authorized for this account", "access_refused"],
+    ["account does not have access to dataset", "access_refused"],
+    ["cannot request data older than 3600s", "dataset_limit_refused"],
+    ["query time range is too large", "dataset_limit_refused"],
+    ["unable to execute query, please try again later", "service_unavailable"],
+    ["private-unknown-error", "unknown"],
+  ]) {
+    const {report, calls} = await inspect({errors: [{message: message + " " + token, path: [token]}]});
+    assert.equal(report.status, "refused");
+    assert.equal(report.reason, "metadata_query_refused");
+    assert.deepEqual(report.query_failure_categories, [expected]);
+    assert.deepEqual(report.events, []);
+    assert.equal(calls.length, 1);
+    assert.doesNotMatch(JSON.stringify(report), /private-field|private-type|private-unknown-error|3600|try again/);
+  }
+});
+
+test("mixed or malformed provider errors cannot create unbounded diagnostic output", async () => {
+  for (const [errors, expected] of [
+    [[{message: "unknown type String"}, {message: "forbidden"}, {message: "forbidden"}], ["access_refused", "query_contract_refused"]],
+    [[{message: 123}], ["unknown"]],
+    ["private-value", ["unknown"]],
+    [Array(17).fill({message: token}), ["unknown"]],
+    [[{message: "x".repeat(4096) + " forbidden"}], ["unknown"]],
+  ]) {
+    const {report, calls} = await inspect({errors});
+    assert.equal(report.status, "refused");
+    assert.deepEqual(report.query_failure_categories, expected);
+    assert.equal(calls.length, 1);
+    assert.equal(JSON.stringify(report).length < 1000, true);
   }
 });

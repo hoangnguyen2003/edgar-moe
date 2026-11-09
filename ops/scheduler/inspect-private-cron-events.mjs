@@ -9,7 +9,7 @@ const WORKER = "edgar-moe-forward-scheduler";
 const START = "2026-11-07T00:00:00.000Z";
 const END = "2026-11-12T00:00:00.000Z";
 const LIMIT = 100;
-const QUERY = `query PrivateCronEvents($account: String!, $from: Time!, $to: Time!) {
+const QUERY = `query PrivateCronEvents($account: string!, $from: Time!, $to: Time!) {
   viewer { accounts(filter: {accountTag: $account}) {
     accountTag
     workersInvocationsScheduled(limit: 100, filter: {
@@ -18,6 +18,26 @@ const QUERY = `query PrivateCronEvents($account: String!, $from: Time!, $to: Tim
   } }
 }`;
 const OUTCOMES = new Set(["ok", "success", "exception", "failure", "exceededCpu", "exceededMemory", "canceled", "unknown"]);
+
+// Classify provider errors in memory; never retain their messages or arbitrary
+// paths. Failure categories cannot establish that the query or access works.
+function queryFailureCategories(errors) {
+  if (!Array.isArray(errors) || errors.length > 16) return ["unknown"];
+  const categories = new Set();
+  for (const error of errors) {
+    const message = typeof error?.message === "string" ? error.message.slice(0, 4096) : "";
+    if (/not authorized|unauthorized|forbidden|permission|does not have access|authentication/i.test(message)) {
+      categories.add("access_refused");
+    } else if (/unknown (?:type|field|argument)|cannot query field|invalid (?:type|argument)|variable.*(?:type|invalid)/i.test(message)) {
+      categories.add("query_contract_refused");
+    } else if (/cannot request data older|query time range is too large|limit.*exceed|too many.*(?:fields|records)/i.test(message)) {
+      categories.add("dataset_limit_refused");
+    } else if (/unable to execute query|too many queries in progress|temporarily unavailable/i.test(message)) {
+      categories.add("service_unavailable");
+    } else categories.add("unknown");
+  }
+  return [...categories].sort();
+}
 
 function stamp(value) {
   if (typeof value !== "string" || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(value) ||
@@ -72,6 +92,7 @@ export async function inspectPrivateCronEvents({env, now = new Date(), fetchImpl
     });
     const document = await boundedJson(response);
     if (document.errors != null && (!Array.isArray(document.errors) || document.errors.length)) {
+      report.query_failure_categories = queryFailureCategories(document.errors);
       throw new Error("metadata_query_refused");
     }
     const accounts = document.data?.viewer?.accounts;
