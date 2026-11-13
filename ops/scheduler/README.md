@@ -428,3 +428,19 @@ characters per message are examined. A refusal remains a refusal, makes no
 additional request and never broadens permissions, narrows a time range
 silently, or retries a provider suggestion. Successful live compatibility
 still requires a fresh, bounded main-branch diagnostic.
+
+### November 13 closeout and cleanup acknowledgement
+
+All three forecast dates remained missing. The closeout scope is finished and
+its workflow is disabled, but the child STOP returned HTTP 401. A November 13
+retry retained the same refusal. The expired date guard remains independently
+inert; successful provider-side cleanup is not claimed.
+
+`stop_private_scheduler.py` now uses the
+[versioned dispatch response](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes?apiVersion=2026-03-10)
+to verify the exact main-branch STOP run, rather than treating a queued request
+as completed cleanup. It checks provenance, waits within a fixed deadline/read
+cap, retains failed acknowledgements and never repeats an ambiguous dispatch.
+The closeout is disabled even when provider cleanup fails; the job then fails
+visibly after receipt retention. See the
+[complete recovery review](../../docs/open-issue-closeout-20261113.md).

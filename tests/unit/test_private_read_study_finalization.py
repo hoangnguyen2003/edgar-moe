@@ -141,6 +141,42 @@ def test_errors_are_counted_without_including_failed_latency_in_success_quantile
     )
 
 
+def test_successful_reads_do_not_hide_platform_or_workflow_failures_or_missing_days():
+    row = record(62)
+    row["run"]["conclusion"] = "failure"
+    row["receipt"]["status"] = "degraded"
+    row["receipt"]["samples"][1].update(
+        platform_start_type="unobserved",
+        provider_trace={"status": "refused", "reason": "private-error"},
+    )
+    report = final.summarize([record(1), row], environment(), END, baseline())
+    assert report["http_or_contract_errors"] == 0
+    assert report["platform_trace_status_counts"] == {"passed": 3, "refused": 1}
+    assert report["workflow_conclusion_counts"] == {"unobserved": 1, "failure": 1}
+    assert report["degraded_observation_pairs"] == 1
+    assert report["observed_utc_date_count"] == 2
+    assert report["pair_start_span_seconds"] == 61 * 3600
+    assert report["window_elapsed"] and report["status"] == "incomplete"
+    assert "private-error" not in json.dumps(report)
+    assert "degraded pairs: 1" in final.markdown(report)
+
+
+def test_no_observations_has_no_invented_span_and_unknown_metadata_is_not_echoed():
+    report = final.summarize([], environment(), END, baseline())
+    assert report["pair_start_span_seconds"] is None
+    assert report["first_pair_started_at"] is report["last_pair_started_at"] is None
+    assert report["observed_utc_date_count"] == 0
+    row = record(0)
+    row["run"]["conclusion"] = "private-workflow-state"
+    row["receipt"]["samples"][1].update(
+        platform_start_type="unobserved", provider_trace={"status": "private-trace-state"}
+    )
+    report = final.summarize([row], environment(), END, baseline())
+    assert report["workflow_conclusion_counts"] == {"unobserved": 1}
+    assert report["platform_trace_status_counts"] == {"passed": 1, "unobserved": 1}
+    assert "private-" not in json.dumps(report)
+
+
 def zip_bytes(files):
     stream = io.BytesIO()
     with zipfile.ZipFile(stream, "w") as archive:

@@ -1,0 +1,1696 @@
+{
+  "acceptance_automatically_asserted": false,
+  "actual_http_attempts": 24,
+  "application_requests_by_finalizer": 0,
+  "attempt_error_rate": 0.0,
+  "cohorts": [
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 4477310,
+          "p95": 4477310,
+          "p99": 4477310
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 739835,
+          "p95": 739835,
+          "p99": 739835
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 2094671,
+          "p95": 2094671,
+          "p99": 2094671
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 1122708,
+          "p95": 1122708,
+          "p99": 1122708
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1133,
+          "p95": 1133,
+          "p99": 1133
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 176156,
+          "p95": 176156,
+          "p99": 176156
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 37490,
+          "p95": 37490,
+          "p99": 37490
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 786277,
+          "p95": 786277,
+          "p99": 786277
+        }
+      },
+      "route": "forecasts"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 762627,
+          "p95": 762627,
+          "p99": 762627
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 230398,
+          "p95": 230398,
+          "p99": 230398
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 350244,
+          "p95": 350244,
+          "p99": 350244
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 35477,
+          "p95": 35477,
+          "p99": 35477
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 473,
+          "p95": 473,
+          "p99": 473
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 50937,
+          "p95": 50937,
+          "p99": 50937
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 15720,
+          "p95": 15720,
+          "p99": 15720
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 252209,
+          "p95": 252209,
+          "p99": 252209
+        }
+      },
+      "route": "forecasts"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 9660019,
+          "p95": 9660019,
+          "p99": 9660019
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 724875,
+          "p95": 724875,
+          "p99": 724875
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 7363735,
+          "p95": 7363735,
+          "p99": 7363735
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 667468,
+          "p95": 667468,
+          "p99": 667468
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 5596182,
+          "p95": 5596182,
+          "p99": 5596182
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 217899,
+          "p95": 217899,
+          "p99": 217899
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 136485,
+          "p95": 136485,
+          "p99": 136485
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 869763,
+          "p95": 869763,
+          "p99": 869763
+        }
+      },
+      "route": "performance"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 1001792,
+          "p95": 1001792,
+          "p99": 1001792
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 445452,
+          "p95": 445452,
+          "p99": 445452
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 708036,
+          "p95": 708036,
+          "p99": 708036
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 86267,
+          "p95": 86267,
+          "p99": 86267
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 32813,
+          "p95": 32813,
+          "p99": 32813
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 52796,
+          "p95": 52796,
+          "p99": 52796
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 69644,
+          "p95": 69644,
+          "p99": 69644
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 521870,
+          "p95": 521870,
+          "p99": 521870
+        }
+      },
+      "route": "performance"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 5098796,
+          "p95": 5098796,
+          "p99": 5098796
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 786804,
+          "p95": 786804,
+          "p99": 786804
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 2688961,
+          "p95": 2688961,
+          "p99": 2688961
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 1214463,
+          "p95": 1214463,
+          "p99": 1214463
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1271,
+          "p95": 1271,
+          "p99": 1271
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 612472,
+          "p95": 612472,
+          "p99": 612472
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 51430,
+          "p95": 51430,
+          "p99": 51430
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 847797,
+          "p95": 847797,
+          "p99": 847797
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 749974,
+          "p95": 749974,
+          "p99": 749974
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 215029,
+          "p95": 215029,
+          "p99": 215029
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 335912,
+          "p95": 335912,
+          "p99": 335912
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 34053,
+          "p95": 34053,
+          "p99": 34053
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 766,
+          "p95": 766,
+          "p99": 766
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 53603,
+          "p95": 53603,
+          "p99": 53603
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 17890,
+          "p95": 17890,
+          "p99": 17890
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 238857,
+          "p95": 238857,
+          "p99": 238857
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "174813027d9180dc6cc74261f77eafb7b9aa3f94",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 3710978,
+          "p95": 3710978,
+          "p99": 3710978
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 699989,
+          "p95": 699989,
+          "p99": 699989
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 1567548,
+          "p95": 1567548,
+          "p99": 1567548
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 620066,
+          "p95": 620066,
+          "p99": 620066
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1252,
+          "p95": 1252,
+          "p99": 1252
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 195003,
+          "p95": 195003,
+          "p99": 195003
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 39410,
+          "p95": 39410,
+          "p99": 39410
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 744293,
+          "p95": 744293,
+          "p99": 744293
+        }
+      },
+      "route": "status"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "174813027d9180dc6cc74261f77eafb7b9aa3f94",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 625023,
+          "p95": 625023,
+          "p99": 625023
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 218172,
+          "p95": 218172,
+          "p99": 218172
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 351759,
+          "p95": 351759,
+          "p99": 351759
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 39946,
+          "p95": 39946,
+          "p99": 39946
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 787,
+          "p95": 787,
+          "p99": 787
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 51783,
+          "p95": 51783,
+          "p99": 51783
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 26602,
+          "p95": 26602,
+          "p99": 26602
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 250135,
+          "p95": 250135,
+          "p99": 250135
+        }
+      },
+      "route": "status"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "174813027d9180dc6cc74261f77eafb7b9aa3f94",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 3741313,
+          "p95": 3741313,
+          "p99": 3741313
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 755542,
+          "p95": 755542,
+          "p99": 755542
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 1626647,
+          "p95": 1626647,
+          "p99": 1626647
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 631361,
+          "p95": 631361,
+          "p99": 631361
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1125,
+          "p95": 1125,
+          "p99": 1125
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 186031,
+          "p95": 186031,
+          "p99": 186031
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 41045,
+          "p95": 41045,
+          "p99": 41045
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 801304,
+          "p95": 801304,
+          "p99": 801304
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "174813027d9180dc6cc74261f77eafb7b9aa3f94",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 691262,
+          "p95": 691262,
+          "p99": 691262
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 228925,
+          "p95": 228925,
+          "p99": 228925
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 378569,
+          "p95": 378569,
+          "p99": 378569
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 44678,
+          "p95": 44678,
+          "p99": 44678
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 880,
+          "p95": 880,
+          "p99": 880
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 66339,
+          "p95": 66339,
+          "p99": 66339
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 19976,
+          "p95": 19976,
+          "p99": 19976
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 257576,
+          "p95": 257576,
+          "p99": 257576
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "2f3c0532eb9c078e60a5eb8c7acfaa24cd7f2266",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 3666375,
+          "p95": 3666375,
+          "p99": 3666375
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 719991,
+          "p95": 719991,
+          "p99": 719991
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 1567244,
+          "p95": 1567244,
+          "p99": 1567244
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 628085,
+          "p95": 628085,
+          "p99": 628085
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1380,
+          "p95": 1380,
+          "p99": 1380
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 167372,
+          "p95": 167372,
+          "p99": 167372
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 39084,
+          "p95": 39084,
+          "p99": 39084
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 763466,
+          "p95": 763466,
+          "p99": 763466
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "2f3c0532eb9c078e60a5eb8c7acfaa24cd7f2266",
+      "database_pair_cohort": "unobserved",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 3804810,
+          "p95": 3804810,
+          "p99": 3804810
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 719780,
+          "p95": 719780,
+          "p99": 719780
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 1552707,
+          "p95": 1552707,
+          "p99": 1552707
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 611362,
+          "p95": 611362,
+          "p99": 611362
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1150,
+          "p95": 1150,
+          "p99": 1150
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 168073,
+          "p95": 168073,
+          "p99": 168073
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 41031,
+          "p95": 41031,
+          "p99": 41031
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 764701,
+          "p95": 764701,
+          "p99": 764701
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "2f3c0532eb9c078e60a5eb8c7acfaa24cd7f2266",
+      "database_pair_cohort": "unobserved",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "unobserved",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 691246,
+          "p95": 691246,
+          "p99": 691246
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 226589,
+          "p95": 226589,
+          "p99": 226589
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 365219,
+          "p95": 365219,
+          "p99": 365219
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 38327,
+          "p95": 38327,
+          "p99": 38327
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 805,
+          "p95": 805,
+          "p99": 805
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 64652,
+          "p95": 64652,
+          "p99": 64652
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 19358,
+          "p95": 19358,
+          "p99": 19358
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 253735,
+          "p95": 253735,
+          "p99": 253735
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "2f3c0532eb9c078e60a5eb8c7acfaa24cd7f2266",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 701307,
+          "p95": 701307,
+          "p99": 701307
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 234027,
+          "p95": 234027,
+          "p99": 234027
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 353809,
+          "p95": 353809,
+          "p99": 353809
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 33891,
+          "p95": 33891,
+          "p99": 33891
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 855,
+          "p95": 855,
+          "p99": 855
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 52742,
+          "p95": 52742,
+          "p99": 52742
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 17334,
+          "p95": 17334,
+          "p99": 17334
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 258326,
+          "p95": 258326,
+          "p99": 258326
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "64e4ebbbec44e475ccb13ec0bd30327652511d63",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 9597013,
+          "p95": 9597013,
+          "p99": 9597013
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 762839,
+          "p95": 762839,
+          "p99": 762839
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 7368168,
+          "p95": 7368168,
+          "p99": 7368168
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 632357,
+          "p95": 632357,
+          "p99": 632357
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 5649008,
+          "p95": 5649008,
+          "p99": 5649008
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 166900,
+          "p95": 166900,
+          "p99": 166900
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 137580,
+          "p95": 137580,
+          "p99": 137580
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 908814,
+          "p95": 908814,
+          "p99": 908814
+        }
+      },
+      "route": "performance"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "64e4ebbbec44e475ccb13ec0bd30327652511d63",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 957010,
+          "p95": 957010,
+          "p99": 957010
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 223454,
+          "p95": 223454,
+          "p99": 223454
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 476106,
+          "p95": 476106,
+          "p99": 476106
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 36508,
+          "p95": 36508,
+          "p99": 36508
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 31814,
+          "p95": 31814,
+          "p99": 31814
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 100233,
+          "p95": 100233,
+          "p99": 100233
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 67477,
+          "p95": 67477,
+          "p99": 67477
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 296900,
+          "p95": 296900,
+          "p99": 296900
+        }
+      },
+      "route": "performance"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "64e4ebbbec44e475ccb13ec0bd30327652511d63",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 4681490,
+          "p95": 4681490,
+          "p99": 4681490
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 962080,
+          "p95": 962080,
+          "p99": 962080
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 2286300,
+          "p95": 2286300,
+          "p99": 2286300
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 1116150,
+          "p95": 1116150,
+          "p99": 1116150
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1156,
+          "p95": 1156,
+          "p99": 1156
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 142593,
+          "p95": 142593,
+          "p99": 142593
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 48284,
+          "p95": 48284,
+          "p99": 48284
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 1018294,
+          "p95": 1018294,
+          "p99": 1018294
+        }
+      },
+      "route": "status"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "64e4ebbbec44e475ccb13ec0bd30327652511d63",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 670708,
+          "p95": 670708,
+          "p99": 670708
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 222059,
+          "p95": 222059,
+          "p99": 222059
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 370714,
+          "p95": 370714,
+          "p99": 370714
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 43056,
+          "p95": 43056,
+          "p99": 43056
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 823,
+          "p95": 823,
+          "p99": 823
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 60202,
+          "p95": 60202,
+          "p99": 60202
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 28679,
+          "p95": 28679,
+          "p99": 28679
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 257044,
+          "p95": 257044,
+          "p99": 257044
+        }
+      },
+      "route": "status"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "8cbe7ea93c8239b63671c717e72da42ac10a10f2",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 3782618,
+          "p95": 3782618,
+          "p99": 3782618
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 715357,
+          "p95": 715357,
+          "p99": 715357
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 1563252,
+          "p95": 1563252,
+          "p99": 1563252
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 619762,
+          "p95": 619762,
+          "p99": 619762
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 1114,
+          "p95": 1114,
+          "p99": 1114
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 173041,
+          "p95": 173041,
+          "p99": 173041
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 36509,
+          "p95": 36509,
+          "p99": 36509
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 760042,
+          "p95": 760042,
+          "p99": 760042
+        }
+      },
+      "route": "forecasts"
+    },
+    {
+      "attempts": 1,
+      "collector_commit": "8cbe7ea93c8239b63671c717e72da42ac10a10f2",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 1,
+          "p50": 808839,
+          "p95": 808839,
+          "p99": 808839
+        },
+        "integrity_us": {
+          "n": 1,
+          "p50": 300492,
+          "p95": 300492,
+          "p99": 300492
+        },
+        "lifecycle_us": {
+          "n": 1,
+          "p50": 435606,
+          "p95": 435606,
+          "p99": 435606
+        },
+        "observer_connect_us": {
+          "n": 1,
+          "p50": 47918,
+          "p95": 47918,
+          "p99": 47918
+        },
+        "preparation_us": {
+          "n": 1,
+          "p50": 426,
+          "p95": 426,
+          "p99": 426
+        },
+        "reader_connect_us": {
+          "n": 1,
+          "p50": 55725,
+          "p95": 55725,
+          "p99": 55725
+        },
+        "service_us": {
+          "n": 1,
+          "p50": 16493,
+          "p95": 16493,
+          "p99": 16493
+        },
+        "snapshot_us": {
+          "n": 1,
+          "p50": 322820,
+          "p95": 322820,
+          "p99": 322820
+        }
+      },
+      "route": "forecasts"
+    },
+    {
+      "attempts": 2,
+      "collector_commit": "f79f67b19c3da58f45da33702285f443bf7cccb3",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "first",
+      "platform": "cold",
+      "process": "first",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 2,
+          "p50": 3915031,
+          "p95": 4216538,
+          "p99": 4216538
+        },
+        "integrity_us": {
+          "n": 2,
+          "p50": 738191,
+          "p95": 748998,
+          "p99": 748998
+        },
+        "lifecycle_us": {
+          "n": 2,
+          "p50": 1606187,
+          "p95": 2035470,
+          "p99": 2035470
+        },
+        "observer_connect_us": {
+          "n": 2,
+          "p50": 616692,
+          "p95": 1109975,
+          "p99": 1109975
+        },
+        "preparation_us": {
+          "n": 2,
+          "p50": 1132,
+          "p95": 1150,
+          "p99": 1150
+        },
+        "reader_connect_us": {
+          "n": 2,
+          "p50": 118094,
+          "p95": 183088,
+          "p99": 183088
+        },
+        "service_us": {
+          "n": 2,
+          "p50": 44605,
+          "p95": 47912,
+          "p99": 47912
+        },
+        "snapshot_us": {
+          "n": 2,
+          "p50": 796272,
+          "p95": 797891,
+          "p99": 797891
+        }
+      },
+      "route": "ticker-filter"
+    },
+    {
+      "attempts": 2,
+      "collector_commit": "f79f67b19c3da58f45da33702285f443bf7cccb3",
+      "database_pair_cohort": "provider_idle_to_active_across_read_pair",
+      "edge_cache": "BYPASS",
+      "errors": 0,
+      "phase": "paired",
+      "platform": "warm",
+      "process": "subsequent",
+      "quantiles_us": {
+        "http_elapsed_us": {
+          "n": 2,
+          "p50": 768469,
+          "p95": 853082,
+          "p99": 853082
+        },
+        "integrity_us": {
+          "n": 2,
+          "p50": 227016,
+          "p95": 237460,
+          "p99": 237460
+        },
+        "lifecycle_us": {
+          "n": 2,
+          "p50": 359521,
+          "p95": 374373,
+          "p99": 374373
+        },
+        "observer_connect_us": {
+          "n": 2,
+          "p50": 38016,
+          "p95": 38258,
+          "p99": 38258
+        },
+        "preparation_us": {
+          "n": 2,
+          "p50": 913,
+          "p95": 1148,
+          "p99": 1148
+        },
+        "reader_connect_us": {
+          "n": 2,
+          "p50": 63228,
+          "p95": 63928,
+          "p99": 63928
+        },
+        "service_us": {
+          "n": 2,
+          "p50": 17817,
+          "p95": 18280,
+          "p99": 18280
+        },
+        "snapshot_us": {
+          "n": 2,
+          "p50": 249766,
+          "p95": 263692,
+          "p99": 263692
+        }
+      },
+      "route": "ticker-filter"
+    }
+  ],
+  "collector_commits": [
+    "1025ba3a7f5b903a3e33e80e05f987fcb267757e",
+    "174813027d9180dc6cc74261f77eafb7b9aa3f94",
+    "2f3c0532eb9c078e60a5eb8c7acfaa24cd7f2266",
+    "64e4ebbbec44e475ccb13ec0bd30327652511d63",
+    "8cbe7ea93c8239b63671c717e72da42ac10a10f2",
+    "f79f67b19c3da58f45da33702285f443bf7cccb3"
+  ],
+  "comparison_limits": [
+    "Native local Unix-socket timings exclude HTTP, TLS and provider startup; never pool them with hosted latency.",
+    "Database resume attribution is pair-level endpoint state, not an exact per-request resume timestamp.",
+    "Private no-store routes do not intentionally exercise edge hits; report zero observed hits explicitly.",
+    "Preparation CPU remains in HTTP/lifecycle time; bootstrap cache state is not separately reported.",
+    "Small per-cohort tail samples are descriptive and do not justify an SLO or alert threshold.",
+    "An elapsed policy window is not proof of seven days of observations; HTTP/contract errors exclude separate trace and workflow failures."
+  ],
+  "database_credentials_in_finalizer": false,
+  "database_pair_counts": {
+    "provider_idle_to_active_across_read_pair": 11,
+    "unobserved": 1
+  },
+  "degraded_observation_pairs": 1,
+  "duplicate_slots": {},
+  "edge_cache_counts": {
+    "BYPASS": 24
+  },
+  "edge_hit_count": 0,
+  "expected_measurement_requests": 336,
+  "expected_pairs": 168,
+  "expires_at": "2026-11-13T08:15:00+00:00",
+  "failure_reasons": {},
+  "first_pair_started_at": "2026-11-06T09:53:21.605955+00:00",
+  "generated_at": "2026-11-13T12:29:21.533995+00:00",
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "http_or_contract_errors": 0,
+  "issue_closed": false,
+  "last_pair_started_at": "2026-11-08T23:09:01.019490+00:00",
+  "local_native_reference": {
+    "environment": {
+      "architecture": "arm64",
+      "fixture_clock": "2026-11-05T16:15:27.810654+00:00",
+      "matched_declared_profile": true,
+      "os": "Darwin",
+      "transport": "local Unix socket; no TLS; fresh connections via NullPool"
+    },
+    "quantiles_us": {
+      "forecasts": {
+        "lifecycle": {
+          "n": 100,
+          "p50": 93307,
+          "p95": 96460,
+          "p99": 101061
+        },
+        "preparation": {
+          "n": 100,
+          "p50": 173,
+          "p95": 197,
+          "p99": 210
+        },
+        "service": {
+          "n": 100,
+          "p50": 3069,
+          "p95": 3258,
+          "p99": 3793
+        }
+      },
+      "performance": {
+        "lifecycle": {
+          "n": 100,
+          "p50": 114928,
+          "p95": 126543,
+          "p99": 128096
+        },
+        "preparation": {
+          "n": 100,
+          "p50": 7600,
+          "p95": 8619,
+          "p99": 18292
+        },
+        "service": {
+          "n": 100,
+          "p50": 17165,
+          "p95": 28197,
+          "p99": 28766
+        }
+      },
+      "status": {
+        "lifecycle": {
+          "n": 100,
+          "p50": 93944,
+          "p95": 99832,
+          "p99": 106239
+        },
+        "preparation": {
+          "n": 100,
+          "p50": 178,
+          "p95": 202,
+          "p99": 264
+        },
+        "service": {
+          "n": 100,
+          "p50": 3663,
+          "p95": 4082,
+          "p99": 14920
+        }
+      },
+      "ticker_filter": {
+        "lifecycle": {
+          "n": 100,
+          "p50": 93923,
+          "p95": 96940,
+          "p99": 103569
+        },
+        "preparation": {
+          "n": 100,
+          "p50": 171,
+          "p95": 198,
+          "p99": 212
+        },
+        "service": {
+          "n": 100,
+          "p50": 3540,
+          "p95": 4011,
+          "p99": 4757
+        }
+      }
+    },
+    "query_plan_shapes": 15,
+    "total_samples": 404
+  },
+  "manual_setup_runs_included": false,
+  "missing_slots": [
+    0,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    10,
+    11,
+    12,
+    13,
+    14,
+    16,
+    17,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    27,
+    28,
+    29,
+    30,
+    31,
+    33,
+    34,
+    35,
+    37,
+    38,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    55,
+    56,
+    57,
+    59,
+    60,
+    61,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127,
+    128,
+    129,
+    130,
+    131,
+    132,
+    133,
+    134,
+    135,
+    136,
+    137,
+    138,
+    139,
+    140,
+    141,
+    142,
+    143,
+    144,
+    145,
+    146,
+    147,
+    148,
+    149,
+    150,
+    151,
+    152,
+    153,
+    154,
+    155,
+    156,
+    157,
+    158,
+    159,
+    160,
+    161,
+    162,
+    163,
+    164,
+    165,
+    166,
+    167
+  ],
+  "observed_pairs": 12,
+  "observed_utc_date_count": 3,
+  "pair_start_span_seconds": 220539.413535,
+  "percentile_method": "nearest_rank_successful_requests_only_with_n",
+  "platform_counts": {
+    "cold": 12,
+    "unobserved": 1,
+    "warm": 11
+  },
+  "platform_trace_status_counts": {
+    "passed": 23,
+    "refused": 1
+  },
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "reference_sha256": {
+    "cloud-reader-query-plans.json": "8084dc96f2c32e574d0ad82e18f5d32cf5efdcd806ed4273899b3136d791686a",
+    "current-free-hosting-plan.json": "679fffbc62e98b721b5dddbaaa01f467342fca08f9b2cfa8a518a729a4665f7f",
+    "finalizer-live-archive-proof.json": "501adef2e4c5c6c6936d75acafc78b4fed4a3590cbb945c7c6fd7b23b4956380",
+    "manifest.json": "b6ff714fbb06c49482049c073123a798badf29234be8b0a5e594c498c10ca6a7",
+    "prepared-hosted-read-proof.json": "51f6d6300b844993469fbf7be1d9b88d331183a2eaa4b9319f86ae2a66e7e1f2",
+    "prepared-local-baseline.json": "0e243fb57b6b41b9a812777ad3e13bf0d92891f2cdd212c371573982e6f12977",
+    "prepared-observer-activation.json": "d8a9c6d140a795188ce3adb5f5fd7626b924528632578538440d766e01ce8eca",
+    "prepared-preview-deployment.json": "237abd876e9ae172dc0587f1c81a7299c217b2724fce117eb4dde827a6027f7a",
+    "prepared-preview-prewindow-proof.json": "401c93315aa9589d161a043a1b972b26a8cbb7d9260b0fb7b80658e20537e840",
+    "prepared-workflow-verification.json": "802b6aa2813d25461979dc141441b434d0f68a6edbca59e8bf13dd1ba1d664fa",
+    "setup-verification-correlated-observation.json": "7e5ed3cb725b544ea7531460aaae6e2c4354b544587b2f70ced74affe2c2107f",
+    "setup-verification-neon-after.json": "b5cad9a73e64f07756c6d10daa1002b04d0cdc16fe355067ccb215b469d71d42",
+    "setup-verification-neon-before.json": "34033e3391a08465c72e41f1f5ca57c5df11e6862fab4eb162e8ed041a1d1108",
+    "staged-source-manifest.json": "b57b8beded5dcf96e418010ed5e237602a817c611c848b45c8f409c8e7b51384"
+  },
+  "response_bodies_retained": false,
+  "runs_without_valid_observation": [],
+  "schema_version": 1,
+  "scope": "portfolio_study290_final_report",
+  "slo_established": false,
+  "starts_at": "2026-11-06T08:15:00+00:00",
+  "status": "incomplete",
+  "supplement_provenance": {
+    "network_requests_in_reanalysis": 0,
+    "original_finalizer_run": 43425554275,
+    "original_manifest_sha256": "30f6bf76edcf8268ea47b4c5a221e19d9238166683234d3cdb0e619cba5d22ba",
+    "original_receipts_rewritten": false,
+    "original_summary_sha256": "5a6d1bba9c855ef6ed2cc56aee18b155a948cd9f1d6ffb4df931d13fe93fe043",
+    "run_metadata_sha256": "2dcad1c9d15c2559fbf3cd3c88b38a247c0b4a11e9f128f0a9aa92b9ddd2ac6c",
+    "summarizer_sha256": "37973f98e3b1e96b9153d3123e2dda87e2a0db3d3e63ff23fe81142df8f295b5"
+  },
+  "utc_dates": [
+    "2026-11-06",
+    "2026-11-07",
+    "2026-11-08"
+  ],
+  "window_elapsed": true,
+  "window_hours": 168,
+  "workflow_conclusion_counts": {
+    "failure": 1,
+    "success": 11
+  }
+}
