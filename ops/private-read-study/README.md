@@ -289,3 +289,14 @@ independent database-pair correlation fix are prepared; activation must use
 the tested code on main. Already missing hourly slots remain missing, and the
 current run cannot attain its predeclared complete-coverage target. Waiting
 alone cannot repair this interruption or replace those observations.
+
+## November 13 final result
+
+The window expired and finalizer run `43425554275` retained the final packet
+and disabled both observer/finalizer workflows. The actual result is
+**incomplete: 12 pairs, 24 reads, three observed UTC dates and 156 missing hourly
+slots**. Zero HTTP/contract errors coexist with one refused platform trace,
+one degraded pair and one failed workflow. See the
+[separately bound reanalysis](evidence/closeout-20261113/summary.md) and
+[all-open-issue recovery review](../../docs/open-issue-closeout-20261113.md).
+No expired slot was replayed and no replacement window was started.

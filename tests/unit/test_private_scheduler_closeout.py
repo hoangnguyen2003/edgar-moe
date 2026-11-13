@@ -165,8 +165,14 @@ def test_publish_permission_and_secrets_are_separated_from_receipt_collection():
     )
     assert "'156'" in publish["steps"][0]["run"]
     stop = doc["jobs"]["stop-finished-scope"]
-    assert stop["permissions"] == {"actions": "write"}
-    assert "closeout-private-scheduler.yml" in stop["steps"][0]["run"]
+    assert stop["permissions"] == {"actions": "write", "contents": "read"}
+    check = next(step for step in stop["steps"] if step.get("id") == "stop")
+    assert "scripts/stop_private_scheduler.py" in check["run"]
+    assert check["continue-on-error"] is True
+    disable = next(step for step in stop["steps"] if "gh workflow disable" in step.get("run", ""))
+    assert disable["if"] == "${{ always() }}"
+    assert "closeout-private-scheduler.yml" in disable["run"]
+    assert stop["steps"][-1]["run"] == "exit 1"
     assert "observe-private-read-study" not in json.dumps(doc)
 
 
