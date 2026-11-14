@@ -14,7 +14,7 @@ spec = importlib.util.spec_from_file_location("scheduler_stop", "scripts/stop_pr
 assert spec and spec.loader
 stop = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(stop)
-NOW = datetime(2026, 11, 13, tzinfo=UTC)
+NOW = datetime(2026, 11, 22, tzinfo=UTC)
 CONTEXT = {"GITHUB_REF": "refs/heads/main", "GITHUB_REPOSITORY": stop.REPOSITORY}
 
 

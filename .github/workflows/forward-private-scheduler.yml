@@ -3,6 +3,12 @@ name: Bounded private scheduler observation
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: Delivery probe cannot execute a provider cycle
+        required: true
+        type: choice
+        options: [delivery_probe, forecast]
+        default: delivery_probe
       device:
         required: true
         type: choice
@@ -19,14 +25,41 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: edgar-moe-forward-production
   cancel-in-progress: false
 
 jobs:
+  delivery-probe:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.mode == 'delivery_probe' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    environment:
+      name: scheduler
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify the signed provider time and retain a source-free delivery receipt
+        env:
+          SCHEDULER_SIGNATURE_KEY: ${{ secrets.SCHEDULER_SIGNATURE_KEY }}
+        run: python3 scripts/verify_private_scheduler_delivery.py --record reports/scheduler-delivery/receipt.json
+      - name: Validate and hash the delivery-only receipt
+        run: |
+          python3 scripts/validate_redacted_artifacts.py --root reports/scheduler-delivery
+          sha256sum reports/scheduler-delivery/receipt.json > reports/scheduler-delivery/SHA256SUMS
+      - name: Retain signed delivery evidence without source credentials
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: scheduler-delivery-probe-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/scheduler-delivery/
+          if-no-files-found: error
+          retention-days: 30
+
   observe:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && inputs.mode == 'forecast' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 150
     environment:
@@ -56,6 +89,10 @@ jobs:
           if os.environ['GITHUB_RUN_ATTEMPT'] != '1': raise ValueError('Reruns are outside the finite scope')
           print('Finite signed scheduler slot admitted; no provider access yet.')
           PY
+      - name: Require the real delivery-probe receipt before provider dependencies or credentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/verify_private_scheduler_delivery.py --require
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
