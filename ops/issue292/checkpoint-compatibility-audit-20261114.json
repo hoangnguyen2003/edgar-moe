@@ -1,0 +1,72 @@
+{
+  "altered_real_feature_copy_refused": true,
+  "assessment_date": "2026-11-14",
+  "blockers": [
+    "historical_market_continuity_unverified",
+    "new_source_selection_checkpoint_dataset_study_chain_unverified",
+    "unresolved_source_identities",
+    "checkpoint_requested_roster_differs_from_fixed_source"
+  ],
+  "checkpoint_dataset_binding_verified": false,
+  "checkpoint_manifest_sha256": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603",
+  "coverage_percent": 85.87,
+  "focused_tests": 42,
+  "full_test_passes": 2521,
+  "full_test_skips": 36,
+  "historical_market_continuity_verified": false,
+  "identity_replay": "verified",
+  "identity_result_sha256": "d1b915a833cd741b7e3337de5331ae2d3b8d232200b91f6f25ad3ff4f568536c",
+  "identity_source_roster_sha256": "9d9637f631c05d2bc4dbb3cb2d865ea44bc99bdb1bd047f7c2326f8e0554f1d6",
+  "identity_statuses": {
+    "ownership_identity_unresolved": 13,
+    "periodic_anchor_unresolved": 2,
+    "pre_cutoff_SEC_identity_anchored": 488
+  },
+  "independent_report_replay_verified": true,
+  "issue_complete": false,
+  "original_processed_assets_unchanged": true,
+  "paid_resources": false,
+  "preflight_algorithm_sha256": "cce2cf03e9d486f17edd7809eb0e8168cccf6f01eb996b6fe2e6a1ec7b72f458",
+  "previous_private_manifest_sha256": "f48130b382b6d98ddb46e1ac4bc1abf65da3adf9b49bbf264d5a04f2c63693cf",
+  "previous_private_packet_files_rehashed": 21,
+  "private_packet_files": 16,
+  "private_packet_manifest_sha256": "6de9cee79e34bad1efed7f6d0588bdba2f3c77a64896e10ad987b7671007e397",
+  "private_rows_published": false,
+  "processed_dataset": {
+    "asset_sha256s": {
+      "availability": "d9d89b94ada05d7062c5e1d43551faafc0ac21bd00b831e9ca330dae50852e4d",
+      "daily_returns": "b7b7a6937a9d7a88ab8fab49d1798bc74467b50465d0041665780f1468bb8095",
+      "events": "56e5e35caa110f2ead4fefc564fb6bef9984f2f9eccaeeb30d3fa4a7f9b5a645",
+      "features": "e3d31c44ef52a9e9e32e4115cfbb1f41fcfe0a11020f564b7d852033462bc526"
+    },
+    "historical_membership_verified": false,
+    "integrity_verified": true,
+    "manifest_sha256": "6cd73733d7568c90139cb5b014facc8bd52d3ea94df11645ed680addc0faa4fa",
+    "source_manifest_sha256": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603"
+  },
+  "provider_requests": 0,
+  "publication_gate_released": false,
+  "report_sha256": "7b92797d3adfb373d6093adec3c2644c9548ad0aba516991e38a0061976245bc",
+  "requested_roster_sha256": "62f65ced09dd566663967c5b952d50e35ad0fc0e46d68b03129798838b39aaac",
+  "roster_comparison": {
+    "checkpoint_securities_outside_fixed_source": 198,
+    "comparison_basis": "literal_issuer_and_symbol_not_permanent_security_continuity",
+    "exact_fixed_source_roster": false,
+    "issuer_only_overlap": 305,
+    "literal_issuer_symbol_matches": 302,
+    "renames_or_class_aliases_inferred": false,
+    "requested_issuers": 500,
+    "requested_pair_set_sha256": "6f1f04ada4b3546005014f087dd04a8e190fa117059e5435ba7abb4a6d626c11",
+    "requested_securities": 500,
+    "source_additional_share_class_rows": 3,
+    "source_candidates": 503,
+    "source_issuers": 500,
+    "source_pair_set_sha256": "eab06143b7a9ebfdd52de272c416ecb383b2d9df1a8a8c8c3701a40830d38434",
+    "source_securities_absent_from_checkpoint": 201
+  },
+  "schema_version": 1,
+  "scope": "offline_existing_checkpoint_compatibility_not_new_study_admission",
+  "source_cutoff": "2022-12-28T23:23:50Z",
+  "status": "blocked_historical_checkpoint_reuse",
+  "unresolved_identities": 15
+}
