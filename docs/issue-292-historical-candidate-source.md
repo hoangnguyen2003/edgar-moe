@@ -84,6 +84,11 @@ nor an unverified archive response were substituted.
 
 ## Remaining acceptance
 
+The separate [checkpoint compatibility preflight](issue-292-checkpoint-preflight.md)
+independently replays the retained identities and checks the existing requested
+roster and processed asset hashes. It refuses to promote compatible file
+integrity or overlapping issuers into historical membership evidence.
+
 1. Establish share-class/security continuity and dated market-identifier joins,
    including ticker reuse, exchange moves and corporate actions. CIKs identify
    issuers, and historical spelling alone does not establish security identity.
