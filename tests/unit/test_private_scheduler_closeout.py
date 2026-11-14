@@ -20,7 +20,7 @@ spec = importlib.util.spec_from_file_location(
 assert spec and spec.loader
 closeout = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(closeout)
-NOW = datetime(2026, 11, 11, 12, tzinfo=UTC)
+NOW = datetime(2026, 11, 21, 12, tzinfo=UTC)
 
 
 def record(day, identifier):
@@ -181,7 +181,7 @@ def test_future_recording_and_weekend_entry_cannot_be_used_as_margin_proof():
     with pytest.raises(ValueError):
         closeout.evaluate(rows, datetime(2026, 11, 7, 7, 18, tzinfo=UTC))
     r = rows[0]["receipt"]
-    r["target_regular_open_utc"] = "2026-11-07T14:30:00+00:00"
+    r["target_regular_open_utc"] = "2026-11-21T14:30:00+00:00"
     r["pre_open_margin_seconds"] = (
         datetime.fromisoformat(r["target_regular_open_utc"])
         - datetime.fromisoformat(r["recorded_at_utc"])
@@ -202,9 +202,9 @@ def test_candidate_report_and_comment_are_operational_and_redacted(tmp_path):
 def test_overdue_missing_delivery_is_flagged_without_replaying_requests():
     before = datetime(2026, 11, 6, 12, tzinfo=UTC)
     assert closeout.evaluate([], before)["attention_required"] is False
-    late = datetime(2026, 11, 7, 11, tzinfo=UTC)
+    late = datetime(2026, 11, 18, 11, tzinfo=UTC)
     report = closeout.evaluate([], late)
     assert report["attention_required"] is True
-    assert report["overdue_missing_dates"] == ["2026-11-07"]
+    assert report["overdue_missing_dates"] == [closeout.DATES[0]]
     assert report["eligible_to_close"] is False
     assert report["provider_requests"] == report["forecast_or_database_requests"] == 0
