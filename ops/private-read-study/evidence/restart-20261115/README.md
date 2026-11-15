@@ -1,6 +1,6 @@
 # Separate November 15–22 restart
 
-Status: **prepared; post-start hosted verification and observer activation pending**.
+Status: **active; post-start hosted and CI observer setup verification passed**.
 The absolute policy window is November 15, 2026, 15:00 UTC through November 22,
 15:00 UTC (22:00 Vietnam time). The policy SHA-256 is
 `190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e`.
@@ -41,6 +41,20 @@ Reported consumption metadata can lag; it is not a measurement of this week.
   deployment, not database reads, cold starts or measurement days.
 - All 132 focused study tests passed on the merged main tree. These use offline
   fixtures and are separate from the live setup checks.
+- After the real start, all four hosted routes returned 200 with verified
+  provider traces: performance was cold, followed by three warm requests. The
+  endpoint transitioned from idle to active across this four-route setup group;
+  no exact per-request database-resume timestamp is inferred.
+- The metadata-only finalizer smoke run
+  [`43725918641`](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43725918641)
+  reported collecting with zero application requests and skipped shutdown.
+- The exact main observer setup run
+  [`43727492668`](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668)
+  passed. Its two 200 responses had complete warm provider traces and independent
+  active-before/after database evidence. All four JSON file digests and the flat
+  artifact inventory were verified. The failure-stop job was skipped and both
+  study workflows were verified active. This manual run is excluded from the
+  scheduled collection, as required by the finalizer's existing event filter.
 
 Setup reads do not enter the scheduled-observation sample count. Application
 requests are never automatically retried. Only the same trace metadata GET may

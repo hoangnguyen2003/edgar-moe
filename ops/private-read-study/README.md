@@ -1,10 +1,16 @@
 # Separate personal-portfolio hosted read study (#290)
 
-Latest status (November 15): **a separate restart is prepared; live activation
-verification is pending**. The new policy is bound to November 15, 15:00 UTC
+Latest status (November 15): **a separate restart is active; hosted and CI setup
+verification passed**. The new policy is bound to November 15, 15:00 UTC
 through November 22, 15:00 UTC (22:00 Vietnam time). The November 6–13 study
 remains closed and incomplete; its twelve pairs are not carried into this window.
 See the [restart packet](evidence/restart-20261115/) and its distinct policy hash.
+Four post-start hosted routes passed with matching provider traces and an
+idle-to-active database transition across that setup group. Observer setup run
+[`43727492668`](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668)
+passed with two further reads and a verified body-free artifact. Both bounded
+workflows are enabled. None of these setup requests count as measurement days;
+#290 remains open pending the real week and evidence-quality review.
 
 The earlier setup chronology below describes the original November study.
 See [the November 6 free-plan recovery](FREE-PLAN-RECOVERY.md) for the verified
