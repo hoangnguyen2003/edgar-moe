@@ -1,0 +1,118 @@
+{
+  "schema_version": 2,
+  "scope": "separate_portfolio_study290_observation",
+  "observed_at": "2026-11-06T08:17:02.248238+00:00",
+  "hourly_slot": 0,
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "status": "passed",
+  "samples": [
+    {
+      "status": "passed",
+      "route": "status",
+      "http_status": 200,
+      "edge_cache": "BYPASS",
+      "origin_timing": {
+        "integrity_us": 231590,
+        "lifecycle_us": 376481,
+        "observer_connect_us": 39903,
+        "preparation_us": 479,
+        "reader_connect_us": 54288,
+        "service_us": 34096,
+        "snapshot_us": 273408,
+        "process": "subsequent"
+      },
+      "platform_start_type": "warm",
+      "database_resume": "unobserved",
+      "body_bytes": 677,
+      "http_elapsed_us": 784557,
+      "phase": "first",
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_project_trace_rest",
+        "classification": "warm",
+        "basis": "complete_provider_invocation_without_startup",
+        "vm_start_observed": false,
+        "python_spawn_observed": false,
+        "user_code_init_observed": false,
+        "startup_ms": {},
+        "invocation_ms": 380.806178,
+        "request_sha256": "c3d67c5ee60cc1a93601df77fce6379708e07a2124effc0b6c8df6dd2e75edfc",
+        "provider_span_count": 6,
+        "trace_tree_validated": true,
+        "completion_basis": "recorded_session_closed_tree",
+        "provider_partial_flag": null,
+        "raw_provider_payload_retained": false
+      }
+    },
+    {
+      "status": "passed",
+      "route": "status",
+      "http_status": 200,
+      "edge_cache": "BYPASS",
+      "origin_timing": {
+        "integrity_us": 229179,
+        "lifecycle_us": 370686,
+        "observer_connect_us": 31940,
+        "preparation_us": 505,
+        "reader_connect_us": 55996,
+        "service_us": 34331,
+        "snapshot_us": 275230,
+        "process": "subsequent"
+      },
+      "platform_start_type": "warm",
+      "database_resume": "unobserved",
+      "body_bytes": 677,
+      "http_elapsed_us": 886469,
+      "phase": "paired",
+      "provider_trace": {
+        "status": "passed",
+        "source": "vercel_project_trace_rest",
+        "classification": "warm",
+        "basis": "complete_provider_invocation_without_startup",
+        "vm_start_observed": false,
+        "python_spawn_observed": false,
+        "user_code_init_observed": false,
+        "startup_ms": {},
+        "invocation_ms": 374.680404,
+        "request_sha256": "11e13b5501d9bbbafb9ae538d3cdda7f3b37ba674a57fefbd9669a5c7f372536",
+        "provider_span_count": 6,
+        "trace_tree_validated": true,
+        "completion_basis": "recorded_session_closed_tree",
+        "provider_partial_flag": null,
+        "raw_provider_payload_retained": false
+      }
+    }
+  ],
+  "maximum_http_requests": 2,
+  "automatic_retries": 0,
+  "provider_trace_enabled": true,
+  "maximum_trace_metadata_get_attempts_per_sample": 3,
+  "database_credentials_in_probe": false,
+  "response_bodies_retained": false,
+  "seven_day_evidence_proven": false,
+  "slo_established": false,
+  "database_lifecycle": {
+    "status": "passed",
+    "cohort": "provider_active_before_and_after_read_pair",
+    "before": {
+      "scope": "portfolio_study290_neon_endpoint_state",
+      "status": "passed",
+      "capture_started_at": "2026-11-06T08:17:01.859117+00:00",
+      "observed_at": "2026-11-06T08:17:02.170402+00:00",
+      "project_sha256": "704a426c95d0ba5bcf4847a14d389ed04c03c377636624a441da8d5b2fa81d63",
+      "endpoint_sha256": "663b3a8444606b8a9f62e0864ff1edbc1213e02c26f2daa605c80fbc3ccd5393",
+      "current_state": "active"
+    },
+    "after": {
+      "scope": "portfolio_study290_neon_endpoint_state",
+      "status": "passed",
+      "capture_started_at": "2026-11-06T08:17:46.995742+00:00",
+      "observed_at": "2026-11-06T08:17:47.271813+00:00",
+      "project_sha256": "704a426c95d0ba5bcf4847a14d389ed04c03c377636624a441da8d5b2fa81d63",
+      "endpoint_sha256": "663b3a8444606b8a9f62e0864ff1edbc1213e02c26f2daa605c80fbc3ccd5393",
+      "current_state": "active"
+    },
+    "scope": "pair_level_provider_state_not_per_request_restart_timestamp"
+  }
+}

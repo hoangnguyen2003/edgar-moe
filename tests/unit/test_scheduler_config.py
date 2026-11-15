@@ -173,3 +173,115 @@ def test_missing_scheduler_config_fails_closed(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "scheduler configuration contract failed" in result.stderr
+
+
+@pytest.mark.parametrize("field", ["workers_dev", "preview_urls", "logpush"])
+@pytest.mark.parametrize("replacement", ["true", None])
+def test_scheduler_config_refuses_implicit_or_enabled_exposure(
+    tmp_path: Path, field: str, replacement: str | None
+) -> None:
+    source = CONFIG.read_text(encoding="utf-8")
+    original = f"{field} = false\n"
+    assert original in source
+    changed = source.replace(original, "" if replacement is None else f"{field} = {replacement}\n")
+    path = tmp_path / "wrangler.toml"
+    path.write_text(changed, encoding="utf-8")
+    result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True)
+    assert result.returncode == 1
+
+
+@pytest.mark.parametrize("extra", ['route = "example.org/*"', 'routes = ["example.org/*"]'])
+def test_scheduler_config_refuses_custom_public_routes(tmp_path: Path, extra: str) -> None:
+    path = tmp_path / "wrangler.toml"
+    path.write_text(extra + "\n" + CONFIG.read_text(encoding="utf-8"), encoding="utf-8")
+    result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True)
+    assert result.returncode == 1
+
+
+@pytest.mark.parametrize("replacement", ["true", "0"])
+def test_scheduler_config_refuses_persistent_logging_drift(
+    tmp_path: Path, replacement: str
+) -> None:
+    path = tmp_path / "wrangler.toml"
+    path.write_text(
+        CONFIG.read_text(encoding="utf-8").replace("enabled = false", f"enabled = {replacement}"),
+        encoding="utf-8",
+    )
+    result = subprocess.run([sys.executable, str(SCRIPT), str(path)], capture_output=True)
+    assert result.returncode == 1
+
+
+def test_scheduler_workflow_refuses_deployment_without_main_guard(tmp_path: Path) -> None:
+    path = tmp_path / WORKFLOW.name
+    path.write_text(
+        WORKFLOW.read_text(encoding="utf-8").replace(
+            "${{ github.ref == 'refs/heads/main' && inputs.deploy == 'DEPLOY' }}",
+            "${{ inputs.deploy == 'DEPLOY' }}",
+        ),
+        encoding="utf-8",
+    )
+    assert (
+        "deploy job must require main and the explicit DEPLOY input"
+        in validate_scheduler_workflow(path)
+    )
+
+
+@pytest.mark.parametrize("change", ["missing", "wrong_profile", "after_upload"])
+def test_scheduler_workflow_requires_materialized_active_profile(
+    tmp_path: Path, change: str
+) -> None:
+    document = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    steps = document["jobs"]["deploy"]["steps"]
+    copy = next(
+        s
+        for s in steps
+        if s.get("run") == "cp ops/scheduler/wrangler.toml.example ops/scheduler/wrangler.toml"
+    )
+    if change == "wrong_profile":
+        copy["run"] = "cp ops/scheduler/wrangler.prepare.toml.example ops/scheduler/wrangler.toml"
+    else:
+        steps.remove(copy)
+        if change == "after_upload":
+            steps.append(copy)
+    path = tmp_path / WORKFLOW.name
+    path.write_text(yaml.safe_dump(document), encoding="utf-8")
+    assert (
+        "deploy job must materialize the reviewed config before Wrangler"
+        in validate_scheduler_workflow(path)
+    )
+
+
+def test_cloudflare_weekdays_match_github_including_saturday():
+    import tomllib
+    from datetime import date, timedelta
+
+    # Independent interpretation of each provider's documented weekday numbers.
+    # Cloudflare: Sunday=1..Saturday=7; GitHub: Sunday=0..Saturday=6.
+    names = dict(zip(("SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"), range(1, 8), strict=True))
+
+    def cf_days(expression):
+        lo, hi = expression.split()[-1].split("-")
+        return set(
+            range(
+                names[lo] if lo in names else int(lo), (names[hi] if hi in names else int(hi)) + 1
+            )
+        )
+
+    github = yaml.safe_load(Path(".github/workflows/forward-production.yml").read_text())
+    trigger = github.get("on", github.get(True))
+    assert trigger["schedule"][0]["cron"] == "17 7 * * 2-6"
+    for path in (CONFIG, Path("ops/scheduler/wrangler.private.toml.example")):
+        cron = tomllib.loads(path.read_text())["triggers"]["crons"][0]
+        assert cron.split()[:4] == ["17", "7", "*", "*"]
+        for offset in range(7):
+            day = date(2026, 11, 1) + timedelta(days=offset)
+            github_day = (day.weekday() + 1) % 7
+            assert (github_day + 1 in cf_days(cron)) == (2 <= github_day <= 6)
+    assert 7 not in cf_days("17 7 * * 2-6")  # Original Cloudflare expression misses Saturday.
+
+
+def test_cloudflare_validator_refuses_ambiguous_copied_github_weekdays(tmp_path):
+    p = tmp_path / "copied.toml"
+    p.write_text(CONFIG.read_text().replace("TUE-SAT", "2-6"))
+    result = subprocess.run([sys.executable, str(SCRIPT), str(p)], capture_output=True, text=True)
+    assert result.returncode == 1

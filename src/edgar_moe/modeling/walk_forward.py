@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -157,6 +158,7 @@ def run_walk_forward_study(
     max_epochs: int | None = None,
     maximum_candidates: int | None = None,
     device: str | None = "cpu",
+    progress: Callable[[str], None] | None = None,
 ) -> WalkForwardStudyResult:
     """Select a stable champion using pre-test expanding-window predictions only."""
     if torch is None:
@@ -176,6 +178,10 @@ def run_walk_forward_study(
         )
 
     for fold in folds:
+        if progress:
+            progress(
+                f"Starting {fold.name}: {len(fold.train)} training and {len(fold.validation)} validation events"
+            )
         train_values, validation_values, target_mean, target_std = _prepare_fold(
             dataset,
             fold,
@@ -185,6 +191,8 @@ def run_walk_forward_study(
         holdout_values = _subset(train_values, holdout_positions)
         validation_target = dataset.target[fold.validation]
         for specification in specifications:
+            if progress:
+                progress(f"{fold.name}: fitting {specification.name}")
             set_deterministic_seed(config.project.random_seed)
             model = RegimeGatedMoE(
                 text_dim=train_values["text"].shape[1],
@@ -233,6 +241,8 @@ def run_walk_forward_study(
             **validation_values,
             "target": validation_target,
         }
+        if progress:
+            progress(f"{fold.name}: fitting simple comparison models")
         comparisons = train_comparisons(
             comparison_train,
             comparison_validation,

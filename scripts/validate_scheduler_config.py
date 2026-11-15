@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-EXPECTED_CRON = "17 7 * * 2-6"
+EXPECTED_CRON = "17 7 * * TUE-SAT"
 EXPECTED_MAIN = "cloudflare-forward-scheduler.mjs"
 EXPECTED_NAME = "edgar-moe-forward-scheduler"
 EXPECTED_VARS = {
@@ -20,7 +20,7 @@ EXPECTED_VARS = {
 }
 
 
-def validate_scheduler_config(path: Path) -> list[str]:
+def validate_scheduler_config(path: Path, *, prepare: bool = False) -> list[str]:
     """Return safety violations without reading or printing secret values."""
     try:
         document = tomllib.loads(path.read_text(encoding="utf-8"))
@@ -33,9 +33,27 @@ def validate_scheduler_config(path: Path) -> list[str]:
         return ["configuration root must be a TOML table"]
     errors: list[str] = []
     errors.extend(_validate_identity(document))
-    errors.extend(_validate_triggers(document))
+    errors.extend(_validate_private_routing(document))
+    errors.extend(_validate_triggers(document, prepare=prepare))
     errors.extend(_validate_vars(document))
     errors.extend(_validate_no_secret_sections(document))
+    return errors
+
+
+def _validate_private_routing(document: dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+    for field in ("workers_dev", "preview_urls", "logpush"):
+        if document.get(field) is not False:
+            errors.append(f"{field} must be explicitly false")
+    observability = document.get("observability")
+    if (
+        not isinstance(observability, dict)
+        or set(observability) != {"enabled"}
+        or observability["enabled"] is not False
+    ):
+        errors.append("observability must remain explicitly disabled")
+    if "route" in document or document.get("routes", []) != []:
+        errors.append("scheduler must not declare public routes")
     return errors
 
 
@@ -53,10 +71,15 @@ def _validate_identity(document: dict[str, Any]) -> list[str]:
     return errors
 
 
-def _validate_triggers(document: dict[str, Any]) -> list[str]:
+def _validate_triggers(document: dict[str, Any], *, prepare: bool = False) -> list[str]:
     triggers = document.get("triggers")
-    if not isinstance(triggers, dict) or triggers.get("crons") != [EXPECTED_CRON]:
-        return [f"triggers.crons must contain only {EXPECTED_CRON!r}"]
+    expected = [] if prepare else [EXPECTED_CRON]
+    if not isinstance(triggers, dict) or triggers.get("crons") != expected:
+        return (
+            ["preparation must explicitly disable all Cron triggers"]
+            if prepare
+            else [f"triggers.crons must contain only {EXPECTED_CRON!r}"]
+        )
     return []
 
 
@@ -105,8 +128,11 @@ def main() -> int:
         default=Path("ops/scheduler/wrangler.toml.example"),
         help="scheduler TOML file to validate",
     )
+    parser.add_argument(
+        "--prepare", action="store_true", help="Require the no-Cron preparation profile"
+    )
     args = parser.parse_args()
-    errors = validate_scheduler_config(args.config)
+    errors = validate_scheduler_config(args.config, prepare=args.prepare)
     if errors:
         print("scheduler configuration contract failed", file=sys.stderr)
         print(f"{len(errors)} validation error(s) detected", file=sys.stderr)
