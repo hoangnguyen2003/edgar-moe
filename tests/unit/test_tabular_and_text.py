@@ -87,3 +87,44 @@ def test_finbert_uniformly_samples_long_filings() -> None:
     sampled = _uniform_chunk_sample(chunks, 4)
 
     assert sampled == [[0], [6], [13], [19]]
+
+
+@pytest.mark.parametrize("resolved_revision", ["b" * 40, None])
+def test_finbert_tokenizer_provenance_uses_resolved_file(monkeypatch, resolved_revision):
+    """A requested revision cannot stand in for the actual tokenizer snapshot."""
+    from types import SimpleNamespace
+
+    import transformers
+    import transformers.utils.hub as hub
+
+    requested = "a" * 40
+    calls = []
+    model = SimpleNamespace(
+        config=SimpleNamespace(
+            _commit_hash=requested, id2label={0: "positive", 1: "negative", 2: "neutral"}
+        ),
+        eval=lambda: None,
+        to=lambda device: None,
+    )
+    monkeypatch.setattr(
+        transformers.AutoTokenizer,
+        "from_pretrained",
+        lambda *args, **kwargs: SimpleNamespace(init_kwargs={}),
+    )
+    monkeypatch.setattr(
+        transformers.AutoModelForSequenceClassification,
+        "from_pretrained",
+        lambda *args, **kwargs: model,
+    )
+
+    def cached_file(name, filename, **kwargs):
+        calls.append((name, filename, kwargs["revision"]))
+        if resolved_revision is None:
+            return None
+        return f"/cache/models--ProsusAI--finbert/snapshots/{resolved_revision}/{filename}"
+
+    monkeypatch.setattr(hub, "cached_file", cached_file)
+    encoder = FinBertEmbedder(revision=requested, device="cpu")
+    assert encoder.model_revision == requested
+    assert encoder.tokenizer_revision == (resolved_revision or "unresolved")
+    assert calls == [("ProsusAI/finbert", "tokenizer_config.json", requested)]

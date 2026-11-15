@@ -1,0 +1,944 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "phase": "postflight_passed",
+  "native_setup_read_attempts": 4,
+  "hosted_application_requests": 0,
+  "measurement_window_bound": false,
+  "existing_resources_mutated": 0,
+  "routes": [
+    {
+      "route": "status",
+      "body_bytes": 677,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 489213,
+        "reader_connect": 1007075,
+        "integrity": 881875,
+        "service": 528923,
+        "snapshot": 1599906,
+        "lifecycle": 3219164
+      }
+    },
+    {
+      "route": "forecasts",
+      "body_bytes": 19124,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 487598,
+        "reader_connect": 836184,
+        "integrity": 890014,
+        "service": 225619,
+        "snapshot": 1316002,
+        "lifecycle": 2756955
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "body_bytes": 15598,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 363670,
+        "reader_connect": 715348,
+        "integrity": 784501,
+        "service": 219757,
+        "snapshot": 1175173,
+        "lifecycle": 2358621
+      }
+    },
+    {
+      "route": "performance",
+      "body_bytes": 461,
+      "same_snapshot": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "observer_connect": 364391,
+        "reader_connect": 795057,
+        "integrity": 872645,
+        "service": 1800236,
+        "snapshot": 2859030,
+        "lifecycle": 4176962
+      }
+    }
+  ],
+  "plan_read_transactions": 1,
+  "plans": [
+    {
+      "sql_sha256": "ed6fb1456b981d4af32de64b2a05344d24ebb18446fdb2246bca095d9255cd43",
+      "routes": [
+        "forecasts",
+        "performance",
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 1.897,
+        "Actual Total Time": 1.897,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 64,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 10000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.046,
+            "Actual Total Time": 1.148,
+            "Plan Rows": 10000,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 64,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Index Only Scan",
+            "Scan Direction": "Forward",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.384,
+      "execution_ms": 2.013
+    },
+    {
+      "sql_sha256": "bdf6f81b80285932cead69276ed422dca394a398d88718535f9d0eca1bfb5665",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 2.151,
+        "Actual Total Time": 2.151,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 157,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 5000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.043,
+            "Actual Total Time": 1.74,
+            "Plan Rows": 5000,
+            "Plan Width": 29,
+            "Shared Hit Blocks": 157,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.148,
+      "execution_ms": 12.736
+    },
+    {
+      "sql_sha256": "cdda41070e273ab050ef500fe1c1d3cff86f13e6c202ab13bf19ee3fb4781304",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.015,
+        "Actual Total Time": 0.015,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 1,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.008,
+            "Actual Total Time": 0.009,
+            "Plan Rows": 1,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 1,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.149,
+      "execution_ms": 0.047
+    },
+    {
+      "sql_sha256": "7bea826a82412e55ee81a3c18b71d2351518931dea18373911f0f0650693e184",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.023,
+        "Actual Total Time": 0.023,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 40.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.009,
+            "Actual Total Time": 0.014,
+            "Plan Rows": 40,
+            "Plan Width": 26,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.204,
+      "execution_ms": 0.056
+    },
+    {
+      "sql_sha256": "faf0ae92b95b4d049efbbdd6153ca55b88c2ce0e0ca3ec9474fc43b91b5272b5",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.096,
+        "Actual Total Time": 0.096,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 5,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.094,
+            "Actual Total Time": 0.095,
+            "Plan Rows": 40,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 5,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 40.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.016,
+                "Actual Total Time": 0.022,
+                "Plan Rows": 40,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.36,
+      "execution_ms": 0.126
+    },
+    {
+      "sql_sha256": "5da38a50a5db416c3f7898569246aab2fffcb558b983a2a62c52215bdc9cdd74",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.043,
+        "Actual Total Time": 0.044,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 5,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 1.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.042,
+            "Actual Total Time": 0.042,
+            "Plan Rows": 40,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 5,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 40.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.01,
+                "Actual Total Time": 0.013,
+                "Plan Rows": 40,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.104,
+      "execution_ms": 0.068
+    },
+    {
+      "sql_sha256": "e1a97cff19d96625971f754a75c181e409c5e19c0c803aca4ad0cece2d6e2515",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 0.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.039,
+        "Actual Total Time": 0.039,
+        "Plan Rows": 1,
+        "Plan Width": 402,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 0.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.038,
+            "Actual Total Time": 0.038,
+            "Plan Rows": 1,
+            "Plan Width": 402,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 0.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.032,
+                "Actual Total Time": 0.032,
+                "Plan Rows": 1,
+                "Plan Width": 402,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.198,
+      "execution_ms": 0.066
+    },
+    {
+      "sql_sha256": "47182c3e717a1024f19f22165fabf7a83b3dfb01724e877553a98fb5d08d5cc6",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 0.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.007,
+        "Actual Total Time": 0.008,
+        "Plan Rows": 1,
+        "Plan Width": 404,
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Seq Scan",
+        "Plans": []
+      },
+      "planning_ms": 0.278,
+      "execution_ms": 0.032
+    },
+    {
+      "sql_sha256": "70e0f0899a608bf36806af658fcfb626e98c6cb44015f5232793804a21e02875",
+      "routes": [
+        "status"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.022,
+        "Actual Total Time": 0.022,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 2,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 0.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.019,
+            "Actual Total Time": 0.019,
+            "Plan Rows": 1,
+            "Plan Width": 26,
+            "Shared Hit Blocks": 2,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Seq Scan",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.081,
+      "execution_ms": 0.051
+    },
+    {
+      "sql_sha256": "0b2c2061c1372501d109ce45be2c7930225e3e74701b21ae9667fc26ac1b64cb",
+      "routes": [
+        "forecasts"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 25.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 1.395,
+        "Actual Total Time": 1.399,
+        "Plan Rows": 25,
+        "Plan Width": 719,
+        "Shared Hit Blocks": 1299,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 25.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 1.394,
+            "Actual Total Time": 1.395,
+            "Plan Rows": 10000,
+            "Plan Width": 719,
+            "Shared Hit Blocks": 1299,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Incremental Sort",
+            "Plans": [
+              {
+                "Actual Rows": 501.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.022,
+                "Actual Total Time": 1.041,
+                "Plan Rows": 10000,
+                "Plan Width": 719,
+                "Shared Hit Blocks": 1296,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Nested Loop",
+                "Join Type": "Left",
+                "Plans": [
+                  {
+                    "Actual Rows": 501.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.012,
+                    "Actual Total Time": 0.218,
+                    "Plan Rows": 10000,
+                    "Plan Width": 508,
+                    "Shared Hit Blocks": 43,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Backward",
+                    "Plans": []
+                  },
+                  {
+                    "Actual Rows": 0.5,
+                    "Actual Loops": 501,
+                    "Actual Startup Time": 0.001,
+                    "Actual Total Time": 0.001,
+                    "Plan Rows": 1,
+                    "Plan Width": 211,
+                    "Shared Hit Blocks": 1253,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Forward",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 2.391,
+      "execution_ms": 1.445
+    },
+    {
+      "sql_sha256": "5524a309aca29dd0b8a43c11e4fa5883c7889f51eb21081ef434f1d21f256f65",
+      "routes": [
+        "forecasts"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.214,
+        "Actual Total Time": 0.214,
+        "Plan Rows": 1,
+        "Plan Width": 33,
+        "Shared Hit Blocks": 39,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Sorted",
+        "Plans": [
+          {
+            "Actual Rows": 500.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.043,
+            "Actual Total Time": 0.167,
+            "Plan Rows": 500,
+            "Plan Width": 57,
+            "Shared Hit Blocks": 39,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Index Scan",
+            "Scan Direction": "Forward",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.102,
+      "execution_ms": 0.247
+    },
+    {
+      "sql_sha256": "d5d34a707e39bee47f3bd7eeab9905f44d133f3f31936740f52f7bad39b98a11",
+      "routes": [
+        "ticker_filter"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 1.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.156,
+        "Actual Total Time": 0.156,
+        "Plan Rows": 1,
+        "Plan Width": 8,
+        "Shared Hit Blocks": 22,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Plain",
+        "Plans": [
+          {
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.053,
+            "Actual Total Time": 0.148,
+            "Plan Rows": 20,
+            "Plan Width": 32,
+            "Shared Hit Blocks": 22,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Bitmap Heap Scan",
+            "Plans": [
+              {
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.04,
+                "Actual Total Time": 0.04,
+                "Plan Rows": 20,
+                "Plan Width": 0,
+                "Shared Hit Blocks": 2,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Bitmap Index Scan",
+                "Plans": []
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.098,
+      "execution_ms": 0.195
+    },
+    {
+      "sql_sha256": "6baeacbe5e8de125cc385cab508e5226629d9812a4e7a4a08adaf332d67d91c6",
+      "routes": [
+        "ticker_filter"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 20.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.164,
+        "Actual Total Time": 0.167,
+        "Plan Rows": 20,
+        "Plan Width": 719,
+        "Shared Hit Blocks": 82,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Limit",
+        "Plans": [
+          {
+            "Actual Rows": 20.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.163,
+            "Actual Total Time": 0.164,
+            "Plan Rows": 20,
+            "Plan Width": 719,
+            "Shared Hit Blocks": 82,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Sort",
+            "Plans": [
+              {
+                "Actual Rows": 20.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.03,
+                "Actual Total Time": 0.14,
+                "Plan Rows": 20,
+                "Plan Width": 719,
+                "Shared Hit Blocks": 82,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Nested Loop",
+                "Join Type": "Left",
+                "Plans": [
+                  {
+                    "Actual Rows": 20.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.021,
+                    "Actual Total Time": 0.047,
+                    "Plan Rows": 20,
+                    "Plan Width": 508,
+                    "Shared Hit Blocks": 22,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Bitmap Heap Scan",
+                    "Plans": [
+                      {
+                        "Actual Rows": 20.0,
+                        "Actual Loops": 1,
+                        "Actual Startup Time": 0.008,
+                        "Actual Total Time": 0.008,
+                        "Plan Rows": 20,
+                        "Plan Width": 0,
+                        "Shared Hit Blocks": 2,
+                        "Shared Read Blocks": 0,
+                        "Shared Dirtied Blocks": 0,
+                        "Shared Written Blocks": 0,
+                        "Temp Read Blocks": 0,
+                        "Temp Written Blocks": 0,
+                        "Node Type": "Bitmap Index Scan",
+                        "Plans": []
+                      }
+                    ]
+                  },
+                  {
+                    "Actual Rows": 1.0,
+                    "Actual Loops": 20,
+                    "Actual Startup Time": 0.004,
+                    "Actual Total Time": 0.004,
+                    "Plan Rows": 1,
+                    "Plan Width": 211,
+                    "Shared Hit Blocks": 60,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Index Scan",
+                    "Scan Direction": "Forward",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.651,
+      "execution_ms": 0.219
+    },
+    {
+      "sql_sha256": "cf5004939b2aaa4a72fd363524e2ccdff5c8911f9a5e8a7deacac1af778282a1",
+      "routes": [
+        "ticker_filter"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 20.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 0.214,
+        "Actual Total Time": 3.577,
+        "Plan Rows": 20,
+        "Plan Width": 33,
+        "Shared Hit Blocks": 726,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Aggregate",
+        "Strategy": "Sorted",
+        "Plans": [
+          {
+            "Actual Rows": 10000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 0.016,
+            "Actual Total Time": 2.327,
+            "Plan Rows": 6415,
+            "Plan Width": 57,
+            "Shared Hit Blocks": 726,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Index Scan",
+            "Scan Direction": "Forward",
+            "Plans": []
+          }
+        ]
+      },
+      "planning_ms": 0.15,
+      "execution_ms": 3.615
+    },
+    {
+      "sql_sha256": "8deffef26957b2d2d70e2fd88054973897bb32a460d624cef8ee7d8b5ab44b7e",
+      "routes": [
+        "performance"
+      ],
+      "parameter_values_retained": false,
+      "plan": {
+        "Actual Rows": 5000.0,
+        "Actual Loops": 1,
+        "Actual Startup Time": 6.649,
+        "Actual Total Time": 6.887,
+        "Plan Rows": 5000,
+        "Plan Width": 56,
+        "Shared Hit Blocks": 872,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0,
+        "Node Type": "Sort",
+        "Plans": [
+          {
+            "Actual Rows": 5000.0,
+            "Actual Loops": 1,
+            "Actual Startup Time": 1.463,
+            "Actual Total Time": 5.053,
+            "Plan Rows": 5000,
+            "Plan Width": 56,
+            "Shared Hit Blocks": 872,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Node Type": "Hash Join",
+            "Join Type": "Inner",
+            "Plans": [
+              {
+                "Actual Rows": 10000.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 0.01,
+                "Actual Total Time": 1.035,
+                "Plan Rows": 10000,
+                "Plan Width": 48,
+                "Shared Hit Blocks": 715,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Seq Scan",
+                "Plans": []
+              },
+              {
+                "Actual Rows": 5000.0,
+                "Actual Loops": 1,
+                "Actual Startup Time": 1.432,
+                "Actual Total Time": 1.433,
+                "Plan Rows": 5000,
+                "Plan Width": 40,
+                "Shared Hit Blocks": 157,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Node Type": "Hash",
+                "Plans": [
+                  {
+                    "Actual Rows": 5000.0,
+                    "Actual Loops": 1,
+                    "Actual Startup Time": 0.006,
+                    "Actual Total Time": 0.621,
+                    "Plan Rows": 5000,
+                    "Plan Width": 40,
+                    "Shared Hit Blocks": 157,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0,
+                    "Node Type": "Seq Scan",
+                    "Plans": []
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "planning_ms": 0.587,
+      "execution_ms": 7.322
+    }
+  ],
+  "reader_sessions_after": 0,
+  "schema_and_fixture_unchanged": true,
+  "native_tls_verified": true,
+  "role_permissions_verified": true,
+  "provider_rows_retained": false,
+  "seven_day_evidence_proven": false,
+  "observed_at": "2026-11-05T16:15:43.018758+00:00"
+}

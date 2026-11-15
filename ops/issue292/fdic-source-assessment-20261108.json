@@ -1,0 +1,30 @@
+{
+  "SEC_subject_assessment_sha256": "3179d3d1fe387351b8350156176caf2b37ea4872452bdc9e35367132be8505de",
+  "assessment_date": "2026-11-08",
+  "candidate_cases": 2,
+  "current_listing_used_for_selection": false,
+  "identity_verified": false,
+  "issue_complete": false,
+  "issuer_metadata_conflicts_retained": 2,
+  "official_public_client_sha256": "c106844105a9535139df60232919d95d23db69cc7b7e4f62a9c088ccba8c7dcf",
+  "paid_resources": false,
+  "portal_url": "https://securitiesfilings.fdicconnect.fdic.gov/",
+  "private_provider_rows_published": false,
+  "proxy_identifier_mentions_found": 0,
+  "proxy_sha256": [
+    "c131bd37fcd019d3bb81e02628dc17bf5029ff52fcc9103149f82dd3b0bbccd9",
+    "0311e60135e5fa04b5ba25b97b8f4e29a60aa5b7ef4c7586e964adc9cb9b4ce6"
+  ],
+  "public_flag_assessment_sha256": "89c961f9bc0ec602b651278191e7d908b7c82e879cd1c68791bfa530ecc92b71",
+  "public_periodic_reports_inspected": 2,
+  "public_proxy_reports_inspected": 2,
+  "report_sha256": [
+    "b17c8c5d6d5ddb7e84fce91edffa685b69556d3a567923c20482620a002c7d90",
+    "12f5d0e6fa85f795e32aa3f879a3efd2a12a74a05b15f7c82321d53ba480e4be"
+  ],
+  "schema_version": 1,
+  "source": "FDIC_public_securities_filing_portal",
+  "source_existence_not_join_proof": true,
+  "source_packet_retained_privately": true,
+  "verified_identity_anchors_added": 0
+}
