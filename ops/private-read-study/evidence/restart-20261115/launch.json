@@ -1,0 +1,10 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "starts_at": "2026-11-15T15:00:00+00:00",
+  "expires_at": "2026-11-22T15:00:00+00:00",
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "application_retries": 0,
+  "billing_changes": 0,
+  "observed_at": "2026-11-15T15:02:13.670423+00:00"
+}

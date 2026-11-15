@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-EXPECTED_CRON = "17 7 * * 2-6"
+EXPECTED_CRON = "17 7 * * TUE-SAT"
 EXPECTED_MAIN = "cloudflare-forward-scheduler.mjs"
 EXPECTED_NAME = "edgar-moe-forward-scheduler"
 EXPECTED_VARS = {

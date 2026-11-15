@@ -18,6 +18,19 @@ A master first captured now cannot produce a reviewable screen before the
 2023–2024 v2 development folds. Do not change its timestamp to make one pass.
 This command supports new prospective study windows; the historical v2 gap
 requires a reviewed archived master and a fresh study under [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292).
+
+The [November 2026 source assessment](issue-292-historical-candidate-source.md)
+records a real pre-2023 server-versioned candidate list and its separate private
+capture/verifier. It supplies dated candidate-source evidence, not verified
+security continuity, permission for market/macro inputs, or a complete study
+chain. Its snapshot-member keys must not be substituted for historical security
+identifiers, and the original v2 dataset/master remain unchanged.
+
+The [SEC identity collector](issue-292-security-identity.md) separately replays
+dated issuer/class/CUSIP evidence and retains every unresolved source member.
+Its successful 12-row live sample does not complete full historical membership,
+market continuity or the new checkpoint/dataset study chain.
+
 For a new prospective cutoff, capture the master before that New York day ends,
 then screen only after the day ends. The default screen cutoff is the previous
 New York day, so a master first captured after that cutoff is not eligible.
@@ -111,6 +124,15 @@ Review:
 - corporate-action edge cases and symbol changes;
 - FRED release coverage;
 - source paths and SHA-256 hashes in `manifest.json`.
+
+The checkpoint's requested-universe asset must have an explicit SHA-256 in its
+manifest. Screen verification hashes the exact roster bytes it parses, rejects
+duplicate JSON fields, includes that digest in the verification receipt, and
+rechecks the roster with the other commitments before returning. A roster
+changed after the checkpoint's initial integrity check fails closed. Legacy
+checkpoints without this hash cannot establish this binding; do not backfill
+missing evidence. These checks strengthen content identity while the historical
+membership and source-availability requirements of #292 remain outstanding.
 
 ## 4. Construct the point-in-time dataset
 

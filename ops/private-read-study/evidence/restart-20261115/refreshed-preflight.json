@@ -1,0 +1,26 @@
+{
+  "issue": 290,
+  "phase": "metadata_preflight",
+  "status": "passed",
+  "application_requests": 0,
+  "database_connections": 0,
+  "billing_changes": 0,
+  "observer_enabled": false,
+  "vercel_plan_metadata_status": 200,
+  "vercel_plan": "hobby",
+  "trace_token_project_isolation_verified": true,
+  "trace_token_declared_expires_at": "2026-12-06T00:00:00+00:00",
+  "token_metadata_status": 404,
+  "free_trace_session_verified": true,
+  "endpoint_state": "idle",
+  "fixed_compute_cu": 0.25,
+  "neon_quota_metadata": {
+    "synthetic_storage_size": 0,
+    "compute_time_seconds": 1845,
+    "data_transfer_bytes": 6448471,
+    "written_data_bytes": 0,
+    "consumption_period_start": "2026-11-01T00:00:00Z",
+    "consumption_period_end": "2026-12-01T00:00:00Z"
+  },
+  "observed_at": "2026-11-15T14:25:17.271890+00:00"
+}

@@ -7,6 +7,9 @@ variable or CLI option that can bypass it.
 The separately scoped scripts/verify_private_forward_cycle.py operator path
 binds the owner's reported approvals to one private #288 verification profile.
 It does not release this general CLI/workflow or publication decision.
+The separate scripts/run_private_scheduler_cycle.py path is similarly bound
+to its own reviewed three-slot #156 personal-use observation record; it does
+not change this decision or extend the old one-cycle authorization.
 """
 
 from __future__ import annotations
