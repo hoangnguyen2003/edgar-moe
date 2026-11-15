@@ -73,7 +73,7 @@ jobs:
           sha256sum reports/private-read-study/*.json > reports/private-read-study/SHA256SUMS
       - name: Retain the observation including failed attempts
         if: ${{ always() && steps.receipt.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: private-read-study-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/private-read-study/
