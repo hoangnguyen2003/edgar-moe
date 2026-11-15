@@ -1,0 +1,9 @@
+{
+  "scope": "offline_study_regression_validation",
+  "tested_commit": "bad7fad2d4cc606046f51d0bddd9da20b145f444",
+  "tests": 132,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "provider_requests_by_tests": 0
+}
