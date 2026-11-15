@@ -1,0 +1,17 @@
+{
+  "issue": 290,
+  "status": "deployed",
+  "phase": "deployed_preview",
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "starts_at": "2026-11-15T15:00:00+00:00",
+  "expires_at": "2026-11-22T15:00:00+00:00",
+  "target": "preview",
+  "database_credential_role": "new_select_only_reader",
+  "owner_credential_exported": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "encrypted_preview_reader_updated": true,
+  "exit_code": 0,
+  "host_sha256": "baa4683cdfc2a92e08fbe9a7fa91a54d4cc1efdf4494af74519d1381b7c27cb5",
+  "observed_at": "2026-11-15T14:34:47.876622+00:00"
+}

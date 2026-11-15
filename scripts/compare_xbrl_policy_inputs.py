@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import os
+import stat
+import tempfile
 from datetime import date
 from pathlib import Path
 
@@ -39,9 +42,27 @@ def main() -> None:
         candidate_manifest_sha256=sha256_file(args.candidate_dataset / "manifest.json"),
     )
     verify_feature_policy_report(result)
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_bytes(orjson.dumps(result, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+    _write_private_report(destination, result)
     print(f"Wrote private pre-test attribution audit: {destination}; status={result['status']}")
+
+
+def _write_private_report(destination: Path, report: dict[str, object]) -> None:
+    """Create a new owner-only audit report without exposing partial content."""
+    destination.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if not destination.parent.is_dir() or stat.S_IMODE(destination.parent.stat().st_mode) != 0o700:
+        raise PermissionError("policy-delta report directory must have owner-only mode 0700")
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{destination.name}.", suffix=".tmp", dir=destination.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(orjson.dumps(report, option=orjson.OPT_INDENT_2 | orjson.OPT_SORT_KEYS))
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.link(temporary, destination)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 if __name__ == "__main__":

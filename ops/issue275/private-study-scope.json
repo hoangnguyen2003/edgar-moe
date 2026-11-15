@@ -1,0 +1,93 @@
+{
+  "issue": 275,
+  "recorded_on": "2026-11-04",
+  "execution_mode": "one_offline_private_paired_study",
+  "evidence_kind": "project-owner attestation in the task conversation",
+  "owner_statements": [
+    "All parties have agreed.",
+    "Resolve the easiest GitHub issue first."
+  ],
+  "provider_responses_independently_verified": false,
+  "purpose": "Private personal portfolio development study, not independent alpha validation",
+  "checkpoint": "data/raw/authenticated/2026-07-31",
+  "checkpoint_manifest_sha256": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603",
+  "output": "issue275-private-run-20261104",
+  "finbert_revision": "4556d13015211d73dccd3fdd39d39232506f3e43",
+  "encoder_device": "mps",
+  "training_device": "cpu",
+  "batch_size": 16,
+  "python_runtime": "CPython 3.12.13",
+  "packages": {
+    "torch": "2.14.0",
+    "transformers": "4.57.6",
+    "numpy": "2.5.3",
+    "pandas": "3.0.6",
+    "scipy": "1.18.1",
+    "scikit-learn": "1.9.0"
+  },
+  "input_sha256": {
+    "config/authenticated-free.yaml": "beaf32a8ef6b05218ab5e9d601400ea01dd6669d0ebae060fc1d002f6f6f6beb",
+    "config/authenticated-v2.yaml": "e4e1f9073486bd58c5967555f3b7f60ea7cc7802b964f1f7f0eb4c6ed32e8193",
+    "config/default.yaml": "d0181ea0a280251367289d9bb5fb562a27dee62f05084017a5c58752af41abe6"
+  },
+  "roster": [
+    "Shrinkage-Gated MoE h=32 dropout=0.10 gate=0.00",
+    "Shrinkage-Gated MoE h=32 dropout=0.10 gate=0.25",
+    "Shrinkage-Gated MoE h=32 dropout=0.10 gate=1.00",
+    "Shrinkage-Gated MoE h=32 dropout=0.20 gate=0.00",
+    "Shrinkage-Gated MoE h=32 dropout=0.20 gate=0.25",
+    "Shrinkage-Gated MoE h=32 dropout=0.20 gate=1.00",
+    "Shrinkage-Gated MoE h=64 dropout=0.10 gate=0.00",
+    "Shrinkage-Gated MoE h=64 dropout=0.10 gate=0.25",
+    "Shrinkage-Gated MoE h=64 dropout=0.10 gate=1.00",
+    "Shrinkage-Gated MoE h=64 dropout=0.20 gate=0.00",
+    "Shrinkage-Gated MoE h=64 dropout=0.20 gate=0.25",
+    "Shrinkage-Gated MoE h=64 dropout=0.20 gate=1.00",
+    "Shrinkage-Gated MoE h=64 dropout=0.15 gate=0.25",
+    "Elastic Net",
+    "Gradient-Boosted Tabular",
+    "Text-Only Expert",
+    "Fundamental-Only Expert",
+    "Market-Only Expert",
+    "Static Early-Fusion MLP",
+    "Equal-Weight Expert Ensemble",
+    "Fundamental-Anchored MoE h=32 dropout=0.10 gate=0.00 moe=0.25",
+    "Fundamental-Anchored MoE h=32 dropout=0.10 gate=0.25 moe=0.25",
+    "Fundamental-Anchored MoE h=32 dropout=0.10 gate=1.00 moe=0.25",
+    "Fundamental-Anchored MoE h=32 dropout=0.20 gate=0.00 moe=0.25",
+    "Fundamental-Anchored MoE h=32 dropout=0.20 gate=0.25 moe=0.25",
+    "Fundamental-Anchored MoE h=32 dropout=0.20 gate=1.00 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.10 gate=0.00 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.10 gate=0.25 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.10 gate=1.00 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.20 gate=0.00 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.20 gate=0.25 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.20 gate=1.00 moe=0.25",
+    "Fundamental-Anchored MoE h=64 dropout=0.15 gate=0.25 moe=0.25"
+  ],
+  "bounds": {
+    "test_start": "2025-01-01",
+    "walk_forward_years": [
+      2023,
+      2024
+    ],
+    "max_epochs": 80,
+    "maximum_candidates": null,
+    "seed": 42,
+    "bootstrap_samples": 1000,
+    "block_months": 2,
+    "provider_calls": false,
+    "registry_access": false,
+    "r2_access": false,
+    "public_numerical_results": false,
+    "locked_scoring": false,
+    "replace_existing_evidence": false,
+    "paid_resources": false
+  },
+  "limitations": [
+    "Owner-reported permission; provider correspondence was not independently inspected.",
+    "New study authorized only by this explicit task and bounded record; general CLI/source/publication holds are not released.",
+    "Fixed cohort with historical membership unverified (#292); no unbiased historical universe or profitable-alpha claim.",
+    "Frozen v1 outcome was already known. V2 remains pending separate reviewed aggregate publication."
+  ]
+}
