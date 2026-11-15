@@ -1,0 +1,21 @@
+{
+  "issue": 290,
+  "phase": "bound",
+  "status": "passed",
+  "study_starts_at": "2026-11-06T08:15:00+00:00",
+  "study_expires_at": "2026-11-13T08:15:00+00:00",
+  "window_hours": 168,
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "rows_written": 0,
+  "existing_project_mutations": 0,
+  "only_dedicated_synthetic_reader_expiry_changed": true,
+  "owner_credential_exported": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "prior_reader_expires_at": "2026-11-13T06:00:00+00:00",
+  "reader_expires_at": "2026-11-13T08:15:00+00:00",
+  "select_only_attributes_and_grants_verified": true,
+  "schema_and_fixture_unchanged": true,
+  "reader_sessions_before": 0,
+  "observed_at": "2026-11-06T08:05:56.062954+00:00"
+}

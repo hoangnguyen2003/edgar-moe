@@ -1,0 +1,18 @@
+{
+  "capture_collector_algorithm_sha256": "8ae29e79ea14987724c73f2a34dd6d873654f229c26befe3695e1256f1290491",
+  "capture_identity_algorithm_sha256": "200dd842d147f1818844d4e889234fd768545c5d37a4edf5960425bcb9c37c25",
+  "issue_complete": false,
+  "processed": 12,
+  "provider_requests": 0,
+  "replay_algorithms": {
+    "collector_algorithm_sha256": "8ae29e79ea14987724c73f2a34dd6d873654f229c26befe3695e1256f1290491",
+    "identity_algorithm_sha256": "200dd842d147f1818844d4e889234fd768545c5d37a4edf5960425bcb9c37c25"
+  },
+  "result_sha256": "fde85d755229bc590d0634ae681d620531e20e3132086dc8eb08303fa3ae6edd",
+  "source_count": 503,
+  "status": "offline_source_replay_verified",
+  "statuses": {
+    "pre_cutoff_SEC_identity_anchored": 12
+  },
+  "verifier_sha256": "cb7fd8d46f83896b29bf4bd78d64060df5e585ab0bdae1212d148191f5dba976"
+}
