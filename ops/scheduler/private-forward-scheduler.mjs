@@ -1,7 +1,9 @@
 /** Finite private #156 slots. No public trigger; signatures bind the Cron timestamp. */
 import { runScheduledDispatch, validateSchedulerConfig } from "./cloudflare-forward-scheduler.mjs";
 
-export const DATES = ["2026-11-07", "2026-11-10", "2026-11-11"];
+export const SCOPE_ID = "issue156-20261114";
+export const DATES = ["2026-11-18", "2026-11-19", "2026-11-20"];
+export const PROBE_DATE = "2026-11-17";
 export const CRON = "17 7 * * TUE-SAT";
 const WORKFLOW = "forward-private-scheduler.yml";
 
@@ -9,7 +11,9 @@ export async function privateInputs(controller, env, now = Date.now()) {
   const timestamp = controller.scheduledTime;
   if (!Number.isFinite(timestamp)) throw new Error("Missing provider scheduled time");
   const stamp = new Date(timestamp).toISOString();
-  if (!DATES.some(day => stamp === `${day}T07:17:00.000Z`)) return null;
+  const mode = stamp === `${PROBE_DATE}T07:17:00.000Z` ? "delivery_probe" :
+    DATES.some(day => stamp === `${day}T07:17:00.000Z`) ? "forecast" : null;
+  if (mode === null) return null;
   if (controller.cron !== CRON || now < timestamp || now - timestamp > 90 * 60000) {
     throw new Error("Private schedule outside freshness boundary");
   }
@@ -21,9 +25,9 @@ export async function privateInputs(controller, env, now = Date.now()) {
   const bytes = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", bytes.encode(env.SCHEDULER_SIGNATURE_KEY),
     {name: "HMAC", hash: "SHA-256"}, false, ["sign"]);
-  const message = `issue156-private-v1\n${stamp}\n${CRON}\nmain\ncpu\n${WORKFLOW}`;
+  const message = `issue156-private-v2\n${SCOPE_ID}\n${mode}\n${stamp}\n${CRON}\nmain\ncpu\n${WORKFLOW}`;
   const signature = await crypto.subtle.sign("HMAC", key, bytes.encode(message));
-  return {device: "cpu", scheduled_at: stamp,
+  return {device: "cpu", mode, scheduled_at: stamp,
     signature: Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("")};
 }
 

@@ -1,6 +1,18 @@
 # Separate personal-portfolio hosted read study (#290)
 
-Status: **isolated setup and free provider tracing verified; not an active hosted study**.
+Latest status (November 15): **a separate restart is active; hosted and CI setup
+verification passed**. The new policy is bound to November 15, 15:00 UTC
+through November 22, 15:00 UTC (22:00 Vietnam time). The November 6–13 study
+remains closed and incomplete; its twelve pairs are not carried into this window.
+See the [restart packet](evidence/restart-20261115/) and its distinct policy hash.
+Four post-start hosted routes passed with matching provider traces and an
+idle-to-active database transition across that setup group. Observer setup run
+[`43727492668`](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668)
+passed with two further reads and a verified body-free artifact. Both bounded
+workflows are enabled. None of these setup requests count as measurement days;
+#290 remains open pending the real week and evidence-quality review.
+
+The earlier setup chronology below describes the original November study.
 See [the November 6 free-plan recovery](FREE-PLAN-RECOVERY.md) for the verified
 Hobby cold/warm metadata path, credential dependencies and alternatives reviewed. The new service and
 observer do not reopen the expired #361 pilot, reset its ledger, or touch #156's
@@ -289,3 +301,15 @@ independent database-pair correlation fix are prepared; activation must use
 the tested code on main. Already missing hourly slots remain missing, and the
 current run cannot attain its predeclared complete-coverage target. Waiting
 alone cannot repair this interruption or replace those observations.
+
+## November 13 final result
+
+The window expired and finalizer run `43425554275` retained the final packet
+and disabled both observer/finalizer workflows. The actual result is
+**incomplete: 12 pairs, 24 reads, three observed UTC dates and 156 missing hourly
+slots**. Zero HTTP/contract errors coexist with one refused platform trace,
+one degraded pair and one failed workflow. See the
+[separately bound reanalysis](evidence/closeout-20261113/summary.md) and
+[all-open-issue recovery review](../../docs/open-issue-closeout-20261113.md).
+At that closeout, no expired slot was replayed and no replacement window had
+started. The separately bound November 15 restart is described above.

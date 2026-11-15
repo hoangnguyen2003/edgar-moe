@@ -1,0 +1,10 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "run_id": 43725918641,
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "collecting_status_verified": true,
+  "application_requests": 0,
+  "stop_job_skipped": true,
+  "issue_closed": false
+}

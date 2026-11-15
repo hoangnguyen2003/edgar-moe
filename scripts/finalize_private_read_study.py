@@ -125,6 +125,10 @@ def summarize(
     edge_counts: Counter[str] = Counter()
     platform_counts: Counter[str] = Counter()
     database_counts: Counter[str] = Counter()
+    trace_counts: Counter[str] = Counter()
+    workflow_counts: Counter[str] = Counter()
+    degraded_pairs = 0
+    pair_starts: list[datetime] = []
     for record in records:
         meta, receipt = record["run"], record["receipt"]
         # Dispatch is setup-only, even if it occupies a valid numbered slot.
@@ -151,6 +155,14 @@ def summarize(
         ):
             raise Refusal("observation_window_refused")
         slots[slot].append(meta["id"])
+        pair_starts.append(stamp)
+        degraded_pairs += receipt.get("status") == "degraded"
+        conclusion = meta.get("conclusion")
+        workflow_counts[
+            conclusion
+            if conclusion in {"success", "failure", "cancelled", "timed_out"}
+            else "unobserved"
+        ] += 1
         dates.add(stamp.date().isoformat())
         source_commits.add(meta["head_sha"])
         if len(receipt["samples"]) not in (1, 2):
@@ -170,6 +182,10 @@ def summarize(
             if not passed:
                 failures[sample.get("reason", "unclassified")] += 1
             provider = sample.get("provider_trace", {})
+            trace_status = provider.get("status")
+            trace_counts[
+                trace_status if trace_status in {"passed", "refused"} else "unobserved"
+            ] += 1
             platform = sample["platform_start_type"]
             platform_counts[platform] += 1
             edge_counts[sample["edge_cache"]] += 1
@@ -252,6 +268,12 @@ def summarize(
         "generated_at": now.isoformat(),
         "window_hours": 168,
         "window_elapsed": elapsed,
+        "observed_utc_date_count": len(dates),
+        "first_pair_started_at": min(pair_starts).isoformat() if pair_starts else None,
+        "last_pair_started_at": max(pair_starts).isoformat() if pair_starts else None,
+        "pair_start_span_seconds": (max(pair_starts) - min(pair_starts)).total_seconds()
+        if pair_starts
+        else None,
         "host_sha256": env["STUDY_DEPLOYMENT_HOST_SHA256"],
         "policy_sha256": env["STUDY_POLICY_SHA256"],
         "expected_pairs": 168,
@@ -261,6 +283,9 @@ def summarize(
         "http_or_contract_errors": errors,
         "attempt_error_rate": errors / attempts if attempts else None,
         "failure_reasons": dict(failures),
+        "platform_trace_status_counts": dict(trace_counts),
+        "degraded_observation_pairs": degraded_pairs,
+        "workflow_conclusion_counts": dict(workflow_counts),
         "edge_cache_counts": dict(edge_counts),
         "edge_hit_count": edge_counts["HIT"],
         "platform_counts": dict(platform_counts),
@@ -286,6 +311,7 @@ def summarize(
             "Private no-store routes do not intentionally exercise edge hits; report zero observed hits explicitly.",
             "Preparation CPU remains in HTTP/lifecycle time; bootstrap cache state is not separately reported.",
             "Small per-cohort tail samples are descriptive and do not justify an SLO or alert threshold.",
+            "An elapsed policy window is not proof of seven days of observations; HTTP/contract errors exclude separate trace and workflow failures.",
         ],
         "slo_established": False,
         "issue_closed": False,
@@ -301,6 +327,8 @@ def markdown(report: dict[str, Any]) -> str:
         f"Collection status: **{report['status']}**. Fixed window: {report['starts_at']} through {report['expires_at']}.",
         "",
         f"Observed {report['observed_pairs']}/168 scheduled pairs and {report['actual_http_attempts']}/336 modeled requests; {report['http_or_contract_errors']} HTTP/contract errors. Manual setup runs are excluded.",
+        f"Actual observations cover {report['observed_utc_date_count']} UTC dates, from {report['first_pair_started_at']} through {report['last_pair_started_at']} (pair-start span: {report['pair_start_span_seconds']} seconds). The policy window elapsing does not fill missing observations.",
+        f"Platform trace statuses: {report['platform_trace_status_counts']}; degraded pairs: {report['degraded_observation_pairs']}; workflow conclusions: {report['workflow_conclusion_counts']}. These are separate from HTTP/contract errors.",
         f"Missing slots: {report['missing_slots']}. Duplicate slots: {report['duplicate_slots']}.",
         "",
         "Successful hosted HTTP latency (milliseconds, nearest-rank; each row retains its own sample count):",

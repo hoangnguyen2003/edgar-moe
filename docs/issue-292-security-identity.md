@@ -1,8 +1,15 @@
-# Historical SEC security identity evidence, 2026-11-09
+# Historical SEC security identity evidence, 2026-11-14
 
 The fixed historical [candidate source](issue-292-historical-candidate-source.md)
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
 source evidence, not a completed historical market master or corrected v2 study.
+
+The latest separate legacy-governing supplement has **488 of 503 verified
+identity anchors**, with **15 unresolved candidates**. Its
+[row-free audit](../ops/issue292/legacy-governing-audit-20261114.json) binds an
+independent offline replay. The collector's original 486-anchor result and
+the earlier 487-anchor supplement remain unchanged; sections below retain
+their separate evidence stages rather than relabeling old captures.
 
 ## Method and actual result
 
@@ -560,7 +567,8 @@ binds the complete private result and original capture/verifier code digests.
 The result SHA-256 is
 `00f085f9f8de5f9f7dab9414ccf72d845b5e8e3a3ea7387f24b07533681b0cef`.
 Its 70 unresolved candidates prevented a complete historical security master
-claim; 16 remain after the latest extensions. Submissions about other issuers
+claim; the filed-class stage retained 16, and the legacy supplement leaves 15.
+Submissions about other issuers
 were actually encountered and refused;
 104 subject-mismatch attempts are retained among unresolved ownership cases.
 Earlier primary-document-only anchor counts below are historical progress,
@@ -597,3 +605,61 @@ source-use hold or publication gate. Frozen v1, existing v2 artifacts and
 append-only forward records are preserved. Public artifacts contain only
 operational counts, hashes and limitations; all source rows and CUSIPs remain
 private. No paid plan, infrastructure change or trading operation was used.
+
+## Legacy governing-document supplement, 2026-11-14
+
+A separate append-only path supports an explicitly incorporated pre-2000 S-4
+charter whose complete SGML submission predates exhibit filenames and acceptance
+timestamps. This is a narrow legacy format; modern documents cannot use it to
+bypass missing metadata. The original collector and filed-class supplement are
+not rewritten.
+
+The newest eligible annual filing must independently register the same issuer,
+symbol, class and par value as the current periodic anchor. Its one governing
+reference must bind the exact SEC issuer path, accession, S-4 file number,
+exhibit, filing date and restatement date. The source must contain one explicit
+filer, the expected primary registration, its complete declared document
+inventory, consecutive sequence numbers and exactly one governing exhibit.
+The charter's legal name and signing date must match. A date-only availability
+bound uses filing date plus 14 calendar days; no missing acceptance timestamp
+is invented and a current retrieval is never labeled a historical capture.
+
+The supported authorization distinguishes one common-stock class from separate
+preferred stock. Word and numeric share counts must agree and reconcile to the
+total. The common par value and explicit one-vote-per-common-share sentence are
+required. Named classes, additional equity families, nonvoting terms, conflicting
+rights or common rights outside the authorized article are refused. Preferred
+series may have their own rights; those rights never qualify a preferred
+security as common stock.
+
+All authenticated ownership candidates must agree on SEC subject, issuer name,
+CUSIP and the compatible missing voting qualifier. Explicit competing classes,
+identifiers or voting rights are not discarded. The proposal cannot override
+an existing anchor, repair a missing periodic anchor, introduce a foreign member
+or duplicate a candidate. No common/ordinary/capital family alias is added.
+
+`scripts/enrich_historical_legacy_governance.py` first independently replays the
+previous filed-class supplement, including its original baseline. It then
+recomputes the legacy source proof with no HTTP client and writes a separately
+content-addressed `legacy-governance-<sha256>.json`. Its `--verify` mode repeats
+both the baseline and new source checks. The 503-row binding, order and every
+earlier anchor payload must remain unchanged. Missing, changed, aliased or
+oversized private files fail closed; source discovery is separate from replay.
+
+```sh
+python -m scripts.enrich_historical_legacy_governance \
+  --directory data/artifacts/historical-identities \
+  --baseline class-enrichment-<previous-sha256>.json \
+  --references private-legacy-plan.json \
+  --governing-sources data/artifacts/private-legacy-sources \
+  --source-capture data/artifacts/historical-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+For replay, replace `--baseline` and `--references` with
+`--verify legacy-governance-<sha256>.json`, retaining the other private inputs.
+This identity evidence does not establish uninterrupted historical class/market
+continuity, source permissions for bars, or a corrected selected-members,
+checkpoint, processed-dataset and study chain. Those completion flags remain
+false; frozen v1 and append-only forward records are unchanged. Private
+issuer/CUSIP rows and governing-source proposals are not published.
