@@ -11,7 +11,7 @@ enabled = false
 # Only three reviewed dates dispatch. All later invocations return before
 # reading credentials or contacting GitHub. The UTC timing remains unchanged.
 [triggers]
-crons = ["17 7 * * 2-6"]
+crons = ["17 7 * * TUE-SAT"]
 
 [vars]
 GITHUB_REPOSITORY = "hoangnguyen2003/edgar-moe"

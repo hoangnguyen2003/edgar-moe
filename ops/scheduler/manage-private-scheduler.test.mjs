@@ -34,7 +34,7 @@ test("installs exactly the separate signing secret after three bounded GETs", as
 test("active or drifted resources cannot receive a signing key", async () => {
   for (const results of [
     [{...worker, id: "wrong"}],
-    [worker, {schedules: [{cron: "17 7 * * 2-6"}]}],
+    [worker, {schedules: [{cron: "17 7 * * TUE-SAT"}]}],
     [worker, {schedules: []}, [secret, {name: "SCHEDULER_SIGNATURE_KEY", type: "secret_text"}]],
     [worker, {schedules: []}, [secret, {name: "unknown", type: "secret_text"}]],
   ]) {
@@ -46,7 +46,7 @@ test("active or drifted resources cannot receive a signing key", async () => {
 });
 
 test("active verification requires exact Cron and both secret names", async () => {
-  const results = [worker, {schedules: [{cron: "17 7 * * 2-6"}]}, [secret, {name: "SCHEDULER_SIGNATURE_KEY", type: "secret_text"}]];
+  const results = [worker, {schedules: [{cron: "17 7 * * TUE-SAT"}]}, [secret, {name: "SCHEDULER_SIGNATURE_KEY", type: "secret_text"}]];
   const {report} = await check("VERIFY_ACTIVE", results);
   assert.equal(report.status, "passed");
   assert.equal(report.cron_enabled, true);

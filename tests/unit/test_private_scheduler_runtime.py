@@ -157,3 +157,20 @@ def test_real_recording_is_required_and_existing_rows_are_preserved(
     assert calls[0]["Key"].endswith("2026-11-05.claim.json")
     assert "private_archive" in calls
     assert json.loads((output / "registry-appended.json").read_text()) == {"forward_runs": 1}
+
+
+def test_upload_budget_covers_all_object_methods_and_refuses_before_writes(tmp_path):
+    from unittest.mock import Mock
+
+    underlying = Mock(client=Mock(), bucket="synthetic")
+    store = runner.BudgetedStore(underlying, limit=10)
+    path = tmp_path / "synthetic"
+    path.write_bytes(b"123456")
+    store.put_file(path)
+    store.put_bytes(b"1234", logical_name="synthetic")
+    assert store.bytes_reserved == 10
+    with pytest.raises(ValueError, match="budget exceeded"):
+        store.put_bytes(b"x", logical_name="overflow")
+    with pytest.raises(ValueError, match="budget exceeded"):
+        store.put_file(path)
+    assert underlying.put_file.call_count == underlying.put_bytes.call_count == 1

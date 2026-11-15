@@ -297,6 +297,21 @@ metadata only. `STOP` disables Cron while retaining the code and both secrets.
 `PREPARE` never overwrites an existing signing key; investigate a partially
 completed preparation before repeating it. The old preparation verifier expects
 only the original secret and is not a verifier for this two-secret profile.
+If the separate key installation succeeded but the upload failed, first run
+`VERIFY_DISABLED`. `RESUME_PREPARE` then requires both secret names and an empty
+Cron list before uploading inert code; it never reinstalls or replaces a key.
+The pinned CLI's deployment receipt retains bounded, redacted diagnostics so a
+failed upload has a usable cause without printing credentials or account URLs.
+Run 41828873912 exposed a pinned-CLI failure reading dashboard metadata. Source
+inspection found that a dashboard-modified Worker makes that CLI read account
+domain records along with service bindings/routes before uploading. The private
+workflow now uses Wrangler only for credential-free bundling and uses the
+[Worker-scoped upload API](https://developers.cloudflare.com/api/resources/workers/subresources/scripts/methods/update/)
+for the existing Worker. That API explicitly accepts Individual Workers Editor.
+It refuses unexpected existing bindings and strictly inherits the two secret
+bindings; no secret values are downloaded. Trigger updates address that same
+Worker only. `STOP` updates the empty Cron list without rewriting code. No
+account-wide permission expansion is required.
 
 The scheduler-side date guard becomes inert after November 7 even if the Cron
 configuration remains present. Run `STOP` after collecting the three receipts.
@@ -307,3 +322,135 @@ private packets before deciding whether timing is reliable enough to close it.
 If no eligible filings occur, retain the inconclusive receipts and prepare a new
 finite observation scope instead of inventing forecasts or silently extending
 this one.
+
+### Corrected provider calendar and fresh finite scope (2026-11-06)
+
+Read-only provider verification confirmed that the November 4 private deployment
+was active, but no signed private workflow run was recorded for November 5 or 6.
+That does not establish why those two invocations failed. The original deployment
+receipts are preserved. Its Cron was stopped before preparing the correction.
+
+A definite configuration error was found independently: Cloudflare numbers
+weekdays **1=Sunday through 7=Saturday**, while GitHub uses **0=Sunday through
+6=Saturday**. Copying `17 7 * * 2-6` into Cloudflare schedules Monday–Friday and
+excludes Saturday. Cloudflare profiles, validation, HMAC admission and provider
+state checks now use **`17 7 * * TUE-SAT`**. The existing GitHub expression stays
+unchanged. Both now mean Tuesday–Saturday at **07:17 UTC**; this correction does
+not move the nominal time, New York cutoff, input universe or filing-coverage
+configuration. See [Cloudflare's documented weekday dialect](https://developers.cloudflare.com/workers/configuration/cron-triggers/).
+
+The old source-scope record is preserved. The fresh operator plan is
+[`private-scheduler-scope-20261106.json`](../issue156/private-scheduler-scope-20261106.json),
+prepared under the current instruction to resolve the issue autonomously and
+carrying forward the existing owner-reported private-use permission. It allows
+only **November 7, 10 and 11, 2026 at 07:17 UTC** (14:17 Vietnam time), using a
+new atomic claim namespace. These are fresh observations, never backdated or
+replayed missing runs. Source families, frozen inputs, private destinations,
+CPU-only inference, no-publication/general-source-hold boundary and maximum
+three cycles remain the same. The provider-date guard is inert afterward.
+
+Each cycle now caps **all** workflow/evidence uploads together below 1 GB,
+including a reservation for its small atomic claim. Counting deduplicated
+attempts conservatively bounds new writes; the existing seed is downloaded and
+never copied back. Three cycles fit within the prior 4 GB allocation. This is
+not an account-wide storage or third-party permission determination.
+
+`closeout-private-scheduler.yml` needs no provider/database credentials. It
+checks actual main-branch attempt-one workflow metadata, flat artifact inventories,
+receipt hashes, source-scope identity, signed scheduled timestamps, nonzero
+forecast counts, unchanged existing rows/cutoff/coverage, consistent recording
+and entry clocks, durable private-evidence hashes, and at least **5,400 seconds**
+of pre-open margin for **every one of the three distinct dates**. Old scopes,
+manual timestamps, reruns, duplicate slots, missing artifacts, empty forecasts
+and short or inconsistent margins cannot satisfy acceptance.
+
+Only after all three real observations pass and the redacted report is uploaded
+does a separate `issues: write` job post the verified operational evidence and
+mark issue 156 completed. It cannot release general ingestion/publication holds
+or close another issue. An `actions: write` cleanup job requests `STOP` for this
+private Worker and disables the closeout workflow after the scope finishes or
+expires; the finite date guard independently prevents later source-backed work.
+Failed/incomplete observations retain their report and leave the issue open.
+Overdue missing slots and failed margin evidence also fail the closeout job
+after artifact retention, so missing scheduler delivery is visible in Actions
+instead of silently counting calendar time as successful observation.
+This is limited operational validation for a personal portfolio, not a claim
+of a production latency SLO. No synthetic fixture is accepted as live evidence.
+
+### Replacement after credential recovery (November 14)
+
+The prior scope is expired. Its Cron shutdown was verified in run 43555332838.
+The separate [replacement plan](../../docs/issue-156-replacement-scheduler.md)
+uses one signed, source-free delivery probe on November 17 before three
+forecast slots on November 18/19/20. All slots retain 07:17 UTC timing. Future
+forecasts require the exact successful delivery artifact before dependencies
+or provider credentials, and late activation is refused. This is preparation,
+not activation or completed acceptance; the prior scope is not extended.
+
+### Read-only missed-Cron diagnosis (November 9)
+
+Closeout run [42504029772](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42504029772)
+reported the November 7 slot overdue with no eligible forecast observation.
+Read-only provider verification run
+[42560486652](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42560486652)
+confirmed the existing private Worker, exact Cron and both secret names.
+Secret presence does not establish credential validity or successful dispatch.
+The current scope cannot satisfy all three dates after missing November 7.
+Neither later observations nor manual replay may replace that date.
+
+The management workflow's new `VERIFY_CRON_EVENTS` stage first performs the
+existing three metadata GETs, then one read-only GraphQL POST for this Worker's
+retained scheduled events. It never uploads code, changes a secret or trigger,
+invokes the Worker, dispatches GitHub work, enables logging, or queries source
+data. The account fingerprint, Worker name, 100-event/64-KiB bounds, 15-second
+timeout, no-redirect/no-retry policy and November 7–11 UTC diagnostic window
+are fixed in `inspect-private-cron-events.mjs`. It uses only the existing scoped
+Cloudflare credential in the main-only `scheduler` environment.
+
+Only normalized event/scheduled times, expected-Cron boolean and allowlisted
+outcomes are retained. Provider errors, account IDs, credentials and unknown
+fields are discarded. Provider permission/schema refusal stays a refusal;
+this stage does not request wider permission. Live query compatibility is
+pending main-branch execution. Empty or capped retained inventories do not
+prove that no invocation occurred. Event success also does not prove a forecast
+was recorded or establish a pre-open margin.
+
+Use actual event evidence to distinguish missed delivery from invocation
+failure or a skipped dispatch before preparing any replacement finite scope.
+The old scope, missed date, original cutoff, source-use hold and filing-coverage
+configuration remain intact. A future scope must use fresh dates and its own
+claim namespace; never silently extend this one or backdate evidence.
+
+The first live Cron-events query (run
+[42563859289](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42563859289))
+passed all existing resource checks, then returned `metadata_query_refused`.
+It made one GraphQL read, zero external writes and zero Worker invocations.
+The original receipt did not retain enough detail to distinguish query
+compatibility, authorization or dataset availability, so none is asserted as
+the verified live cause.
+
+The follow-up aligns the account variable with the lowercase `string` scalar
+in Cloudflare's [core query examples](https://developers.cloudflare.com/analytics/graphql-api/getting-started/querying-basics/)
+and maps in-memory [documented error families](https://developers.cloudflare.com/analytics/graphql-api/errors/)
+to a small sorted category set. Messages, arbitrary paths, account values and
+unknown payload fields are still discarded. At most 16 errors and 4,096
+characters per message are examined. A refusal remains a refusal, makes no
+additional request and never broadens permissions, narrows a time range
+silently, or retries a provider suggestion. Successful live compatibility
+still requires a fresh, bounded main-branch diagnostic.
+
+### November 13 closeout and cleanup acknowledgement
+
+All three forecast dates remained missing. The closeout scope is finished and
+its workflow is disabled, but the child STOP returned HTTP 401. A November 13
+retry retained the same refusal. The expired date guard remains independently
+inert; successful provider-side cleanup is not claimed.
+
+`stop_private_scheduler.py` now uses the
+[versioned dispatch response](https://docs.github.com/en/rest/about-the-rest-api/breaking-changes?apiVersion=2026-03-10)
+to verify the exact main-branch STOP run, rather than treating a queued request
+as completed cleanup. It checks provenance, waits within a fixed deadline/read
+cap, retains failed acknowledgements and never repeats an ambiguous dispatch.
+The closeout is disabled even when provider cleanup fails; the job then fails
+visibly after receipt retention. See the
+[complete recovery review](../../docs/open-issue-closeout-20261113.md).

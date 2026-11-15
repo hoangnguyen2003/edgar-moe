@@ -19,7 +19,7 @@ from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from private_scheduler_scope import admit, read_scope
+from private_scheduler_scope import SCOPE_ID, SCOPE_SHA256, admit, read_scope
 from validate_frozen_runtime import validate_frozen_runtime
 from verify_private_forward_cycle import compare_snapshots, snapshot, target_fingerprints
 from verify_scheduler_runtime_targets import compare_targets
@@ -43,13 +43,47 @@ MAX_ARCHIVE_BYTES = 1_000_000_000
 MAX_EXTRACT_BYTES = 6_000_000_000
 
 
+class BudgetedStore:
+    """Conservative upload-byte ceiling across workflow and evidence objects.
+
+    Counting deduplicated attempts as new bytes gives an upper bound. Reserve
+    1 KiB for the separate atomic claim; the seed is downloaded, never copied
+    back into R2. Private output files are complete before put_file is called.
+    """
+
+    def __init__(self, store: Any, limit: int = MAX_ARCHIVE_BYTES - 1024) -> None:
+        self.store = store
+        self.client, self.bucket = store.client, store.bucket
+        self.limit = limit
+        self.bytes_reserved = 0
+
+    def reserve(self, size: int) -> None:
+        if size < 0 or self.bytes_reserved + size > self.limit:
+            raise ValueError("Private cycle upload budget exceeded")
+        self.bytes_reserved += size
+
+    def put_file(self, source: str | Path, *, logical_name: str | None = None) -> Any:
+        self.reserve(Path(source).stat().st_size)
+        return self.store.put_file(source, logical_name=logical_name)
+
+    def put_bytes(self, content: bytes, *, logical_name: str) -> Any:
+        self.reserve(len(content))
+        return self.store.put_bytes(content, logical_name=logical_name)
+
+    def read_bytes(self, reference: Any) -> bytes:
+        result: bytes = self.store.read_bytes(reference)
+        return result
+
+
 def write_json(path: Path, payload: Any) -> None:
     with path.open("x") as stream:
         json.dump(payload, stream, indent=2, default=str)
         stream.write("\n")
 
 
-def restore_seed(store: R2ArtifactStore, record: dict[str, Any], output: Path) -> None:
+def restore_seed(
+    store: R2ArtifactStore | BudgetedStore, record: dict[str, Any], output: Path
+) -> None:
     seed = record["private_cache_seed"]
     path = output / "seed.tar.gz"
     store.client.download_file(store.bucket, seed["key"], str(path))
@@ -124,18 +158,21 @@ def run(root: Path, record: dict[str, Any], scheduled: datetime, output: Path) -
     if errors:
         raise ValueError("Reviewed frozen runtime failed validation")
     config = ResearchConfig.from_yaml(root / "config/authenticated-free.yaml")
-    store = R2ArtifactStore(
+    raw_store = R2ArtifactStore(
         endpoint_url=settings.edgar_moe_r2_endpoint_url,
         bucket=settings.edgar_moe_r2_bucket,
         access_key_id=settings.edgar_moe_r2_access_key_id,
         secret_access_key=settings.edgar_moe_r2_secret_access_key,
     )
+    store = BudgetedStore(raw_store)
     database = RegistryDatabase(
         settings.edgar_moe_registry_database_url, pool_size=1, max_overflow=0
     )
     stage = "snapshot"
     report: dict[str, Any] = {
         "status": "failed",
+        "scope_id": SCOPE_ID,
+        "scope_sha256": SCOPE_SHA256,
         "scheduled_at": scheduled.isoformat(),
         "source_cutoff_rule_unchanged": True,
         "filing_coverage_configuration_unchanged": True,
@@ -148,7 +185,7 @@ def run(root: Path, record: dict[str, Any], scheduled: datetime, output: Path) -
         stage = "claim_schedule_slot"
         store.client.put_object(
             Bucket=store.bucket,
-            Key=f"private-scheduler/issue156-20261104/{scheduled.date().isoformat()}.claim.json",
+            Key=f"private-scheduler/{SCOPE_ID}/{scheduled.date().isoformat()}.claim.json",
             Body=json.dumps({"run_id": os.environ["GITHUB_RUN_ID"]}).encode(),
             ContentType="application/json",
             IfNoneMatch="*",
@@ -207,6 +244,9 @@ def run(root: Path, record: dict[str, Any], scheduled: datetime, output: Path) -
             status="recorded" if forecast.counts["forecasts_inserted"] else "no_eligible_forecasts",
             cutoff=cutoff,
             forecast_run_id=forecast.run_id,
+            forecasts_inserted=forecast.counts["forecasts_inserted"],
+            recorded_at_utc=margin.get("details", {}).get("observed_at"),
+            target_regular_open_utc=margin.get("details", {}).get("target_regular_open"),
             actual_forecasts_recorded=forecast.counts["forecasts_inserted"] > 0,
             forecast_margin_proven=forecast.counts["forecasts_inserted"] > 0
             and margin["status"] == "passed",
@@ -242,6 +282,7 @@ def run(root: Path, record: dict[str, Any], scheduled: datetime, output: Path) -
         raise ValueError("Private evidence archive exceeds the bounded storage allocation")
     reference = store.put_file(archive_path, logical_name="private-scheduler-evidence.tar.gz")
     report["private_evidence_sha256"] = reference.sha256
+    report["new_storage_upper_bound_bytes"] = store.bytes_reserved + 1024
     return report
 
 

@@ -7,7 +7,7 @@ import { pathToFileURL } from "node:url";
 const WORKER = "edgar-moe-forward-scheduler";
 const ID = "d8be7a3ac48547e98a48e99f1eb145a1";
 const ACCOUNT_SHA = "d55626b5e28b4d2ac50ff058e39cd722f2779d300ca7db10f76e3e3d7966d386";
-const CRON = "17 7 * * 2-6";
+const CRON = "17 7 * * TUE-SAT";
 export async function managePrivateScheduler({phase, env, expectedAccountSha256 = ACCOUNT_SHA, fetchImpl = globalThis.fetch}) {
 let requests = 0;
 let writes = 0;
