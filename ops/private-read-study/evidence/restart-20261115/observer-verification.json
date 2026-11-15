@@ -1,0 +1,32 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "observer_run_id": 43727492668,
+  "observer_run_url": "https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668",
+  "source_commit": "bad7fad2d4cc606046f51d0bddd9da20b145f444",
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "host_sha256": "baa4683cdfc2a92e08fbe9a7fa91a54d4cc1efdf4494af74519d1381b7c27cb5",
+  "starts_at": "2026-11-15T15:00:00+00:00",
+  "expires_at": "2026-11-22T15:00:00+00:00",
+  "exact_setup_artifact_verified": true,
+  "archive_sha256": "4ad58db081cb9cf5e668a0ce66d94ffc82969b353ee8afb348c94eeb6fc33e10",
+  "artifact_digest_checks": 4,
+  "setup_http_reads": 2,
+  "scheduled_measurement_pairs_in_this_receipt": 0,
+  "provider_trace_classifications": [
+    "warm",
+    "warm"
+  ],
+  "database_pair_cohort": "provider_active_before_and_after_read_pair",
+  "workflow_states": {
+    "observe-private-read-study.yml": "active",
+    "finalize-private-read-study.yml": "active",
+    "closeout-private-scheduler.yml": "active"
+  },
+  "flag_enabled_verified": true,
+  "original_study_remains_incomplete": true,
+  "seven_day_evidence_proven": false,
+  "issue_closed": false,
+  "billing_changes": 0,
+  "observed_at": "2026-11-15T15:03:12.324638+00:00"
+}
