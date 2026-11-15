@@ -1,0 +1,20 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "phase": "bound",
+  "old_policy_extended": false,
+  "existing_reader_changed": false,
+  "existing_rows_changed": false,
+  "owner_credential_exported": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "starts_at": "2026-11-15T15:00:00+00:00",
+  "expires_at": "2026-11-22T15:00:00+00:00",
+  "new_reader_created": true,
+  "prior_reader_still_expired": true,
+  "prior_reader_expiry": "2026-11-13T08:15:00+00:00",
+  "schema_and_fixture_unchanged": true,
+  "reader_connection_limit": 2,
+  "observed_at": "2026-11-15T14:32:58.186089+00:00"
+}
