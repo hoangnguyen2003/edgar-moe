@@ -1,12 +1,18 @@
 name = "edgar-moe-forward-scheduler"
 main = "cloudflare-forward-scheduler.mjs"
 compatibility_date = "2026-09-22"
+workers_dev = false
+preview_urls = false
+logpush = false
+
+[observability]
+enabled = false
 
 # Keep this adapter dormant until it has been deployed and observed. The
 # repository's GitHub schedule remains the live trigger until a separate PR
 # removes that schedule after a successful cutover.
 [triggers]
-crons = ["17 7 * * 2-6"]
+crons = ["17 7 * * TUE-SAT"]
 
 [vars]
 GITHUB_REPOSITORY = "hoangnguyen2003/edgar-moe"

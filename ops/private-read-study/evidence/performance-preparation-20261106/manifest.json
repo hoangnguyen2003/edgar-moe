@@ -1,0 +1,27 @@
+{
+  "issue": 290,
+  "measurement_days": 0,
+  "setup_evidence_only": true,
+  "files": [
+    {
+      "path": "performance-stage-diagnostic.json",
+      "sha256": "f917f6d84477ead609fbee39b1031856866e8366f8bae05b351a823e2dca9da8"
+    },
+    {
+      "path": "prepared-local-baseline.json",
+      "sha256": "0e243fb57b6b41b9a812777ad3e13bf0d92891f2cdd212c371573982e6f12977"
+    },
+    {
+      "path": "prepared-window-binding.json",
+      "sha256": "6c2fec3208b013ec5ccfa70676b716645cdfd9e03ffda217d72f9cd0aacf1f92"
+    },
+    {
+      "path": "public-preparation-input-proof.json",
+      "sha256": "336252ccb2d66eacc890bcd76b4c0b5b988bdeade0682303c5948fab68be6dbd"
+    },
+    {
+      "path": "unprepared-local-baseline.json",
+      "sha256": "4872e7ca7b353fd309a12be0e2c653f84aff06eeab479c19c142305005e92c20"
+    }
+  ]
+}

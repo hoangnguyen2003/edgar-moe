@@ -1,0 +1,18 @@
+{
+  "issue": 290,
+  "phase": "setup_vector_equivalence",
+  "measurement_sample": false,
+  "http_requests": 0,
+  "select_only": true,
+  "database_connections": 1,
+  "rows_retained": false,
+  "owner_credential_used": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "preparation_inputs_sha256": "d684918c1ea41f63ae7c76ff6f1388f535819075150c30caad47dda7ad890802",
+  "fixture_payload_sha256": "d6d852a89cf6221704b045775e85134cba94d3c0871677e8a5321d39e3562f7d",
+  "status": "passed",
+  "exact_float_time_and_order_match": true,
+  "pair_count": 5000,
+  "observed_at": "2026-11-06T08:03:51.253908+00:00"
+}

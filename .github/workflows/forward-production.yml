@@ -2,8 +2,9 @@ name: Prospective forward cycle
 
 on:
   schedule:
-    # 07:17 UTC Tuesday-Saturday is after the prior U.S. SEC acceptance window
-    # and leaves at least six hours before the next regular NYSE open.
+    # Nominal 07:17 UTC timing preserves the existing U.S. source cutoff.
+    # GitHub can start late; use the recorded pre_open_schedule_margin,
+    # rather than this cron time, to assess the actual lead time before entry.
     - cron: "17 7 * * 2-6"
   workflow_dispatch:
     inputs:
