@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from pathlib import Path
+from platform import python_version
 
 import numpy as np
 import orjson
@@ -206,6 +207,7 @@ async def test_authenticated_checkpoint_builds_point_in_time_dataset(tmp_path) -
     assert not dataset.availability.empty
     assert dataset.attrition["included_events"] == 3
     assert restored.dataset_id == dataset.dataset_id
+    assert restored.provenance["python_runtime"] == python_version()
     assert restored.provenance["text_encoder"].startswith("hashing-blake2b-v1")
     assert dataset_xbrl_fact_policy(restored) == "duration_aware_v2"
     fundamental_names = dataset.feature_names["fundamental"]

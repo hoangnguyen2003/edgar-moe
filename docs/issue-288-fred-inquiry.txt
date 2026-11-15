@@ -1,0 +1,28 @@
+To: stlsFRED@stls.frb.org
+Subject: Permission question: private noncommercial EDGAR research and checkpoint verification
+
+Hello FRED team,
+
+I am an individual developer building EDGAR-MoE solely as a personal resume
+portfolio project, without commercial use.
+
+The research pipeline uses FRED/ALFRED series VIXCLS, DGS10, DFF and BAA10Y,
+including historical initial-release vintages, stored private checkpoints and
+features, and a quantitative machine-learning model. I want to verify one
+private forward cycle, including interruption/resume, model inference,
+settlement and diagnostic retention. It would use a previously trained model
+and its retained training dataset as well as newly refreshed inputs. Raw
+observations and provider-derived diagnostics would remain private; the public
+site currently serves synthetic demonstration data.
+
+Your published terms restrict software/ML use and API storage. Is the described
+use permitted under an applicable existing permission, or can written
+permission be granted? Please clarify whether retained inputs/model use are
+covered and which Cboe or Moody's permissions must be obtained separately.
+I am not asking FRED to grant rights it does not hold.
+
+The provider-backed path is currently paused pending this determination.
+Please identify any applicable conditions and the terms/version governing
+your response.
+
+Thank you.

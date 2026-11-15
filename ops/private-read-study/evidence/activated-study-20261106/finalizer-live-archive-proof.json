@@ -1,0 +1,11 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "actual_actions_artifact_hashes_verified": true,
+  "manual_setup_run_excluded_by_scheduled_listing": true,
+  "scheduled_runs_at_check": 0,
+  "application_requests": 0,
+  "provider_requests": 0,
+  "secrets_included": false,
+  "observed_at": "2026-11-06T08:33:40.461836+00:00"
+}
