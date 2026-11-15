@@ -18,13 +18,35 @@ A master first captured now cannot produce a reviewable screen before the
 2023–2024 v2 development folds. Do not change its timestamp to make one pass.
 This command supports new prospective study windows; the historical v2 gap
 requires a reviewed archived master and a fresh study under [issue #292](https://github.com/hoangnguyen2003/edgar-moe/issues/292).
+
+The [November 2026 source assessment](issue-292-historical-candidate-source.md)
+records a real pre-2023 server-versioned candidate list and its separate private
+capture/verifier. It supplies dated candidate-source evidence, not verified
+security continuity, permission for market/macro inputs, or a complete study
+chain. Its snapshot-member keys must not be substituted for historical security
+identifiers, and the original v2 dataset/master remain unchanged.
+
+The [SEC identity collector](issue-292-security-identity.md) separately replays
+dated issuer/class/CUSIP evidence and retains every unresolved source member.
+Its successful 12-row live sample does not complete full historical membership,
+market continuity or the new checkpoint/dataset study chain.
+
 For a new prospective cutoff, capture the master before that New York day ends,
 then screen only after the day ends. The default screen cutoff is the previous
 New York day, so a master first captured after that cutoff is not eligible.
 
-The screen rejects market bars after its declared cutoff. Before reading data
-credentials or contacting Alpaca, it also rejects a master observed after the
-screen cutoff or a cutoff whose New York day has not finished. Its version-4
+The screen rejects market bars after its declared cutoff, invalid nonempty bar
+dates, and repeated daily dates for the same symbol, including identical rows
+or conflicting corrections. Duplicate rows are not arbitrarily deduplicated:
+they cannot inflate the minimum-session count or silently change liquidity
+ranking. Finite prices and volumes must also produce finite dollar-volume
+values and a finite median. These checks run before CSV/audit writes, preserving
+existing outputs on rejection. They validate screen inputs, not historical
+listing membership or independently available source data.
+
+Before reading data credentials or contacting Alpaca, the screen also rejects a
+master observed after the screen cutoff or a cutoff whose New York day has not
+finished. Its version-5
 audit records hashes of both CSVs and the master-capture record, the screen
 generation time, and a `research_screen` purpose. A retrospective screen is
 possible only with `--allow-retrospective-diagnostic` **and separate** `--output`
@@ -36,13 +58,34 @@ screen cutoff to precede the **first** walk-forward validation year and binds
 the screened CSV to the checkpoint's requested universe. After building a
 processed dataset, rerun with `--dataset-dir data/processed/<dataset-id>` to
 hash-check its assets and bind its source-manifest digest to that same checkpoint.
-Older audits lack the explicit purpose and fail closed; do not backfill them by
-guessing. Even a passing version-4 trace cannot prove that
+Older audits, including version 4 without retained screening inputs, fail closed;
+do not backfill them from bars fetched later or guess missing hashes. Even a
+passing version-5 replay cannot prove that
 the broad SEC-to-Alpaca master has complete historical membership or that the
 local timestamps were independently witnessed. A current master screened
 against old bars remains subject to retrospective membership/survivorship bias.
 Keep such v2 results as
 development diagnostics, not point-in-time or independent alpha evidence.
+
+New screens also retain their complete parsed daily-bar inputs, source hashes,
+feed/date range, screening parameters and screening-code SHA-256 in one new
+owner-only directory beneath ignored `data/artifacts/universe-screen-inputs/`.
+To choose its location, pass `--screen-inputs-dir data/artifacts/<new-directory>`.
+The directory must not already exist; invalid paths and aliases are rejected
+before credentials/provider access. Directory mode is 0700 and file mode 0600;
+never commit this file or print its rows. A failed capture is not repaired,
+overwritten or removed automatically. Verification checks stable, single-linked
+regular files and reads at most 64 MiB before decoding duplicate-free JSON.
+
+The offline verifier binds those inputs to the audit and exact screening-code
+version, reruns selection, and compares all selected CSV fields, session counts,
+last prices, dollar-volume medians, ranks and exclusion counts. It then binds
+the requested checkpoint roster and optional processed-dataset assets and
+rechecks the file commitments before returning. A matching output hash alone
+cannot replace this replay. Parameter drift, missing inputs or code-version
+drift fail closed. Retain older code/audits for their historical scope; no
+automatic conversion is provided. Normal source-use and chronology holds still
+apply, and successful replay remains explicitly upstream-membership-unverified.
 
 ## 3. Build immutable inputs
 
@@ -81,6 +124,15 @@ Review:
 - corporate-action edge cases and symbol changes;
 - FRED release coverage;
 - source paths and SHA-256 hashes in `manifest.json`.
+
+The checkpoint's requested-universe asset must have an explicit SHA-256 in its
+manifest. Screen verification hashes the exact roster bytes it parses, rejects
+duplicate JSON fields, includes that digest in the verification receipt, and
+rechecks the roster with the other commitments before returning. A roster
+changed after the checkpoint's initial integrity check fails closed. Legacy
+checkpoints without this hash cannot establish this binding; do not backfill
+missing evidence. These checks strengthen content identity while the historical
+membership and source-availability requirements of #292 remain outstanding.
 
 ## 4. Construct the point-in-time dataset
 
@@ -326,6 +378,25 @@ Use the numeric ID after `#issuecomment-` in the returned link to verify it
 ```sh
 python -m scripts.verify_prospective_sec_attestation --live --capture-dir data/artifacts/sec-filer-cohort-2026q3-v1 --comment-id COMMENT_ID --output data/artifacts/sec-filer-cohort-2026q3-v1/github-attestation.json
 ```
+
+The offline capture verifier and writer compare commitments by canonical JSON
+identity, not Python dictionary equality. Boolean/float substitutions for
+integer counts or schema fields fail closed, and duplicate JSON fields in
+policies or commitments are rejected. Whitespace and key order do not change
+the identity. Valid existing commitments retain their original hashes; do not
+rewrite a rejected artifact to make it pass or substitute a recomputed
+commitment for the independently timestamped one.
+
+On POSIX hosts, private capture directories must be owned by the current user
+with no group/other permissions. Verification opens each component relative to
+directory descriptors without following symlinks, and accepts only owner-only,
+single-linked regular files. Reads are bounded to 64 MiB for the index, 16 MiB
+for the roster, and 16 KiB for the commitment. The live command checks for an
+invalid or already-existing destination before contacting SEC; the writer still
+requires an exclusively new capture directory. A preflight is not a reservation:
+a concurrent filesystem change can still make the subsequent save fail. Failed
+or rejected captures are not repaired, overwritten, or removed automatically.
+These checks protect the local evidence boundary, not historical membership.
 
 The verifier first recomputes the private capture and roster, then makes one
 anonymous GitHub API GET. It checks the exact issue/comment URL, designated

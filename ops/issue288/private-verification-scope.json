@@ -1,0 +1,50 @@
+{
+  "issue": 288,
+  "recorded_on": "2026-11-03",
+  "evidence_kind": "project-owner attestation in the task conversation",
+  "owner_statements": [
+    "All parties have agreed.",
+    "I'm only using this project for personal purposes, so I don't think it should be an issue. Please do your best to move forward and complete as much as possible.",
+    "do"
+  ],
+  "provider_responses_independently_verified": false,
+  "purpose": "Private personal portfolio verification of the original checkpoint-repair acceptance criteria",
+  "source_scope": {
+    "fred_alfred_series": [
+      "VIXCLS",
+      "DGS10",
+      "DFF",
+      "BAA10Y"
+    ],
+    "market": "Alpaca Basic/IEX adjusted daily bars, corporate actions and asset metadata",
+    "filings": "Identified, rate-limited SEC submissions, filings and Company Facts",
+    "retained_model": "edgar-moe-frozen-v1",
+    "retained_training_dataset": "research-2026-07-31-3553e7ad78dd"
+  },
+  "bounds": {
+    "initial_step": "Read-only prerequisite checks followed by one private interruption/resume, frozen inference and settlement verification",
+    "new_training": false,
+    "publication_of_provider_data_or_model_outputs": false,
+    "scheduled_workflow_activation": false,
+    "global_source_gate_release": false,
+    "rewrite_existing_evidence": false,
+    "paid_plan_or_upgrade": false
+  },
+  "limitations": [
+    "This records the owner's reported permission and authorized task scope, not independently inspected provider correspondence.",
+    "It does not constitute an unrestricted source-use decision or authorize a runtime bypass of the existing CLI/workflow gate.",
+    "This record authorizes only the dedicated input-bound private verifier. The normal CLI/workflow and public-release gates remain held."
+  ],
+  "execution_mode": "one_private_cycle",
+  "private_target_fingerprints": {
+    "registry": "1c04f9b0109668ccccff2c0e2751fd1caab90a75f5ce7a3248a50f035520f5bf",
+    "storage": "0453db918fd6a577d6b4251dc3070d9040ec96205f94d8e1af631d3ed7c2ebb7"
+  },
+  "bound_input_sha256": {
+    "config/forward.yaml": "6fee9ade5a98b291cc1a895b10e0213a1d98911ff446252dbe9844b3e15ac318",
+    "config/authenticated-free.yaml": "beaf32a8ef6b05218ab5e9d601400ea01dd6669d0ebae060fc1d002f6f6f6beb",
+    "config/default.yaml": "d0181ea0a280251367289d9bb5fb562a27dee62f05084017a5c58752af41abe6",
+    "config/universe.research.csv": "630270ba5e17858ce9a543e7af8a7bf0e8b9edba6adb2d8d8db6fb4e5ba4e51d"
+  },
+  "cached_finbert_revision": "4556d13015211d73dccd3fdd39d39232506f3e43"
+}

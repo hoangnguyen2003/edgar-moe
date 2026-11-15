@@ -68,6 +68,7 @@ class FinBertEmbedder:
         max_chunks: int | None = 12,
         inference_batch_size: int = 16,
         device: str | None = None,
+        revision: str | None = None,
     ) -> None:
         if (
             chunk_tokens < 1
@@ -89,9 +90,32 @@ class FinBertEmbedder:
             "transformers": str(getattr(transformers, "__version__", "unknown")),
         }
         self.model_name = model_name
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)  # type: ignore[no-untyped-call]
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name)
+        revision_options = {"revision": revision} if revision is not None else {}
+        self.tokenizer = AutoTokenizer.from_pretrained(  # type: ignore[no-untyped-call]
+            model_name, **revision_options
+        )
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, **revision_options
+        )
         self.model_revision = str(getattr(self.model.config, "_commit_hash", None) or "unresolved")
+        tokenizer_metadata = getattr(self.tokenizer, "init_kwargs", {})
+        tokenizer_revision = (
+            tokenizer_metadata.get("_commit_hash") if isinstance(tokenizer_metadata, dict) else None
+        )
+        if not tokenizer_revision:
+            # Tokenizer constructors can drop _commit_hash from init_kwargs.
+            # Resolve the actual cached file rather than inventing provenance
+            # from a requested branch/tag or copying today's runtime into old data.
+            from transformers.utils.hub import cached_file, extract_commit_hash
+
+            resolved = cached_file(
+                model_name,
+                "tokenizer_config.json",
+                **revision_options,
+                _raise_exceptions_for_missing_entries=False,
+            )
+            tokenizer_revision = extract_commit_hash(resolved, None)
+        self.tokenizer_revision = str(tokenizer_revision or "unresolved")
         self.sentiment_indices = _canonical_sentiment_indices(dict(self.model.config.id2label))
         self.model.eval()
         self.chunk_tokens = chunk_tokens
@@ -109,8 +133,10 @@ class FinBertEmbedder:
             f"torch={self.runtime_versions['torch']}:"
             f"transformers={self.runtime_versions['transformers']}:"
             f"model={self.model_name}:revision={self.model_revision}:"
+            f"tokenizer_revision={self.tokenizer_revision}:"
             f"chunk_tokens={self.chunk_tokens}:pooling=weighted-cls:"
-            f"max_chunks={self.max_chunks}:sampling=uniform-v1:"
+            f"max_chunks={self.max_chunks}:batch_size={self.inference_batch_size}:"
+            f"device={self.device}:sampling=uniform-v1:"
             "sentiment=negative-neutral-positive"
         )
 

@@ -90,6 +90,17 @@ def inspect_permissions(
         f"""SELECT NOT EXISTS (
             SELECT 1 FROM pg_catalog.pg_class c
             JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
+            WHERE {_USER_SCHEMA}
+            AND CASE WHEN c.relkind = 'S'
+                THEN has_sequence_privilege(current_user, c.oid, 'SELECT')
+                ELSE false END)""",
+        "sequence_read_allowed",
+    )
+    _require(
+        connection,
+        f"""SELECT NOT EXISTS (
+            SELECT 1 FROM pg_catalog.pg_class c
+            JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace
             WHERE {_USER_SCHEMA} AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
             AND NOT (n.nspname = 'public' AND c.relname IN ({allowed_names}))
             AND has_any_column_privilege(current_user, c.oid, 'SELECT'))""",
@@ -164,6 +175,7 @@ def inspect_permissions(
             "no_schema_create",
             "no_table_or_column_writes",
             "no_select_grant_option",
+            "no_sequence_reads",
             "no_sequence_mutation",
             "no_security_definer_execution",
             "no_unrelated_table_reads",
