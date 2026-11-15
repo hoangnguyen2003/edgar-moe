@@ -43,6 +43,8 @@ describe("Architecture page", () => {
     const copilot = screen.getByRole("region", { name: "Evidence copilot" });
     expect(within(copilot).getByText(/read-only evidence tools/i)).toBeInTheDocument();
     expect(within(copilot).getByText(/Human review/i)).toBeInTheDocument();
+    expect(within(copilot).getByText(/Deterministic evidence navigation is the default/i)).toBeInTheDocument();
+    expect(within(copilot).getByText(/explicit --experimental-llm opt-in/i)).toBeInTheDocument();
     const delivery = screen.getByRole("region", { name: "Delivery and checks" });
     expect(within(delivery).getAllByRole("listitem").map((item) => item.querySelector("strong")?.textContent)).toEqual([
       "Pull request",

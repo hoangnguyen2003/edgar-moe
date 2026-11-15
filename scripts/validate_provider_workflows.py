@@ -14,6 +14,7 @@ PROVIDER_WORKFLOWS = (
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
+    "provider-partial-write-rehearsal.yml",
 )
 
 # Tags such as @v7 are mutable; only a full commit SHA pins the executed code.
@@ -55,7 +56,80 @@ def validate_provider_workflows(
             errors.extend(_validate_r2(name, workflow))
         elif name == "provider-restore-rehearsal.yml":
             errors.extend(_validate_restore(name, workflow))
+        elif name == "provider-partial-write-rehearsal.yml":
+            errors.extend(_validate_partial_write(name, workflow))
 
+    return errors
+
+
+def _validate_partial_write(name: str, workflow: dict[str, Any]) -> list[str]:
+    bindings = {
+        "SOURCE_DATABASE_URL": "EDGAR_MOE_RESTORE_SOURCE_DATABASE_URL",
+        "PROTECTED_R2_BUCKET": "EDGAR_MOE_R2_BUCKET",
+        "REHEARSAL_DATABASE_URL": "EDGAR_MOE_REHEARSAL_DATABASE_URL",
+        "REHEARSAL_AUDITOR_DATABASE_URL": "EDGAR_MOE_REHEARSAL_AUDITOR_DATABASE_URL",
+        **{
+            variable: "EDGAR_MOE_" + variable
+            for variable in (
+                "REHEARSAL_R2_ENDPOINT_URL",
+                "REHEARSAL_R2_BUCKET",
+                "REHEARSAL_R2_ACCESS_KEY_ID",
+                "REHEARSAL_R2_SECRET_ACCESS_KEY",
+                "REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
+                "REHEARSAL_R2_AUDITOR_SECRET_ACCESS_KEY",
+            )
+        },
+    }
+    expected = {key: "${{ secrets." + secret + " }}" for key, secret in bindings.items()}
+    errors = _validate_step_secret_bindings(
+        name,
+        workflow,
+        "recovery-rehearsal",
+        {
+            "Exercise isolated failure and verified repair": expected,
+        },
+    )
+    jobs = workflow.get("jobs", {})
+    job = jobs.get("recovery-rehearsal", {}) if isinstance(jobs, dict) else {}
+    steps = job.get("steps", []) if isinstance(job, dict) else []
+    exercise = next(
+        (step for step in steps if isinstance(step, dict) and step.get("id") == "rehearsal"), {}
+    )
+    command = (
+        'case "$READ_ONLY_PREFLIGHT" in\n'
+        '  true) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" --preflight-only ;;\n'
+        '  false) uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR" ;;\n'
+        "  *) exit 2 ;;\n"
+        "esac\n"
+    )
+    if exercise.get("run") != command or exercise.get("continue-on-error"):
+        errors.append(
+            f"{name}: isolated recovery must use the reviewed helper without ignoring failure"
+        )
+    if exercise.get("env", {}).get("CONFIRM_ISOLATED_FAILURE") != "${{ inputs.confirm }}":
+        errors.append(f"{name}: isolated recovery requires explicit confirmation")
+    if exercise.get("env", {}).get("READ_ONLY_PREFLIGHT") != "${{ inputs.preflight_only }}":
+        errors.append(f"{name}: read-only preflight must use the explicit input")
+    trigger = _workflow_trigger(workflow)
+    dispatch = trigger.get("workflow_dispatch", {}) if isinstance(trigger, dict) else {}
+    preflight = (
+        dispatch.get("inputs", {}).get("preflight_only", {}) if isinstance(dispatch, dict) else {}
+    )
+    if preflight != {
+        "description": "Read-only diagnostics; disable only with new explicit recovery approval",
+        "required": True,
+        "default": True,
+        "type": "boolean",
+    }:
+        errors.append(f"{name}: read-only preflight must be the required safe default")
+    confirmation = (
+        dispatch.get("inputs", {}).get("confirm", {}) if isinstance(dispatch, dict) else {}
+    )
+    if (
+        confirmation.get("options") != ["I_UNDERSTAND_ISOLATED_FAILURE"]
+        or confirmation.get("required") is not True
+    ):
+        errors.append(f"{name}: isolated recovery confirmation must be required and scoped")
     return errors
 
 
@@ -370,22 +444,28 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
         if exposes_credentials(job.get("env")):
             errors.append(f"{name}: R2 audit credentials must not be job-scoped")
         consumers = {
-            "Require read-only provider credentials",
-            "Run the independent Go auditor",
+            "Require read-only provider credentials": credentials,
+            "Verify auditor database permissions": {
+                "AUDITOR_DATABASE_URL": credentials["AUDITOR_DATABASE_URL"],
+            },
+            "Run the independent Go auditor": credentials,
         }
         observed: set[str] = set()
+        named_steps: dict[str, dict[str, Any]] = {}
         steps = job.get("steps")
         if isinstance(steps, list):
             for step in steps:
                 if not isinstance(step, dict):
                     continue
                 step_name = str(step.get("name", ""))
+                named_steps[step_name] = step
                 step_env = step.get("env")
                 if step_name in consumers:
+                    if step_name in observed:
+                        errors.append(f"{name}: duplicate R2 audit credential consumer {step_name}")
                     observed.add(step_name)
-                    if not isinstance(step_env, dict) or any(
-                        step_env.get(key) != expression for key, expression in credentials.items()
-                    ):
+                    expected = consumers[step_name]
+                    if step_env != expected:
                         errors.append(f"{name}: {step_name} must receive the read-only credentials")
                     if isinstance(step_env, dict) and any(
                         key not in credentials and references_secret(item)
@@ -398,8 +478,29 @@ def _validate_r2(name: str, workflow: dict[str, Any]) -> list[str]:
                     errors.append(
                         f"{name}: R2 audit credentials must not enter {step_name or 'unnamed step'}"
                     )
-        for missing_step in sorted(consumers - observed):
+        for missing_step in sorted(set(consumers) - observed):
             errors.append(f"{name}: missing R2 audit credential consumer {missing_step}")
+        grants = named_steps.get("Verify auditor database permissions")
+        audit = named_steps.get("Run the independent Go auditor")
+        final = named_steps.get("Fail unless the provider audit passed")
+        if (
+            not grants
+            or grants.get("id") != "grants"
+            or (
+                'scripts/verify_postgres_auditor.py > "$AUDIT_DIR/database-permissions.json"'
+                not in str(grants.get("run", ""))
+            )
+        ):
+            errors.append(f"{name}: auditor permission report must be retained")
+        if not audit or audit.get("if") != (
+            "${{ always() && steps.secret.outcome == 'success' && steps.grants.outcome == 'success' }}"
+        ):
+            errors.append(f"{name}: Go audit must require passed auditor permissions")
+        if not final or final.get("if") != (
+            "${{ always() && (steps.secret.outcome != 'success' || steps.grants.outcome != 'success' "
+            "|| steps.audit.outputs.exit_code != '0' || steps.redaction.outcome != 'success') }}"
+        ):
+            errors.append(f"{name}: final audit gate must reject failed auditor permissions")
     for required in (
         "actions/setup-go@",
         "AUDITOR_DATABASE_URL",
@@ -444,9 +545,9 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         "TARGET_DATABASE_URL",
         "SOURCE_AUDITOR_DATABASE_URL",
         "TARGET_AUDITOR_DATABASE_URL",
-        "source and isolated target identities are not distinct",
-        "isolated target is not empty",
-        "pg_dump --format=custom",
+        "scripts/verify_restore_identities.py",
+        "scripts/export_registry_dump.py",
+        '--functions-output "$WORK_DIR/registry-functions.sql"',
         "pg_restore --no-owner --no-privileges --exit-on-error",
         "Remove private temporary dump",
     ):
@@ -474,6 +575,9 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
             **r2,
         },
         "Export source registry counts": {"SOURCE_DATABASE_URL": source},
+        "Verify source auditor permissions": {"AUDITOR_DATABASE_URL": source_auditor},
+        "Verify empty target auditor permissions": {"AUDITOR_DATABASE_URL": target_auditor},
+        "Verify restored target reader permissions": {"AUDITOR_DATABASE_URL": target_auditor},
         "Audit source registry and R2 evidence": {"AUDITOR_DATABASE_URL": source_auditor, **r2},
         "Dump source into private temporary storage": {"SOURCE_DATABASE_URL": source},
         "Re-check target emptiness before restore": {"TARGET_DATABASE_URL": target},
@@ -484,6 +588,131 @@ def _validate_restore(name: str, workflow: dict[str, Any]) -> list[str]:
         "Probe restored read path": {"EDGAR_MOE_REGISTRY_READ_DATABASE_URL": target_auditor},
     }
     errors.extend(_validate_step_secret_bindings(name, workflow, "restore-rehearsal", consumers))
+    jobs = workflow.get("jobs", {})
+    job = jobs.get("restore-rehearsal", {}) if isinstance(jobs, dict) else {}
+    steps = job.get("steps", []) if isinstance(job, dict) else []
+    named = (
+        {str(step.get("name", "")): step for step in steps if isinstance(step, dict)}
+        if isinstance(steps, list)
+        else {}
+    )
+    preflight = named.get("Validate isolated target and read-only audit credentials", {})
+    setup = named.get("Install reviewed PostgreSQL client tools", {})
+    setup_index = next((index for index, step in enumerate(steps) if step is setup), -1)
+    preflight_index = next((index for index, step in enumerate(steps) if step is preflight), -1)
+    if (
+        setup.get("run") != "bash scripts/setup_postgres_client.sh"
+        or not 0 <= setup_index < preflight_index
+    ):
+        errors.append(f"{name}: reviewed PostgreSQL client setup must precede credential preflight")
+    preflight_run = str(preflight.get("run", ""))
+    identity_command = 'uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"'
+    if (
+        preflight.get("id") != "preflight"
+        or "set -euo pipefail" not in preflight_run
+        or preflight_run.strip().splitlines()[-1:] != [identity_command]
+        or "inet_server_addr" in text
+    ):
+        errors.append(f"{name}: restore preflight must fail closed using endpoint identity checks")
+    empty_run = str(named.get("Re-check target emptiness before restore", {}).get("run", ""))
+    if "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'" not in empty_run:
+        errors.append(f"{name}: target emptiness must cover all non-system schemas")
+    schema = named.get("Check restored schema", {})
+    if (
+        schema.get("id") != "schema"
+        or schema.get("run")
+        != 'uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"'
+    ):
+        errors.append(f"{name}: schema check must fail closed with credential-free diagnostics")
+    read_run = str(named.get("Probe restored read path", {}).get("run", ""))
+    if (
+        "uv run python scripts/probe_restore_read_path.py" not in read_run
+        or '--expected-counts "$REHEARSAL_DIR/source-counts.json"' not in read_run
+        or '> "$REHEARSAL_DIR/read-path.json"' not in read_run
+        or "|| true" in read_run
+    ):
+        errors.append(
+            f"{name}: read probe must verify source-count consistency and retain its result"
+        )
+    dump_run = str(named.get("Dump source into private temporary storage", {}).get("run", ""))
+    restore_run = str(named.get("Restore into the isolated target", {}).get("run", ""))
+    if "scripts/export_registry_dump.py" not in dump_run or re.search(r"\bpg_dump\b", dump_run):
+        errors.append(f"{name}: restore export must use only the scoped registry exporter")
+    functions_marker = '--file="$WORK_DIR/registry-functions.sql"'
+    if (
+        functions_marker not in restore_run
+        or restore_run.find(functions_marker) > restore_run.find("pg_restore --no-owner")
+        or 'if [[ "$functions_code" -ne 0 ]]' not in restore_run
+    ):
+        errors.append(f"{name}: restore must install reviewed trigger functions and fail closed")
+    gates = {
+        "Verify source auditor permissions": ("source_grants", ("preflight",)),
+        "Verify empty target auditor permissions": (
+            "empty_target_grants",
+            ("preflight", "source_grants"),
+        ),
+        "Export source registry counts": (
+            "source_counts",
+            ("preflight", "source_grants", "empty_target_grants"),
+        ),
+        "Audit source registry and R2 evidence": ("source_audit", ("source_counts",)),
+        "Dump source into private temporary storage": ("source_dump", ("source_counts",)),
+        "Re-check target emptiness before restore": ("target_empty", ("source_dump",)),
+        "Restore into the isolated target": ("restore", ("target_empty",)),
+        "Export restored registry counts": ("restored_counts", ("restore",)),
+        "Verify restored target reader permissions": ("restored_grants", ("restored_counts",)),
+        "Audit restored registry and R2 evidence": (
+            "restored_audit",
+            ("restored_counts", "restored_grants"),
+        ),
+        "Probe restored read path": ("read_path", ("restored_counts", "restored_grants")),
+    }
+    for step_name, (step_id, dependencies) in gates.items():
+        step = named.get(step_name, {})
+        condition = (
+            "${{ "
+            + " && ".join(f"steps.{dependency}.outcome == 'success'" for dependency in dependencies)
+            + " }}"
+        )
+        if step.get("id") != step_id or step.get("if") != condition:
+            errors.append(f"{name}: {step_name} must preserve the restore permission gates")
+    profiles = {
+        "Verify source auditor permissions": ("evidence", "source-permissions.json"),
+        "Verify empty target auditor permissions": (
+            "empty-restore-target",
+            "empty-target-permissions.json",
+        ),
+        "Verify restored target reader permissions": (
+            "registry-reader",
+            "restored-target-permissions.json",
+        ),
+    }
+    summary = named.get("Write redacted rehearsal summary", {})
+    summary_env = summary.get("env", {})
+    outcome_loop = re.search(r"for outcome in (.*?); do", str(summary.get("run", "")), re.S)
+    for step_name, (profile, report) in profiles.items():
+        step = named.get(step_name, {})
+        command = (
+            f"uv run python scripts/verify_postgres_auditor.py --profile {profile}"
+            f' > "$REHEARSAL_DIR/{report}"'
+        )
+        if step.get("run") != command:
+            errors.append(f"{name}: {step_name} must retain the correct permission profile")
+        step_id = gates[step_name][0]
+        variable = step_id.upper() + "_OUTCOME"
+        if (
+            not isinstance(summary_env, dict)
+            or summary_env.get(variable) != "${{ steps." + step_id + ".outcome }}"
+            or outcome_loop is None
+            or f'"${variable}"' not in outcome_loop.group(1)
+        ):
+            errors.append(f"{name}: rehearsal summary must reject failed {step_id}")
+    final = named.get("Fail unless the rehearsal passed", {})
+    if final.get("if") != (
+        "${{ always() && (steps.summary.outputs.overall_status != 'passed' "
+        "|| steps.redaction.outcome != 'success') }}"
+    ):
+        errors.append(f"{name}: final restore gate must require summary and redaction success")
     return errors
 
 

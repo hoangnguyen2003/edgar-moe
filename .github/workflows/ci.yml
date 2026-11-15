@@ -9,6 +9,30 @@ permissions:
   contents: read
 
 jobs:
+  offline-read-admission:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Check offline controller and fixture syntax
+        run: |
+          for module in ops/private-read-admission/*.mjs; do
+            node --check "$module"
+          done
+      - name: Test synthetic admission and observation fixtures without providers
+        # No dependencies, provider credentials, deployments, or scheduled jobs.
+        # The optional local-workerd test explicitly skips without Miniflare.
+        run: >-
+          node --test
+          ops/private-read-admission/admission.test.mjs
+          ops/private-read-admission/executor-process.test.mjs
+          ops/private-read-admission/study-plan.test.mjs
+          ops/private-read-admission/workerd.test.mjs
+
   python:
     runs-on: ubuntu-24.04
     steps:
@@ -27,10 +51,15 @@ jobs:
       - run: uv run pytest --cov=edgar_moe --cov-report=term-missing --cov-fail-under=80
       - name: Check the reader-role audit command is runnable
         run: uv run python scripts/verify_postgres_reader.py --help
+      - name: Check the auditor-permission command is runnable
+        run: uv run python scripts/verify_postgres_auditor.py --help
       - name: Check restore comparison command is runnable
         run: uv run python scripts/compare_restore_reports.py --help
-      - name: Check restore comparison verifier is runnable
-        run: uv run python scripts/verify_restore_comparison.py --help
+      - name: Check restore comparison and identity verifiers are runnable
+        run: |
+          uv run python scripts/verify_restore_comparison.py --help
+          uv run python scripts/verify_restore_identities.py --help
+          uv run python scripts/probe_restore_read_path.py --help
       - name: Check local restore rehearsal command is runnable
         run: uv run python scripts/rehearse_sqlite_restore.py --help
       - name: Check PostgreSQL restore fixture commands are runnable
@@ -155,6 +184,52 @@ jobs:
           uv run alembic upgrade head
           uv run alembic check
 
+  private-read-study-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Stage the standalone credential-free study bundle
+        run: python3 scripts/stage_private_read_study.py --destination "$GITHUB_WORKSPACE/data/artifacts/ci-private-read-study-source"
+      - name: Install only the hash-pinned standalone dependencies
+        run: uv pip install --python 3.12 --target "$RUNNER_TEMP/study-dependencies" --require-hashes --requirements data/artifacts/ci-private-read-study-source/requirements.txt
+      - name: Import the real staged application closure without any database connection
+        env:
+          STUDY_DEPENDENCIES: ${{ runner.temp }}/study-dependencies
+        run: |
+          uv run --no-project --python 3.12 python -I - <<'PY'
+          import hashlib, json, os, pathlib, sys
+          bundle = pathlib.Path('data/artifacts/ci-private-read-study-source').resolve()
+          sys.path[:0] = [os.environ['STUDY_DEPENDENCIES'], str(bundle)]
+          import certifi
+          import psycopg
+          assert pathlib.Path(certifi.where()).is_file()
+          connections = []
+          def forbidden(*args, **kwargs):
+              connections.append(True)
+              raise AssertionError('Source-only CI must not connect to any database')
+          psycopg.connect = forbidden
+          import snapshot_kernel
+          import index
+          assert index.app.openapi_url is None
+          assert not connections
+          manifest = json.loads((bundle / 'study-source-manifest.json').read_text())
+          for item in manifest['files']:
+              raw = (bundle / item['path']).read_bytes()
+              assert len(raw) == item['bytes']
+              assert hashlib.sha256(raw).hexdigest() == item['sha256']
+          assert manifest['credentials_included'] is False
+          assert manifest['policy_bound'] is False
+          print('Hash-pinned source closure imports on Linux; zero database/provider connections.')
+          PY
+
   postgres-reader-role:
     runs-on: ubuntu-24.04
     services:
@@ -216,6 +291,17 @@ jobs:
             --variable api_reader_role=edgar_moe_api_reader \
             --variable migration_owner=edgar_moe_migrator \
             --file ops/postgres/provision-reader.sql
+      - name: Create an isolated database for auditor grant regressions
+        env:
+          EDGAR_MOE_REGISTRY_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe
+        run: >-
+          psql "$EDGAR_MOE_REGISTRY_DATABASE_URL"
+          --set ON_ERROR_STOP=1
+          --command "CREATE DATABASE edgar_moe_auditor_permission_test"
+      - name: Verify auditor catalog checks against real PostgreSQL grants
+        env:
+          EDGAR_MOE_TEST_AUDITOR_POSTGRES_URL: postgresql://postgres:postgres@127.0.0.1:5432/edgar_moe_auditor_permission_test
+        run: uv run pytest tests/integration/test_auditor_permissions.py -q
       - name: Verify effective PostgreSQL reader privileges and denied writes
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: postgresql://edgar_moe_api_reader:reader-password@127.0.0.1:5432/edgar_moe
@@ -236,7 +322,7 @@ jobs:
       RESTORE_ARTIFACT_ROOT: ${{ github.workspace }}/reports/postgres-restore/artifacts
     services:
       postgres:
-        image: postgres:16
+        image: postgres:18
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -250,6 +336,8 @@ jobs:
           --health-retries 12
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install reviewed PostgreSQL client tools
+        run: bash scripts/setup_postgres_client.sh
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: "3.12"
@@ -260,7 +348,9 @@ jobs:
           cache-dependency-path: tools/evidence-auditor/go.sum
       - run: uv sync --locked --extra dev
       - name: Prepare isolated rehearsal directories
-        run: mkdir -p "$REHEARSAL_DIR" "$RESTORE_ARTIFACT_ROOT"
+        run: |
+          umask 077
+          mkdir -p "$REHEARSAL_DIR" "$RESTORE_ARTIFACT_ROOT"
       - name: Apply schema and seed a representative registry
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.SOURCE_DATABASE_URL }}
@@ -283,23 +373,34 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          pg_dump --format=custom --no-owner \
-            --file="$REHEARSAL_DIR/registry.dump" "$SOURCE_DATABASE_URL"
+          # Synthetic unrelated relations must never enter the registry archive.
+          psql "$SOURCE_DATABASE_URL" -X --set ON_ERROR_STOP=1 \
+            --command "CREATE TABLE public.unrelated_restore_fixture (id text); INSERT INTO public.unrelated_restore_fixture VALUES ('synthetic-excluded-row'); CREATE SCHEMA unrelated_restore_fixture; CREATE TABLE unrelated_restore_fixture.forward_runs (id text);"
+          uv run python scripts/export_registry_dump.py \
+            --output "$REHEARSAL_DIR/registry.dump" \
+            --functions-output "$REHEARSAL_DIR/registry-functions.sql" \
+            > "$REHEARSAL_DIR/dump-scope.json"
           psql "$SOURCE_DATABASE_URL" --set ON_ERROR_STOP=1 \
             --command "CREATE DATABASE edgar_moe_restored"
           restore_started="$(date +%s)"
-          pg_restore --no-owner --exit-on-error \
+          psql "$RESTORE_DATABASE_URL" -X --set ON_ERROR_STOP=1 \
+            --file="$REHEARSAL_DIR/registry-functions.sql"
+          pg_restore --no-owner --no-privileges --exit-on-error \
             --dbname="$RESTORE_DATABASE_URL" "$REHEARSAL_DIR/registry.dump"
           restore_finished="$(date +%s)"
           printf '{"restore_elapsed_seconds":%s}\n' \
             "$((restore_finished - restore_started))" \
             > "$REHEARSAL_DIR/timing.json"
+      - name: Verify scoped restore excludes unrelated relations and preserves triggers
+        env:
+          EDGAR_MOE_TEST_REGISTRY_DUMP_URL: ${{ env.RESTORE_DATABASE_URL }}
+        run: uv run pytest tests/integration/test_scoped_registry_restore.py -q
       - name: Check restored schema and export counts
         env:
           EDGAR_MOE_REGISTRY_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
         run: |
           set -euo pipefail
-          uv run alembic check
+          uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"
           uv run python scripts/export_forward_registry_counts.py \
             --database-url "$RESTORE_DATABASE_URL" \
             --output "$REHEARSAL_DIR/restored-counts.json"
@@ -323,24 +424,9 @@ jobs:
         env:
           EDGAR_MOE_REGISTRY_READ_DATABASE_URL: ${{ env.RESTORE_DATABASE_URL }}
         run: |
-          uv run python - <<'PY'
-          import os
-
-          from edgar_moe.forward.database import RegistryDatabase
-          from edgar_moe.forward.registry import ForwardRegistry
-
-          database = RegistryDatabase(os.environ["EDGAR_MOE_REGISTRY_READ_DATABASE_URL"])
-          try:
-              registry = ForwardRegistry(database, actor="restore-rehearsal-read-probe")
-              status = registry.status()
-              forecasts = registry.list_forecasts(limit=1)
-              assert status["health_status"] == "ok", status
-              assert status["run_count"] == 1, status
-              assert forecasts["total"] == 1, forecasts
-              assert registry.performance()["forecast_count"] == 1
-          finally:
-              database.dispose()
-          PY
+          uv run python scripts/probe_restore_read_path.py \
+            --expected-counts "$REHEARSAL_DIR/source-counts.json" \
+            > "$REHEARSAL_DIR/read-path.json"
       - name: Upload restore rehearsal evidence
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -388,7 +474,15 @@ jobs:
           node-version: "24"
           package-manager-cache: false
       - name: Test the optional Cloudflare scheduler contract
-        run: node --test ops/scheduler/cloudflare-forward-scheduler.test.mjs
+        run: node --test ops/scheduler/*.test.mjs
+      - name: Dry-run scheduler profiles with the pinned CLI
+        env:
+          WRANGLER_SEND_METRICS: "false"
+        run: |
+          for scheduler_profile in wrangler.prepare.toml.example wrangler.toml.example wrangler.private.toml.example; do
+            cp "ops/scheduler/$scheduler_profile" ops/scheduler/wrangler.toml
+            npx --yes --package=wrangler@4.136.2 wrangler deploy --dry-run --config ops/scheduler/wrangler.toml --outdir "$RUNNER_TEMP/scheduler-dry-run-$scheduler_profile"
+          done
 
   container:
     runs-on: ubuntu-24.04

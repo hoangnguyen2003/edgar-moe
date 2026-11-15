@@ -1,0 +1,23 @@
+{
+  "issue": 290,
+  "status": "enabled",
+  "merge_commit": "d4ee8135765a3dce4e939cb61e6f2d3f31072d09",
+  "workflow": "observe-private-read-study.yml",
+  "workflow_state": "active",
+  "repository_flag": "true",
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "starts_at": "2026-11-06T08:15:00+00:00",
+  "expires_at": "2026-11-13T08:15:00+00:00",
+  "measurement_days_completed": 0,
+  "setup_verification_event": "workflow_dispatch",
+  "setup_verification_excluded_from_measurement": true,
+  "scheduled_measurements_event": "schedule",
+  "scheduled_pair_model": 168,
+  "scheduled_http_model": 336,
+  "secrets_destination": "hosted-read-study/main-only",
+  "billing_changes": 0,
+  "existing_scheduler_mutations": 0,
+  "activated_at": "2026-11-06T08:16:48.450382+00:00",
+  "verification_dispatch_submitted": true
+}

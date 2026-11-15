@@ -1,0 +1,90 @@
+{
+  "issue": 275,
+  "status": "private_development_acceptance_complete",
+  "completed_at_utc": "2026-11-04T03:57:36.416861+00:00",
+  "private_case": "data/artifacts/issue275-private-run-20261104",
+  "scope_sha256": "ae72948c3ea5925e49632e3437370a358ee6ed9a4961390034b496e57c09ed70",
+  "source_manifest_sha256": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603",
+  "pretraining_input_commit": "28a11768ebbd2a7145c8b50018e6768d72eabb73",
+  "prepared_commitment_sha256": "469c583b0a7f246ef0508e166224b04e41a5cf4f18c961cbe403356ff1ab0b99",
+  "input_audit_sha256": "f3def506ecdb83fd0033a75a53322f7b73ed09b6dcf0cf82dd5bc96b4d2759db",
+  "private_report_sha256": {
+    "outcome-review.json": "c0fbbd19a80a0cadea3836df2ca82c73b0f13578606374b266ea9295752ead5b",
+    "candidate-pretest-review.json": "1d98dc556efd0f1e25a8ccd1ff4656b805a6c2ffab4aa8b7a42f799abe07c4ad",
+    "content-audit.json": "46a2fcaf51792e380d8391c61a3b93505152429cb960edfd3d8e710845c598ca",
+    "interpretation.md": "6e8a626c10d721818dfa37d6fa9228314ff7a0292577938058633c3974ab16f7",
+    "closeout.json": "29a92e2d25d31d819e73bf066decd87744089d6b72912647ee5b25cc8ea9f793"
+  },
+  "datasets": {
+    "baseline": {
+      "dataset_id": "research-2026-07-31-7ff33beccc1b",
+      "manifest_sha256": "979a71b00fc4d7a5bb264b1e6c249ac62f7f2ff4ca41425cefbc4e20dba8689c",
+      "path": "datasets/research-2026-07-31-7ff33beccc1b",
+      "selection_file_sha256": "07bc38e6da6733fbdc58d4ff28e9d1bb693a464f3d70b08dca978de4f7c6f1b0",
+      "selection_content_sha256": "9925e3c7e223554850e0dd739e7ed9cff4b18c21187e44f6669da94addfc1d0e",
+      "oof_sha256": "c150c22991c3ec3b5be8b5aa40c0b453e82bfdc050d77cd1b81ca421a008512b",
+      "folds": [
+        {
+          "name": "validation-2023",
+          "train_events": 1647,
+          "validation_events": 1152
+        },
+        {
+          "name": "validation-2024",
+          "train_events": 2824,
+          "validation_events": 1153
+        }
+      ]
+    },
+    "candidate": {
+      "dataset_id": "research-2026-07-31-7cc42282e68d",
+      "manifest_sha256": "5890c09f9852d6b8f8598fdca4e4199aa9970fbf76f2f2b93041863dd64425b4",
+      "path": "datasets/research-2026-07-31-7cc42282e68d",
+      "selection_file_sha256": "696feb3f1dbd55ca013572b09cb4bbc142869d544a4c586d42bb08aa94d2567a",
+      "selection_content_sha256": "bf3c2da428fa288ac7186760ce65cf77d9ffd2bb0fba8b58f65573f48cf27348",
+      "oof_sha256": "b0aa395107e4c5a42fdb736bd9250ae309420307a0fe8ecda09cad448658ac80",
+      "folds": [
+        {
+          "name": "validation-2023",
+          "train_events": 1647,
+          "validation_events": 1152
+        },
+        {
+          "name": "validation-2024",
+          "train_events": 2824,
+          "validation_events": 1153
+        }
+      ]
+    }
+  },
+  "verification": {
+    "models_per_dataset": 33,
+    "full_original_roster": true,
+    "locked_test_predictions": 0,
+    "input_policy_isolated": true,
+    "negative_controls_equal": true,
+    "metrics_recomputed": true,
+    "paired_uncertainty_retained": true,
+    "cost_scenarios_bps": [
+      10,
+      25,
+      50
+    ],
+    "explicit_failed_hypotheses_retained": true,
+    "content_checks_passed": 48,
+    "frozen_assets_unchanged": true,
+    "original_dataset_assets_verified": true,
+    "checkpoint_assets_verified_by_successful_run": true,
+    "pretest_audit_chronology_verified": true,
+    "private_permissions_verified": true,
+    "provider_requests": 0,
+    "registry_writes": 0
+  },
+  "source_use_basis": "project-owner attestation; provider correspondence not independently inspected",
+  "general_source_gate_released": false,
+  "publication_gate_released": false,
+  "historical_membership_verified": false,
+  "alpha_claim": false,
+  "v2_status": "pending_separate_reviewed_publication",
+  "public_commitment_kind": "Operational hashes, protocol counts and verification flags only; no financial results or provider rows"
+}

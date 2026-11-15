@@ -3,12 +3,16 @@ from shutil import copy2
 from subprocess import run
 from sys import executable
 
+import pytest
+import yaml
+
 WORKFLOW_ROOT = Path(".github/workflows")
 PROVIDER_WORKFLOWS = (
     "provider-evidence-preflight.yml",
     "provider-reader-contract-audit.yml",
     "provider-r2-evidence-audit.yml",
     "provider-restore-rehearsal.yml",
+    "provider-partial-write-rehearsal.yml",
 )
 
 
@@ -25,7 +29,208 @@ def test_provider_workflows_satisfy_the_safety_contract() -> None:
     result = _run_validator(WORKFLOW_ROOT)
 
     assert result.returncode == 0
-    assert "provider workflow safety contract passed (4 workflows)" in result.stdout
+    assert "provider workflow safety contract passed (5 workflows)" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "ignore_failure",
+        "wrong_helper",
+        "confirmation",
+        "production_writer",
+        "missing_reader",
+        "unsafe_default",
+        "hardcoded_mode",
+        "removed_read_only_flag",
+    ],
+)
+def test_partial_write_workflow_cannot_widen_or_bypass_scope(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-partial-write-rehearsal.yml"
+    text = path.read_text()
+    command = (
+        'uv run python -m scripts.rehearse_provider_partial_write --output-root "$REHEARSAL_DIR"'
+    )
+    if mutation == "ignore_failure":
+        text = text.replace(command, command + " || true")
+    elif mutation == "wrong_helper":
+        text = text.replace(command, "echo skipped")
+    elif mutation == "confirmation":
+        text = text.replace(
+            "CONFIRM_ISOLATED_FAILURE: ${{ inputs.confirm }}", "CONFIRM_ISOLATED_FAILURE: yes"
+        )
+    elif mutation == "production_writer":
+        text = text.replace(
+            "secrets.EDGAR_MOE_REHEARSAL_DATABASE_URL", "secrets.EDGAR_MOE_REGISTRY_DATABASE_URL"
+        )
+    elif mutation == "missing_reader":
+        text = text.replace(
+            "secrets.EDGAR_MOE_REHEARSAL_R2_AUDITOR_ACCESS_KEY_ID",
+            "secrets.EDGAR_MOE_REHEARSAL_R2_ACCESS_KEY_ID",
+        )
+    elif mutation == "unsafe_default":
+        text = text.replace("default: true", "default: false")
+    elif mutation == "hardcoded_mode":
+        text = text.replace(
+            "READ_ONLY_PREFLIGHT: ${{ inputs.preflight_only }}", "READ_ONLY_PREFLIGHT: false"
+        )
+    else:
+        text = text.replace(" --preflight-only", "")
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+
+
+@pytest.mark.parametrize("mutation", ["raw_diagnostics", "ignore_failure", "wrong_report"])
+def test_restore_schema_diagnostics_cannot_leak_or_ignore_failure(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    command = 'uv run python scripts/verify_restore_schema.py > "$REHEARSAL_DIR/schema-check.json"'
+    replacement = {
+        "raw_diagnostics": 'uv run alembic check > "$REHEARSAL_DIR/alembic-check.txt" 2>&1',
+        "ignore_failure": command + " || true",
+        "wrong_report": command.replace("schema-check.json", "unreviewed.json"),
+    }[mutation]
+    path.write_text(path.read_text().replace(command, replacement))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "credential-free diagnostics" in result.stdout
+
+
+@pytest.mark.parametrize("mutation", ["ignore_failure", "wrong_baseline", "unreviewed_probe"])
+def test_restore_read_probe_cannot_ignore_failure_or_source_baseline(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    marker = "uv run python scripts/probe_restore_read_path.py"
+    before, after = text.split(marker, 1)
+    if mutation == "ignore_failure":
+        after = after.replace(
+            '> "$REHEARSAL_DIR/read-path.json"', '> "$REHEARSAL_DIR/read-path.json" || true', 1
+        )
+    elif mutation == "wrong_baseline":
+        after = after.replace(
+            '--expected-counts "$REHEARSAL_DIR/source-counts.json"',
+            '--expected-counts "$REHEARSAL_DIR/unreviewed-counts.json"',
+            1,
+        )
+    else:
+        marker = "uv run python scripts/unreviewed_probe.py"
+    path.write_text(before + marker + after)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "read probe must verify source-count consistency" in result.stdout
+
+
+def test_restore_requires_reviewed_client_setup_before_preflight(tmp_path):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    path.write_text(path.read_text().replace("bash scripts/setup_postgres_client.sh", "true"))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "reviewed PostgreSQL client setup" in result.stdout
+
+
+@pytest.mark.parametrize("mutation", ["skip_helper", "ignore_failure", "backend_ip", "public_only"])
+def test_restore_identity_and_all_schema_emptiness_cannot_be_bypassed(tmp_path, mutation):
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    command = 'uv run python scripts/verify_restore_identities.py --output "$REHEARSAL_DIR/preflight.json"'
+    if mutation == "skip_helper":
+        text = text.replace(command, "true")
+    elif mutation == "ignore_failure":
+        text = text.replace(command, command + " || true")
+    elif mutation == "backend_ip":
+        text = text.replace(command, "echo inet_server_addr\n          " + command)
+    else:
+        text = text.replace(
+            "n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'", "n.nspname = 'public'"
+        )
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "endpoint identity checks" in result.stdout or "all non-system schemas" in result.stdout
+
+
+@pytest.mark.parametrize(
+    "mutation", ["whole_database_dump", "missing_functions", "ignored_function_failure"]
+)
+def test_restore_rejects_export_scope_and_function_installation_bypass(
+    tmp_path: Path, mutation: str
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    text = path.read_text()
+    if mutation == "whole_database_dump":
+        text = text.replace(
+            "uv run python scripts/export_registry_dump.py", "pg_dump --format=custom"
+        )
+    elif mutation == "missing_functions":
+        text = text.replace(
+            '--file="$WORK_DIR/registry-functions.sql"', '--file="$WORK_DIR/unreviewed.sql"'
+        )
+    else:
+        text = text.replace('if [[ "$functions_code" -ne 0 ]]', "if [[ 0 -ne 0 ]]")
+    path.write_text(text)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert (
+        "scoped registry exporter" in result.stdout or "reviewed trigger functions" in result.stdout
+    )
+
+
+def test_r2_permissions_cannot_receive_object_store_credentials(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    before, after = workflow.read_text().split(
+        "      - name: Verify auditor database permissions", 1
+    )
+    after = after.replace(
+        "        run: uv run python scripts/verify_postgres_auditor.py",
+        "          AUDITOR_R2_ACCESS_KEY_ID: ${{ secrets.EDGAR_MOE_R2_AUDITOR_ACCESS_KEY_ID }}\n"
+        "        run: uv run python scripts/verify_postgres_auditor.py",
+        1,
+    )
+    workflow.write_text(before + "      - name: Verify auditor database permissions" + after)
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert (
+        "Verify auditor database permissions must receive the read-only credentials"
+        in result.stdout
+    )
+
+
+def test_r2_go_audit_cannot_bypass_failed_permissions(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    workflow.write_text(
+        workflow.read_text().replace(" && steps.grants.outcome == 'success'", " || true", 1)
+    )
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "Go audit must require passed auditor permissions" in result.stdout
+
+
+def test_r2_final_gate_cannot_ignore_failed_permissions(tmp_path: Path) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    workflow = tmp_path / "provider-r2-evidence-audit.yml"
+    workflow.write_text(
+        workflow.read_text().replace(" || steps.grants.outcome != 'success'", "", 1)
+    )
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert "final audit gate must reject failed auditor permissions" in result.stdout
 
 
 def test_provider_preflight_rejects_job_scoped_secrets(tmp_path: Path) -> None:
@@ -157,6 +362,93 @@ def test_provider_restore_requires_secret_on_restore_step(tmp_path: Path) -> Non
     assert (
         "Restore into the isolated target must receive only its reviewed secrets" in result.stdout
     )
+
+
+@pytest.mark.parametrize(
+    "step_name",
+    [
+        "Verify source auditor permissions",
+        "Verify empty target auditor permissions",
+        "Export source registry counts",
+        "Audit source registry and R2 evidence",
+        "Dump source into private temporary storage",
+        "Re-check target emptiness before restore",
+        "Restore into the isolated target",
+        "Export restored registry counts",
+        "Verify restored target reader permissions",
+        "Audit restored registry and R2 evidence",
+        "Probe restored read path",
+    ],
+)
+def test_restore_cannot_bypass_permission_dependency_chain(tmp_path: Path, step_name: str) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        step
+        for step in workflow["jobs"]["restore-rehearsal"]["steps"]
+        if step.get("name") == step_name
+    )
+    step["if"] = "${{ always() }}"
+    path.write_text(yaml.safe_dump(workflow))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert f"{step_name} must preserve the restore permission gates" in result.stdout
+
+
+@pytest.mark.parametrize(
+    ("step_name", "mutation", "message"),
+    [
+        ("Verify source auditor permissions", "owner", "must receive only its reviewed secrets"),
+        (
+            "Verify empty target auditor permissions",
+            "owner",
+            "must receive only its reviewed secrets",
+        ),
+        (
+            "Verify restored target reader permissions",
+            "owner",
+            "must receive only its reviewed secrets",
+        ),
+        (
+            "Verify restored target reader permissions",
+            "profile",
+            "must retain the correct permission profile",
+        ),
+        ("Write redacted rehearsal summary", "summary", "must reject failed restored_grants"),
+        ("Write redacted rehearsal summary", "loop", "must reject failed restored_grants"),
+        ("Fail unless the rehearsal passed", "final", "final restore gate must require summary"),
+    ],
+)
+def test_restore_rejects_owner_substitution_wrong_profile_or_incomplete_final_gate(
+    tmp_path: Path, step_name: str, mutation: str, message: str
+) -> None:
+    for name in PROVIDER_WORKFLOWS:
+        copy2(WORKFLOW_ROOT / name, tmp_path / name)
+    path = tmp_path / "provider-restore-rehearsal.yml"
+    workflow = yaml.safe_load(path.read_text())
+    step = next(
+        step
+        for step in workflow["jobs"]["restore-rehearsal"]["steps"]
+        if step.get("name") == step_name
+    )
+    if mutation == "owner":
+        step["env"]["AUDITOR_DATABASE_URL"] = "${{ secrets.EDGAR_MOE_RESTORE_TARGET_DATABASE_URL }}"
+    elif mutation == "profile":
+        step["run"] = step["run"].replace(
+            "--profile registry-reader", "--profile empty-restore-target"
+        )
+    elif mutation == "summary":
+        del step["env"]["RESTORED_GRANTS_OUTCOME"]
+    elif mutation == "loop":
+        step["run"] = step["run"].replace('"$RESTORED_GRANTS_OUTCOME"', '"success"', 1)
+    else:
+        step["if"] = "${{ always() && steps.redaction.outcome != 'success' }}"
+    path.write_text(yaml.safe_dump(workflow))
+    result = _run_validator(tmp_path)
+    assert result.returncode != 0
+    assert message in result.stdout
 
 
 def test_provider_reader_secret_cannot_be_job_scoped(tmp_path: Path) -> None:

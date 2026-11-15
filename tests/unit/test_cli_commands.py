@@ -66,7 +66,7 @@ def test_copilot_plan_only_describes_the_tools_without_contacting_a_provider() -
     assert result.exit_code == 0, result.output
     report = json.loads(result.stdout)
     assert report["provider_contacted"] is False
-    assert len(report["tools"]) == 7
+    assert len(report["tools"]) == 5
     assert report["profile_id"] == "research"
     snapshot_digest = hashlib.sha256(Path("data/demo/snapshot.json").read_bytes()).hexdigest()
     assert report["frozen_identity"]["sha256"] == snapshot_digest
@@ -80,6 +80,7 @@ def test_copilot_plan_only_accepts_a_solution_architecture_profile() -> None:
             "Which controls are still unverified?",
             "--profile",
             "architect",
+            "--experimental-llm",
             "--plan-only",
         ],
     )
@@ -169,13 +170,22 @@ def test_copilot_answer_is_written_and_verifiable_end_to_end(
     output = tmp_path / "answer.json"
 
     asked = runner.invoke(
-        cli.app, ["research-copilot", "What does the study report?", "--output", str(output)]
+        cli.app,
+        [
+            "research-copilot",
+            "--experimental-llm",
+            "What does the study report?",
+            "--output",
+            str(output),
+        ],
     )
     verified = runner.invoke(cli.app, ["research-copilot-verify", str(output)])
 
     assert asked.exit_code == 0, asked.output
     envelope = orjson.loads(output.read_bytes())
     assert envelope["evidence_status"] == "grounded"
+    assert envelope["provider"] == "openai-compatible"
+    assert not responses
     assert verified.exit_code == 0, verified.output
     assert "citations=1; tool_calls=1" in verified.stdout
 

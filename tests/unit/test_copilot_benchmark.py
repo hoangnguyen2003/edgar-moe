@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import stat
 from pathlib import Path
 
 import pytest
@@ -90,7 +91,9 @@ def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> Non
 
     assert result.suite.pass_rate == 1.0
     assert not result.failures
-    report = tmp_path / "summary.json"
+    assert stat.S_IMODE(tmp_path.stat().st_mode) == 0o700
+    case_report = tmp_path / "summary.json"
+    report = tmp_path / "aggregate.json"
     write_benchmark_report(report, result.as_dict(provider="test-provider", model="test-model"))
     aggregate = report.read_text(encoding="utf-8")
     assert "The cited snapshot" not in aggregate
@@ -102,7 +105,9 @@ def test_benchmark_writes_private_case_and_safe_aggregate(tmp_path: Path) -> Non
     assert '"total_tokens": 14' in aggregate
     assert '"peak_context_bytes": 16384' in aggregate
     assert '"summary"' in aggregate
-    assert (tmp_path / "summary.json").stat().st_size > 0
+    assert case_report.stat().st_size > 0
+    assert stat.S_IMODE(case_report.stat().st_mode) == 0o600
+    assert stat.S_IMODE(report.stat().st_mode) == 0o600
 
 
 def test_benchmark_keeps_unreported_token_counters_null(tmp_path: Path) -> None:
@@ -198,6 +203,47 @@ def test_benchmark_refuses_to_overwrite_a_private_prior_run(tmp_path: Path) -> N
     with pytest.raises(FileExistsError, match="not empty"):
         run_benchmark(_corpus(), ShouldNotRun(), tmp_path)
     assert existing.read_text(encoding="utf-8") == "private prior answer"
+
+
+def test_benchmark_refuses_broad_output_directory_before_running(tmp_path: Path) -> None:
+    output_dir = tmp_path / "shared-output"
+    output_dir.mkdir(mode=0o755)
+    output_dir.chmod(0o755)
+
+    class ShouldNotRun:
+        def ask(self, question: str) -> CopilotAnswer:
+            raise AssertionError("runner must not be called for a broadly accessible directory")
+
+    with pytest.raises(PermissionError, match="owner-only mode 0700"):
+        run_benchmark(_corpus(), ShouldNotRun(), output_dir)
+
+
+def test_benchmark_refuses_symlink_output_directory(tmp_path: Path) -> None:
+    target = tmp_path / "private-target"
+    target.mkdir(mode=0o700)
+    output_dir = tmp_path / "linked-output"
+    output_dir.symlink_to(target, target_is_directory=True)
+
+    class ShouldNotRun:
+        def ask(self, question: str) -> CopilotAnswer:
+            raise AssertionError("runner must not be called for a symlinked directory")
+
+    with pytest.raises(PermissionError, match="must not be a symlink"):
+        run_benchmark(_corpus(), ShouldNotRun(), output_dir)
+
+
+def test_benchmark_refuses_output_inside_git_worktree(tmp_path: Path) -> None:
+    worktree = tmp_path / "synthetic-worktree"
+    (worktree / ".git").mkdir(parents=True)
+    output_dir = worktree / "data" / "artifacts" / "private-benchmark"
+
+    class ShouldNotRun:
+        def ask(self, question: str) -> CopilotAnswer:
+            raise AssertionError("runner must not be called for a Git worktree output path")
+
+    with pytest.raises(PermissionError, match="outside a Git working tree"):
+        run_benchmark(_corpus(), ShouldNotRun(), output_dir)
+    assert not output_dir.exists()
 
 
 def test_selected_case_order_survives_a_middle_provider_failure(tmp_path: Path) -> None:

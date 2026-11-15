@@ -240,10 +240,26 @@ and has no unresolved review state. The content-addressed summary contains
 only safe identities, counts, hashes, check statuses, and blocker codes; it
 never authorizes retraining or changes the frozen v1 artifact.
 
-For evidence navigation, the optional operator-run research copilot can answer
-questions over the currently published synthetic snapshot and, in a private
-operator workflow, the forward registry.
-It uses bounded read-only tools and content-hashed citations. Every evidence
+For evidence navigation, `research-copilot` defaults to a credential-free,
+deterministic navigator over the currently published synthetic snapshot. Its
+`deterministic-evidence-explanations-v1` templates display cited metrics, costs,
+methodology, experiment rows, identity, and governance with explicit missing-evidence
+and synthetic-only limits. They never contact
+a provider or registry database by default. A configured API key does not
+enable the LLM. Topic matches can combine up to five evidence projections;
+unmatched topics abstain. This is not a validated general-purpose question-answering
+system. The original `deterministic-evidence-navigation-v1` benchmark router and
+its saved comparison remain unchanged.
+Use `research-copilot "Explain the target and limitations." --format text` for
+a readable terminal answer with citations and the research disclaimer. JSON stays
+the default, and `--output` always retains the private JSON envelope without
+printing answer text. The default `--plan-only` preview lists only its five
+snapshot projections; experimental capability previews require `--experimental-llm`.
+The operator-only LLM is experimental: `research-copilot`,
+`research-copilot-panel`, and `research-copilot-benchmark` require an explicit
+`--experimental-llm` flag before any model execution. It can also inspect the
+forward registry in a private, configured workflow.
+The experimental agent uses bounded read-only tools and content-hashed citations. Every evidence
 tool result must carry provenance, and once an evidence tool is called,
 generation and offline verification fail closed unless at least one tool
 citation survives; only refusal-only runs may remain explicitly `uncited`. It
@@ -254,7 +270,7 @@ the contract without contacting an LLM provider. Saved private reports can be
 checked against the reviewed `config/copilot_eval_cases.json` corpus with
 `research-copilot-eval`; that offline gate scores citation/tool structure, not
 the truth of generated prose. To run all reviewed questions through a private
-provider configuration, use `research-copilot-benchmark`; it writes answer
+provider configuration, use `research-copilot-benchmark --experimental-llm`; it writes answer
 envelopes under `/tmp` and keeps only structural hashes in its aggregate score.
 New answer envelopes also pin the copilot policy digest, exact tool-contract
 digest, and tool-call budget so reviewers can reproduce the agent boundary

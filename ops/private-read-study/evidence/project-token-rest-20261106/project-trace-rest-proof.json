@@ -1,0 +1,46 @@
+{
+  "issue": 290,
+  "official_api": "GET /v1/projects/traces",
+  "project_scoped_credential": true,
+  "trace_status": 200,
+  "application_requests": 0,
+  "database_connections": 0,
+  "billing_changes": 0,
+  "response_keys": [
+    "trace"
+  ],
+  "observed_at": "2026-11-06T05:36:43.976395+00:00",
+  "trace_keys": [
+    "traceId",
+    "spans",
+    "resources",
+    "rootSpanId"
+  ],
+  "span_count": 9,
+  "span_schema_keys": [
+    "attributes",
+    "duration",
+    "endTime",
+    "events",
+    "kind",
+    "library",
+    "links",
+    "name",
+    "parentSpanId",
+    "resource",
+    "spanId",
+    "startTime",
+    "status",
+    "traceFlags",
+    "traceState"
+  ],
+  "provider_span_names": [
+    "Start VM",
+    "Invoke Function",
+    "Spawn Python",
+    "Init User Code",
+    "waitUntil"
+  ],
+  "dashboard_gateway_status": 403,
+  "dashboard_gateway_error_code": "forbidden"
+}

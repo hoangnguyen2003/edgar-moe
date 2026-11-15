@@ -52,8 +52,9 @@ secrets, all kept outside logs and artifacts:
   `EDGAR_MOE_R2_AUDITOR_SECRET_ACCESS_KEY`: read-only R2 verification access.
 
 The operator must choose `I_UNDERSTAND_ISOLATED_TARGET`. The workflow checks that
-source and target identities differ, both auditor URLs point at their matching
-database, and the target has no public tables before it runs. It uses a custom
+source and target configured endpoints differ, both auditor URLs point at their
+matching database, and the target has no relations in non-system schemas before
+it runs. It uses a custom
 `pg_dump` only as a logical rehearsal, stores the dump under a private temporary
 directory, removes it before job completion, and never uses `pg_restore --clean`.
 The dump itself is never uploaded. Retained evidence contains counts, schema and
@@ -63,7 +64,99 @@ evidence of this specific source/target rehearsal; it is not proof that the
 provider's managed backup job, RPO, or RTO meets a target until those observations
 are recorded separately.
 
-Pull-request CI also runs a fully disposable PostgreSQL 16 version of this
+The identity preflight compares explicit TLS PostgreSQL URL hostnames, ports and
+database names, then authenticates each URL in a bounded read-only transaction
+and checks the observed database and session/current role. Only Neon's documented
+`ep-…-pooler`/`ep-…` hostname pair is treated as the same endpoint; other aliases
+must match exactly. A different database or port on the source hostname is not an
+isolated target. Backend addresses (`inet_server_addr()`) are not stable provider
+endpoint identifiers and are not used for pairing or isolation. These checks do
+not independently prove provider branch topology: the operator must still verify
+the disposable branch/project in the provider console before confirming dispatch.
+See [PostgreSQL session information](https://www.postgresql.org/docs/current/functions-info.html)
+and [Neon connection pooling](https://neon.com/docs/connect/connection-pooling).
+
+The retained preflight report contains fixed failure codes, booleans, the empty
+relation count and numeric server major versions, never URLs, hostnames, database
+or role names, passwords or raw driver errors. For example,
+`source_auditor_endpoint_mismatch` requires correcting that auditor secret, not
+bypassing the check. Missing TLS/explicit credentials, connection-string endpoint
+overrides, observed identity mismatches and nonempty targets all stop the run
+before export/restore. A second all-non-system-schema emptiness check runs just
+before restore. No check clears the target.
+
+The hosted workflow explicitly installs major-version-18 PostgreSQL client tools
+from the signed PGDG packages before any provider secrets are passed to a step.
+Preflight records numeric `pg_dump`/`pg_restore` majors and rejects an older dump
+client, differing dump/restore clients, or a target older than the dump client.
+It does not rely on the runner's default client version. The same setup is tested
+by disposable PostgreSQL 18 restore CI; the separate reader-grant CI remains on 16.
+The exporter uses Neon's documented direct alias (removing only the endpoint's
+`-pooler` suffix in memory) for its two shared-snapshot connections, preserving
+database, role, password, port and TLS options. Stored secrets are not changed.
+Neon's transaction pooler is not used for `pg_dump` startup/session options.
+
+The read-path probe checks availability and aggregate consistency against the
+source count report, not whether an old or intentionally held forward runner is
+currently healthy. It preserves `health_status` and `forward_health_ok` in its
+fixed-schema report: a faithfully restored stale registry can have available
+reads and still report `degraded` health. No forecast timestamps, quality gates,
+freshness thresholds or source-use holds are changed to make recovery pass.
+Wrong counts, malformed responses, failed reads and missing configuration still
+fail the probe. Connections are explicitly read-only with a 10-second statement
+timeout and a single bounded pool; raw driver errors and sample rows are never
+retained, including on failure. The permission gates, full eight-table comparison
+and both evidence audits remain separate required checks.
+
+Schema verification runs Alembic through a bounded, explicitly read-only helper.
+Only fixed-schema JSON is retained, on success or failure; raw Alembic/driver
+output stays in process memory and is never logged or uploaded. Percent-encoded
+connection options and passwords are escaped for ConfigParser interpolation so
+they round-trip unchanged. A schema error still fails the rehearsal. The artifact
+redaction gate remains mandatory; no suppressed diagnostic becomes a schema pass.
+
+A failed final probe does not make an already restored target empty again. Never
+dispatch another restore over it or clear it to obtain a green run. A standalone
+read-only follow-up may verify the existing copy against retained source counts,
+but does not change the original workflow outcome. For a clean end-to-end rerun,
+obtain approval and configure a new pre-created empty isolated database/reader.
+
+Database identities alone do not establish least privilege. Before exporting or
+restoring, the workflow verifies the source auditor's effective SELECT-only grants
+on `forward_runs` and `forward_artifacts`, and checks the target auditor's role
+attributes and effective grants while the target has no user tables. After
+restore, it requires SELECT on all eight forward-registry tables before either
+the restored Go audit or application read probe can run. Optional SELECT on
+`alembic_version` (migration metadata) is allowed; unrelated table reads, table
+writes, role memberships, schema creation and executable user-defined
+SECURITY DEFINER functions are rejected. These are bounded, read-only catalog
+checks, not mutation probes or proof of future privileges/provider IAM.
+
+Configure target-reader privileges **before** dispatch, using the isolated
+restore owner. Since `pg_restore --no-privileges` does not copy source grants,
+the target owner can set default SELECT privileges for tables it will create:
+
+```sql
+-- Run only in the explicitly isolated, empty target; replace the role names.
+GRANT CONNECT ON DATABASE isolated_target TO isolated_reader;
+GRANT USAGE ON SCHEMA public TO isolated_reader;
+ALTER DEFAULT PRIVILEGES FOR ROLE isolated_restore_owner IN SCHEMA public
+  GRANT SELECT ON TABLES TO isolated_reader;
+```
+
+The reader must be a dedicated non-owner LOGIN role, without elevated role
+attributes, other role memberships, database CREATE or schema CREATE. Do not
+grant writes or sequence access. Default privileges are scoped to the exact
+owner used by restore, not the source owner. The scoped exporter selects exactly
+the eight public forward tables and `public.alembic_version`, even when the source
+also contains unrelated relations. It never exports those other relations.
+Restoring unrelated tables with these defaults fails the permission gate. A passing empty-target
+check explicitly does **not** verify future SELECT grants; the separate
+post-restore check is mandatory. A populated provider clone is not an empty
+logical-restore target: use a new empty database instead, without clearing or
+overwriting the clone.
+
+Pull-request CI also runs a fully disposable PostgreSQL 18 version of this
 exercise. It seeds an explicit synthetic fixture (only when the workflow passes
 `--allow-synthetic`), creates a custom-format dump, restores it into a different
 database, compares all registry-table counts, runs the Go auditor against the
@@ -81,7 +174,7 @@ R2 credentials, network policy, or production RPO/RTO.
   manager. Do not paste them into this runbook, shell history, CI logs, or an
   issue. Disable shell tracing (`set +x`) before running commands.
 - Use the migration owner only for restoring and schema inspection. Use the
-  read-only database and R2 roles for verification where possible.
+  dedicated read-only database and R2 roles for auditor/read-path verification.
 - The rehearsal must not change forecasts, labels, model identities, or source
   artifacts. Any mismatch is recorded and investigated; it is not repaired by
   editing the restored data.
@@ -100,8 +193,10 @@ Define these variables without printing them:
 
 ```bash
 set +x
-export SOURCE_DATABASE_URL='...'       # private writer URL; never commit it
-export RESTORE_DATABASE_URL='...'      # isolated target URL; not production
+export SOURCE_DATABASE_URL='...'       # private dump/read URL; never commit it
+export RESTORE_DATABASE_URL='...'      # isolated restore-owner URL; not production
+export SOURCE_AUDITOR_DATABASE_URL='...'  # SELECT-only on the two evidence tables
+export RESTORE_AUDITOR_DATABASE_URL='...' # isolated SELECT-only registry reader
 export AUDITOR_R2_ENDPOINT_URL='...'
 export AUDITOR_R2_BUCKET='...'
 export AUDITOR_R2_ACCESS_KEY_ID='...'
@@ -110,10 +205,24 @@ export REHEARSAL_DIR="$(mktemp -d -t edgar-moe-restore)"
 chmod 700 "$REHEARSAL_DIR"
 ```
 
-If the provider offers a point-in-time branch, create it before setting
-`RESTORE_DATABASE_URL`. Otherwise create a new empty database owned by the
-migration role. Confirm the target hostname and database name twice before
-continuing.
+For the logical dump below, create a new empty database owned by the migration
+role and configure the separate target-reader/default privileges described
+above. Do not restore a dump over a populated point-in-time clone. A provider's
+managed point-in-time recovery is a separate operation. Confirm the target
+hostname and database name twice before continuing; independently verify that
+both auditor URLs point to their corresponding source/isolated databases.
+
+Before any dump/restore, retain these permission reports and stop if either
+command fails:
+
+```bash
+AUDITOR_DATABASE_URL="$SOURCE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile evidence \
+  > "$REHEARSAL_DIR/source-permissions.json"
+AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile empty-restore-target \
+  > "$REHEARSAL_DIR/empty-target-permissions.json"
+```
 
 ## Capture a backup and restore it
 
@@ -134,21 +243,42 @@ psql "$SOURCE_DATABASE_URL" -XAtc \
     'forward_audit_events', (SELECT count(*) FROM forward_audit_events)
   )::text" | tee "$REHEARSAL_DIR/source-counts.json"
 (
-  export AUDITOR_DATABASE_URL="$SOURCE_DATABASE_URL"
+  export AUDITOR_DATABASE_URL="$SOURCE_AUDITOR_DATABASE_URL"
   cd tools/evidence-auditor
   go run . -timeout 5m -stale-after 96h
 ) \
   >"$REHEARSAL_DIR/source-evidence-audit.json"
-/usr/bin/time -p pg_dump --format=custom --no-owner \
-  --file="$REHEARSAL_DIR/registry.dump" "$SOURCE_DATABASE_URL" \
+SOURCE_DATABASE_URL="$SOURCE_DATABASE_URL" \
+  uv run python scripts/export_registry_dump.py \
+  --output "$REHEARSAL_DIR/registry.dump" \
+  --functions-output "$REHEARSAL_DIR/registry-functions.sql" \
+  > "$REHEARSAL_DIR/dump-scope.json" \
   2>"$REHEARSAL_DIR/pg-dump.time.txt"
 pg_restore --list "$REHEARSAL_DIR/registry.dump" \
   >"$REHEARSAL_DIR/restore-contents.txt"
-/usr/bin/time -p pg_restore --no-owner --exit-on-error \
+# Stop on any function installation error; never continue to pg_restore.
+psql "$RESTORE_DATABASE_URL" -X --set ON_ERROR_STOP=1 \
+  --file="$REHEARSAL_DIR/registry-functions.sql" && \
+/usr/bin/time -p pg_restore --no-owner --no-privileges --exit-on-error \
   --dbname="$RESTORE_DATABASE_URL" "$REHEARSAL_DIR/registry.dump" \
   2>"$REHEARSAL_DIR/pg-restore.time.txt"
 date -u +%Y-%m-%dT%H:%M:%SZ | tee "$REHEARSAL_DIR/finished-at.txt"
 ```
+
+The exporter currently supports reviewed migration `20260921_0002` only. It
+rejects missing/partitioned registry tables, altered or extra registry triggers,
+trigger-function drift, external foreign keys, and custom/default/generated
+column dependencies. It requires private output directories and never
+overwrites an existing output. Inspection and dump share one exported read-only
+snapshot, held open until `pg_dump` finishes. Table-filtered `pg_dump` omits function
+dependencies, so the SQL sidecar contains only the two append-only functions
+from the pinned migration implementation; install it before restoring the
+archive's tables, indexes, foreign keys, and triggers. Keep source schema changes
+paused throughout export. This is **registry recovery**, not a complete backup
+of a shared database. CI tests exclusion and restored immutability using only
+synthetic, disposable PostgreSQL data. Keep both raw outputs private and remove
+them after the rehearsal; the hosted workflow retains only its redacted scope
+report and deletes the entire private temporary directory.
 
 For a provider-managed backup, replace only the dump/restore commands with the
 provider's isolated restore operation and retain its job ID, start/end times,
@@ -189,11 +319,15 @@ row is harmless because the API still starts.
 
 The Go auditor reads a consistent registry snapshot and verifies every artifact
 reference and object byte. Run it with the isolated database and read-only R2
-credentials:
+credentials. First retain the post-restore grant report; stop on a failure
+before running either the auditor or API probe:
 
 ```bash
+AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
+  uv run python scripts/verify_postgres_auditor.py --profile registry-reader \
+  > "$REHEARSAL_DIR/restored-target-permissions.json"
 (
-  export AUDITOR_DATABASE_URL="$RESTORE_DATABASE_URL"
+  export AUDITOR_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL"
   cd tools/evidence-auditor
   go run . -timeout 5m -stale-after 96h
 ) \
@@ -236,7 +370,7 @@ production backup.
 Start a local API process against the restored target, not the production URL:
 
 ```bash
-EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_DATABASE_URL" \
+EDGAR_MOE_REGISTRY_READ_DATABASE_URL="$RESTORE_AUDITOR_DATABASE_URL" \
   EDGAR_MOE_REGISTRY_DATABASE_URL='' \
   uv run uvicorn edgar_moe.api.app:app --host 127.0.0.1 --port 8000
 ```

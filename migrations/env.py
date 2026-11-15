@@ -15,7 +15,12 @@ if config.config_file_name is not None:
 
 database_url = os.environ.get("EDGAR_MOE_REGISTRY_DATABASE_URL")
 if database_url:
-    config.set_main_option("sqlalchemy.url", normalize_database_url(database_url))
+    # ConfigParser interpolation is not URL decoding. Escape literal percent
+    # signs so encoded passwords/options round-trip without credential-bearing
+    # interpolation diagnostics.
+    config.set_main_option(
+        "sqlalchemy.url", normalize_database_url(database_url).replace("%", "%%")
+    )
 
 target_metadata = Base.metadata
 

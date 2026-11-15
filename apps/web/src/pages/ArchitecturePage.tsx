@@ -56,9 +56,9 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
     id: "copilot",
     title: "Evidence copilot",
     zone: "Private, operator-run",
-    summary: "Explains the research record without entering the forecasting, registry, or public-serving path.",
+    summary: "Deterministic evidence navigation is the default; LLM explanations remain experimental and outside forecasting or public serving.",
     steps: [
-      { title: "Operator asks a question", detail: "A local CLI sends a bounded question to an explicitly configured OpenAI-compatible provider" },
+      { title: "Operator asks a question", detail: "A local CLI returns cited snapshot fields by default; provider calls require an explicit --experimental-llm opt-in" },
       { title: "Read-only evidence tools", detail: "The agent can inspect the frozen snapshot, governance state, derived filing events, and opt-in redacted diagnostics" },
       { title: "Citations and identity", detail: "Tool-payload hashes, frozen identity, policy/tool-contract digests, and bounded usage are retained" },
       { title: "Human review", detail: "Offline evaluation and review history are required before generated prose is relied on" },
@@ -81,7 +81,7 @@ const LANES: Array<{ id: string; title: string; zone: string; summary: string; s
 const ZONES = [
   { zone: "Public", runs: "Browser, web app, and API", can: "Read the synthetic demo and registry", holds: "No secrets; at most a read-only database address" },
   { zone: "Private", runs: "Scheduled runner and research pipeline", can: "Add forecasts, results, and evidence", holds: "Database writer, R2, and data-source keys, each scoped to the step that needs it" },
-  { zone: "AI copilot", runs: "Operator CLI and an LLM provider", can: "Explain cited evidence and compare controls", holds: "A local provider key; no write credentials and no public endpoint" },
+  { zone: "AI copilot", runs: "Deterministic operator CLI; opt-in experimental LLM", can: "Navigate cited evidence; experimental explanations need review", holds: "No provider credentials needed by default; opt-in local key, no public endpoint" },
   { zone: "Verification", runs: "CI, CodeQL, post-deploy check, evidence auditor", can: "Check and report", holds: "No secrets, or read-only access" },
 ];
 

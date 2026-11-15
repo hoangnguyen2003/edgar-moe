@@ -14,6 +14,7 @@ from edgar_moe.copilot.benchmark import run_benchmark, write_benchmark_report
 from edgar_moe.copilot.blind_review import (
     MaskedReviewError,
     prepare_masked_review,
+    read_private_json,
     score_masked_review,
     write_private_json,
 )
@@ -144,6 +145,8 @@ def test_masked_packet_omits_explicit_arm_identity_and_scores_complete_review(
     assert packet["cases"][0]["A"]["answer"].startswith("Evidence summary")
     assert "provider" not in packet
     assert "model" not in packet
+    assert "paired_comparison" not in packet
+    assert packet["paired_comparison_sha256"] == content_hash(key["paired_comparison"])
     review = _review(packet)
     review["cases"][0]["B"]["usefulness"] = 4
     review["cases"][1]["B"]["task_completion"] = "fail"
@@ -158,16 +161,48 @@ def test_masked_packet_omits_explicit_arm_identity_and_scores_complete_review(
         "both": 1,
         "neither": 0,
     }
+    assert report["paired_rubric_outcomes"] == {
+        "task_completion": {
+            "copilot_only": 1,
+            "baseline_only": 0,
+            "both": 1,
+            "neither": 0,
+        },
+        "factuality": {"copilot_only": 0, "baseline_only": 0, "both": 2, "neither": 0},
+        "citations": {"copilot_only": 0, "baseline_only": 0, "both": 2, "neither": 0},
+        "safety": {"copilot_only": 0, "baseline_only": 0, "both": 2, "neither": 0},
+    }
     assert report["usefulness_order"] == {
         "copilot_higher": 2,
         "baseline_higher": 0,
         "tie": 0,
     }
+    assert report["paired_comparison"]["case_count"] == 2
+    assert report["paired_comparison"]["categories"] == {
+        "both_pass": 2,
+        "baseline_only": 0,
+        "copilot_only": 0,
+        "neither_or_missing": 0,
+    }
+    assert (
+        report["paired_comparison"]["copilot_latency_us"]["p95_nearest_rank"]
+        >= report["paired_comparison"]["copilot_latency_us"]["median"]
+    )
     assert "Evidence summary" not in orjson.dumps(report).decode()
 
 
 @pytest.mark.parametrize(
-    "mutation", ["packet", "missing_case", "rating", "mapping", "timestamp", "extra_review_field"]
+    "mutation",
+    [
+        "packet",
+        "missing_case",
+        "rating",
+        "unhashable_rating",
+        "mapping",
+        "paired_comparison",
+        "timestamp",
+        "extra_review_field",
+    ],
 )
 def test_masked_scoring_rejects_tampered_or_incomplete_review(
     tmp_path: Path, mutation: str
@@ -186,8 +221,12 @@ def test_masked_scoring_rejects_tampered_or_incomplete_review(
         review["cases"].pop()
     elif mutation == "rating":
         review["cases"][0]["A"]["usefulness"] = 6
+    elif mutation == "unhashable_rating":
+        review["cases"][0]["A"]["factuality"] = {"pass": True}
     elif mutation == "mapping":
         key["assignments"][0]["B"] = "baseline"
+    elif mutation == "paired_comparison":
+        key["paired_comparison"]["cases"][0]["copilot_duration_us"] += 1
     elif mutation == "timestamp":
         review["reviewed_at"] = "2026-09-26"
     else:
@@ -214,6 +253,19 @@ def test_private_writer_refuses_overwrite_and_sets_owner_only_mode(tmp_path: Pat
     with pytest.raises(FileExistsError):
         write_private_json(path, {"schema_version": 2})
     assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
+
+
+def test_private_reader_rejects_symlinks_and_broadened_permissions(tmp_path: Path) -> None:
+    path = tmp_path / "private.json"
+    alias = tmp_path / "private-alias.json"
+    write_private_json(path, {"schema_version": 1})
+    assert read_private_json(path) == {"schema_version": 1}
+    alias.symlink_to(path)
+    with pytest.raises(MaskedReviewError, match="could not read"):
+        read_private_json(alias)
+    path.chmod(0o644)
+    with pytest.raises(MaskedReviewError, match="owner-only"):
+        read_private_json(path)
 
 
 def test_mask_and_score_cli_keep_private_answers_out_of_stdout(
@@ -261,6 +313,10 @@ def test_mask_and_score_cli_keep_private_answers_out_of_stdout(
     assert scored.exit_code == 0, scored.output
     assert "Evidence summary" not in scored.output
     assert orjson.loads(score_path.read_bytes())["case_count"] == 2
+    score_report = orjson.loads(score_path.read_bytes())
+    assert "copilot_latency_us" in score_report["paired_comparison"]
+    assert "copilot_usage" in score_report["paired_comparison"]
+    assert "paired_rubric_outcomes" in score_report
     assert stat.S_IMODE(score_path.stat().st_mode) == 0o600
     rerun = CliRunner().invoke(
         app,

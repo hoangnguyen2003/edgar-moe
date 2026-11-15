@@ -35,3 +35,14 @@ def test_provider_r2_workflow_has_no_repair_or_writer_path() -> None:
     install = text.index("uv sync --locked --extra dev")
     redaction = text.index("scripts/validate_redacted_artifacts.py")
     assert setup_uv < install < redaction
+
+
+def test_provider_auditor_requires_retained_read_only_permission_check() -> None:
+    text = WORKFLOW.read_text(encoding="utf-8")
+    assert "scripts/verify_postgres_auditor.py" in text
+    assert 'database-permissions.json"' in text
+    assert "steps.grants.outcome == 'success'" in text
+    assert "steps.grants.outcome != 'success'" in text
+    assert text.index("Verify auditor database permissions") < text.index(
+        "Run the independent Go auditor"
+    )

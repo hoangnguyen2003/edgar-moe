@@ -310,10 +310,29 @@ async def refresh_authenticated_to_disk(
 
     # A forward-cycle cache may populate the checkpoint only after the request
     # contract exists. If seeding fails halfway, the same request can resume.
+    seed_receipt_path = run_directory / "cache-seed.json"
     if seed_filings is not None:
-        seeded = seed_filings()
-        if progress is not None:
-            progress(f"Prepared {seeded:,} cached filing document(s) for cutoff {as_of}.")
+        if seed_receipt_path.exists():
+            if not _has_verified_sidecar(seed_receipt_path):
+                raise ValueError("Cache seeding receipt is not hash-verified")
+            receipt = _read_json(seed_receipt_path)
+            if not isinstance(receipt, dict) or receipt.get("request_sha256") != sha256_file(
+                request_path
+            ):
+                raise ValueError("Cache seeding receipt belongs to a different request")
+        else:
+            seeded = seed_filings()
+            _write_json(
+                seed_receipt_path,
+                {
+                    "schema_version": 1,
+                    "request_sha256": sha256_file(request_path),
+                    "seeded_file_count": seeded,
+                },
+            )
+            _write_sidecar_hash(seed_receipt_path)
+            if progress is not None:
+                progress(f"Prepared {seeded:,} cached filing document(s) for cutoff {as_of}.")
 
     sec_directory = run_directory / "sec"
     filing_directory = sec_directory / "filings"
@@ -327,6 +346,8 @@ async def refresh_authenticated_to_disk(
     _write_json(requested_universe_path, requested_universe)
     asset_paths["requested_universe"] = requested_universe_path
     asset_paths["request"] = request_path
+    if seed_receipt_path.exists():
+        asset_paths["cache_seed"] = seed_receipt_path
 
     filing_index: list[dict[str, Any]] = []
     research_members: list[UniverseMember] = []

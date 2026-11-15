@@ -1,0 +1,300 @@
+"""Real PostgreSQL grant regressions; only an explicitly isolated test DB is allowed."""
+
+from __future__ import annotations
+
+import importlib.util
+import os
+from collections.abc import Iterator
+from pathlib import Path
+from uuid import uuid4
+
+import psycopg
+import pytest
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+_SPEC = importlib.util.spec_from_file_location(
+    "verify_postgres_auditor", Path(__file__).parents[2] / "scripts/verify_postgres_auditor.py"
+)
+assert _SPEC is not None and _SPEC.loader is not None
+audit = importlib.util.module_from_spec(_SPEC)
+_SPEC.loader.exec_module(audit)
+
+_READER_SPEC = importlib.util.spec_from_file_location(
+    "verify_postgres_reader", Path(__file__).parents[2] / "scripts/verify_postgres_reader.py"
+)
+assert _READER_SPEC is not None and _READER_SPEC.loader is not None
+reader_audit = importlib.util.module_from_spec(_READER_SPEC)
+_READER_SPEC.loader.exec_module(reader_audit)
+
+
+@pytest.fixture
+def auditor_database() -> Iterator[tuple[psycopg.Connection[tuple[object, ...]], str, str]]:
+    admin_url = os.environ.get("EDGAR_MOE_TEST_AUDITOR_POSTGRES_URL", "")
+    if not admin_url:
+        pytest.skip("dedicated PostgreSQL auditor fixture is not configured")
+    settings = conninfo_to_dict(admin_url)
+    database = settings.get("dbname", "")
+    assert isinstance(database, str) and database.endswith("_auditor_permission_test")
+    host = settings.get("host", "")
+    assert isinstance(host, str)
+    assert host in {"127.0.0.1", "localhost", "::1"} or host.startswith("/private/tmp/")
+    role = "auditor_fixture_" + uuid4().hex
+    with psycopg.connect(admin_url, autocommit=True) as admin:
+        assert admin.execute("SELECT to_regclass('public.forward_runs')").fetchone() == (None,)
+        admin.execute("CREATE TABLE public.forward_runs (run_id text)")
+        admin.execute("CREATE TABLE public.forward_artifacts (artifact_id text)")
+        for table in set(audit.READER_TABLES) - set(audit.AUDITOR_TABLES):
+            admin.execute(
+                psycopg.sql.SQL("CREATE TABLE public.{} (id text)").format(
+                    psycopg.sql.Identifier(table)
+                )
+            )
+        admin.execute("CREATE TABLE public.alembic_version (version_num text)")
+        admin.execute("CREATE TABLE public.unrelated_fixture (id integer)")
+        admin.execute("CREATE SEQUENCE public.auditor_fixture_sequence")
+        admin.execute(
+            "CREATE FUNCTION public.auditor_fixture_function() RETURNS integer LANGUAGE sql SECURITY DEFINER AS 'SELECT 1'"
+        )
+        admin.execute("REVOKE ALL ON FUNCTION public.auditor_fixture_function() FROM PUBLIC")
+        admin.execute(
+            psycopg.sql.SQL("CREATE ROLE {} LOGIN PASSWORD 'synthetic-fixture-only'").format(
+                psycopg.sql.Identifier(role)
+            )
+        )
+        admin.execute(
+            psycopg.sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(
+                psycopg.sql.Identifier(role)
+            )
+        )
+        admin.execute(
+            psycopg.sql.SQL(
+                "GRANT SELECT ON public.forward_runs, public.forward_artifacts TO {}"
+            ).format(psycopg.sql.Identifier(role))
+        )
+        dsn = make_conninfo(admin_url, user=role, password="synthetic-fixture-only")
+        try:
+            yield admin, role, dsn
+        finally:
+            admin.execute("DROP FUNCTION public.auditor_fixture_function()")
+            admin.execute("DROP SEQUENCE public.auditor_fixture_sequence")
+            for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+                admin.execute(
+                    psycopg.sql.SQL("DROP TABLE IF EXISTS public.{}").format(
+                        psycopg.sql.Identifier(table)
+                    )
+                )
+            admin.execute(psycopg.sql.SQL("DROP OWNED BY {}").format(psycopg.sql.Identifier(role)))
+            admin.execute(psycopg.sql.SQL("DROP ROLE {}").format(psycopg.sql.Identifier(role)))
+
+
+@pytest.mark.parametrize(
+    ("grant", "code"),
+    [
+        ("", ""),
+        ("GRANT INSERT (run_id) ON public.forward_runs TO {}", "table_write_or_grant_allowed"),
+        ("GRANT UPDATE (run_id) ON public.forward_runs TO {}", "table_write_or_grant_allowed"),
+        (
+            "GRANT SELECT (run_id) ON public.forward_runs TO {} WITH GRANT OPTION",
+            "table_write_or_grant_allowed",
+        ),
+        ("GRANT SELECT ON public.unrelated_fixture TO {}", "unrelated_table_read_allowed"),
+        (
+            "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO {}",
+            "sequence_read_allowed",
+        ),
+        (
+            "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO PUBLIC",
+            "sequence_read_allowed",
+        ),
+        (
+            "GRANT USAGE ON SEQUENCE public.auditor_fixture_sequence TO {}",
+            "sequence_mutation_allowed",
+        ),
+        (
+            "GRANT EXECUTE ON FUNCTION public.auditor_fixture_function() TO {}",
+            "security_definer_execution_allowed",
+        ),
+        ("GRANT CREATE ON SCHEMA public TO {}", "schema_create_allowed"),
+        ("ALTER ROLE {} CREATEDB", "elevated_role_attributes"),
+        ("GRANT pg_read_all_data TO {}", "role_membership_not_allowed"),
+        ("GRANT REFERENCES (run_id) ON public.forward_runs TO {}", "table_write_or_grant_allowed"),
+        ("GRANT DELETE ON public.forward_runs TO {}", "table_write_or_grant_allowed"),
+        ("GRANT MAINTAIN ON public.forward_runs TO {}", "table_write_or_grant_allowed"),
+        ("REVOKE SELECT ON public.forward_runs FROM {}", "required_select_missing"),
+    ],
+)
+def test_actual_postgres_grants_fail_closed_without_mutations(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+    grant: str,
+    code: str,
+) -> None:
+    admin, role, dsn = auditor_database
+    if "MAINTAIN" in grant:
+        version = admin.execute("SHOW server_version_num").fetchone()
+        assert version is not None
+        if int(str(version[0])) < 170000:
+            pytest.skip("MAINTAIN privilege requires PostgreSQL 17+")
+    assert audit.audit_auditor_role(dsn)["status"] == "passed"
+    if grant:
+        admin.execute(psycopg.sql.SQL(grant).format(psycopg.sql.Identifier(role)))
+        with pytest.raises(audit.AuditorPermissionError, match=f"^{code}$"):
+            audit.audit_auditor_role(dsn)
+    assert admin.execute("SELECT count(*) FROM public.forward_runs").fetchone() == (0,)
+    assert admin.execute("SELECT count(*) FROM public.forward_artifacts").fetchone() == (0,)
+
+
+def test_non_inherited_membership_is_still_rejected(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    admin.execute(psycopg.sql.SQL("ALTER ROLE {} NOINHERIT").format(psycopg.sql.Identifier(role)))
+    admin.execute(
+        psycopg.sql.SQL("GRANT pg_write_all_data TO {}").format(psycopg.sql.Identifier(role))
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^role_membership_not_allowed$"):
+        audit.audit_auditor_role(dsn)
+
+
+def test_public_column_write_grant_is_still_rejected(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, _, dsn = auditor_database
+    admin.execute("GRANT UPDATE (run_id) ON public.forward_runs TO PUBLIC")
+    with pytest.raises(audit.AuditorPermissionError, match="^table_write_or_grant_allowed$"):
+        audit.audit_auditor_role(dsn)
+
+
+def test_empty_target_is_not_proof_of_future_select_grants(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    admin.execute(
+        psycopg.sql.SQL(
+            "REVOKE SELECT ON public.forward_runs, public.forward_artifacts FROM {}"
+        ).format(psycopg.sql.Identifier(role))
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^restore_target_not_empty$"):
+        audit.audit_auditor_role(dsn, profile="empty-restore-target")
+    for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+        admin.execute(psycopg.sql.SQL("DROP TABLE public.{}").format(psycopg.sql.Identifier(table)))
+    report = audit.audit_auditor_role(dsn, profile="empty-restore-target")
+    assert report["status"] == "passed"
+    assert report["select_tables"] == []
+    assert report["future_table_grants_verified"] is False
+    # No default privileges: a subsequently restored table is not readable.
+    admin.execute("CREATE TABLE public.forward_datasets (id text)")
+    with pytest.raises(audit.AuditorPermissionError, match="^required_select_missing$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+    admin.execute(
+        psycopg.sql.SQL("GRANT CREATE ON SCHEMA public TO {}").format(psycopg.sql.Identifier(role))
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^schema_create_allowed$"):
+        audit.audit_auditor_role(dsn, profile="empty-restore-target")
+
+
+def test_restored_reader_accepts_only_registry_and_optional_migration_metadata(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    for table in (*audit.READER_TABLES, "alembic_version"):
+        admin.execute(
+            psycopg.sql.SQL("GRANT SELECT ON public.{} TO {}").format(
+                psycopg.sql.Identifier(table), psycopg.sql.Identifier(role)
+            )
+        )
+    report = audit.audit_auditor_role(dsn, profile="registry-reader")
+    assert report["select_tables"] == list(audit.READER_TABLES)
+    assert report["allowed_select_tables"] == [*audit.READER_TABLES, "alembic_version"]
+    with pytest.raises(audit.AuditorPermissionError, match="^unrelated_table_read_allowed$"):
+        audit.audit_auditor_role(dsn)  # Default evidence profile was not weakened.
+    admin.execute(
+        psycopg.sql.SQL("GRANT SELECT ON public.unrelated_fixture TO {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^unrelated_table_read_allowed$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+
+
+def test_restored_reader_rejects_owner_write_privileges(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    admin.execute(
+        psycopg.sql.SQL("GRANT SELECT, UPDATE ON ALL TABLES IN SCHEMA public TO {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    # Remove unrelated reads so this specifically exercises the write check.
+    admin.execute(
+        psycopg.sql.SQL("REVOKE SELECT ON public.unrelated_fixture FROM {}").format(
+            psycopg.sql.Identifier(role)
+        )
+    )
+    with pytest.raises(audit.AuditorPermissionError, match="^table_write_or_grant_allowed$"):
+        audit.audit_auditor_role(dsn, profile="registry-reader")
+
+
+def test_isolated_owner_default_grants_support_post_restore_reader_check(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+) -> None:
+    admin, role, dsn = auditor_database
+    for table in (*audit.READER_TABLES, "alembic_version", "unrelated_fixture"):
+        admin.execute(psycopg.sql.SQL("DROP TABLE public.{}").format(psycopg.sql.Identifier(table)))
+    assert audit.audit_auditor_role(dsn, profile="empty-restore-target")["status"] == "passed"
+    admin.execute(
+        psycopg.sql.SQL(
+            "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES TO {}"
+        ).format(psycopg.sql.Identifier(role))
+    )
+    # As with --no-owner --no-privileges, the target owner creates new tables;
+    # the source ACL is not imported. The reader obtains only target defaults.
+    for table in (*audit.READER_TABLES, "alembic_version"):
+        admin.execute(
+            psycopg.sql.SQL("CREATE TABLE public.{} (id text)").format(
+                psycopg.sql.Identifier(table)
+            )
+        )
+    assert audit.audit_auditor_role(dsn, profile="registry-reader")["status"] == "passed"
+
+
+@pytest.mark.parametrize(
+    "grant",
+    [
+        "GRANT INSERT (id) ON public.forward_forecasts TO {}",
+        "GRANT UPDATE (id) ON public.forward_forecasts TO {}",
+        "GRANT UPDATE (id) ON public.forward_forecasts TO PUBLIC",
+        "GRANT REFERENCES (id) ON public.forward_forecasts TO {}",
+        "GRANT SELECT (id) ON public.forward_forecasts TO {} WITH GRANT OPTION",
+        "GRANT SELECT ON public.unrelated_fixture TO {}",
+        "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO {}",
+        "GRANT SELECT ON SEQUENCE public.auditor_fixture_sequence TO PUBLIC",
+        "GRANT USAGE ON SEQUENCE public.auditor_fixture_sequence TO {}",
+        "GRANT EXECUTE ON FUNCTION public.auditor_fixture_function() TO {}",
+        "GRANT pg_write_all_data TO {}",
+        "GRANT MAINTAIN ON public.forward_forecasts TO {}",
+    ],
+)
+def test_reader_audit_rejects_effective_privileges_outside_table_write_probes(
+    auditor_database: tuple[psycopg.Connection[tuple[object, ...]], str, str],
+    grant: str,
+) -> None:
+    admin, role, dsn = auditor_database
+    if "MAINTAIN" in grant and admin.info.server_version < 170000:
+        pytest.skip("MAINTAIN privilege requires PostgreSQL 17+")
+    admin.execute(psycopg.sql.SQL("ALTER ROLE {} NOINHERIT").format(psycopg.sql.Identifier(role)))
+    for table in audit.READER_TABLES:
+        admin.execute(
+            psycopg.sql.SQL("GRANT SELECT ON public.{} TO {}").format(
+                psycopg.sql.Identifier(table), psycopg.sql.Identifier(role)
+            )
+        )
+    baseline = reader_audit.audit_reader_role(dsn)
+    assert baseline["status"] == "passed"
+    assert baseline["permission_inspection"]["profile"] == "registry-reader"
+    assert baseline["permission_inspection"]["mutation_probes"] is False
+    admin.execute(psycopg.sql.SQL(grant).format(psycopg.sql.Identifier(role)))
+    with pytest.raises(reader_audit.ReaderRoleAuditError):
+        reader_audit.audit_reader_role(dsn)
+    assert admin.execute("SELECT count(*) FROM public.forward_forecasts").fetchone() == (0,)
+    assert admin.execute("SELECT count(*) FROM public.forward_runs").fetchone() == (0,)
