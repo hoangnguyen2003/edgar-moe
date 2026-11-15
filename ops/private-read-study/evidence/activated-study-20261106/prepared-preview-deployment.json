@@ -1,0 +1,15 @@
+{
+  "issue": 290,
+  "explicit_protected_preview_destination_approval": true,
+  "status": "deployed",
+  "policy_sha256": "b635bf076433cc0e35695f845920e60aabc5a7b9dc3078606cc35e003b7a9da8",
+  "starts_at": "2026-11-06T08:15:00+00:00",
+  "expires_at": "2026-11-13T08:15:00+00:00",
+  "target": "preview",
+  "owner_credential_exported": false,
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "exit_code": 0,
+  "host_sha256": "100bab3fe13f7593bb5d84e9f2dedd4fec8bee264474f89cd642fed4f535d051",
+  "observed_at": "2026-11-06T08:08:28.465788+00:00"
+}

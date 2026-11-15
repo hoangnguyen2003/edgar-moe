@@ -1,0 +1,24 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "phase": "inactive_target_bound",
+  "secret_names_updated": [
+    "STUDY_DEPLOYMENT_URL",
+    "STUDY_TRACE_DEPLOYMENT_ID"
+  ],
+  "variable_names_updated": [
+    "STUDY_DEPLOYMENT_HOST_SHA256",
+    "STUDY_POLICY_SHA256",
+    "STUDY_STARTS_AT",
+    "STUDY_EXPIRES_AT"
+  ],
+  "observer_enabled": false,
+  "billing_changes": 0,
+  "database_credentials_in_observer": false,
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "host_sha256": "baa4683cdfc2a92e08fbe9a7fa91a54d4cc1efdf4494af74519d1381b7c27cb5",
+  "starts_at": "2026-11-15T15:00:00+00:00",
+  "expires_at": "2026-11-22T15:00:00+00:00",
+  "environment_variables_verified": true,
+  "observed_at": "2026-11-15T14:37:51.614909+00:00"
+}

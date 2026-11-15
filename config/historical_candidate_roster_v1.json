@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "cohort_id": "published-candidates-20221228-v1",
+  "source": "enwiki-server-revision",
+  "page_id": 2676045,
+  "page_title": "List of S&P 500 companies",
+  "revision_id": 1130173030,
+  "revision_timestamp": "2022-12-28T23:23:50Z",
+  "wikitext_sha256": "852a25efb345a50ba615e82de0dcc21fece03570a63c3d608637152fe453f67a",
+  "expected_candidates": 503,
+  "expected_issuers": 500,
+  "first_validation_start": "2023-01-01T00:00:00Z",
+  "selection_rule": "all_rows_in_the_pinned_constituents_table",
+  "later_status_rule": "retain_every_snapshot_member",
+  "scope": "private_source_feasibility_only"
+}

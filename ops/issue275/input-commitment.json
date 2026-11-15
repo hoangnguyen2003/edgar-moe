@@ -1,0 +1,23 @@
+{
+  "datasets": {
+    "baseline": {
+      "dataset_id": "research-2026-07-31-7ff33beccc1b",
+      "manifest_sha256": "979a71b00fc4d7a5bb264b1e6c249ac62f7f2ff4ca41425cefbc4e20dba8689c",
+      "path": "datasets/research-2026-07-31-7ff33beccc1b"
+    },
+    "candidate": {
+      "dataset_id": "research-2026-07-31-7cc42282e68d",
+      "manifest_sha256": "5890c09f9852d6b8f8598fdca4e4199aa9970fbf76f2f2b93041863dd64425b4",
+      "path": "datasets/research-2026-07-31-7cc42282e68d"
+    }
+  },
+  "input_audit_sha256": "f3def506ecdb83fd0033a75a53322f7b73ed09b6dcf0cf82dd5bc96b4d2759db",
+  "input_audit_status": "isolated_policy_change",
+  "issue": 275,
+  "locked_test_scored": false,
+  "locked_test_start": "2025-01-01",
+  "model_roster_count": 33,
+  "prepared_at_utc": "2026-11-04T03:52:57.621965+00:00",
+  "scope_sha256": "ae72948c3ea5925e49632e3437370a358ee6ed9a4961390034b496e57c09ed70",
+  "source_manifest_sha256": "5d5aa4c9cb67975cad21bdd0a9caf5763ac81b0c31a019ca6edd9f576c8b9603"
+}

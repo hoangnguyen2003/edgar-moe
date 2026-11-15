@@ -1,0 +1,78 @@
+{
+  "issue": 290,
+  "status": "passed",
+  "phase": "new_reader_native_verification",
+  "measurement_samples": 0,
+  "database_write_credentials_in_probe": false,
+  "response_bodies_retained": false,
+  "application_reads": 4,
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "routes": [
+    {
+      "route": "status",
+      "status": "passed",
+      "body_bytes": 677,
+      "same_snapshot_verified": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "preparation": 237,
+        "observer_connect": 389840,
+        "reader_connect": 752268,
+        "integrity": 849469,
+        "service": 459816,
+        "snapshot": 1472263,
+        "lifecycle": 2711853
+      }
+    },
+    {
+      "route": "forecasts",
+      "status": "passed",
+      "body_bytes": 19124,
+      "same_snapshot_verified": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "preparation": 971,
+        "observer_connect": 432524,
+        "reader_connect": 862786,
+        "integrity": 888259,
+        "service": 228186,
+        "snapshot": 1306837,
+        "lifecycle": 2711979
+      }
+    },
+    {
+      "route": "ticker_filter",
+      "status": "passed",
+      "body_bytes": 15598,
+      "same_snapshot_verified": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "preparation": 985,
+        "observer_connect": 403845,
+        "reader_connect": 870014,
+        "integrity": 909577,
+        "service": 230530,
+        "snapshot": 1338656,
+        "lifecycle": 2713502
+      }
+    },
+    {
+      "route": "performance",
+      "status": "passed",
+      "body_bytes": 461,
+      "same_snapshot_verified": true,
+      "reader_absence_verified": true,
+      "timing_us": {
+        "preparation": 1452595,
+        "observer_connect": 454736,
+        "reader_connect": 1048621,
+        "integrity": 1019314,
+        "service": 1068551,
+        "snapshot": 2246837,
+        "lifecycle": 5311800
+      }
+    }
+  ],
+  "billing_changes": 0,
+  "observed_at": "2026-11-15T14:34:11.634238+00:00"
+}
