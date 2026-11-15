@@ -1,0 +1,16 @@
+{
+  "id": 43727492668,
+  "html_url": "https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668",
+  "created_at": "2026-11-15T15:01:05Z",
+  "updated_at": "2026-11-15T15:02:07Z",
+  "status": "completed",
+  "conclusion": "success",
+  "head_branch": "main",
+  "event": "workflow_dispatch",
+  "path": ".github/workflows/observe-private-read-study.yml",
+  "run_attempt": 1,
+  "head_sha": "bad7fad2d4cc606046f51d0bddd9da20b145f444",
+  "mode": "observer",
+  "policy_sha256": "190f660677e6d498603772d537b6ab8b1c555391ba22e9155b952fa0763db86e",
+  "observed_at": "2026-11-15T15:02:13.656549+00:00"
+}

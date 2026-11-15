@@ -377,6 +377,16 @@ instead of silently counting calendar time as successful observation.
 This is limited operational validation for a personal portfolio, not a claim
 of a production latency SLO. No synthetic fixture is accepted as live evidence.
 
+### Replacement after credential recovery (November 14)
+
+The prior scope is expired. Its Cron shutdown was verified in run 43555332838.
+The separate [replacement plan](../../docs/issue-156-replacement-scheduler.md)
+uses one signed, source-free delivery probe on November 17 before three
+forecast slots on November 18/19/20. All slots retain 07:17 UTC timing. Future
+forecasts require the exact successful delivery artifact before dependencies
+or provider credentials, and late activation is refused. This is preparation,
+not activation or completed acceptance; the prior scope is not extended.
+
 ### Read-only missed-Cron diagnosis (November 9)
 
 Closeout run [42504029772](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/42504029772)

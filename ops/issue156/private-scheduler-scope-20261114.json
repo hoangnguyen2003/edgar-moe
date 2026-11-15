@@ -1,0 +1,113 @@
+{
+  "issue": 156,
+  "recorded_on": "2026-11-14",
+  "evidence_kind": "New finite operator plan under current autonomous-resolution instruction; expired predecessor preserved",
+  "owner_statements": [
+    "All parties have agreed.",
+    "I'm only using this project for personal purposes, so I don't think it should be an issue. Please do your best to move forward and complete as much as possible.",
+    "Resolve the easiest GitHub issue first.",
+    "done"
+  ],
+  "provider_responses_independently_verified": false,
+  "purpose": "One signed source-free delivery probe followed by three private frozen-v1 forecast-margin observations",
+  "scheduled_dates_utc": [
+    "2026-11-18",
+    "2026-11-19",
+    "2026-11-20"
+  ],
+  "cron": "17 7 * * TUE-SAT",
+  "source_scope": {
+    "fred_alfred_series": [
+      "VIXCLS",
+      "DGS10",
+      "DFF",
+      "BAA10Y"
+    ],
+    "market": "Alpaca Basic/IEX adjusted daily bars, corporate actions and asset metadata",
+    "filings": "Identified, rate-limited SEC submissions, filings and Company Facts",
+    "retained_model": "edgar-moe-frozen-v1",
+    "retained_training_dataset": "research-2026-07-31-3553e7ad78dd"
+  },
+  "bounds": {
+    "maximum_schedule_slots": 4,
+    "cpu_only": true,
+    "signed_provider_scheduled_time_required": true,
+    "new_training": false,
+    "publication_of_provider_data_or_model_outputs": false,
+    "global_source_gate_release": false,
+    "rewrite_existing_evidence": false,
+    "paid_plan_or_upgrade": false,
+    "public_trigger": false,
+    "maximum_new_storage_bytes": 4000000000,
+    "maximum_forecast_slots": 3,
+    "maximum_delivery_probe_slots": 1,
+    "maximum_actions_metadata_reads_per_delivery_check": 4
+  },
+  "limitations": [
+    "Owner-reported permissions are not independently inspected provider correspondence.",
+    "This new finite operator scope does not reuse the old one-cycle authorization or release general CLI/publication gates.",
+    "Zero eligible forecasts is inconclusive for issue 156 acceptance.",
+    "Nominal UTC timing, New York cutoff, frozen model, universe and 730-day input window are preserved."
+  ],
+  "private_target_fingerprints": {
+    "registry": "1c04f9b0109668ccccff2c0e2751fd1caab90a75f5ce7a3248a50f035520f5bf",
+    "storage": "0453db918fd6a577d6b4251dc3070d9040ec96205f94d8e1af631d3ed7c2ebb7"
+  },
+  "bound_input_sha256": {
+    "config/forward.yaml": "6fee9ade5a98b291cc1a895b10e0213a1d98911ff446252dbe9844b3e15ac318",
+    "config/authenticated-free.yaml": "beaf32a8ef6b05218ab5e9d601400ea01dd6669d0ebae060fc1d002f6f6f6beb",
+    "config/default.yaml": "d0181ea0a280251367289d9bb5fb562a27dee62f05084017a5c58752af41abe6",
+    "config/universe.research.csv": "630270ba5e17858ce9a543e7af8a7bf0e8b9edba6adb2d8d8db6fb4e5ba4e51d",
+    "ops/scheduler/private-forward-scheduler.mjs": "01ca1b44f49cb053d299f564d585c6484b4a90ff93d0df1c06a5b79c99104928",
+    ".github/workflows/forward-private-scheduler.yml": "d2dacb870c432d27ef5c6378e5073e08f29c8ed46a06a90345bc145b41bf89f8",
+    ".github/workflows/deploy-private-scheduler.yml": "0ff143115305e9428468cb8f38682e87a56133ea83316c5b95596c4050fc9f6a",
+    "scripts/verify_private_scheduler_delivery.py": "4bb30f0eb5e11455c5775edfb794c493c647cb986b48b475fd34a4457e1ee455",
+    "scripts/run_private_scheduler_cycle.py": "3bcfe30c289cdb7710fa38cb9ba50c54fe84a437f0cbe4aa9f05045436ff8d51",
+    "scripts/closeout_private_scheduler.py": "57139093aaca8b2115066330bf65ce53770b796a61d86746873caa83487208a1",
+    "ops/scheduler/manage-private-scheduler.mjs": "760f950d5530373549bbb4941d57b74803d2d8b1f95bc5556a1e1e9b742496a6",
+    "ops/scheduler/upload-private-worker.mjs": "0c86509da663685b78021c1b911d30f741013cf2faa93cd8f49d678fc2ede59e"
+  },
+  "cached_finbert_revision": "4556d13015211d73dccd3fdd39d39232506f3e43",
+  "private_cache_seed": {
+    "key": "sha256/3c/3c85ec9a2c3821ddae7e9296722dccf855319447bd7bea82f6357313d354649b/private-scheduler-cache-seed.tar.gz",
+    "sha256": "3c85ec9a2c3821ddae7e9296722dccf855319447bd7bea82f6357313d354649b",
+    "size_bytes": 652681172,
+    "source_checkpoint_cutoff": "2026-11-03",
+    "filing_documents": 3693,
+    "purpose": "Seed existing verified filing bodies and content-keyed frozen embeddings; provider refresh and newly available filings still required"
+  },
+  "operator_plan": {
+    "instruction": "continue",
+    "predecessor_scope": "ops/issue156/private-scheduler-scope-20261106.json",
+    "new_scope_id": "issue156-20261114",
+    "fresh_forecast_dates": [
+      "2026-11-18",
+      "2026-11-19",
+      "2026-11-20"
+    ],
+    "activation_deadline_utc": "2026-11-17T06:17:00Z",
+    "delivery_probe_date": "2026-11-17",
+    "change": "New identities and dates; mode-bound source-free delivery proof required before three forecast cycles. Prior expired scope and evidence remain unchanged.",
+    "github_cron_unchanged": "17 7 * * 2-6",
+    "scheduled_time_utc": "07:17",
+    "source_cutoff_rule_unchanged": true,
+    "additional_provider_families": false,
+    "maximum_total_new_upload_bytes_per_cycle": 1000000000,
+    "no_publication_or_general_source_gate_release": true
+  },
+  "delivery_probe_date_utc": "2026-11-17",
+  "predecessor_scope_sha256": "0e5d81c5e005be948fa8deb71f1466248ab4620de4b43529b3ab3a609d83ad95",
+  "verified_predecessor_stop_run": 43555332838,
+  "delivery_prerequisite": {
+    "workflow": "forward-private-scheduler.yml",
+    "mode": "delivery_probe",
+    "signed_provider_time_required": true,
+    "source_credentials_allowed": false,
+    "source_requests": 0,
+    "reruns_allowed": false,
+    "artifact_prefix": "scheduler-delivery-probe",
+    "forecast_mode_must_verify_successful_probe_first": true,
+    "same_GitHub_dispatch_credential_as_forecasts": true,
+    "separate_Analytics_permission_required": false
+  }
+}
