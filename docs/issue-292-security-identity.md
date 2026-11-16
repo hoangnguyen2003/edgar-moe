@@ -4,14 +4,14 @@ The fixed historical [candidate source](issue-292-historical-candidate-source.md
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
 source evidence, not a completed historical market master or corrected v2 study.
 
-The latest separate issuer-definition supplement has **490 of 503 verified
-identity anchors**, with **13 unresolved candidates**: 11 ownership identities
+The latest separate charter-redesignation supplement has **491 of 503 verified
+identity anchors**, with **12 unresolved candidates**: 10 ownership identities
 and two periodic anchors. Its
-[row-free audit](../ops/issue292/issuer-proxy-definition-audit-20261116.json) binds an
-independent offline replay. All 489 previous anchor payloads, the source binding
-and the complete candidate order are preserved. The legacy supplement and
-earlier captures remain unchanged; sections below retain their separate
-evidence stages rather than relabeling old captures.
+[row-free audit](../ops/issue292/class-redesignation-audit-20261116.json) binds the
+retained result and offline verification. All 490 previous anchor payloads, the
+source binding and complete candidate order are preserved. Earlier supplements
+and captures remain unchanged; sections below retain their separate evidence
+stages rather than relabeling old captures.
 
 ## Method and actual result
 
@@ -807,3 +807,67 @@ with 11 ownership and two periodic cases unresolved. The current
 [checkpoint preflight](issue-292-checkpoint-preflight.md) now independently
 replays that complete identity chain; source exploration does not relabel or
 admit the original checkpoint or dataset.
+
+
+## Explicit one-for-one charter redesignation
+
+`scripts/enrich_historical_class_redesignation.py` handles a narrower case than
+an equity-family alias: an issuer's dated charter explicitly redesignates each
+share of a named common class as one share of unnamed common stock and directs
+all references to the old class to refer to the new class. The current annual
+filing must incorporate that exact exhibit, with matching SEC file number,
+filing date, accession and issuer. The complete original submission must contain
+both the primary report and the named charter. Its primary report independently
+corroborates the effective date and class rename; the charter binds the named
+corporation, reconciled common/preferred authorizations, par value, one-for-one
+ratio and one-vote common rights.
+
+Only ownership reports accepted after the charter's conservative availability
+bound qualify. Every subject-authenticated report returned by the bounded
+ownership discovery must agree on the identifier and the old class. Conflicting
+issuers, classes, voting rights, families, ratios, dates and par values are
+refused. This supplies a documented legal class correspondence; it does not
+infer continuity of tradable instruments or market-provider identifiers.
+
+The new append-only stage independently replays the entire issuer-definition
+parent chain and preserves its anchors, binding and candidate order. It requires
+a private plan naming only unresolved ownership members, the retained complete
+submission hash and primary filename; accession and exhibit location come from
+the current annual filing, not a manually supplied alias. Source reads use an
+offline cache with no HTTP client. Capture is exclusive and content addressed;
+separate verification recomputes the complete result. Historical continuity,
+new checkpoint/dataset binding, publication and issue-completion fields stay
+false.
+
+```sh
+python -m scripts.enrich_historical_class_redesignation \
+  --directory data/artifacts/private-identity-capture \
+  --baseline proxy-definition-<sha256>.json \
+  --references private-redesignation-plan.json \
+  --governing-sources data/artifacts/private-legacy-sources \
+  --proxy-sources data/artifacts/private-combined-proxy-sources \
+  --redesignation-sources data/artifacts/private-redesignation-sources \
+  --source-capture data/artifacts/private-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+Replace `--baseline` and `--references` with
+`--verify class-redesignation-<sha256>.json` for independent offline replay.
+All prior and current private source pairs must remain available. Raw source
+rows, ownership details and identity payloads stay private; public audits
+contain only operational counts, hashes and explicit unresolved gates.
+
+The November 16 retained replay adds one identity using four agreeing,
+subject-authenticated ownership reports and the incorporated issuer charter.
+No source rows were dropped and no new filing request was needed: the complete
+charter submission was already retained. Eleven bounded SEC search requests
+were used for discovery earlier in this review. Four had an unintended form
+filter intersection and are not treated as negative evidence; one extended
+search returned 100 of 105 hits and is not claimed exhaustive. Search results
+were not used as identity proof. The actual charter, primary report, current
+annual reference and ownership filings are the evidence.
+
+The original checkpoint still differs from the fixed source, and all 12
+unresolved identities, historical market continuity and the new
+source/selection/checkpoint/dataset/study chain remain blockers. #292 remains
+open; identity coverage is not an issue-completion percentage.

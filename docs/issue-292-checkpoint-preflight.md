@@ -2,7 +2,7 @@
 
 `scripts/audit_historical_checkpoint.py` checks whether an existing checkpoint
 can be reused as the fixed historical source. It independently replays the
-selected legacy, issuer-proxy or issuer-definition identity supplement and all
+selected legacy, issuer-proxy, issuer-definition or charter-redesignation identity supplement and all
 its previous baselines before reading the checkpoint's hash-bound requested
 roster. It compares literal issuer and
 symbol pairs, retaining multiple share classes with one CIK. A renamed symbol
@@ -22,9 +22,10 @@ Run from an isolated checkout with the existing private inputs:
 ```sh
 python -m scripts.audit_historical_checkpoint \
   --directory data/artifacts/private-identity-capture \
-  --identity-result proxy-definition-<sha256>.json \
+  --identity-result class-redesignation-<sha256>.json \
   --governing-sources data/artifacts/private-legacy-sources \
   --proxy-sources data/artifacts/private-combined-proxy-sources \
+  --redesignation-sources data/artifacts/private-redesignation-sources \
   --source-capture data/artifacts/private-candidate-source \
   --retained-checkpoint data/raw/authenticated/2026-07-31 \
   --processed-dataset data/processed/v2-finbert/<dataset-id> \
@@ -36,14 +37,16 @@ exclusively created. For independent replay, replace `--output-dir` with
 `--verify-report data/artifacts/historical-checkpoint-preflight/compatibility-<sha256>.json`.
 The supplied paths must be canonical directories without aliases.
 
-Supported result prefixes are `legacy-governance`, `proxy-class` and
-`proxy-definition`. The filename digest, internal stage kind and declared
+Supported result prefixes are `legacy-governance`, `proxy-class`,
+`proxy-definition` and `class-redesignation`. The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
-For either proxy stage, `--proxy-sources` is mandatory and must preserve every
+For either proxy stage and the redesignation stage, `--proxy-sources` is mandatory and must preserve every
 prior/current source pair needed by the chain. For the legacy-only stage, omit
 that option; unused proxy inputs are refused. Missing or corrupt current-stage
 sources cannot fall back to an earlier result or an attested anchor count.
+For `class-redesignation`, `--redesignation-sources` is also mandatory.
+That option is refused for all earlier stages, so no source input is silently ignored.
 
 Exit **2** means a valid retained report with historical reuse **blocked**;
 exit **1** means invalid or unreadable evidence. This command intentionally has
@@ -84,7 +87,7 @@ the same report without network requests. A modified copy of the real feature
 asset was refused; the original remained unchanged. Validation: 2,521 full-suite
 tests passed, 36 skipped, 85.87% coverage, and 42 focused checks passed.
 
-## Current identity-chain replay, November 16, 2026
+## Issuer-definition identity-chain replay, November 16, 2026
 
 The preflight now accepts the separately content-addressed 490-anchor
 issuer-definition result and replays its complete parent chain. The 13
@@ -99,3 +102,16 @@ algorithm version and all original data remain unchanged. The command still
 returns 2 for a valid blocked report and 1 for invalid evidence. Synthetic tests
 also demonstrate that even identical rosters and complete identity counts
 cannot release the historical continuity or new-study-chain gates.
+
+
+## Charter-redesignation replay, November 16, 2026
+
+The fourth supported stage independently replays the 491-anchor result and all
+its previous baselines. Its [separate row-free audit](../ops/issue292/checkpoint-redesignation-audit-20261116.json)
+retains the new report without replacing either earlier checkpoint audit.
+Twelve identities remain unresolved. The original requested roster still has
+302 literal matches, with 201 source securities absent and 198 checkpoint
+securities outside the fixed source. The original processed assets remain
+hash verified; historical continuity and a new study chain remain unverified.
+A valid blocked report continues to exit 2 and cannot release publication or
+mark the issue complete.
