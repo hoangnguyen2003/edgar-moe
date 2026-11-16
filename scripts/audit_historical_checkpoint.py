@@ -22,6 +22,8 @@ from typing import Any
 
 from edgar_moe.data.screen_inputs import canonical_bytes, decode_json
 from scripts import enrich_historical_legacy_governance as legacy
+from scripts import enrich_historical_proxy_class as proxy_class
+from scripts import enrich_historical_proxy_definition as proxy_definition
 from scripts.capture_historical_security_identity import ARTIFACT_ROOT, RETAINED_MANIFEST_SHA256
 from scripts.capture_prospective_sec_index import (
     _capture_directory,
@@ -186,26 +188,59 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
     }
 
 
-def assess(args: argparse.Namespace) -> dict[str, Any]:
-    code_hash = digest(Path(__file__).read_bytes())
-    match = re.fullmatch(r"legacy-governance-([a-f0-9]{64})\.json", args.identity_result)
+def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
+    """Dispatch only named, independently replayable stages; never trust a count."""
+    match = re.fullmatch(
+        r"(legacy-governance|proxy-class|proxy-definition)-([a-f0-9]{64})\.json",
+        args.identity_result,
+    )
     if match is None:
         raise ValueError("invalid_identity_result_filename")
     with _capture_directory(args.directory, root=ARTIFACT_ROOT) as fd:
         raw = _read_private_file(fd, args.identity_result, 32 * 1024**2)
-    if digest(raw) != match[1]:
+    if digest(raw) != match[2]:
         raise ValueError("identity_result_digest_mismatch")
     stored = decode_json(raw)
-    replayed = legacy.recompute(
+    stages = {
+        "legacy-governance": (legacy, "private_legacy_governing_identity_supplement"),
+        "proxy-class": (proxy_class, "private_issuer_proxy_missing_class_supplement"),
+        "proxy-definition": (proxy_definition, "private_issuer_proxy_definition_supplement"),
+    }
+    module, kind = stages[match[1]]
+    if not isinstance(stored, dict) or stored.get("kind") != kind:
+        raise ValueError("identity_result_kind_mismatch")
+    proxy_sources = getattr(args, "proxy_sources", None)
+    if match[1] == "legacy-governance" and proxy_sources is not None:
+        raise ValueError("unexpected_proxy_sources_for_legacy_identity")
+    if match[1] != "legacy-governance" and not isinstance(proxy_sources, Path):
+        raise ValueError("missing_proxy_sources_for_identity_replay")
+    before = module.algorithms()
+    if stored.get("algorithms") != before:
+        raise ValueError("identity_replay_algorithm_version_mismatch")
+    common = (
         args.directory,
         stored["baseline_filename"],
         stored["reference_plan_filename"],
         args.governing_sources,
-        args.source_capture,
-        args.retained_checkpoint,
     )
+    if match[1] == "legacy-governance":
+        replayed = legacy.recompute(*common, args.source_capture, args.retained_checkpoint)
+    else:
+        # The complete prior and current proxy source pairs are required. An
+        # absent/corrupt proxy must never fall back to a legacy replay or count.
+        replayed = module.recompute(
+            *common, proxy_sources, args.source_capture, args.retained_checkpoint
+        )
+    if module.algorithms() != before:
+        raise ValueError("identity_algorithm_changed_during_preflight_replay")
     if canonical_bytes(stored) != canonical_bytes(replayed):
         raise ValueError("identity_replay_mismatch")
+    return replayed, match[2], digest(canonical_bytes(before))
+
+
+def assess(args: argparse.Namespace) -> dict[str, Any]:
+    code_hash = digest(Path(__file__).read_bytes())
+    replayed, identity_hash, replay_algorithm_hash = replay_identity(args)
     with _directory(args.retained_checkpoint) as fd:
         manifest, manifest_hash = _read(fd, "manifest.json", MAX_MANIFEST_BYTES)
         if manifest_hash != RETAINED_MANIFEST_SHA256:
@@ -237,7 +272,9 @@ def assess(args: argparse.Namespace) -> dict[str, Any]:
         "schema_version": 1,
         "status": "blocked_historical_checkpoint_reuse",
         "scope": "offline_existing_checkpoint_compatibility_not_new_study_admission",
-        "identity_result_sha256": match[1],
+        "identity_result_sha256": identity_hash,
+        "identity_result_kind": replayed["kind"],
+        "identity_replay_algorithms_sha256": replay_algorithm_hash,
         "identity_replay": "verified",
         "identity_source_roster_sha256": replayed["binding"]["source_roster_sha256"],
         "source_cutoff": replayed["binding"]["cutoff"],
@@ -270,6 +307,11 @@ def main() -> int:
     ):
         parser.add_argument("--" + name, required=True, type=Path)
     parser.add_argument("--identity-result", required=True)
+    parser.add_argument(
+        "--proxy-sources",
+        type=Path,
+        help="Required for proxy-class/proxy-definition stages; refused for the legacy-only stage",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)
     mode.add_argument("--verify-report", type=Path)
