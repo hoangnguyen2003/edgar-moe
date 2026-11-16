@@ -4,11 +4,11 @@ The fixed historical [candidate source](issue-292-historical-candidate-source.md
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
 source evidence, not a completed historical market master or corrected v2 study.
 
-The latest separate issuer-proxy supplement has **489 of 503 verified
-identity anchors**, with **14 unresolved candidates**: 12 ownership identities
+The latest separate issuer-definition supplement has **490 of 503 verified
+identity anchors**, with **13 unresolved candidates**: 11 ownership identities
 and two periodic anchors. Its
-[row-free audit](../ops/issue292/issuer-proxy-class-audit-20261116.json) binds an
-independent offline replay. All 488 previous anchor payloads, the source binding
+[row-free audit](../ops/issue292/issuer-proxy-definition-audit-20261116.json) binds an
+independent offline replay. All 489 previous anchor payloads, the source binding
 and the complete candidate order are preserved. The legacy supplement and
 earlier captures remain unchanged; sections below retain their separate
 evidence stages rather than relabeling old captures.
@@ -723,3 +723,62 @@ identified selection/checkpoint/processed-dataset/study chain remain required.
 The existing retrospective checkpoint cannot inherit the fixed source's date
 or membership claim. Publication and issue-completion flags stay false;
 frozen v1, original v2 and append-only forward records are preserved.
+
+## Issuer-defined common-class supplement, 2026-11-16
+
+A second, separate path supports a proxy that explicitly defines its generic
+“common stock” term as one named common class. The definition must occur once
+and match the registered class. It cannot equate common, ordinary or capital
+stock, or replace an explicit ownership class or voting right. Complete proxy
+and ownership submissions retain the same SEC filer/subject, accession, form,
+primary-document and conservative availability checks as the previous stage.
+
+For the supported shared-power ownership format, the reporting name on the
+cover must bind to the SEC filer's exact nonzero IRS identifier. An issuer citation
+must then repeat that cover name and match its business address, filing date,
+event date, shared voting, sole dispositive and shared dispositive positions.
+The ownership cover must report zero sole voting power, and both dispositive
+positions must reconcile exactly to its aggregate. A reporting name is not
+joined by dropping corporate suffixes or inventing a name alias. No rounding,
+share-count tolerance or correction of an issuer's apparent typo is allowed.
+A separate discovered citation contained a real position mismatch and was not
+used to qualify an identity.
+
+Pagination can split the reporter's name across pages. The parser removes only
+explicit `#TOC` headers and structurally separate, centered footers in a complete
+consecutive numbered-page sequence. It records hashes of removed furniture;
+arbitrary narrative text and business counts are not erased by a text regex.
+The complete submission and primary bytes remain unchanged and hash-bound.
+
+`scripts/enrich_historical_proxy_definition.py` replays the entire 489-anchor
+parent result before adding one new identity. Its private reference plan uses
+the same strict member/accession/filename/source-hash schema. It writes a new
+`proxy-definition-<sha256>.json` exclusively, and its separate `--verify` mode
+recomputes both the parent and supplement with no HTTP client. Every prior
+anchor, the 503-member denominator, source binding and candidate order remain
+unchanged. The earlier proxy algorithm and captures are not rewritten.
+
+```sh
+python -m scripts.enrich_historical_proxy_definition \
+  --directory data/artifacts/historical-identities \
+  --baseline proxy-class-<previous-sha256>.json \
+  --references private-proxy-definition-plan.json \
+  --governing-sources data/artifacts/private-legacy-sources \
+  --proxy-sources data/artifacts/private-combined-proxy-sources \
+  --source-capture data/artifacts/historical-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+For replay, replace `--baseline` and `--references` with
+`--verify proxy-definition-<sha256>.json`. The combined private proxy directory
+must independently preserve both the prior and new source/receipt pairs so the
+parent can replay. One additional bounded SEC read supplied the new complete
+submission; the primary proxy and cited ownership report were already retained.
+Capture and replay make zero network or market-provider requests and use no paid
+resources. Only operational counts and hashes are published.
+
+The remaining 13 identities, historical market continuity and new
+selection/checkpoint/processed-dataset/study chain are still required. Neither
+this supplement nor its private replay admits the original retrospective
+checkpoint or releases the source/publication holds. Frozen v1, original v2 and
+append-only forward records remain unchanged; issue completion stays false.
