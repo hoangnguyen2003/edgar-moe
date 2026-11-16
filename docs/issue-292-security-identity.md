@@ -1,15 +1,17 @@
-# Historical SEC security identity evidence, 2026-11-14
+# Historical SEC security identity evidence, 2026-11-16
 
 The fixed historical [candidate source](issue-292-historical-candidate-source.md)
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
 source evidence, not a completed historical market master or corrected v2 study.
 
-The latest separate legacy-governing supplement has **488 of 503 verified
-identity anchors**, with **15 unresolved candidates**. Its
-[row-free audit](../ops/issue292/legacy-governing-audit-20261114.json) binds an
-independent offline replay. The collector's original 486-anchor result and
-the earlier 487-anchor supplement remain unchanged; sections below retain
-their separate evidence stages rather than relabeling old captures.
+The latest separate issuer-proxy supplement has **489 of 503 verified
+identity anchors**, with **14 unresolved candidates**: 12 ownership identities
+and two periodic anchors. Its
+[row-free audit](../ops/issue292/issuer-proxy-class-audit-20261116.json) binds an
+independent offline replay. All 488 previous anchor payloads, the source binding
+and the complete candidate order are preserved. The legacy supplement and
+earlier captures remain unchanged; sections below retain their separate
+evidence stages rather than relabeling old captures.
 
 ## Method and actual result
 
@@ -663,3 +665,61 @@ continuity, source permissions for bars, or a corrected selected-members,
 checkpoint, processed-dataset and study chain. Those completion flags remain
 false; frozen v1 and append-only forward records are unchanged. Private
 issuer/CUSIP rows and governing-source proposals are not published.
+
+## Issuer-proxy named-class supplement, 2026-11-16
+
+An issuer's pre-cutoff definitive proxy can qualify a missing class letter in
+an otherwise subject-authenticated Schedule 13G/A cover. This path requires
+an explicit definition associating the registered class with the proxy's
+issuer alias, followed by an exact citation naming that class, ownership
+reporter, amendment number, filing date and share positions. The complete
+ownership submission must independently identify the same subject CIK and
+reporter. Its sole/shared voting, sole/shared dispositive and aggregate
+positions must reconcile with the supported two-power citation; nonzero
+shared positions or ambiguous citations are refused.
+
+Only an absent named-class qualifier within the **same common-stock family**
+can be added. A reported class letter or voting qualifier cannot be replaced.
+Common, ordinary and capital stock remain distinct. Proxy filer name and CIK,
+accession, form, primary filename and filing/acceptance dates must agree with
+the complete SEC submission. The primary document, SEC header, exact citation,
+complete submission and current retrieval receipt are hash-bound privately.
+A proxy's date-only availability uses filing date plus 14 calendar days; the
+qualified ownership record becomes available at the later of that bound and
+the ownership evidence's bound. Retrieval in 2026 is not a historical capture.
+
+The offline `scripts/enrich_historical_proxy_class.py` command first replays
+the complete legacy supplement and every parent stage. It then reads a private
+plan binding an unresolved candidate to one ownership accession and one exact
+proxy source hash. It cannot override an existing anchor, repair a missing
+periodic anchor, remove a candidate or introduce an unbound member. Capture
+writes a new `proxy-class-<sha256>.json` exclusively; `--verify` independently
+recomputes the parent and supplement and checks the entire result. Changed
+source bytes, receipts, plans, algorithms or result contents fail closed.
+Neither mode has an HTTP client.
+
+```sh
+python -m scripts.enrich_historical_proxy_class \
+  --directory data/artifacts/historical-identities \
+  --baseline legacy-governance-<previous-sha256>.json \
+  --references private-proxy-class-plan.json \
+  --governing-sources data/artifacts/private-legacy-sources \
+  --proxy-sources data/artifacts/private-proxy-sources \
+  --source-capture data/artifacts/historical-candidate-source \
+  --retained-checkpoint data/raw/authenticated/2026-07-31
+```
+
+For replay, replace `--baseline` and `--references` with
+`--verify proxy-class-<sha256>.json`. Private source discovery made four bounded
+SEC reads, including three primary proxies and one complete submission. Only
+the supported source qualified a new identity; the other discoveries were not
+counted as anchors. Full capture and replay use zero network requests, market
+provider requests and paid resources. Public artifacts contain only hashes,
+counts and limitations; synthetic tests contain no provider rows.
+
+This adds one source-verified identity, not a completed historical master.
+The 14 unresolved candidates, historical market continuity and separately
+identified selection/checkpoint/processed-dataset/study chain remain required.
+The existing retrospective checkpoint cannot inherit the fixed source's date
+or membership claim. Publication and issue-completion flags stay false;
+frozen v1, original v2 and append-only forward records are preserved.
