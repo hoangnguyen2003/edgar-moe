@@ -388,7 +388,9 @@ test("separate processes contend on one actual SQLite file; exactly one reserves
     worker.once("error", reject);
     let response;
     worker.once("message", value => { response = value; });
-    worker.once("exit", code => code === 0 && response ? resolve(response) : reject(new Error("Fixture failed")));
+    // `exit` can precede draining IPC; `close` follows channel/stdio closure.
+    worker.once("close", code => code === 0 && response ? resolve(response) :
+      reject(new Error(`Fixture failed (exit ${code}, receipt ${Boolean(response)})`)));
     worker.send({ filename, policy, requestId: id(index + 1), nowMs: START });
   })));
   assert.equal(outcomes.filter(value => value.status === "admitted").length, 1);
