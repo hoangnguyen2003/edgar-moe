@@ -167,6 +167,8 @@ def preflight(tmp_path, monkeypatch):
         "cutoff": "2022-12-28T23:23:50Z",
     }
     result = {
+        "kind": "private_legacy_governing_identity_supplement",
+        "algorithms": audit.legacy.algorithms(),
         "baseline_filename": "previous.json",
         "reference_plan_filename": "proposal.json",
         "binding": binding,
@@ -244,6 +246,177 @@ def test_independent_identity_replay_cannot_be_replaced_by_an_attested_count(tmp
     monkeypatch.setattr(audit.legacy, "recompute", lambda *a: {**result, "tampered": True})
     with pytest.raises(ValueError, match="identity_replay_mismatch"):
         audit.assess(args)
+
+
+PROXY_STAGES = [
+    ("proxy-class", audit.proxy_class, "private_issuer_proxy_missing_class_supplement"),
+    ("proxy-definition", audit.proxy_definition, "private_issuer_proxy_definition_supplement"),
+]
+
+
+def proxy_preflight(tmp_path, monkeypatch, prefix, module, kind):
+    args, result, legacy_calls = preflight(tmp_path, monkeypatch)
+    result.update(kind=kind, algorithms=module.algorithms())
+    raw = canonical_bytes(result)
+    args.identity_result = prefix + "-" + audit.digest(raw) + ".json"
+    path = args.directory / args.identity_result
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    args.proxy_sources = args.directory.parent / "combined-proxy-sources"
+    calls = []
+    monkeypatch.setattr(module, "recompute", lambda *a: calls.append(a) or deepcopy(result))
+    return args, result, legacy_calls, calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, result, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    report = audit.assess(args)
+    assert not legacy_calls and len(calls) == 1
+    assert calls[0][4] == args.proxy_sources and len(calls[0]) == 7
+    assert report["identity_result_kind"] == kind
+    assert report["identity_replay_algorithms_sha256"] == audit.digest(
+        canonical_bytes(result["algorithms"])
+    )
+    assert report["identity_result_sha256"] == audit.digest(canonical_bytes(result))
+    assert report["unresolved_identities"] == 1
+    assert report["checkpoint_dataset_binding_verified"] is False
+    assert report["publication_gate_released"] is False
+    assert report["issue_complete"] is False
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_missing_proxy_sources_are_not_silently_replaced_with_a_legacy_replay(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, _, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.proxy_sources = None
+    with pytest.raises(ValueError, match="missing_proxy_sources"):
+        audit.assess(args)
+    assert not calls and not legacy_calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_a_correct_digest_cannot_mislabel_the_identity_stage(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, result, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    result["kind"] = "private_legacy_governing_identity_supplement"
+    raw = canonical_bytes(result)
+    args.identity_result = prefix + "-" + audit.digest(raw) + ".json"
+    path = args.directory / args.identity_result
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(ValueError, match="identity_result_kind_mismatch"):
+        audit.assess(args)
+    assert not calls and not legacy_calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("failure", ["missing_source", "changed_source", "changed_result"])
+def test_current_stage_failures_never_fall_back_to_an_earlier_anchor_count(
+    tmp_path, monkeypatch, prefix, module, kind, failure
+):
+    args, result, legacy_calls, _ = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+
+    def fail(*_args):
+        if failure == "missing_source":
+            raise FileNotFoundError("missing private source")
+        if failure == "changed_source":
+            raise ValueError("source digest mismatch")
+        return result | {"report": {"statuses": {"pre_cutoff_SEC_identity_anchored": 4}}}
+
+    monkeypatch.setattr(module, "recompute", fail)
+    with pytest.raises((ValueError, OSError)):
+        audit.assess(args)
+    assert not legacy_calls
+
+
+def test_legacy_stage_refuses_unused_proxy_source_arguments(tmp_path, monkeypatch):
+    args, _, calls = preflight(tmp_path, monkeypatch)
+    args.proxy_sources = args.directory
+    with pytest.raises(ValueError, match="unexpected_proxy_sources"):
+        audit.assess(args)
+    assert not calls
+
+
+def test_declared_algorithm_versions_must_match_actual_replay_code(tmp_path, monkeypatch):
+    args, result, calls = preflight(tmp_path, monkeypatch)
+    result["algorithms"] = {"fabricated": "f" * 64}
+    raw = canonical_bytes(result)
+    args.identity_result = "legacy-governance-" + audit.digest(raw) + ".json"
+    path = args.directory / args.identity_result
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    with pytest.raises(ValueError, match="algorithm_version_mismatch"):
+        audit.assess(args)
+    assert not calls
+
+
+def test_algorithm_changes_during_identity_replay_refuse_the_preflight(tmp_path, monkeypatch):
+    args, result, _ = preflight(tmp_path, monkeypatch)
+    versions = iter([result["algorithms"], {"changed": "f" * 64}])
+    monkeypatch.setattr(audit.legacy, "algorithms", lambda: next(versions))
+    with pytest.raises(ValueError, match="identity_algorithm_changed"):
+        audit.assess(args)
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_identical_rosters_and_complete_identity_counts_still_cannot_admit_a_study(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, result, _, _ = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    result["results"] = [{"status": "pre_cutoff_SEC_identity_anchored"}] * 4
+    result["report"]["statuses"] = {"pre_cutoff_SEC_identity_anchored": 4}
+    raw = canonical_bytes(result)
+    args.identity_result = prefix + "-" + audit.digest(raw) + ".json"
+    path = args.directory / args.identity_result
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    selected = canonical_bytes(requested())
+    (args.retained_checkpoint / "requested-universe.json").write_bytes(selected)
+    manifest_path = args.retained_checkpoint / "manifest.json"
+    manifest = audit.decode_json(manifest_path.read_bytes())
+    manifest["hashes"]["requested_universe"] = audit.digest(selected)
+    raw_manifest = canonical_bytes(manifest)
+    manifest_path.write_bytes(raw_manifest)
+    monkeypatch.setattr(audit, "RETAINED_MANIFEST_SHA256", audit.digest(raw_manifest))
+    processed_path = args.processed_dataset / "manifest.json"
+    processed = audit.decode_json(processed_path.read_bytes())
+    processed["source_manifest_hash"] = audit.digest(raw_manifest)
+    processed_path.write_bytes(canonical_bytes(processed))
+    report = audit.assess(args)
+    assert report["roster_comparison"]["exact_fixed_source_roster"] is True
+    assert report["unresolved_identities"] == 0
+    assert report["blockers"] == [
+        "historical_market_continuity_unverified",
+        "new_source_selection_checkpoint_dataset_study_chain_unverified",
+    ]
+    assert report["status"] == "blocked_historical_checkpoint_reuse"
+    assert report["historical_market_continuity_verified"] is False
+    assert report["checkpoint_dataset_binding_verified"] is False
+    assert report["publication_gate_released"] is False
+    assert report["issue_complete"] is False
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_proxy_stage_cli_replays_a_retained_blocked_report_and_never_exits_zero(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, _, _, _ = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    argv = ["audit_historical_checkpoint"]
+    for name, value in vars(args).items():
+        argv += ["--" + name.replace("_", "-"), str(value)]
+    output = args.directory.parent / "report"
+    monkeypatch.setattr("sys.argv", argv + ["--output-dir", str(output)])
+    assert audit.main() == 2
+    path = next(output.glob("compatibility-*.json"))
+    before = path.read_bytes()
+    monkeypatch.setattr("sys.argv", argv + ["--verify-report", str(path)])
+    assert audit.main() == 2
+    assert path.read_bytes() == before
 
 
 def test_unchanged_issuer_count_cannot_hide_modified_requested_security(tmp_path, monkeypatch):

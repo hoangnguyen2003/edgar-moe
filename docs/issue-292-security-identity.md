@@ -782,3 +782,28 @@ selection/checkpoint/processed-dataset/study chain are still required. Neither
 this supplement nor its private replay admits the original retrospective
 checkpoint or releases the source/publication holds. Frozen v1, original v2 and
 append-only forward records remain unchanged; issue completion stays false.
+
+## Additional source review, 2026-11-16
+
+The remaining 13 cases were rechecked against retained, subject-authenticated
+ownership reports without provider calls. A promising ordinary-share title in
+an issuer's submissions history belonged to another SEC subject and was
+refused. No wrong-subject report, common/ordinary/capital shortcut or removed
+class letter supplied a new identity.
+
+One complete, pre-cutoff SEC submission supplied the two images of an explicitly
+incorporated stock-certificate exhibit. Visual review found blank forms with no
+usable identifier. One image had noncanonical uuencoding padding; it was
+reviewed separately and was not used as identity evidence. Four additional
+issuer-filed security-description exhibits also supplied no matching equity
+identifier. Identifier mentions in debt disclosures cannot identify the issuer's
+registered equity. These five bounded SEC reads added no anchors and made no
+market-provider requests or paid-resource changes.
+
+The [row-free source assessment](../ops/issue292/additional-source-assessment-20261116.json)
+records counts, hashes and refusal outcomes. The source bytes, decoded images,
+receipts and comparison details remain private. Coverage stays 490 of 503,
+with 11 ownership and two periodic cases unresolved. The current
+[checkpoint preflight](issue-292-checkpoint-preflight.md) now independently
+replays that complete identity chain; source exploration does not relabel or
+admit the original checkpoint or dataset.
