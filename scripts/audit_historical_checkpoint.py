@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from edgar_moe.data.screen_inputs import canonical_bytes, decode_json
+from scripts import enrich_historical_class_redesignation as class_redesignation
 from scripts import enrich_historical_legacy_governance as legacy
 from scripts import enrich_historical_proxy_class as proxy_class
 from scripts import enrich_historical_proxy_definition as proxy_definition
@@ -191,7 +192,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -205,11 +206,21 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
         "legacy-governance": (legacy, "private_legacy_governing_identity_supplement"),
         "proxy-class": (proxy_class, "private_issuer_proxy_missing_class_supplement"),
         "proxy-definition": (proxy_definition, "private_issuer_proxy_definition_supplement"),
+        "class-redesignation": (
+            class_redesignation,
+            "private_charter_class_redesignation_supplement",
+        ),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
         raise ValueError("identity_result_kind_mismatch")
     proxy_sources = getattr(args, "proxy_sources", None)
+    redesignation_sources = getattr(args, "redesignation_sources", None)
+    if match[1] == "class-redesignation":
+        if not isinstance(redesignation_sources, Path):
+            raise ValueError("missing_redesignation_sources_for_identity_replay")
+    elif redesignation_sources is not None:
+        raise ValueError("unexpected_redesignation_sources_for_identity_replay")
     if match[1] == "legacy-governance" and proxy_sources is not None:
         raise ValueError("unexpected_proxy_sources_for_legacy_identity")
     if match[1] != "legacy-governance" and not isinstance(proxy_sources, Path):
@@ -225,6 +236,19 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     )
     if match[1] == "legacy-governance":
         replayed = legacy.recompute(*common, args.source_capture, args.retained_checkpoint)
+    elif match[1] == "class-redesignation":
+        if not isinstance(proxy_sources, Path) or not isinstance(redesignation_sources, Path):
+            raise ValueError("missing_sources_for_redesignation_replay")
+        replayed = class_redesignation.recompute(
+            args.directory,
+            stored["baseline_filename"],
+            stored["reference_plan_filename"],
+            args.governing_sources,
+            proxy_sources,
+            redesignation_sources,
+            args.source_capture,
+            args.retained_checkpoint,
+        )
     else:
         # The complete prior and current proxy source pairs are required. An
         # absent/corrupt proxy must never fall back to a legacy replay or count.
@@ -310,7 +334,10 @@ def main() -> int:
     parser.add_argument(
         "--proxy-sources",
         type=Path,
-        help="Required for proxy-class/proxy-definition stages; refused for the legacy-only stage",
+        help="Required for proxy and class-redesignation stages; refused for the legacy-only stage",
+    )
+    parser.add_argument(
+        "--redesignation-sources", type=Path, help="Required only for the class-redesignation stage"
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)

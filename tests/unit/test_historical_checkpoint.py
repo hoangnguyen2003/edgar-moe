@@ -251,6 +251,11 @@ def test_independent_identity_replay_cannot_be_replaced_by_an_attested_count(tmp
 PROXY_STAGES = [
     ("proxy-class", audit.proxy_class, "private_issuer_proxy_missing_class_supplement"),
     ("proxy-definition", audit.proxy_definition, "private_issuer_proxy_definition_supplement"),
+    (
+        "class-redesignation",
+        audit.class_redesignation,
+        "private_charter_class_redesignation_supplement",
+    ),
 ]
 
 
@@ -263,6 +268,8 @@ def proxy_preflight(tmp_path, monkeypatch, prefix, module, kind):
     path.write_bytes(raw)
     path.chmod(0o600)
     args.proxy_sources = args.directory.parent / "combined-proxy-sources"
+    if prefix == "class-redesignation":
+        args.redesignation_sources = args.directory.parent / "redesignation-sources"
     calls = []
     monkeypatch.setattr(module, "recompute", lambda *a: calls.append(a) or deepcopy(result))
     return args, result, legacy_calls, calls
@@ -275,7 +282,11 @@ def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
     args, result, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
     report = audit.assess(args)
     assert not legacy_calls and len(calls) == 1
-    assert calls[0][4] == args.proxy_sources and len(calls[0]) == 7
+    assert calls[0][4] == args.proxy_sources
+    if prefix == "class-redesignation":
+        assert calls[0][5] == args.redesignation_sources and len(calls[0]) == 8
+    else:
+        assert len(calls[0]) == 7
     assert report["identity_result_kind"] == kind
     assert report["identity_replay_algorithms_sha256"] == audit.digest(
         canonical_bytes(result["algorithms"])
@@ -449,3 +460,33 @@ def test_cli_retains_blocked_report_and_replays_it_without_returning_success(
     report.write_bytes(original + b" ")
     assert audit.main() == 1
     assert "refused" in capsys.readouterr().err
+
+
+def test_missing_redesignation_source_cannot_skip_the_current_stage(tmp_path, monkeypatch):
+    prefix, module, kind = PROXY_STAGES[-1]
+    args, _, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.redesignation_sources = None
+    with pytest.raises(ValueError, match="missing_redesignation_sources"):
+        audit.assess(args)
+    assert not calls and not legacy_calls
+
+
+@pytest.mark.parametrize("stage", range(2))
+def test_proxy_stages_refuse_unused_redesignation_sources(tmp_path, monkeypatch, stage):
+    prefix, module, kind = PROXY_STAGES[stage]
+    args, _, legacy_calls, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.redesignation_sources = args.directory
+    with pytest.raises(ValueError, match="unexpected_redesignation_sources"):
+        audit.assess(args)
+    assert not calls and not legacy_calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES[:-1])
+def test_unused_redesignation_sources_are_not_silently_ignored(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, _, _, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.redesignation_sources = args.directory
+    with pytest.raises(ValueError, match="unexpected_redesignation_sources"):
+        audit.assess(args)
+    assert not calls
