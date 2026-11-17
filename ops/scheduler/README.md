@@ -454,3 +454,26 @@ cap, retains failed acknowledgements and never repeats an ambiguous dispatch.
 The closeout is disabled even when provider cleanup fails; the job then fails
 visibly after receipt retention. See the
 [complete recovery review](../../docs/open-issue-closeout-20261113.md).
+
+### November 17 replacement-probe inspection
+
+The replacement probe has no Actions run as of November 17, 09:00 UTC.
+Management run [44052817635](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/44052817635)
+verified the active private Worker and both expected secret names using three
+metadata GETs. Its legacy Cron-events step correctly refused its expired
+November 7–11 diagnostic before sending a GraphQL request. That refusal does
+not identify the cause of the replacement's missing delivery.
+
+`inspect-private-scheduler.yml` supplies a separate main-only, manually dispatched
+metadata diagnostic. After the same existing state checks, it selects the fixed
+`replacement-20261114` window, November 17 at 07:00 UTC through November 18 at
+00:00 UTC, for one bounded GraphQL query on the same Worker. The legacy window
+and default remain expired. No arbitrary date or resource input, retry, trigger
+change, source access, signing-key read, Worker invocation or forecast dispatch
+is added. Refused queries retain only the existing bounded error categories.
+The active scope's twelve bound inputs and hashes are unchanged.
+
+This diagnostic does not replay the missing probe or bypass its prerequisite.
+Provider permission/dataset refusal and an empty event inventory cannot establish
+successful delivery. Live query compatibility remains unverified until the new
+workflow is run on merged main and its retained receipt is inspected.

@@ -6,8 +6,12 @@ import {pathToFileURL} from "node:url";
 
 const ACCOUNT_SHA = "d55626b5e28b4d2ac50ff058e39cd722f2779d300ca7db10f76e3e3d7966d386";
 const WORKER = "edgar-moe-forward-scheduler";
-const START = "2026-11-07T00:00:00.000Z";
-const END = "2026-11-12T00:00:00.000Z";
+// Preserve the expired diagnostic; a separate, explicit scope covers only the
+// replacement's missed delivery probe. No caller-selected account or dates.
+const WINDOWS = Object.freeze({
+  legacy: Object.freeze({start: "2026-11-07T00:00:00.000Z", end: "2026-11-12T00:00:00.000Z"}),
+  "replacement-20261114": Object.freeze({start: "2026-11-17T07:00:00.000Z", end: "2026-11-18T00:00:00.000Z"}),
+});
 const LIMIT = 100;
 const QUERY = `query PrivateCronEvents($account: string!, $from: Time!, $to: Time!) {
   viewer { accounts(filter: {accountTag: $account}) {
@@ -68,27 +72,30 @@ async function boundedJson(response) {
   }
 }
 
-export async function inspectPrivateCronEvents({env, now = new Date(), fetchImpl = globalThis.fetch,
+export async function inspectPrivateCronEvents({env, now = new Date(), diagnosticScope = "legacy", fetchImpl = globalThis.fetch,
   expectedAccountSha256 = ACCOUNT_SHA}) {
   const report = {schema_version: 1, status: "refused", scope: "issue156_fixed_cron_metadata",
     request_count: 0, external_writes: 0, worker_invocations: 0,
     forecast_margin_proven: false, dispatch_origin_proven: false, events: []};
   try {
+    if (!Object.hasOwn(WINDOWS, diagnosticScope)) throw new Error("diagnostic_scope_refused");
+    const {start, end} = WINDOWS[diagnosticScope];
     const account = env.CLOUDFLARE_ACCOUNT_ID;
     const token = env.CLOUDFLARE_API_TOKEN;
     if (!/^[a-f0-9]{32}$/.test(account ?? "") || !token ||
         createHash("sha256").update(JSON.stringify(account)).digest("hex") !== expectedAccountSha256) {
       throw new Error("account_refused");
     }
-    if (!(now instanceof Date) || !Number.isFinite(now.getTime()) || now < new Date(START) || now >= new Date(END)) {
+    if (!(now instanceof Date) || !Number.isFinite(now.getTime()) || now < new Date(start) || now >= new Date(end)) {
       throw new Error("diagnostic_window_refused");
     }
-    report.window = {starts_at: START, ends_at: now.toISOString()};
+    report.diagnostic_scope = diagnosticScope;
+    report.window = {starts_at: start, ends_at: now.toISOString()};
     report.request_count = 1;
     const response = await fetchImpl("https://api.cloudflare.com/client/v4/graphql", {
       method: "POST", redirect: "error", signal: AbortSignal.timeout(15000),
       headers: {Authorization: `Bearer ${token}`, "Content-Type": "application/json"},
-      body: JSON.stringify({query: QUERY, variables: {account, from: START, to: now.toISOString()}}),
+      body: JSON.stringify({query: QUERY, variables: {account, from: start, to: now.toISOString()}}),
     });
     const document = await boundedJson(response);
     if (document.errors != null && (!Array.isArray(document.errors) || document.errors.length)) {
@@ -105,7 +112,7 @@ export async function inspectPrivateCronEvents({env, now = new Date(), fetchImpl
       if (event?.scriptName !== WORKER) throw new Error("event_worker_refused");
       const observed = stamp(event.datetime);
       const scheduled = stamp(event.scheduledDatetime);
-      if (observed < START || observed > now.toISOString() || scheduled < START || scheduled > now.toISOString()) {
+      if (observed < start || observed > now.toISOString() || scheduled < start || scheduled > now.toISOString()) {
         throw new Error("event_window_refused");
       }
       return {observed_at: observed, scheduled_at: scheduled,
@@ -118,7 +125,7 @@ export async function inspectPrivateCronEvents({env, now = new Date(), fetchImpl
     report.event_absence_proves_no_invocation = false;
     report.status = "passed";
   } catch (error) {
-    const reasons = new Set(["account_refused", "diagnostic_window_refused", "metadata_http_refused", "metadata_body_refused",
+    const reasons = new Set(["account_refused", "diagnostic_scope_refused", "diagnostic_window_refused", "metadata_http_refused", "metadata_body_refused",
       "metadata_size_refused", "metadata_query_refused", "metadata_account_refused", "event_inventory_refused",
       "event_worker_refused", "event_time_refused", "event_window_refused"]);
     report.reason = reasons.has(error?.message) ? error.message : "metadata_read_refused";
@@ -127,9 +134,9 @@ export async function inspectPrivateCronEvents({env, now = new Date(), fetchImpl
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [output] = process.argv.slice(2);
-  if (!output) throw new Error("Missing receipt output path");
-  const report = await inspectPrivateCronEvents({env: process.env});
+  const [output, diagnosticScope = "legacy", ...extra] = process.argv.slice(2);
+  if (!output || extra.length) throw new Error("Expected receipt output path and optional fixed diagnostic scope");
+  const report = await inspectPrivateCronEvents({env: process.env, diagnosticScope});
   mkdirSync(dirname(output), {recursive: true, mode: 0o700});
   writeFileSync(output, JSON.stringify(report, null, 2) + "\n", {flag: "wx", mode: 0o600});
   console.log(JSON.stringify(report));

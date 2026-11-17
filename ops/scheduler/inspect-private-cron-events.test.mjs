@@ -69,6 +69,44 @@ test("wrong resource and expired finite diagnostic scope refuse before network",
   }
 });
 
+test("replacement diagnostic reads only the missed probe window and preserves the legacy expiry", async () => {
+  const current = new Date("2026-11-17T09:00:00Z");
+  const replacementEvent = {...event, datetime: "2026-11-17T07:17:01Z", scheduledDatetime: "2026-11-17T07:17:00Z"};
+  const {report, calls} = await inspect(document([replacementEvent]), {
+    now: current, diagnosticScope: "replacement-20261114",
+  });
+  assert.equal(report.status, "passed");
+  assert.equal(report.diagnostic_scope, "replacement-20261114");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(calls[0].init.body).variables, {
+    account, from: "2026-11-17T07:00:00.000Z", to: current.toISOString(),
+  });
+  const expired = await inspect(document([]), {now: current});
+  assert.equal(expired.report.reason, "diagnostic_window_refused");
+  assert.equal(expired.calls.length, 0);
+});
+
+test("replacement scope cannot select arbitrary dates, renew itself or accept predecessor events", async () => {
+  for (const diagnosticScope of ["__proto__", "constructor", "arbitrary", null]) {
+    const {report, calls} = await inspect(document([]), {diagnosticScope});
+    assert.equal(report.reason, "diagnostic_scope_refused");
+    assert.equal(calls.length, 0);
+  }
+  for (const time of ["2026-11-17T06:59:59Z", "2026-11-18T00:00:00Z", "2026-11-19T07:17:00Z"]) {
+    const {report, calls} = await inspect(document([]), {
+      diagnosticScope: "replacement-20261114", now: new Date(time),
+    });
+    assert.equal(report.reason, "diagnostic_window_refused");
+    assert.equal(calls.length, 0);
+  }
+  const {report, calls} = await inspect(document([event]), {
+    diagnosticScope: "replacement-20261114", now: new Date("2026-11-17T09:00:00Z"),
+  });
+  assert.equal(report.reason, "event_window_refused");
+  assert.equal(calls.length, 1);
+  assert.deepEqual(report.events, []);
+});
+
 test("provider refusal, invalid schema, resource drift and out-of-window rows fail closed", async () => {
   for (const body of [
     {errors: [{message: "sentinel-secret-provider-error"}], ...document([event])},
