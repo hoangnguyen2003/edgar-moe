@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from edgar_moe.data.screen_inputs import canonical_bytes, decode_json
+from scripts import enrich_historical_bank_filings as bank_filings
 from scripts import enrich_historical_class_redesignation as class_redesignation
 from scripts import enrich_historical_legacy_governance as legacy
 from scripts import enrich_historical_proxy_class as proxy_class
@@ -192,7 +193,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -210,13 +211,21 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
             class_redesignation,
             "private_charter_class_redesignation_supplement",
         ),
+        "bank-filings": (bank_filings, "private_FDIC_periodic_SEC_ownership_supplement"),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
         raise ValueError("identity_result_kind_mismatch")
     proxy_sources = getattr(args, "proxy_sources", None)
     redesignation_sources = getattr(args, "redesignation_sources", None)
-    if match[1] == "class-redesignation":
+    bank_sources = getattr(args, "bank_sources", None)
+    bank_ownership_sources = getattr(args, "bank_ownership_sources", None)
+    if match[1] == "bank-filings":
+        if not isinstance(bank_sources, Path) or not isinstance(bank_ownership_sources, Path):
+            raise ValueError("missing_bank_sources_for_identity_replay")
+    elif bank_sources is not None or bank_ownership_sources is not None:
+        raise ValueError("unexpected_bank_sources_for_identity_replay")
+    if match[1] in {"class-redesignation", "bank-filings"}:
         if not isinstance(redesignation_sources, Path):
             raise ValueError("missing_redesignation_sources_for_identity_replay")
     elif redesignation_sources is not None:
@@ -236,6 +245,26 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     )
     if match[1] == "legacy-governance":
         replayed = legacy.recompute(*common, args.source_capture, args.retained_checkpoint)
+    elif match[1] == "bank-filings":
+        if not all(
+            isinstance(p, Path)
+            for p in (proxy_sources, redesignation_sources, bank_sources, bank_ownership_sources)
+        ):
+            raise ValueError("missing_sources_for_bank_replay")
+        # Keep each regulator's source family explicit and replay the whole
+        # parent chain. A bank result is never a renamed SEC-only attestation.
+        replayed = bank_filings.recompute(
+            args.directory,
+            stored["baseline_filename"],
+            stored["reference_plan_filename"],
+            args.governing_sources,
+            args.proxy_sources,
+            args.redesignation_sources,
+            args.bank_sources,
+            args.bank_ownership_sources,
+            args.source_capture,
+            args.retained_checkpoint,
+        )
     elif match[1] == "class-redesignation":
         if not isinstance(proxy_sources, Path) or not isinstance(redesignation_sources, Path):
             raise ValueError("missing_sources_for_redesignation_replay")
@@ -287,7 +316,11 @@ def assess(args: argparse.Namespace) -> dict[str, Any]:
         "new_source_selection_checkpoint_dataset_study_chain_unverified",
     ]
     statuses = replayed["report"]["statuses"]
-    unresolved = len(replayed["results"]) - statuses.get("pre_cutoff_SEC_identity_anchored", 0)
+    unresolved = (
+        len(replayed["results"])
+        - statuses.get("pre_cutoff_SEC_identity_anchored", 0)
+        - statuses.get("pre_cutoff_FDIC_SEC_identity_anchored", 0)
+    )
     if unresolved:
         blockers.append("unresolved_source_identities")
     if not comparison["exact_fixed_source_roster"]:
@@ -337,7 +370,15 @@ def main() -> int:
         help="Required for proxy and class-redesignation stages; refused for the legacy-only stage",
     )
     parser.add_argument(
-        "--redesignation-sources", type=Path, help="Required only for the class-redesignation stage"
+        "--redesignation-sources",
+        type=Path,
+        help="Required for class-redesignation and bank-filings stages",
+    )
+    parser.add_argument(
+        "--bank-sources", type=Path, help="Required only for the bank-filings stage"
+    )
+    parser.add_argument(
+        "--bank-ownership-sources", type=Path, help="Required only for the bank-filings stage"
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)

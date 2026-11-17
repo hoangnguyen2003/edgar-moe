@@ -256,6 +256,7 @@ PROXY_STAGES = [
         audit.class_redesignation,
         "private_charter_class_redesignation_supplement",
     ),
+    ("bank-filings", audit.bank_filings, "private_FDIC_periodic_SEC_ownership_supplement"),
 ]
 
 
@@ -268,8 +269,11 @@ def proxy_preflight(tmp_path, monkeypatch, prefix, module, kind):
     path.write_bytes(raw)
     path.chmod(0o600)
     args.proxy_sources = args.directory.parent / "combined-proxy-sources"
-    if prefix == "class-redesignation":
+    if prefix in {"class-redesignation", "bank-filings"}:
         args.redesignation_sources = args.directory.parent / "redesignation-sources"
+    if prefix == "bank-filings":
+        args.bank_sources = args.directory.parent / "FDIC-sources"
+        args.bank_ownership_sources = args.directory.parent / "bank-ownership-sources"
     calls = []
     monkeypatch.setattr(module, "recompute", lambda *a: calls.append(a) or deepcopy(result))
     return args, result, legacy_calls, calls
@@ -283,7 +287,11 @@ def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
     report = audit.assess(args)
     assert not legacy_calls and len(calls) == 1
     assert calls[0][4] == args.proxy_sources
-    if prefix == "class-redesignation":
+    if prefix == "bank-filings":
+        assert calls[0][5] == args.redesignation_sources
+        assert calls[0][6] == args.bank_sources
+        assert calls[0][7] == args.bank_ownership_sources and len(calls[0]) == 10
+    elif prefix == "class-redesignation":
         assert calls[0][5] == args.redesignation_sources and len(calls[0]) == 8
     else:
         assert len(calls[0]) == 7
@@ -481,7 +489,7 @@ def test_proxy_stages_refuse_unused_redesignation_sources(tmp_path, monkeypatch,
     assert not calls and not legacy_calls
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES[:-1])
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES[:2])
 def test_unused_redesignation_sources_are_not_silently_ignored(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -490,3 +498,43 @@ def test_unused_redesignation_sources_are_not_silently_ignored(
     with pytest.raises(ValueError, match="unexpected_redesignation_sources"):
         audit.assess(args)
     assert not calls
+
+
+@pytest.mark.parametrize("field", ["bank_sources", "bank_ownership_sources"])
+def test_bank_stage_requires_both_explicit_source_families(tmp_path, monkeypatch, field):
+    prefix, module, kind = PROXY_STAGES[-1]
+    args, _, legacy, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    setattr(args, field, None)
+    with pytest.raises(ValueError, match="missing_bank_sources"):
+        audit.assess(args)
+    assert not legacy and not calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES[:-1])
+def test_earlier_stages_refuse_unused_bank_sources(tmp_path, monkeypatch, prefix, module, kind):
+    args, _, legacy, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.bank_sources = args.directory
+    with pytest.raises(ValueError, match="unexpected_bank_sources"):
+        audit.assess(args)
+    assert not legacy and not calls
+
+
+def test_mixed_regulators_count_as_separate_verified_identities_but_do_not_admit_a_study(
+    tmp_path, monkeypatch
+):
+    prefix, module, kind = PROXY_STAGES[-1]
+    args, result, _, _ = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    result["report"]["statuses"] = {
+        "pre_cutoff_SEC_identity_anchored": 2,
+        "pre_cutoff_FDIC_SEC_identity_anchored": 1,
+        "periodic_anchor_unresolved": 1,
+    }
+    raw = canonical_bytes(result)
+    args.identity_result = prefix + "-" + audit.digest(raw) + ".json"
+    path = args.directory / args.identity_result
+    path.write_bytes(raw)
+    path.chmod(0o600)
+    report = audit.assess(args)
+    assert report["unresolved_identities"] == 1
+    assert report["identity_statuses"]["pre_cutoff_FDIC_SEC_identity_anchored"] == 1
+    assert not report["publication_gate_released"] and not report["issue_complete"]
