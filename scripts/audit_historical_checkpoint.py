@@ -22,6 +22,7 @@ from typing import Any
 
 from edgar_moe.data.screen_inputs import canonical_bytes, decode_json
 from scripts import enrich_historical_bank_filings as bank_filings
+from scripts import enrich_historical_capital_definition as capital_definition
 from scripts import enrich_historical_class_redesignation as class_redesignation
 from scripts import enrich_historical_legacy_governance as legacy
 from scripts import enrich_historical_proxy_class as proxy_class
@@ -193,7 +194,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -212,6 +213,7 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
             "private_charter_class_redesignation_supplement",
         ),
         "bank-filings": (bank_filings, "private_FDIC_periodic_SEC_ownership_supplement"),
+        "capital-definition": (capital_definition, "private_issuer_capital_definition_supplement"),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
@@ -220,12 +222,18 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     redesignation_sources = getattr(args, "redesignation_sources", None)
     bank_sources = getattr(args, "bank_sources", None)
     bank_ownership_sources = getattr(args, "bank_ownership_sources", None)
-    if match[1] == "bank-filings":
+    capital_sources = getattr(args, "capital_sources", None)
+    if match[1] == "capital-definition":
+        if not isinstance(capital_sources, Path):
+            raise ValueError("missing_capital_sources_for_identity_replay")
+    elif capital_sources is not None:
+        raise ValueError("unexpected_capital_sources_for_identity_replay")
+    if match[1] in {"bank-filings", "capital-definition"}:
         if not isinstance(bank_sources, Path) or not isinstance(bank_ownership_sources, Path):
             raise ValueError("missing_bank_sources_for_identity_replay")
     elif bank_sources is not None or bank_ownership_sources is not None:
         raise ValueError("unexpected_bank_sources_for_identity_replay")
-    if match[1] in {"class-redesignation", "bank-filings"}:
+    if match[1] in {"class-redesignation", "bank-filings", "capital-definition"}:
         if not isinstance(redesignation_sources, Path):
             raise ValueError("missing_redesignation_sources_for_identity_replay")
     elif redesignation_sources is not None:
@@ -245,6 +253,25 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     )
     if match[1] == "legacy-governance":
         replayed = legacy.recompute(*common, args.source_capture, args.retained_checkpoint)
+    elif match[1] == "capital-definition":
+        if (
+            not isinstance(proxy_sources, Path)
+            or not isinstance(redesignation_sources, Path)
+            or not isinstance(bank_sources, Path)
+            or not isinstance(bank_ownership_sources, Path)
+            or not isinstance(capital_sources, Path)
+        ):
+            raise ValueError("missing_sources_for_capital_replay")
+        replayed = capital_definition.recompute(
+            *common,
+            proxy_sources,
+            redesignation_sources,
+            bank_sources,
+            bank_ownership_sources,
+            capital_sources,
+            args.source_capture,
+            args.retained_checkpoint,
+        )
     elif match[1] == "bank-filings":
         if not all(
             isinstance(p, Path)
@@ -379,6 +406,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--bank-ownership-sources", type=Path, help="Required only for the bank-filings stage"
+    )
+    parser.add_argument(
+        "--capital-sources", type=Path, help="Required only for the capital-definition stage"
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)

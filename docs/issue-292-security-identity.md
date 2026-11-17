@@ -891,3 +891,20 @@ comparison and processed assets remain unchanged. Eleven unresolved identities,
 historical market continuity and the separately identified new study chain
 still block #292 and publication. No source member is removed from the
 503-candidate denominator, and no current asset directory is used.
+
+## Explicit issuer common-stock/capital-stock definition, November 17
+
+The [capital-definition supplement](issue-292-capital-definition.md) adds a
+separate source-qualified correspondence. A dated issuer proxy explicitly
+defines its common stock as the registered capital stock at the same par value,
+then gives its one-vote rule. The same proxy's marked ownership table and
+citation match a retained ownership report's reporter, address, filing/event
+dates, aggregate and all four positions. Six subject-authenticated reports agree
+on the identifier; a foreign-subject report is retained as a refusal rather than
+being used to infer a new issuer or class alias.
+
+The new stage preserves all 492 prior anchors and all 503 source members. It
+verifies 493 identities, leaving nine ownership and one periodic case unresolved.
+Historical market continuity and the complete new study chain remain separate
+unverified gates. The original checkpoint cohort is unchanged, so #292 remains
+open and the new count is not an issue-completion percentage.
