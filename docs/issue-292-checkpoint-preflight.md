@@ -2,7 +2,7 @@
 
 `scripts/audit_historical_checkpoint.py` checks whether an existing checkpoint
 can be reused as the fixed historical source. It independently replays the
-selected legacy, issuer-proxy, issuer-definition or charter-redesignation identity supplement and all
+selected legacy, issuer-proxy, issuer-definition, charter-redesignation or FDIC-bank identity supplement and all
 its previous baselines before reading the checkpoint's hash-bound requested
 roster. It compares literal issuer and
 symbol pairs, retaining multiple share classes with one CIK. A renamed symbol
@@ -38,7 +38,7 @@ exclusively created. For independent replay, replace `--output-dir` with
 The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
-`proxy-definition` and `class-redesignation`. The filename digest, internal stage kind and declared
+`proxy-definition`, `class-redesignation` and `bank-filings`. The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
 For either proxy stage and the redesignation stage, `--proxy-sources` is mandatory and must preserve every
@@ -115,3 +115,18 @@ securities outside the fixed source. The original processed assets remain
 hash verified; historical continuity and a new study chain remain unverified.
 A valid blocked report continues to exit 2 and cannot release publication or
 mark the issue complete.
+
+
+## FDIC/SEC bank supplement
+
+The [bank filing supplement](issue-292-bank-filings.md) adds an explicit fifth
+replay stage. For `bank-filings-<sha256>.json`, retain both `--bank-sources` and
+`--bank-ownership-sources`, plus the full proxy, redesignation and legacy parent
+sources. Earlier stages refuse the two bank-only options. The preflight replays
+the complete selected stage and binds its decoder and producer versions; no
+missing bank source can fall back to an earlier count.
+
+FDIC-periodic/SEC-ownership anchors have their own status. They contribute to the
+verified identity total without relabeling their regulator or changing previous
+anchor payloads. Historical continuity and a separately identified new study
+chain remain independently blocked.

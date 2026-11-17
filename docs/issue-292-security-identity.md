@@ -1,14 +1,15 @@
-# Historical SEC security identity evidence, 2026-11-16
+# Historical regulatory security identity evidence, 2026-11-17
 
 The fixed historical [candidate source](issue-292-historical-candidate-source.md)
 now has a reproducible SEC issuer/share-class/CUSIP anchoring path. It remains
 source evidence, not a completed historical market master or corrected v2 study.
 
-The latest separate charter-redesignation supplement has **491 of 503 verified
-identity anchors**, with **12 unresolved candidates**: 10 ownership identities
-and two periodic anchors. Its
-[row-free audit](../ops/issue292/class-redesignation-audit-20261116.json) binds the
-retained result and offline verification. All 490 previous anchor payloads, the
+The latest separate [FDIC bank filing supplement](issue-292-bank-filings.md) has
+**492 of 503 verified identity anchors**, with **11 unresolved candidates**:
+10 ownership identities and one periodic anchor. The total preserves 491
+SEC-only anchors and adds one explicitly labeled FDIC-periodic/SEC-ownership
+anchor. Its [row-free audit](../ops/issue292/bank-filing-audit-20261117.json) binds
+the retained result and offline verification. Every prior anchor payload, the
 source binding and complete candidate order are preserved. Earlier supplements
 and captures remain unchanged; sections below retain their separate evidence
 stages rather than relabeling old captures.
@@ -871,3 +872,22 @@ The original checkpoint still differs from the fixed source, and all 12
 unresolved identities, historical market continuity and the new
 source/selection/checkpoint/dataset/study chain remain blockers. #292 remains
 open; identity coverage is not an issue-completion percentage.
+
+
+## FDIC periodic report and exact issuer citation, November 17, 2026
+
+The new [bank source path](issue-292-bank-filings.md) addresses a periodic filing
+that is outside EDGAR. The bank's own FDIC-filed proxy matches a dated SEC
+ownership report's reporter identity, address, filing/event dates, aggregate and
+four voting/dispositive positions. The reported subject tax identifier does not
+match the periodic cover, and that conflict remains in the private proof. It is
+not equated or repaired; the explicit issuer-filed citation is the independently
+verified bridge. Five retained ownership reports agree on the reported
+identifier and common class. The other bank remains unresolved.
+
+The [new checkpoint audit](../ops/issue292/checkpoint-bank-audit-20261117.json)
+replays this fifth stage and its complete parent chain. The original cohort
+comparison and processed assets remain unchanged. Eleven unresolved identities,
+historical market continuity and the separately identified new study chain
+still block #292 and publication. No source member is removed from the
+503-candidate denominator, and no current asset directory is used.
