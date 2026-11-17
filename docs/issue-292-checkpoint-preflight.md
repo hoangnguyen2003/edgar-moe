@@ -38,7 +38,8 @@ exclusively created. For independent replay, replace `--output-dir` with
 The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
-`proxy-definition`, `class-redesignation` and `bank-filings`. The filename digest, internal stage kind and declared
+`proxy-definition`, `class-redesignation`, `bank-filings` and `capital-definition`.
+The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
 For either proxy stage and the redesignation stage, `--proxy-sources` is mandatory and must preserve every
@@ -130,3 +131,19 @@ FDIC-periodic/SEC-ownership anchors have their own status. They contribute to th
 verified identity total without relabeling their regulator or changing previous
 anchor payloads. Historical continuity and a separately identified new study
 chain remain independently blocked.
+
+## Explicit capital-definition replay
+
+The [capital-definition supplement](issue-292-capital-definition.md) adds a
+sixth stage after the bank result. Select `capital-definition-<sha256>.json`
+with `--capital-sources` in addition to all five parent source-family arguments.
+Each older stage refuses this new argument; the new stage refuses missing
+current or parent sources. Its filename, stage kind, algorithm identities and
+independently recomputed payload must all match. There is no fallback to a
+previous anchor count.
+
+The new identity total is 493 of 503. The original checkpoint still has 302
+literal matches, 201 absent source securities and 198 checkpoint securities
+outside the fixed source. Original processed bytes remain separately verified;
+continuity, new study binding, publication and issue completion remain blocked.
+A valid retained report still exits 2, and invalid evidence exits 1.

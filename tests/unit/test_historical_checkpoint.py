@@ -258,6 +258,12 @@ PROXY_STAGES = [
     ),
     ("bank-filings", audit.bank_filings, "private_FDIC_periodic_SEC_ownership_supplement"),
 ]
+CAPITAL_STAGE = (
+    "capital-definition",
+    audit.capital_definition,
+    "private_issuer_capital_definition_supplement",
+)
+ALL_PROXY_STAGES = [*PROXY_STAGES, CAPITAL_STAGE]
 
 
 def proxy_preflight(tmp_path, monkeypatch, prefix, module, kind):
@@ -269,17 +275,19 @@ def proxy_preflight(tmp_path, monkeypatch, prefix, module, kind):
     path.write_bytes(raw)
     path.chmod(0o600)
     args.proxy_sources = args.directory.parent / "combined-proxy-sources"
-    if prefix in {"class-redesignation", "bank-filings"}:
+    if prefix in {"class-redesignation", "bank-filings", "capital-definition"}:
         args.redesignation_sources = args.directory.parent / "redesignation-sources"
-    if prefix == "bank-filings":
+    if prefix in {"bank-filings", "capital-definition"}:
         args.bank_sources = args.directory.parent / "FDIC-sources"
         args.bank_ownership_sources = args.directory.parent / "bank-ownership-sources"
+    if prefix == "capital-definition":
+        args.capital_sources = args.directory.parent / "capital-proxy-sources"
     calls = []
     monkeypatch.setattr(module, "recompute", lambda *a: calls.append(a) or deepcopy(result))
     return args, result, legacy_calls, calls
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -287,7 +295,11 @@ def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
     report = audit.assess(args)
     assert not legacy_calls and len(calls) == 1
     assert calls[0][4] == args.proxy_sources
-    if prefix == "bank-filings":
+    if prefix == "capital-definition":
+        assert calls[0][5] == args.redesignation_sources
+        assert calls[0][6] == args.bank_sources and calls[0][7] == args.bank_ownership_sources
+        assert calls[0][8] == args.capital_sources and len(calls[0]) == 11
+    elif prefix == "bank-filings":
         assert calls[0][5] == args.redesignation_sources
         assert calls[0][6] == args.bank_sources
         assert calls[0][7] == args.bank_ownership_sources and len(calls[0]) == 10
@@ -306,7 +318,7 @@ def test_proxy_stages_replay_their_whole_chain_with_the_bound_source_directory(
     assert report["issue_complete"] is False
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 def test_missing_proxy_sources_are_not_silently_replaced_with_a_legacy_replay(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -317,7 +329,7 @@ def test_missing_proxy_sources_are_not_silently_replaced_with_a_legacy_replay(
     assert not calls and not legacy_calls
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 def test_a_correct_digest_cannot_mislabel_the_identity_stage(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -333,7 +345,7 @@ def test_a_correct_digest_cannot_mislabel_the_identity_stage(
     assert not calls and not legacy_calls
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 @pytest.mark.parametrize("failure", ["missing_source", "changed_source", "changed_result"])
 def test_current_stage_failures_never_fall_back_to_an_earlier_anchor_count(
     tmp_path, monkeypatch, prefix, module, kind, failure
@@ -382,7 +394,7 @@ def test_algorithm_changes_during_identity_replay_refuse_the_preflight(tmp_path,
         audit.assess(args)
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 def test_identical_rosters_and_complete_identity_counts_still_cannot_admit_a_study(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -420,7 +432,7 @@ def test_identical_rosters_and_complete_identity_counts_still_cannot_admit_a_stu
     assert report["issue_complete"] is False
 
 
-@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+@pytest.mark.parametrize("prefix,module,kind", ALL_PROXY_STAGES)
 def test_proxy_stage_cli_replays_a_retained_blocked_report_and_never_exits_zero(
     tmp_path, monkeypatch, prefix, module, kind
 ):
@@ -538,3 +550,27 @@ def test_mixed_regulators_count_as_separate_verified_identities_but_do_not_admit
     assert report["unresolved_identities"] == 1
     assert report["identity_statuses"]["pre_cutoff_FDIC_SEC_identity_anchored"] == 1
     assert not report["publication_gate_released"] and not report["issue_complete"]
+
+
+@pytest.mark.parametrize(
+    "field", ["capital_sources", "bank_sources", "bank_ownership_sources", "redesignation_sources"]
+)
+def test_capital_stage_needs_its_current_and_all_parent_source_families(
+    tmp_path, monkeypatch, field
+):
+    args, _, legacy, calls = proxy_preflight(tmp_path, monkeypatch, *CAPITAL_STAGE)
+    setattr(args, field, None)
+    with pytest.raises(ValueError, match="missing_.*sources"):
+        audit.assess(args)
+    assert not legacy and not calls
+
+
+@pytest.mark.parametrize("prefix,module,kind", PROXY_STAGES)
+def test_prior_stages_refuse_an_unused_capital_source_directory(
+    tmp_path, monkeypatch, prefix, module, kind
+):
+    args, _, legacy, calls = proxy_preflight(tmp_path, monkeypatch, prefix, module, kind)
+    args.capital_sources = args.directory
+    with pytest.raises(ValueError, match="unexpected_capital_sources"):
+        audit.assess(args)
+    assert not legacy and not calls
