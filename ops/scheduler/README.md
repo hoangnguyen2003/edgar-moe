@@ -477,3 +477,11 @@ This diagnostic does not replay the missing probe or bypass its prerequisite.
 Provider permission/dataset refusal and an empty event inventory cannot establish
 successful delivery. Live query compatibility remains unverified until the new
 workflow is run on merged main and its retained receipt is inspected.
+
+The [November 17 live result](../../docs/open-issue-live-review-20261117.md)
+now confirms a GraphQL `access_refused` response under the existing credential,
+after successful state checks. This identifies an analytics-access blocker,
+not the cause of the missing dispatch. An unmerged draft follow-up proposes
+`CLOUDFLARE_ANALYTICS_READ_TOKEN` for GraphQL and retains the Worker-scoped
+`CLOUDFLARE_API_TOKEN` exclusively for state checks. The new analytics secret
+has not been installed; no fallback or additional query is performed here.
