@@ -27,6 +27,7 @@ from scripts import enrich_historical_capital_stock_tags as capital_stock_tags
 from scripts import enrich_historical_class_redesignation as class_redesignation
 from scripts import enrich_historical_fdic_equity as fdic_equity
 from scripts import enrich_historical_legacy_governance as legacy
+from scripts import enrich_historical_listed_isin as listed_isin
 from scripts import enrich_historical_proxy_class as proxy_class
 from scripts import enrich_historical_proxy_definition as proxy_definition
 from scripts.capture_historical_security_identity import ARTIFACT_ROOT, RETAINED_MANIFEST_SHA256
@@ -196,7 +197,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity|listed-isin)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -218,6 +219,7 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
         "capital-definition": (capital_definition, capital_definition.KIND),
         "capital-stock-tags": (capital_stock_tags, capital_stock_tags.KIND),
         fdic_equity.PREFIX: (fdic_equity, fdic_equity.KIND),
+        listed_isin.PREFIX: (listed_isin, listed_isin.KIND),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
@@ -228,12 +230,19 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     bank_ownership_sources = getattr(args, "bank_ownership_sources", None)
     capital_sources = getattr(args, "capital_sources", None)
     listed_equity_sources = getattr(args, "listed_equity_sources", None)
-    if match[1] == fdic_equity.PREFIX:
+    isin_sources = getattr(args, "listed_isin_sources", None)
+    if match[1] == listed_isin.PREFIX:
+        if not isinstance(isin_sources, Path):
+            raise ValueError("missing_listed_isin_sources_for_identity_replay")
+    elif isin_sources is not None:
+        raise ValueError("unexpected_listed_isin_sources_for_identity_replay")
+    bank_equity_stages = {fdic_equity.PREFIX, listed_isin.PREFIX}
+    if match[1] in bank_equity_stages:
         if not isinstance(listed_equity_sources, Path):
             raise ValueError("missing_listed_equity_sources_for_identity_replay")
     elif listed_equity_sources is not None:
         raise ValueError("unexpected_listed_equity_sources_for_identity_replay")
-    capital_stages = {"capital-definition", "capital-stock-tags", fdic_equity.PREFIX}
+    capital_stages = {"capital-definition", "capital-stock-tags", *bank_equity_stages}
     if match[1] in capital_stages:
         if not isinstance(capital_sources, Path):
             raise ValueError("missing_capital_sources_for_identity_replay")
@@ -282,7 +291,11 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
             args.source_capture,
             args.retained_checkpoint,
         )
-        if match[1] == fdic_equity.PREFIX:
+        if match[1] == listed_isin.PREFIX:
+            replayed = listed_isin.recompute(
+                *common, *sources, args.listed_equity_sources, args.listed_isin_sources
+            )
+        elif match[1] == fdic_equity.PREFIX:
             replayed = fdic_equity.recompute(*common, *sources, args.listed_equity_sources)
         else:
             replayed = module.recompute(*common, *sources)
@@ -429,6 +442,7 @@ def main() -> int:
     parser.add_argument(
         "--listed-equity-sources", type=Path, help="Required for fdic-listed-equity replay"
     )
+    parser.add_argument("--listed-isin-sources", type=Path, help="Required for listed-isin replay")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)
     mode.add_argument("--verify-report", type=Path)
