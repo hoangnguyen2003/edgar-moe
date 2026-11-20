@@ -39,7 +39,7 @@ The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
 `proxy-definition`, `class-redesignation`, `bank-filings`, `capital-definition`
-and `capital-stock-tags`.
+`capital-stock-tags`, and `fdic-listed-equity`.
 The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
@@ -169,3 +169,21 @@ The fixed cohort now has 494 anchored identities, eight unresolved ownership
 cases and one unresolved periodic registration. The private identity result has
 SHA-256 `4d5160d9789bda9c184a854b0ed2f1813a868ea86f5e57a5e42d5a93d58cf68f`.
 The replay used retained evidence and made zero provider requests.
+
+## FDIC registration and SEC prospectus replay, November 21, 2026
+
+The `fdic-listed-equity` stage pairs an FDIC quarterly registration with a
+pre-cutoff SEC pricing supplement. The prospectus identifies the same bank
+by its FDIC certificate and names the bank's common stock, ticker, exchange,
+and security identifier in a single overview. The verifier checks the
+identifier against filed ownership reports with the requested SEC subject
+CIK. The ownership headers and FDIC report disagree on the tax identifier.
+The prospectus supplies the certificate-based link, and replay binds the FDIC
+registration, prospectus, and ownership receipts separately. The archival price table supplies the labelled equity identifier.
+Its price values are outside this check.
+
+Capture with `python -m scripts.enrich_historical_fdic_equity`. Use the
+capital-stock-tags result for `--baseline`, an owner-only member and source
+plan for `--references`, and the archived SEC submission cache for
+`--listed-equity-sources`. To replay through the checkpoint audit, select
+`fdic-listed-equity-<sha256>.json` and provide the same source directories.
