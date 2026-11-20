@@ -39,7 +39,7 @@ The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
 `proxy-definition`, `class-redesignation`, `bank-filings`, `capital-definition`
-`capital-stock-tags`, `fdic-listed-equity`, `listed-isin`, and `issuer-vote`.
+`capital-stock-tags`, `fdic-listed-equity`, `listed-isin`, `issuer-vote`, and `issuer-offering`.
 The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
@@ -224,3 +224,19 @@ Capture with `python -m scripts.enrich_historical_vote_identity`. Pass the
 listed-isin result as `--baseline`, the owner-only plan as `--references`,
 and the archived filing cache as `--vote-identity-sources`. The checkpoint
 audit accepts `issuer-vote-<sha256>.json` with the same sources.
+
+## Issuer ordinary-share offering replay
+
+The `issuer-offering` stage checks a filed issuer offering against its later
+periodic registration. It requires the same registrant, ticker, listing
+venue and par value. The ordinary-share terms supply the CUSIP and ISIN in
+one labelled row. Subject-authenticated ownership filings corroborate the
+CUSIP, including at least one available in the year preceding the cutoff.
+Reports for a different SEC subject or notices lacking an identifier are
+recorded as refusals.
+
+Capture with `python -m scripts.enrich_historical_offering_identity`. Use the
+issuer-vote result as `--baseline`, the owner-only source plan as
+`--references`, and the issuer filing cache as `--offering-identity-sources`.
+The checkpoint audit accepts `issuer-offering-<sha256>.json` with the same
+sources.
