@@ -39,7 +39,7 @@ The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
 `proxy-definition`, `class-redesignation`, `bank-filings`, `capital-definition`
-`capital-stock-tags`, `fdic-listed-equity`, and `listed-isin`.
+`capital-stock-tags`, `fdic-listed-equity`, `listed-isin`, and `issuer-vote`.
 The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
@@ -209,3 +209,18 @@ Result SHA-256: `0130ebe6af14f8fab4cf1e341613defd5a952b953ae4ea365936871dde112ee
 Both retained full-size checkpoint rosters match only 302 historical
 issuer-and-symbol pairs. The identity update leaves market continuity and
 the new study binding unresolved.
+
+## Issuer and fund voting-report replay
+
+The `issuer-vote` stage matches the issuer's ordinary-share registration
+and annual meeting results to separately filed fund voting reports. It
+requires the same ticker, meeting and security identifier in both fund
+reports, the issuer's record date in one report, and agreement with the
+subject-authenticated ownership filings. Ownership filings that supply
+only the corroborated ISIN in a CUSIP field or omit the identifier are
+recorded as refusals.
+
+Capture with `python -m scripts.enrich_historical_vote_identity`. Pass the
+listed-isin result as `--baseline`, the owner-only plan as `--references`,
+and the archived filing cache as `--vote-identity-sources`. The checkpoint
+audit accepts `issuer-vote-<sha256>.json` with the same sources.

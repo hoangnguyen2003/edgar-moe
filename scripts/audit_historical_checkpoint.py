@@ -30,6 +30,7 @@ from scripts import enrich_historical_legacy_governance as legacy
 from scripts import enrich_historical_listed_isin as listed_isin
 from scripts import enrich_historical_proxy_class as proxy_class
 from scripts import enrich_historical_proxy_definition as proxy_definition
+from scripts import enrich_historical_vote_identity as vote_identity
 from scripts.capture_historical_security_identity import ARTIFACT_ROOT, RETAINED_MANIFEST_SHA256
 from scripts.capture_prospective_sec_index import (
     _capture_directory,
@@ -197,7 +198,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity|listed-isin)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity|listed-isin|issuer-vote)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -220,6 +221,7 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
         "capital-stock-tags": (capital_stock_tags, capital_stock_tags.KIND),
         fdic_equity.PREFIX: (fdic_equity, fdic_equity.KIND),
         listed_isin.PREFIX: (listed_isin, listed_isin.KIND),
+        vote_identity.PREFIX: (vote_identity, vote_identity.KIND),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
@@ -231,12 +233,19 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     capital_sources = getattr(args, "capital_sources", None)
     listed_equity_sources = getattr(args, "listed_equity_sources", None)
     isin_sources = getattr(args, "listed_isin_sources", None)
-    if match[1] == listed_isin.PREFIX:
+    vote_sources = getattr(args, "vote_identity_sources", None)
+    if match[1] == vote_identity.PREFIX:
+        if not isinstance(vote_sources, Path):
+            raise ValueError("missing_vote_identity_sources_for_identity_replay")
+    elif vote_sources is not None:
+        raise ValueError("unexpected_vote_identity_sources_for_identity_replay")
+    isin_stages = {listed_isin.PREFIX, vote_identity.PREFIX}
+    if match[1] in isin_stages:
         if not isinstance(isin_sources, Path):
             raise ValueError("missing_listed_isin_sources_for_identity_replay")
     elif isin_sources is not None:
         raise ValueError("unexpected_listed_isin_sources_for_identity_replay")
-    bank_equity_stages = {fdic_equity.PREFIX, listed_isin.PREFIX}
+    bank_equity_stages = {fdic_equity.PREFIX, *isin_stages}
     if match[1] in bank_equity_stages:
         if not isinstance(listed_equity_sources, Path):
             raise ValueError("missing_listed_equity_sources_for_identity_replay")
@@ -291,7 +300,15 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
             args.source_capture,
             args.retained_checkpoint,
         )
-        if match[1] == listed_isin.PREFIX:
+        if match[1] == vote_identity.PREFIX:
+            replayed = vote_identity.recompute(
+                *common,
+                *sources,
+                args.listed_equity_sources,
+                args.listed_isin_sources,
+                args.vote_identity_sources,
+            )
+        elif match[1] == listed_isin.PREFIX:
             replayed = listed_isin.recompute(
                 *common, *sources, args.listed_equity_sources, args.listed_isin_sources
             )
@@ -443,6 +460,9 @@ def main() -> int:
         "--listed-equity-sources", type=Path, help="Required for fdic-listed-equity replay"
     )
     parser.add_argument("--listed-isin-sources", type=Path, help="Required for listed-isin replay")
+    parser.add_argument(
+        "--vote-identity-sources", type=Path, help="Required for issuer-vote replay"
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)
     mode.add_argument("--verify-report", type=Path)
