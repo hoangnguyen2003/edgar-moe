@@ -38,7 +38,8 @@ exclusively created. For independent replay, replace `--output-dir` with
 The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
-`proxy-definition`, `class-redesignation`, `bank-filings` and `capital-definition`.
+`proxy-definition`, `class-redesignation`, `bank-filings`, `capital-definition`
+and `capital-stock-tags`.
 The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
@@ -147,3 +148,24 @@ literal matches, 201 absent source securities and 198 checkpoint securities
 outside the fixed source. Original processed bytes remain separately verified;
 continuity, new study binding, publication and issue completion remain blocked.
 A valid retained report still exits 2, and invalid evidence exits 1.
+
+## Common-stock tags in issuer filings, November 20, 2026
+
+The `capital-stock-tags` stage accepts a registered capital-stock class when
+the same filing uses standard common-stock tags for its printed outstanding
+share count and balance-sheet par value. It requires one registered class,
+issuer-scoped facts with matching dates and units, and at least two retained
+ownership filings that name unqualified common stock and agree on the security
+identifier. Capture with `python -m scripts.enrich_historical_capital_stock_tags`
+using `--baseline` for the capital-definition result and `--references` for
+an owner-only JSON plan in the same capture directory. The plan has
+`schema_version` 1, `scope` set to `private_same_filing_capital_stock_tags_only`,
+and `snapshot_member_keys` listing the unresolved ownership cases to replay.
+To replay in the compatibility audit, select `capital-stock-tags-<sha256>.json`
+and supply the same source arguments as for the capital-definition stage.
+
+The retained replay adds one SEC identity and preserves the prior 493 anchors.
+The fixed cohort now has 494 anchored identities, eight unresolved ownership
+cases and one unresolved periodic registration. The private identity result has
+SHA-256 `4d5160d9789bda9c184a854b0ed2f1813a868ea86f5e57a5e42d5a93d58cf68f`.
+The replay used retained evidence and made zero provider requests.
