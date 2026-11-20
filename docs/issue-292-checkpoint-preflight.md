@@ -39,7 +39,7 @@ The supplied paths must be canonical directories without aliases.
 
 Supported result prefixes are `legacy-governance`, `proxy-class`,
 `proxy-definition`, `class-redesignation`, `bank-filings`, `capital-definition`
-`capital-stock-tags`, and `fdic-listed-equity`.
+`capital-stock-tags`, `fdic-listed-equity`, and `listed-isin`.
 The filename digest, internal stage kind and declared
 algorithm identities must match before the selected stage independently
 replays. The report binds that stage kind and the replay algorithm-set hash.
@@ -187,3 +187,25 @@ capital-stock-tags result for `--baseline`, an owner-only member and source
 plan for `--references`, and the archived SEC submission cache for
 `--listed-equity-sources`. To replay through the checkpoint audit, select
 `fdic-listed-equity-<sha256>.json` and provide the same source directories.
+
+## Issuer-listed ISIN and SEC fund replay
+
+The `listed-isin` stage binds the same issuer's periodic registration and
+archived listing prospectus by registrant, share class, nominal value and
+ticker. A public pre-cutoff Form N-PORT submission gives the same ISIN and
+a CUSIP for the direct ordinary-share holding. Two authenticated SEC
+ownership filings agree on that CUSIP. An exit notice lacking an identifier
+is recorded as a refusal.
+
+Capture with `python -m scripts.enrich_historical_listed_isin`. Use the
+FDIC-listed-equity result for `--baseline`, the owner-only source plan for
+`--references`, and the archived filing cache for `--listed-isin-sources`.
+To replay through the checkpoint audit, select `listed-isin-<sha256>.json`
+and provide the same source directories.
+
+The retained result verifies 496 of 503 candidate identities, preserves
+the prior 495 anchors and leaves seven ownership cases unresolved.
+Result SHA-256: `0130ebe6af14f8fab4cf1e341613defd5a952b953ae4ea365936871dde112ee7`.
+Both retained full-size checkpoint rosters match only 302 historical
+issuer-and-symbol pairs. The identity update leaves market continuity and
+the new study binding unresolved.
