@@ -239,4 +239,52 @@ Capture with `python -m scripts.enrich_historical_offering_identity`. Use the
 issuer-vote result as `--baseline`, the owner-only source plan as
 `--references`, and the issuer filing cache as `--offering-identity-sources`.
 The checkpoint audit accepts `issuer-offering-<sha256>.json` with the same
-sources.
+sources. For `ordinary-holdings-<sha256>.json`, also supply the retained Form
+13F source directory using `--ordinary-holdings-sources`.
+
+## Replaying a new fixed-cohort screen
+
+`python -m scripts.replay_historical_market_screen --help` lists the offline
+replay options. Supply the private SEC identity result and its original source
+directories as for the checkpoint preflight. Provide an independently retained
+SHA-256 of the private `review.json` with `--review-sha256`. Keep the package
+under ignored `data/artifacts` in owner-only files. The review covers the
+market source version, permissions, the source's publication and revision
+history, and the transformation from the retained archive to the replay inputs.
+
+- `review.json` uses schema version 1 and scope
+  `private_historical_market_screen_replay`. It binds
+  `identity_result_sha256`, `source_version`, `listing_intervals_sha256`,
+  `daily_bars_sha256`, `lookback_start`, `maximum_issuers`, `minimum_sessions`
+  and `minimum_price`.
+- `listing-intervals.json` is an array of
+  `archive_security_id`, `cusip`, `symbol`, `valid_from`, `valid_before` and
+  `available_by` objects. The interval is half-open over local market dates.
+  Use a null end for an open interval. The reviewed record must support when the
+  interval became available. The cutoff mapping must match the issuer filing's
+  share-class CUSIP and the snapshot symbol.
+- `daily-bars.json` maps the archive security IDs to arrays of
+  `session`, `symbol`, `close`, `volume` and `available_by` objects. An empty
+  series explicitly accounts for a member whose reviewed archive has no bars.
+  Use contemporaneous USD prices and share volumes with their original units.
+  Each bar must fall within its listing interval and have been available after
+  the session close and by the screen cutoff.
+
+The replay keeps every original candidate and ranks its share classes before
+selecting the most liquid eligible class per issuer. The existing liquidity
+ranking uses median dollar volume with a ticker tie-break. The issuer cap
+applies after deduplication, and aggregate counts account for omitted classes
+and inadequate data. `--output-dir` writes the selected members and screen
+receipt to a new private directory. The command prints only aggregate counts
+and hashes.
+
+To verify an existing **new** checkpoint and processed dataset, supply
+`--checkpoint`, `--processed-dataset` and `--dataset-binding-sha256` together.
+The latter pins a `dataset-binding.json` in the private package. It uses schema
+version 1 and binds `screen_sha256` (the exact `screen.json` bytes),
+`checkpoint_manifest_sha256` and `processed_manifest_sha256`. The checkpoint
+must request precisely the selected CIK, ticker and security IDs in screen
+order. The replay verifies the processed assets and their source manifest.
+The receipt covers the recorded selection and dataset lineage. Evidence of
+market continuity across the study, source rights, and the publication decision
+remain separate.
