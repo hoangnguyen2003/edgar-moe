@@ -30,9 +30,13 @@ def test_replacement_inspection_has_only_manual_main_branch_metadata_reads() -> 
         "node ops/scheduler/inspect-private-cron-events.mjs "
         "reports/private-scheduler-inspection/events.json replacement-20261114"
     )
-    for step in credential_steps:
+    for step, secret in zip(
+        credential_steps,
+        ("CLOUDFLARE_API_TOKEN", "CLOUDFLARE_ANALYTICS_READ_TOKEN"),
+        strict=True,
+    ):
         assert step["env"] == {
-            "CLOUDFLARE_API_TOKEN": "${{ secrets.CLOUDFLARE_API_TOKEN }}",
+            "CLOUDFLARE_API_TOKEN": "${{ secrets." + secret + " }}",
             "CLOUDFLARE_ACCOUNT_ID": "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
         }
     receipt = next(step for step in job["steps"] if step.get("id") == "receipt")

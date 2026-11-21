@@ -1,5 +1,14 @@
 # Separate personal-portfolio hosted read study (#290)
 
+November 17 interim review: collection remains active, but the declared
+168-pair complete-coverage target is already unattainable. Five verified
+scheduled pairs contain ten successful reads; 37 of the first 42 completed
+hourly slots are missing. No missing hour was replayed. The actual week still
+ends November 22 at 15:00 UTC. See the
+[live review](../../docs/open-issue-live-review-20261117.md) and
+[row-free interim audit](evidence/progress-20261117.json); neither asserts
+acceptance or establishes an SLO.
+
 Latest status (November 15): **a separate restart is active; hosted and CI setup
 verification passed**. The new policy is bound to November 15, 15:00 UTC
 through November 22, 15:00 UTC (22:00 Vietnam time). The November 6–13 study

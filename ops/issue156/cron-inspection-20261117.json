@@ -1,0 +1,42 @@
+{
+  "events": {
+    "diagnostic_scope": "replacement-20261114",
+    "dispatch_origin_proven": false,
+    "events": [],
+    "external_writes": 0,
+    "forecast_margin_proven": false,
+    "query_failure_categories": [
+      "access_refused"
+    ],
+    "reason": "metadata_query_refused",
+    "request_count": 1,
+    "schema_version": 1,
+    "scope": "issue156_fixed_cron_metadata",
+    "status": "refused",
+    "window": {
+      "ends_at": "2026-11-17T09:18:10.735Z",
+      "starts_at": "2026-11-17T07:00:00.000Z"
+    },
+    "worker_invocations": 0
+  },
+  "issue": 156,
+  "issue_complete": false,
+  "original_receipt_sha256": {
+    "SHA256SUMS": "75e76982ca87b93aedbb4d68c31e1ad6ea70951ae13935c6d963030a5101a64c",
+    "events.json": "f6765ebe7bbf76659ebad3c9cf6e95660aa90aa7628f30e324960025b2a7e187",
+    "state.json": "83420562ee1c18e63fe1e05f5e28ae4859092aaf36369c1ff89cccb2968e7efc"
+  },
+  "state": {
+    "cron_enabled": true,
+    "dispatch_secret_present": true,
+    "external_writes": 0,
+    "forecast_margin_proven": false,
+    "phase": "VERIFY_ACTIVE",
+    "private_urls_verified": true,
+    "request_count": 3,
+    "signature_secret_present": true,
+    "status": "passed"
+  },
+  "workflow_run_id": 44054308815,
+  "workflow_url": "https://github.com/hoangnguyen2003/edgar-moe/actions/runs/44054308815"
+}
