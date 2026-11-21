@@ -51,7 +51,7 @@ jobs:
           python3 scripts/validate_redacted_artifacts.py --root reports/scheduler-delivery
           sha256sum reports/scheduler-delivery/receipt.json > reports/scheduler-delivery/SHA256SUMS
       - name: Retain signed delivery evidence without source credentials
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: scheduler-delivery-probe-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/scheduler-delivery/
@@ -124,7 +124,7 @@ jobs:
           sha256sum reports/private-scheduler/receipt.json > reports/private-scheduler/SHA256SUMS
       - name: Retain redacted timing receipt
         if: ${{ always() && steps.receipt.outcome == 'success' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: private-scheduler-${{ github.run_id }}-${{ github.run_attempt }}
           path: reports/private-scheduler/
