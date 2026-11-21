@@ -29,6 +29,7 @@ from scripts import enrich_historical_fdic_equity as fdic_equity
 from scripts import enrich_historical_legacy_governance as legacy
 from scripts import enrich_historical_listed_isin as listed_isin
 from scripts import enrich_historical_offering_identity as offering_identity
+from scripts import enrich_historical_ordinary_holdings as ordinary_holdings
 from scripts import enrich_historical_proxy_class as proxy_class
 from scripts import enrich_historical_proxy_definition as proxy_definition
 from scripts import enrich_historical_vote_identity as vote_identity
@@ -199,7 +200,7 @@ def compare_rosters(source: Any, requested: Any) -> dict[str, Any]:
 def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]:
     """Dispatch only named, independently replayable stages; never trust a count."""
     match = re.fullmatch(
-        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity|listed-isin|issuer-vote|issuer-offering)-([a-f0-9]{64})\.json",
+        r"(legacy-governance|proxy-class|proxy-definition|class-redesignation|bank-filings|capital-definition|capital-stock-tags|fdic-listed-equity|listed-isin|issuer-vote|issuer-offering|ordinary-holdings)-([a-f0-9]{64})\.json",
         args.identity_result,
     )
     if match is None:
@@ -224,6 +225,7 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
         listed_isin.PREFIX: (listed_isin, listed_isin.KIND),
         vote_identity.PREFIX: (vote_identity, vote_identity.KIND),
         offering_identity.PREFIX: (offering_identity, offering_identity.KIND),
+        ordinary_holdings.PREFIX: (ordinary_holdings, ordinary_holdings.KIND),
     }
     module, kind = stages[match[1]]
     if not isinstance(stored, dict) or stored.get("kind") != kind:
@@ -237,12 +239,19 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
     isin_sources = getattr(args, "listed_isin_sources", None)
     vote_sources = getattr(args, "vote_identity_sources", None)
     offering_sources = getattr(args, "offering_identity_sources", None)
-    if match[1] == offering_identity.PREFIX:
+    holdings_sources = getattr(args, "ordinary_holdings_sources", None)
+    if match[1] == ordinary_holdings.PREFIX:
+        if not isinstance(holdings_sources, Path):
+            raise ValueError("missing_ordinary_holdings_sources_for_identity_replay")
+    elif holdings_sources is not None:
+        raise ValueError("unexpected_ordinary_holdings_sources_for_identity_replay")
+    offering_stages = {offering_identity.PREFIX, ordinary_holdings.PREFIX}
+    if match[1] in offering_stages:
         if not isinstance(offering_sources, Path):
             raise ValueError("missing_offering_identity_sources_for_identity_replay")
     elif offering_sources is not None:
         raise ValueError("unexpected_offering_identity_sources_for_identity_replay")
-    vote_stages = {vote_identity.PREFIX, offering_identity.PREFIX}
+    vote_stages = {vote_identity.PREFIX, *offering_stages}
     if match[1] in vote_stages:
         if not isinstance(vote_sources, Path):
             raise ValueError("missing_vote_identity_sources_for_identity_replay")
@@ -309,8 +318,8 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
             args.source_capture,
             args.retained_checkpoint,
         )
-        if match[1] == offering_identity.PREFIX:
-            replayed = offering_identity.recompute(
+        if match[1] in offering_stages:
+            offering_args = (
                 *common,
                 *sources,
                 args.listed_equity_sources,
@@ -318,6 +327,11 @@ def replay_identity(args: argparse.Namespace) -> tuple[dict[str, Any], str, str]
                 args.vote_identity_sources,
                 args.offering_identity_sources,
             )
+            if match[1] == ordinary_holdings.PREFIX:
+                assert isinstance(holdings_sources, Path)
+                replayed = ordinary_holdings.recompute(*offering_args, holdings_sources)
+            else:
+                replayed = offering_identity.recompute(*offering_args)
         elif match[1] == vote_identity.PREFIX:
             replayed = vote_identity.recompute(
                 *common,
@@ -483,6 +497,9 @@ def main() -> int:
     )
     parser.add_argument(
         "--offering-identity-sources", type=Path, help="Required for issuer-offering replay"
+    )
+    parser.add_argument(
+        "--ordinary-holdings-sources", type=Path, help="Required for ordinary-holdings replay"
     )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--output-dir", type=Path)
