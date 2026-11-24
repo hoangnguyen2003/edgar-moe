@@ -313,3 +313,19 @@ one degraded pair and one failed workflow. See the
 [all-open-issue recovery review](../../docs/open-issue-closeout-20261113.md).
 At that closeout, no expired slot was replayed and no replacement window had
 started. The separately bound November 15 restart is described above.
+
+## November 22 final result
+
+The replacement window ended at 15:00 UTC on November 22. The
+[retained GitHub Actions report](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45329321540)
+records **17 of 168 scheduled pairs and 34 of 336 modeled reads** with zero
+HTTP or response-contract errors. One platform trace was refused, all reads
+bypassed the edge cache, and 151 hourly slots were missing. Observations
+spanned just under six and a half days. The report keeps its latency cohorts
+and local comparison, and issue #290 remains open.
+
+The report upload succeeded. The shutdown job then failed when GitHub rejected
+the request to disable the observer that had already stopped. The expired
+finalizer was disabled separately and both workflow states were verified. The
+shutdown job now checks each workflow's state before disabling it and confirms
+the state again if a disable request fails.
