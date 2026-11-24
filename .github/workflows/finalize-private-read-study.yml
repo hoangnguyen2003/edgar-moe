@@ -60,6 +60,23 @@ jobs:
       - name: Stop only these two bounded study workflows
         env:
           GH_TOKEN: ${{ github.token }}
+        shell: bash
         run: |
-          gh workflow disable observe-private-read-study.yml --repo "$GITHUB_REPOSITORY"
-          gh workflow disable finalize-private-read-study.yml --repo "$GITHUB_REPOSITORY"
+          for workflow in observe-private-read-study.yml finalize-private-read-study.yml; do
+            endpoint="repos/$GITHUB_REPOSITORY/actions/workflows/$workflow"
+            state=$(gh api "$endpoint" --jq '.state')
+            if [[ "$state" == active ]]; then
+              if gh api --method PUT "$endpoint/disable"; then
+                continue
+              fi
+              # Another job may have stopped the workflow since the first read.
+              state=$(gh api "$endpoint" --jq '.state')
+            fi
+            case "$state" in
+              disabled_manually|disabled_inactivity|disabled_fork) ;;
+              *)
+                printf 'Could not confirm shutdown of %s\n' "$workflow" >&2
+                exit 1
+                ;;
+            esac
+          done

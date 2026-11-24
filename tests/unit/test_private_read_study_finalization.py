@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import subprocess
 import sys
 import zipfile
 from datetime import UTC, datetime, timedelta
@@ -238,6 +239,76 @@ def test_finalizer_receives_no_provider_secret_and_stops_only_the_study_workflow
     run = stop["steps"][0]["run"]
     assert "observe-private-read-study.yml" in run and "finalize-private-read-study.yml" in run
     assert "156" not in run
+
+
+@pytest.mark.parametrize(
+    ("observer_state", "observer_put", "expected_status", "expected_calls"),
+    [
+        ("disabled_manually", "deny", 0, ["read observer", "read finalizer", "stop finalizer"]),
+        (
+            "active",
+            "allow",
+            0,
+            ["read observer", "stop observer", "read finalizer", "stop finalizer"],
+        ),
+        (
+            "active",
+            "race",
+            0,
+            ["read observer", "stop observer", "read observer", "read finalizer", "stop finalizer"],
+        ),
+        ("active", "deny", 1, ["read observer", "stop observer", "read observer"]),
+    ],
+)
+def test_shutdown_handles_an_already_disabled_observer(
+    tmp_path, monkeypatch, observer_state, observer_put, expected_status, expected_calls
+):
+    doc = yaml.safe_load(Path(".github/workflows/finalize-private-read-study.yml").read_text())
+    run = doc["jobs"]["stop-finished-study"]["steps"][0]["run"]
+    fake_gh = tmp_path / "gh"
+    fake_gh.write_text(
+        """#!/bin/bash
+set -eu
+base=repos/hoangnguyen2003/edgar-moe/actions/workflows
+case "$*" in
+  "api $base/observe-private-read-study.yml --jq .state")
+    echo 'read observer' >> calls
+    cat observer-state
+    ;;
+  "api --method PUT $base/observe-private-read-study.yml/disable")
+    echo 'stop observer' >> calls
+    case "$OBSERVER_PUT" in
+      allow) exit 0 ;;
+      race) echo disabled_manually > observer-state ;;
+    esac
+    exit 1
+    ;;
+  "api $base/finalize-private-read-study.yml --jq .state")
+    echo 'read finalizer' >> calls
+    echo active
+    ;;
+  "api --method PUT $base/finalize-private-read-study.yml/disable")
+    echo 'stop finalizer' >> calls
+    ;;
+  *) exit 8 ;;
+esac
+"""
+    )
+    fake_gh.chmod(0o700)
+    (tmp_path / "observer-state").write_text(observer_state)
+    monkeypatch.setenv("PATH", str(tmp_path), prepend=":")
+    monkeypatch.setenv("GITHUB_REPOSITORY", final.REPOSITORY)
+    monkeypatch.setenv("OBSERVER_PUT", observer_put)
+
+    result = subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", run],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+    assert result.returncode == expected_status, result.stderr
+    assert (tmp_path / "calls").read_text().splitlines() == expected_calls
 
 
 def test_elapsed_window_builds_redacted_readable_report_and_references(tmp_path, monkeypatch):
