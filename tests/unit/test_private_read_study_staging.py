@@ -48,6 +48,19 @@ def test_observer_is_dormant_and_never_receives_database_credentials():
     assert "156" not in stop["steps"][0]["run"]
 
 
+def test_observer_checks_the_window_before_provider_steps_and_failure_handling():
+    workflow = yaml.safe_load(Path(".github/workflows/observe-private-read-study.yml").read_text())
+    steps = workflow["jobs"]["observe"]["steps"]
+    gate_index, gate = next((i, step) for i, step in enumerate(steps) if step.get("id") == "window")
+    assert set(gate["env"]) == {"STUDY_STARTS_AT", "STUDY_EXPIRES_AT"}
+    assert "secrets." not in json.dumps(gate)
+    assert "--check-window" in gate["run"]
+    assert all("secrets." not in json.dumps(step) for step in steps[:gate_index])
+    assert all(
+        "steps.window.outputs.eligible == 'true'" in step["if"] for step in steps[gate_index + 1 :]
+    )
+
+
 def test_refused_probe_retains_a_zero_request_receipt(tmp_path, monkeypatch):
     spec = importlib.util.spec_from_file_location(
         "portfolio_study_probe_refusal", "scripts/observe_private_read_study.py"

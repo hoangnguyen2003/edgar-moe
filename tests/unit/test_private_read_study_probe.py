@@ -32,6 +32,51 @@ def environment():
     }
 
 
+@pytest.mark.parametrize(
+    ("attempt", "now", "eligible"),
+    [
+        ("1", datetime(2026, 11, 5, 23, 59, tzinfo=UTC), False),
+        ("1", datetime(2026, 11, 6, tzinfo=UTC), True),
+        ("1", datetime(2026, 11, 12, 23, 59, tzinfo=UTC), True),
+        ("1", datetime(2026, 11, 13, tzinfo=UTC), False),
+        ("2", datetime(2026, 11, 6, tzinfo=UTC), False),
+        (None, datetime(2026, 11, 6, tzinfo=UTC), False),
+    ],
+)
+def test_workflow_window_check_only_admits_first_attempts_within_the_window(
+    monkeypatch, capsys, attempt, now, eligible
+):
+    class FrozenDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    monkeypatch.setattr(probe, "datetime", FrozenDatetime)
+    monkeypatch.setattr(sys, "argv", ["probe", "--check-window"])
+    monkeypatch.setenv("STUDY_STARTS_AT", environment()["STUDY_STARTS_AT"])
+    monkeypatch.setenv("STUDY_EXPIRES_AT", environment()["STUDY_EXPIRES_AT"])
+    if attempt is None:
+        monkeypatch.delenv("GITHUB_RUN_ATTEMPT", raising=False)
+    else:
+        monkeypatch.setenv("GITHUB_RUN_ATTEMPT", attempt)
+    monkeypatch.setattr(probe, "observe", lambda *a, **kw: pytest.fail("No provider reads"))
+
+    assert probe.main() == 0
+    assert capsys.readouterr().out == f"eligible={str(eligible).lower()}\n"
+
+
+def test_workflow_window_check_refuses_invalid_configuration_without_output(monkeypatch, capsys):
+    monkeypatch.setattr(sys, "argv", ["probe", "--check-window"])
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.setenv("STUDY_STARTS_AT", "2026-11-06T00:00:01Z")
+    monkeypatch.setenv("STUDY_EXPIRES_AT", "2026-11-13T00:00:01Z")
+
+    assert probe.main() == 1
+    output = capsys.readouterr()
+    assert output.out == ""
+    assert output.err == "study_configuration_refused\n"
+
+
 class Response(io.BytesIO):
     status = 200
 
