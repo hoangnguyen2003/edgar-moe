@@ -11,7 +11,7 @@ DOMAIN = "edgar-moe/study-external-delivery/v1"
 FORMAT = "%Y-%m-%dT%H:%M:%S.000Z"
 
 
-def receipt(env: dict[str, str], now: datetime) -> dict:
+def receipt(env: dict[str, str], now: datetime) -> dict[str, str | int]:
     if env.get("GITHUB_RUN_ATTEMPT") != "1" or env.get("GITHUB_EVENT_NAME") != "workflow_dispatch":
         raise ValueError("External delivery provenance refused")
     start_text = env["STUDY_DELIVERY_STARTS_AT"]
