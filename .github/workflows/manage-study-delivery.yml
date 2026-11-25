@@ -1,0 +1,42 @@
+name: Manage independent hosted study delivery
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Verify, start, or stop the separate one-day delivery test
+        required: true
+        type: choice
+        default: VERIFY
+        options: [VERIFY, START, STOP]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: manage-issue290-external-delivery
+  cancel-in-progress: false
+
+jobs:
+  manage:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.private == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: hosted-study-delivery
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Manage only the dedicated delivery Worker
+        env:
+          STUDY_DELIVERY_STAGE: ${{ inputs.stage }}
+          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
+          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+          STUDY_DELIVERY_STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+          STUDY_DELIVERY_SIGNING_KEY: ${{ inputs.stage == 'START' && secrets.STUDY_DELIVERY_SIGNING_KEY || '' }}
+          STUDY_DELIVERY_GITHUB_TOKEN: ${{ inputs.stage == 'START' && secrets.STUDY_DELIVERY_GITHUB_TOKEN || '' }}
+        run: node ops/scheduler/manage-study-delivery.mjs

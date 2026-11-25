@@ -381,3 +381,14 @@ rejects timestamps outside the window. Review one authenticated receipt per
 hour, with duplicates and missing hours visible. Remove the Cron after the
 trial. The receiver has no application, hosting or database credential and
 each receipt records zero study measurements.
+
+For GitHub-managed setup, the
+[management workflow](../../.github/workflows/manage-study-delivery.yml)
+reads `STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID` and
+`STUDY_DELIVERY_CLOUDFLARE_TOKEN` from `hosted-study-delivery`. Create the
+dedicated Worker first and scope the Cloudflare token to that Worker.
+`VERIFY` reads only its status. `START` also reads
+`STUDY_DELIVERY_GITHUB_TOKEN` and `STUDY_DELIVERY_SIGNING_KEY`. It uses the
+same GitHub start variable as the receiver and requires at least 20 minutes
+before the selected start to allow Cron propagation. It refuses an already
+active Worker. `STOP` removes the known Cron and verifies the result.
