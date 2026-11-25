@@ -329,3 +329,10 @@ the request to disable the observer that had already stopped. The expired
 finalizer was disabled separately and both workflow states were verified. The
 shutdown job now checks each workflow's state before disabling it and confirms
 the state again if a disable request fails.
+
+A [scheduled observer run after expiry](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45039493088)
+made two Neon endpoint metadata requests. The application probe reported zero
+HTTP requests. The observer now checks its absolute window before any step
+that uses provider credentials. A first attempt outside the window or any
+rerun skips observation and leaves the expired study for the finalizer to
+report. In-window attempts retain their existing failure and evidence handling.

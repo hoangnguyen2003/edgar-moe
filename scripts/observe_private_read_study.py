@@ -15,6 +15,7 @@ import math
 import os
 import re
 import socket
+import sys
 import time
 import urllib.error
 import urllib.request
@@ -42,6 +43,23 @@ class Refusal(ValueError):
     pass
 
 
+def study_window(env: dict[str, str]) -> tuple[datetime, datetime]:
+    try:
+        start = datetime.fromisoformat(env["STUDY_STARTS_AT"].replace("Z", "+00:00"))
+        end = datetime.fromisoformat(env["STUDY_EXPIRES_AT"].replace("Z", "+00:00"))
+    except (KeyError, ValueError):
+        raise Refusal("study_configuration_refused") from None
+    if (
+        start.utcoffset() != timedelta(0)
+        or end.utcoffset() != timedelta(0)
+        or start.second
+        or start.microsecond
+        or end - start != timedelta(days=7)
+    ):
+        raise Refusal("study_configuration_refused")
+    return start, end
+
+
 @dataclass(frozen=True, repr=False)
 class Configuration:
     origin: str
@@ -57,8 +75,7 @@ class Configuration:
         try:
             origin = env["STUDY_DEPLOYMENT_URL"]
             parsed = urlsplit(origin)
-            start = datetime.fromisoformat(env["STUDY_STARTS_AT"].replace("Z", "+00:00"))
-            end = datetime.fromisoformat(env["STUDY_EXPIRES_AT"].replace("Z", "+00:00"))
+            start, end = study_window(env)
             host_hash = env["STUDY_DEPLOYMENT_HOST_SHA256"]
             policy_hash = env["STUDY_POLICY_SHA256"]
             bearer, bypass = env["STUDY_BEARER_TOKEN"], env["STUDY_PLATFORM_BYPASS"]
@@ -71,11 +88,6 @@ class Configuration:
                 or parsed.path not in ("", "/")
                 or parsed.query
                 or parsed.fragment
-                or start.utcoffset() != timedelta(0)
-                or end.utcoffset() != timedelta(0)
-                or start.second
-                or start.microsecond
-                or end - start != timedelta(days=7)
                 or not re.fullmatch(r"[a-f0-9]{64}", host_hash)
                 or hashlib.sha256((parsed.hostname or "").encode()).hexdigest() != host_hash
                 or not re.fullmatch(r"[a-f0-9]{64}", policy_hash)
@@ -631,8 +643,22 @@ def observe(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--output", type=Path)
+    mode.add_argument("--check-window", action="store_true")
     args = parser.parse_args()
+    if args.check_window:
+        eligible = False
+        if os.environ.get("GITHUB_RUN_ATTEMPT") == "1":
+            try:
+                start, end = study_window(dict(os.environ))
+            except Refusal as error:
+                print(str(error), file=sys.stderr)
+                return 1
+            eligible = start <= datetime.now(UTC) < end
+        print(f"eligible={str(eligible).lower()}")
+        return 0
+
     try:
         if os.environ.get("GITHUB_RUN_ATTEMPT", "1") != "1":
             raise Refusal("rerun_refused")
