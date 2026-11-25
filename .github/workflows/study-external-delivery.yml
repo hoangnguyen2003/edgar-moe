@@ -1,0 +1,34 @@
+name: Hosted study external delivery preflight
+
+on:
+  workflow_dispatch:
+    inputs:
+      scheduled_at:
+        description: Signed UTC trigger time
+        required: true
+        type: string
+      signature:
+        description: HMAC for the nominated trigger
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.private == false && vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    environment: hosted-study-delivery
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Verify and record delivery
+        env:
+          STUDY_DELIVERY_STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+          STUDY_DELIVERY_SCHEDULED_AT: ${{ inputs.scheduled_at }}
+          STUDY_DELIVERY_SIGNATURE: ${{ inputs.signature }}
+          STUDY_DELIVERY_SIGNING_KEY: ${{ secrets.STUDY_DELIVERY_SIGNING_KEY }}
+        run: python3 scripts/observe_external_study_delivery.py
