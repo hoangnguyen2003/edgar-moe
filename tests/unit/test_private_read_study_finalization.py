@@ -328,8 +328,59 @@ def test_elapsed_window_builds_redacted_readable_report_and_references(tmp_path,
     report = json.loads((output / "summary.json").read_text())
     assert report["status"] == "incomplete" and len(report["missing_slots"]) == 167
     assert report["edge_hit_count"] == 0 and report["platform_counts"] == {"warm": 2}
+    assert report["window_setup_evidence"] == {"status": "missing"}
     assert "Local native reference" in (output / "summary.md").read_text()
-    assert (output / "references/cloud-reader-query-plans.json").is_file()
+    assert set(report["reference_sha256"]) == {final.BASELINE.name}
+    assert {p.name for p in (output / "references").iterdir()} == {final.BASELINE.name}
     from scripts.validate_redacted_artifacts import validate_redacted_artifacts
 
     assert validate_redacted_artifacts(output) == []
+
+
+def test_replacement_window_uses_the_bound_setup_and_query_plans():
+    folder = final.SETUP_EVIDENCE / "restart-20261115"
+    target = json.loads((folder / "observer-target.json").read_bytes())
+
+    info, references = final.bound_setup_references(target)
+
+    assert info["status"] == "matched" and info["query_plan_shapes"] == 15
+    assert (
+        info["setup_manifest_sha256"]
+        == hashlib.sha256((folder / "SHA256SUMS").read_bytes()).hexdigest()
+    )
+    assert set(references) == {"observer-target.json", "plans.json"}
+    assert references["plans.json"] == (folder / "plans.json").read_bytes()
+    assert final.bound_setup_references(target | {"host_sha256": "f" * 64}) == (
+        {"status": "missing"},
+        {},
+    )
+
+
+@pytest.mark.parametrize("change", ["plan_bytes", "foreign_policy", "duplicate_window"])
+def test_unverified_window_references_are_not_attached(tmp_path, monkeypatch, change):
+    origin = final.SETUP_EVIDENCE / "restart-20261115"
+    target = json.loads((origin / "observer-target.json").read_bytes())
+    folder = tmp_path / "restart-20261115"
+    folder.mkdir()
+    for filename in ("observer-target.json", "plans.json", "SHA256SUMS"):
+        (folder / filename).write_bytes((origin / filename).read_bytes())
+    monkeypatch.setattr(final, "SETUP_EVIDENCE", tmp_path)
+    plan = folder / "plans.json"
+    if change == "plan_bytes":
+        plan.write_bytes(plan.read_bytes() + b"\n")
+    elif change == "foreign_policy":
+        contents = plan.read_bytes()
+        plan.write_bytes(contents.replace(target["policy_sha256"].encode(), b"f" * 64))
+        manifest = folder / "SHA256SUMS"
+        manifest.write_text(
+            manifest.read_text().replace(
+                hashlib.sha256(contents).hexdigest(), hashlib.sha256(plan.read_bytes()).hexdigest()
+            )
+        )
+    else:
+        later = tmp_path / "restart-copy"
+        later.mkdir()
+        (later / "observer-target.json").write_bytes((folder / "observer-target.json").read_bytes())
+
+    expected = "ambiguous" if change == "duplicate_window" else "refused"
+    assert final.bound_setup_references(target) == ({"status": expected}, {})

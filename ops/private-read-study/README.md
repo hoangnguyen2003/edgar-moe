@@ -276,9 +276,15 @@ validates ZIP paths and each receipt hash, excludes manual setup runs, retains
 failed/missing/duplicate hours, and separates collector commit, route, pair
 phase, cache, provider startup, database-pair state and process cohorts.
 
-The final packet contains readable and JSON p50/p95/p99/error summaries, matched
-native local distributions, the original receipts, safe cloud/local query
-plans and setup/source hashes. It is redaction-checked and retained for 90 days.
+The final packet contains readable and JSON p50/p95/p99/error summaries,
+the original receipts and a separate native local reference. It attaches
+hosted setup plans when a `restart-*` setup packet supplies an
+`observer-target.json` matching the start, expiry, policy hash and deployment
+host hash, and its `SHA256SUMS` verifies both that receipt and `plans.json`.
+The plans must carry the same policy and verify SELECT-only setup with zero
+measurement samples. A missing, ambiguous or invalid match leaves timing
+collection available with the setup evidence status recorded in the report.
+The packet is redaction-checked and retained for 90 days.
 Only after successful packet upload does a separate job disable these two study
 workflows. It cannot affect #156 and receives no provider or database secret.
 The app's absolute window and reader password expiry independently stop reads.

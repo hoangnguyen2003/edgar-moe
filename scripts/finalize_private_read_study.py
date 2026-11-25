@@ -29,7 +29,7 @@ BASELINE = (
     ROOT
     / "ops/private-read-study/evidence/performance-preparation-20261106/prepared-local-baseline.json"
 )
-SETUP_EVIDENCE = ROOT / "ops/private-read-study/evidence/activated-study-20261106"
+SETUP_EVIDENCE = ROOT / "ops/private-read-study/evidence"
 ROUTES = ("status", "forecasts", "ticker-filter", "performance")
 FILES = {
     "observation.json",
@@ -100,6 +100,70 @@ def archive_files(raw: bytes) -> dict[str, bytes]:
     ):
         raise Refusal("artifact_digest_refused")
     return files
+
+
+def bound_setup_references(
+    report: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, bytes]]:
+    """Select verified setup receipts for this exact observation window."""
+    binding = {
+        key: report[key] for key in ("starts_at", "expires_at", "policy_sha256", "host_sha256")
+    }
+    candidates = []
+    for path in sorted(SETUP_EVIDENCE.glob("restart-*/observer-target.json")):
+        if path.is_symlink() or path.parent.is_symlink():
+            continue
+        try:
+            raw = path.read_bytes()
+            target = json.loads(raw)
+        except (OSError, ValueError):
+            continue
+        if isinstance(target, dict) and all(
+            target.get(key) == value for key, value in binding.items()
+        ):
+            candidates.append((path, raw, target))
+
+    if len(candidates) != 1:
+        return {"status": "ambiguous" if candidates else "missing"}, {}
+
+    path, raw, target = candidates[0]
+    plan_path = path.with_name("plans.json")
+    manifest_path = path.with_name("SHA256SUMS")
+    try:
+        if plan_path.is_symlink() or manifest_path.is_symlink():
+            raise Refusal("setup_reference_symlink_refused")
+        references = {path.name: raw, plan_path.name: plan_path.read_bytes()}
+        manifest = manifest_path.read_bytes()
+        for name, contents in references.items():
+            matches = re.findall(
+                rb"^([a-f0-9]{64})  " + re.escape(name.encode()) + rb"$", manifest, re.M
+            )
+            if matches != [hashlib.sha256(contents).hexdigest().encode()]:
+                raise Refusal("setup_reference_digest_refused")
+
+        plans = json.loads(references[plan_path.name])
+        if (
+            target.get("issue") != 290
+            or target.get("status") != "passed"
+            or not isinstance(plans, dict)
+            or plans.get("issue") != 290
+            or plans.get("status") != "passed"
+            or plans.get("policy_sha256") != binding["policy_sha256"]
+            or plans.get("select_only_plans_verified") is not True
+            or plans.get("measurement_samples") != 0
+            or plans.get("response_bodies_retained") is not False
+            or not isinstance(plans.get("plans"), list)
+            or not plans["plans"]
+        ):
+            raise Refusal("setup_reference_binding_refused")
+    except (OSError, ValueError):
+        return {"status": "refused"}, {}
+
+    return {
+        "status": "matched",
+        "setup_manifest_sha256": hashlib.sha256(manifest).hexdigest(),
+        "query_plan_shapes": len(plans["plans"]),
+    }, references
 
 
 def quantiles(values: list[int]) -> dict[str, int] | None:
@@ -321,6 +385,12 @@ def summarize(
 
 
 def markdown(report: dict[str, Any]) -> str:
+    setup = report.get("window_setup_evidence", {"status": "missing"})
+    setup_text = (
+        f"The setup receipts include {setup['query_plan_shapes']} query shapes matched to this window."
+        if setup["status"] == "matched"
+        else f"Setup receipts matching this window are unavailable ({setup['status']})."
+    )
     lines = [
         "# Issue 290: hosted read observation",
         "",
@@ -330,6 +400,7 @@ def markdown(report: dict[str, Any]) -> str:
         f"Actual observations cover {report['observed_utc_date_count']} UTC dates, from {report['first_pair_started_at']} through {report['last_pair_started_at']} (pair-start span: {report['pair_start_span_seconds']} seconds). The policy window elapsing does not fill missing observations.",
         f"Platform trace statuses: {report['platform_trace_status_counts']}; degraded pairs: {report['degraded_observation_pairs']}; workflow conclusions: {report['workflow_conclusion_counts']}. These are separate from HTTP/contract errors.",
         f"Missing slots: {report['missing_slots']}. Duplicate slots: {report['duplicate_slots']}.",
+        setup_text,
         "",
         "Successful hosted HTTP latency (milliseconds, nearest-rank; each row retains its own sample count):",
         "",
@@ -471,18 +542,21 @@ def main() -> int:
         os.umask(0o077)
         args.output_dir.mkdir(mode=0o700, parents=True, exist_ok=False)
         records, missing = collect(env, args.output_dir)
-        report = summarize(records, env, now, json.loads(BASELINE.read_text()))
+        if BASELINE.is_symlink():
+            raise Refusal("reference_symlink_refused")
+        baseline = BASELINE.read_bytes()
+        report = summarize(records, env, now, json.loads(baseline))
         report["runs_without_valid_observation"] = missing
         if missing:
             report["status"] = "incomplete"
         references = args.output_dir / "references"
         references.mkdir(mode=0o700)
-        for source in (BASELINE, *sorted(SETUP_EVIDENCE.glob("*.json"))):
-            if source.is_symlink():
-                raise Refusal("reference_symlink_refused")
-            (references / source.name).write_bytes(source.read_bytes())
+        report["window_setup_evidence"], matched = bound_setup_references(report)
+        reference_files = {BASELINE.name: baseline} | matched
+        for name, contents in reference_files.items():
+            (references / name).write_bytes(contents)
         report["reference_sha256"] = {
-            p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in references.iterdir()
+            name: hashlib.sha256(contents).hexdigest() for name, contents in reference_files.items()
         }
         (args.output_dir / "summary.json").write_bytes(canonical(report) + b"\n")
         (args.output_dir / "summary.md").write_text(markdown(report))
