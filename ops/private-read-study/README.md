@@ -361,3 +361,23 @@ of each slot separately. Any missing slot leaves this delivery test incomplete.
 A complete preflight would support another study window after a separate
 at-most-once per-slot guard is in place. Its receipts carry zero measurements
 for issue #290.
+
+### Independent delivery preflight
+
+Use a separate Worker, configured from
+[`wrangler.study-delivery.toml.example`](../scheduler/wrangler.study-delivery.toml.example),
+and the [external delivery workflow](../../.github/workflows/study-external-delivery.yml).
+The example starts with Cron disabled. Provision the Worker with a
+repository-scoped GitHub Actions dispatch token and a newly generated
+64-character lowercase hex HMAC key. The same HMAC key belongs in the
+`hosted-study-delivery` GitHub environment. The repository start variable
+`ISSUE290_EXTERNAL_DELIVERY_STARTS_AT` and Worker variable
+`STUDY_DELIVERY_STARTS_AT` use the same upcoming UTC hour in
+`YYYY-MM-DDTHH:00:00.000Z` form.
+
+A one-day trial uses `17 * * * *` after configuration and allows time for
+Cron propagation. The Worker sends one signed dispatch per invocation and
+rejects timestamps outside the window. Review one authenticated receipt per
+hour, with duplicates and missing hours visible. Remove the Cron after the
+trial. The receiver has no application, hosting or database credential and
+each receipt records zero study measurements.
