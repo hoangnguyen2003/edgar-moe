@@ -336,3 +336,22 @@ HTTP requests. The observer now checks its absolute window before any step
 that uses provider credentials. A first attempt outside the window or any
 rerun skips observation and leaves the expired study for the finalizer to
 report. In-window attempts retain their existing failure and evidence handling.
+
+## Scheduled delivery preflight
+
+The [delivery preflight workflow](../../.github/workflows/study-delivery-preflight.yml)
+uses a standard GitHub runner in this public repository. It checks whether
+scheduled jobs reach all 24 hourly slots when GitHub has four candidate trigger
+times per hour. It records the actual UTC step time in a log receipt. A manual
+dispatch verifies the job setup and carries no scheduled slot. The job loads
+no secrets, uploads no artifacts and makes no application or hosting-provider
+requests. The separate shutdown job disables only this preflight.
+
+For a finite test, set the repository variable `ISSUE290_DELIVERY_STARTS_AT` to
+an upcoming UTC hour in `YYYY-MM-DDTHH:00:00Z` form. The first run after 24 hours
+disables the preflight. Count distinct slot numbers from first-attempt scheduled
+receipts. Count repeated slots, missing slots and the delay from the beginning
+of each slot separately. Any missing slot leaves this delivery test incomplete.
+A complete preflight would support another study window after a separate
+at-most-once per-slot guard is in place. Its receipts carry zero measurements
+for issue #290.
