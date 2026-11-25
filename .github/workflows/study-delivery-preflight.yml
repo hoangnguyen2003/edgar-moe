@@ -1,0 +1,88 @@
+name: Hosted read study delivery preflight
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+permissions: {}
+
+jobs:
+  probe:
+    if: ${{ github.ref == 'refs/heads/main' && github.event.repository.private == false && (github.event_name == 'workflow_dispatch' || vars.ISSUE290_DELIVERY_STARTS_AT != '') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    outputs:
+      expired: ${{ steps.delivery.outputs.expired }}
+    steps:
+      - name: Record delivery
+        id: delivery
+        env:
+          DELIVERY_STARTS_AT: ${{ vars.ISSUE290_DELIVERY_STARTS_AT }}
+          DELIVERY_CRON: ${{ github.event.schedule }}
+        run: |
+          python3 - <<'PY'
+          from datetime import UTC, datetime, timedelta
+          import json
+          import os
+          from pathlib import Path
+
+          now = datetime.now(UTC)
+          receipt = {
+              "scope": "issue290_scheduler_delivery",
+              "run_id": int(os.environ["GITHUB_RUN_ID"]),
+              "observed_at": now.isoformat(timespec="seconds"),
+              "application_requests": 0,
+              "provider_requests": 0,
+              "measurement_pairs": 0,
+          }
+          if os.environ["GITHUB_RUN_ATTEMPT"] != "1":
+              receipt["status"] = "rerun_excluded"
+          elif os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+              receipt["status"] = "manual_setup"
+          else:
+              start_text = os.environ["DELIVERY_STARTS_AT"]
+              start = datetime.strptime(start_text, "%Y-%m-%dT%H:00:00Z").replace(tzinfo=UTC)
+              if (
+                  start.strftime("%Y-%m-%dT%H:00:00Z") != start_text
+                  or os.environ["GITHUB_EVENT_NAME"] != "schedule"
+                  or os.environ["DELIVERY_CRON"] != "7,22,37,52 * * * *"
+              ):
+                  raise SystemExit("Delivery schedule or start refused")
+              end = start + timedelta(days=1)
+              receipt.update(starts_at=start.isoformat(), expires_at=end.isoformat())
+              if now >= end:
+                  receipt["status"] = "expired"
+                  with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:
+                      stream.write("expired=true\n")
+              elif now < start:
+                  receipt["status"] = "before_window"
+              else:
+                  receipt["status"] = "observed"
+                  receipt["hourly_slot"] = (now - start) // timedelta(hours=1)
+          print("study290_delivery " + json.dumps(receipt, sort_keys=True))
+          PY
+
+  stop:
+    if: ${{ needs.probe.outputs.expired == 'true' }}
+    needs: probe
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    concurrency:
+      group: issue290-delivery-preflight-stop
+      cancel-in-progress: false
+    permissions:
+      actions: write
+    steps:
+      - name: Disable the expired delivery preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          endpoint="repos/$GITHUB_REPOSITORY/actions/workflows/study-delivery-preflight.yml"
+          state=$(gh api "$endpoint" --jq '.state')
+          if [ "$state" = active ]; then
+            gh api --method PUT "$endpoint/disable"
+          elif [ "$state" != disabled_manually ]; then
+            printf 'Unexpected preflight state\n' >&2
+            exit 1
+          fi
