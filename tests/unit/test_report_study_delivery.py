@@ -155,6 +155,71 @@ def test_closeout_gate_has_no_api_access_and_waits_for_grace(monkeypatch, capsys
     )
 
 
+@pytest.mark.parametrize(
+    ("created", "now", "ready", "delay"),
+    [
+        ("04:16:59", "04:17:10", False, []),
+        ("04:17:00", "04:17:00", True, [3180]),
+        ("04:17:22", "04:17:30", True, [3150]),
+        ("04:17:22", "05:10:00", True, []),
+        ("04:17:22", "04:17:21", False, []),
+        ("05:00:00", "05:10:00", False, []),
+    ],
+)
+def test_backup_waits_only_for_the_final_slot(monkeypatch, capsys, created, now, ready, delay):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz):
+            return datetime.fromisoformat(f"2026-11-27T{now}Z")
+
+    sleeps = []
+    monkeypatch.setattr(report, "datetime", Clock)
+    monkeypatch.setattr(report, "sleep", sleeps.append)
+    monkeypatch.setattr(report, "gh", lambda *_args: pytest.fail("unexpected API access"))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "report",
+            "--starts-at",
+            START.strftime(report.FORMAT),
+            "--wait-for-closeout-after-receipt",
+            f"2026-11-27T{created}Z",
+        ],
+    )
+    assert report.main() == 0
+    assert sleeps == delay
+    assert capsys.readouterr().out == (
+        f"starts_at={START.strftime(report.FORMAT)}\n" if ready else ""
+    )
+
+
+def test_receipt_triggered_closeout_targets_only_the_main_finalizer():
+    path = Path(".github/workflows/trigger-study-delivery-closeout.yml")
+    workflow = yaml.safe_load(path.read_text())
+    assert workflow[True] == {
+        "workflow_run": {
+            "workflows": ["Hosted study external delivery preflight"],
+            "types": ["completed"],
+            "branches": ["main"],
+        }
+    }
+    wait = workflow["jobs"]["wait-for-expiry"]
+    dispatch = workflow["jobs"]["dispatch"]
+    assert wait["permissions"] == {"contents": "read"}
+    assert wait["steps"][0]["with"] == {
+        "ref": "${{ github.sha }}",
+        "persist-credentials": False,
+    }
+    assert "github.event.workflow_run.head_repository.full_name == github.repository" in wait["if"]
+    assert "github.event.workflow_run.run_attempt == 1" in wait["if"]
+    assert dispatch["needs"] == "wait-for-expiry"
+    assert "outputs.starts_at == vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT" in dispatch["if"]
+    assert dispatch["permissions"] == {"actions": "write"}
+    assert "workflow=finalize-study-delivery.yml" in dispatch["steps"][0]["run"]
+    assert "secrets." not in path.read_text()
+
+
 def test_closeout_workflow_keeps_reporting_and_shutdown_credentials_separate():
     workflow = yaml.safe_load(Path(".github/workflows/finalize-study-delivery.yml").read_text())
     manager = yaml.safe_load(Path(".github/workflows/manage-study-delivery.yml").read_text())
