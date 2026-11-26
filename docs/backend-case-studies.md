@@ -17,6 +17,13 @@ HTTP dispatch. Workerd rejected the original Fetch redirect mode. The
 corrected version made exactly one request to a local mock with GitHub's
 required User-Agent and refused redirect responses.
 
+The first live diagnosis observed a scheduled invocation arrive about 53
+seconds after the nominal slot, with a reported time that differed from the
+exact minute and no GitHub dispatch. A replay in Workerd reproduced a skipped
+dispatch for a synthetic timestamp 53 seconds late. The Worker now signs the
+nominal minute-17 slot for an event received within the five-minute grace
+period. [Live diagnosis](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45789761599) · [Timestamp fix](https://github.com/hoangnguyen2003/edgar-moe/pull/490)
+
 The pilot report joins GitHub run creation, job start and signed-receipt time
 to each expected slot. It reports missing and duplicate slots and excludes
 credential setup. Each receipt carries zero hosted read samples. The seven-day
