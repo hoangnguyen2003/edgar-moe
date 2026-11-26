@@ -16,12 +16,22 @@ import os
 import re
 import stat
 import subprocess
+import sys
 import zipfile
 from collections import Counter, defaultdict
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+if __name__ == "__main__" and not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.admit_study_observation import (  # noqa: E402
+    AdmissionError,
+    active_slot,
+    observation_event,
+)
 
 REPOSITORY = "hoangnguyen2003/edgar-moe"
 WORKFLOW = "observe-private-read-study.yml"
@@ -202,6 +212,7 @@ def summarize(
     records: list[dict[str, Any]], env: dict[str, str], now: datetime, baseline: dict[str, Any]
 ) -> dict[str, Any]:
     start, end = window(env)
+    event = observation_event(env.get("STUDY_DELIVERY_MODE", ""))
     slots: dict[int, list[int]] = defaultdict(list)
     groups: dict[tuple[str, ...], list[dict[str, Any]]] = defaultdict(list)
     failures: Counter[str] = Counter()
@@ -217,8 +228,7 @@ def summarize(
     pair_starts: list[datetime] = []
     for record in records:
         meta, receipt = record["run"], record["receipt"]
-        # Dispatch is setup-only, even if it occupies a valid numbered slot.
-        if meta["event"] != "schedule":
+        if meta["event"] != event:
             continue
         if (
             meta["head_branch"] != "main"
@@ -240,6 +250,11 @@ def summarize(
             or slot != int((stamp - start).total_seconds() // 3600)
         ):
             raise Refusal("observation_window_refused")
+        if event == "workflow_dispatch":
+            try:
+                active_slot(start, end, receipt["scheduled_at"], stamp)
+            except (AdmissionError, KeyError, TypeError):
+                raise Refusal("signed_observation_slot_refused") from None
         slots[slot].append(meta["id"])
         pair_starts.append(stamp)
         degraded_pairs += receipt.get("status") == "degraded"
@@ -481,6 +496,7 @@ def collect(
     env: dict[str, str], destination: Path
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     start, end = window(env)
+    event = observation_event(env.get("STUDY_DELIVERY_MODE", ""))
     records, missing = [], []
     for page in range(1, 6):
         raw = gh(
@@ -489,7 +505,7 @@ def collect(
             "GET",
             f"repos/{REPOSITORY}/actions/workflows/{WORKFLOW}/runs",
             "-f",
-            "event=schedule",
+            f"event={event}",
             "-f",
             "branch=main",
             "-f",
@@ -501,7 +517,7 @@ def collect(
         )
         runs = json.loads(raw)["workflow_runs"]
         for run in runs:
-            if run["event"] != "schedule" or run["head_branch"] != "main":
+            if run["event"] != event or run["head_branch"] != "main":
                 raise Refusal("run_provenance_refused")
             run = first_attempt(run, gh)
             name = f"private-read-study-{run['id']}-1"

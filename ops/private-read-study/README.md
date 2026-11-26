@@ -446,6 +446,36 @@ atomic slot-claim contract for a future seven-day observer. Live use requires
 the previously planned protected target, a fresh window, and a trusted
 integration that verifies the signed dispatch before acquiring the claim.
 
+#### Seven-day observer intake
+
+The observer and finalizer support a separate, dormant
+`ISSUE290_STUDY_DELIVERY_MODE=cloudflare` path. Enable it only with a dedicated
+measurement sender, a fresh UTC-hour-aligned 168-hour policy, a protected
+fixture deployment and a credentials review. The one-day delivery Worker
+currently signs only preflight receipts.
+
+The [measurement Worker](../scheduler/study-observation-worker.mjs) dispatches
+`observe-private-read-study.yml` on main with `scheduled_at` and `signature`.
+Its start, expiry, policy and host commitments use
+`STUDY_OBSERVATION_STARTS_AT`, `STUDY_OBSERVATION_EXPIRES_AT`,
+`STUDY_OBSERVATION_POLICY_SHA256` and `STUDY_OBSERVATION_HOST_SHA256`.
+It uses a repository-scoped `STUDY_OBSERVATION_GITHUB_TOKEN` and the signing
+secret. The signature is lowercase hex
+HMAC-SHA256 over six newline-separated fields, with no trailing newline:
+`edgar-moe/private-study-observation/v1`, the start, the expiry, the policy
+SHA-256, the deployment host SHA-256, and the nominal minute-17 timestamp.
+Use UTC timestamps in `YYYY-MM-DDTHH:mm:ss.000Z` form and the UTF-8 text of
+the dedicated 64-character lowercase hex `STUDY_OBSERVATION_SIGNING_KEY`.
+
+The admission job uses its own bucket-scoped credentials for the private
+`edgar-moe-study-observation-claims` R2 bucket. A conditional write reserves
+one key per policy, target, window and slot. That job must succeed before the
+observer can access its hosted endpoint or provider metadata. A reserved slot
+stays spent if work fails or returns late. Keep the claim objects until after
+the window and closeout. The SELECT-only data target stores no claim state.
+The finalizer selects first-attempt signed-observer runs and checks each
+recorded timestamp against its slot.
+
 `VERIFY_ACTIVE` reads the active Worker version with the existing scoped
 token and reports whether it exposes a scheduled handler and the expected
 bindings. It prints booleans only for the bindings and makes no deployment

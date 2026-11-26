@@ -34,7 +34,8 @@ jobs:
           STUDY_EXPIRES_AT: ${{ vars.STUDY_EXPIRES_AT }}
           STUDY_POLICY_SHA256: ${{ vars.STUDY_POLICY_SHA256 }}
           STUDY_DEPLOYMENT_HOST_SHA256: ${{ vars.STUDY_DEPLOYMENT_HOST_SHA256 }}
-        run: python3 scripts/finalize_private_read_study.py --output-dir reports/private-read-study-final
+          STUDY_DELIVERY_MODE: ${{ vars.ISSUE290_STUDY_DELIVERY_MODE }}
+        run: python3 -m scripts.finalize_private_read_study --output-dir reports/private-read-study-final
       - name: Validate and hash the final evidence packet
         if: ${{ steps.report.outputs.finished == 'true' }}
         run: |

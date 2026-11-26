@@ -173,6 +173,37 @@ def test_failed_first_read_is_not_retried_or_followed_by_a_warm_sample(monkeypat
         probe.observe(config, now=config.expires_at + timedelta(seconds=1))
 
 
+def test_signed_hour_cannot_be_spent_in_the_next_slot(monkeypatch):
+    config = probe.Configuration.load(environment())
+    stamp = "2026-11-06T00:17:00.000Z"
+    next_hour = config.starts_at + timedelta(hours=1)
+    calls = []
+
+    def request(_config, route):
+        calls.append(route)
+        return {"status": "passed"}
+
+    clock = iter([next_hour - timedelta(seconds=20), next_hour])
+
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return next(clock)
+
+    monkeypatch.setattr(probe, "request", request)
+    monkeypatch.setattr(probe.time, "sleep", lambda seconds: None)
+    monkeypatch.setattr(probe, "datetime", Clock)
+    with pytest.raises(probe.Refusal, match="study_observation_slot_refused"):
+        probe.observe(config, now=next_hour, scheduled_at=stamp)
+    assert calls == []
+
+    report = probe.observe(config, now=next_hour - timedelta(seconds=20), scheduled_at=stamp)
+    assert calls == ["status"]
+    assert report["scheduled_at"] == stamp
+    assert len(report["samples"]) == 1
+    assert report["status"] == "degraded"
+
+
 def test_missing_origin_timing_cannot_be_counted_as_successful_measurement(monkeypatch):
     response = Response({"available": True})
     del response.headers["x-study-read-timing"]

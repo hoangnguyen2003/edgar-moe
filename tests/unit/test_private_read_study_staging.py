@@ -52,13 +52,40 @@ def test_observer_checks_the_window_before_provider_steps_and_failure_handling()
     workflow = yaml.safe_load(Path(".github/workflows/observe-private-read-study.yml").read_text())
     steps = workflow["jobs"]["observe"]["steps"]
     gate_index, gate = next((i, step) for i, step in enumerate(steps) if step.get("id") == "window")
-    assert set(gate["env"]) == {"STUDY_STARTS_AT", "STUDY_EXPIRES_AT"}
+    assert set(gate["env"]) == {"STUDY_STARTS_AT", "STUDY_EXPIRES_AT", "STUDY_SCHEDULED_AT"}
     assert "secrets." not in json.dumps(gate)
     assert "--check-window" in gate["run"]
     assert all("secrets." not in json.dumps(step) for step in steps[:gate_index])
     assert all(
         "steps.window.outputs.eligible == 'true'" in step["if"] for step in steps[gate_index + 1 :]
     )
+
+
+def test_external_observer_requires_a_claim_before_provider_credentials():
+    workflow = yaml.safe_load(Path(".github/workflows/observe-private-read-study.yml").read_text())
+    admission, observer = (workflow["jobs"][name] for name in ("admit-signed-slot", "observe"))
+    assert observer["needs"] == "admit-signed-slot"
+    assert "needs.admit-signed-slot.result == 'success'" in observer["if"]
+    assert "needs.admit-signed-slot.outputs.scheduled_at != ''" in observer["if"]
+    assert "ISSUE290_STUDY_DELIVERY_MODE == 'cloudflare'" in admission["if"]
+    assert "github.event_name == 'workflow_dispatch'" in admission["if"]
+    assert "portfolio-private-study290-inactive-schedule" in workflow["concurrency"]["group"]
+    probe_step = next(step for step in observer["steps"] if step.get("id") == "probe")
+    assert (
+        "needs.admit-signed-slot.outputs.policy_sha256" in probe_step["env"]["STUDY_POLICY_SHA256"]
+    )
+    assert (
+        "needs.admit-signed-slot.outputs.host_sha256"
+        in probe_step["env"]["STUDY_DEPLOYMENT_HOST_SHA256"]
+    )
+    claim_step = admission["steps"][-1]
+    assert "inputs.signature" not in json.dumps(admission)
+    assert {name for name, value in claim_step["env"].items() if "secrets." in value} == {
+        "STUDY_OBSERVATION_SIGNING_KEY",
+        "STUDY_CLAIM_R2_ACCOUNT_ID",
+        "STUDY_CLAIM_R2_ACCESS_KEY_ID",
+        "STUDY_CLAIM_R2_SECRET_ACCESS_KEY",
+    }
 
 
 def test_refused_probe_retains_a_zero_request_receipt(tmp_path, monkeypatch):
