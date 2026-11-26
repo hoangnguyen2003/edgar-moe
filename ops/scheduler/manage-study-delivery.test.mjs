@@ -144,6 +144,8 @@ test("tail receipts omit arbitrary exception text, raw logs and unrelated events
     event_observed: true, scheduled_time_matches: true, delivery_delay_ms: 500,
     outcome: "failed", error: "github_declined",
   });
+  event.exceptions[0].message = "GitHub declined external delivery (HTTP 403)";
+  assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "github_http_403");
   event.exceptions[0].message = "another private value";
   assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "other");
   assert.equal(summarizeScheduledEvent(JSON.stringify({ ...event, scriptName: "other" }), expected),

@@ -22,6 +22,7 @@ async function checkGitHub(token, send) {
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github+json",
+      "User-Agent": "edgar-moe-study-delivery-check",
       "X-GitHub-Api-Version": "2026-03-10",
       "Content-Type": "application/json",
     },

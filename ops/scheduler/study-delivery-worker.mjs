@@ -28,18 +28,19 @@ export async function deliver(controller, env, now = Date.now(), send = fetch) {
   const signature = Array.from(new Uint8Array(signed), (b) => b.toString(16).padStart(2, "0")).join("");
   const response = await send(WORKFLOW, {
     method: "POST",
-    redirect: "error",
+    redirect: "manual",
     signal: AbortSignal.timeout(10_000),
     headers: {
       Authorization: `Bearer ${env.STUDY_DELIVERY_GITHUB_TOKEN}`,
       Accept: "application/vnd.github+json",
+      "User-Agent": "edgar-moe-study-delivery",
       "X-GitHub-Api-Version": "2026-03-10",
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ref: "main", inputs: {scheduled_at: stamp, signature}}),
   });
   if (response.status !== 200 && response.status !== 204) {
-    throw new Error("GitHub declined external delivery");
+    throw new Error(`GitHub declined external delivery (HTTP ${response.status})`);
   }
   return "dispatched";
 }
