@@ -16,6 +16,7 @@ EDGAR-MoE tests whether the predictive value of filing text, XBRL fundamentals, 
 | --- | --- |
 | Explore the software | The [synthetic demo](https://edgar-moe.vercel.app), which uses generated example data and makes no investment-performance claim |
 | Understand the system design | [Solution architecture](docs/solution-architecture.md): context, views, security, operations, and a requirement-to-test traceability matrix |
+| Review backend engineering decisions | [Three case studies](docs/backend-case-studies.md) with operational evidence |
 | Review the decisions | The [ADR index](docs/adr/README.md): 34 decisions grouped by theme (one proposed) |
 | Review the historical record | See the [model card](docs/model-card.md) and [source-rights issue](https://github.com/hoangnguyen2003/edgar-moe/issues/280); archival metrics remain under review |
 | Verify the live site yourself | Run `uv run python scripts/smoke_deployment.py https://edgar-moe.vercel.app --expect-lock config/public_snapshot.lock.json` from a clone. It needs no credentials and checks that production serves the fingerprinted synthetic identity. |

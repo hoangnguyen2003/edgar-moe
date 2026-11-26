@@ -131,3 +131,18 @@ synthetic workload/setup writes, seven-day observation traffic and absolute expi
 Do not use the old tiny recovery fixture as representative scale. Managed backups
 and measured RPO/RTO remain separate requirements. Preserve all existing copies,
 production, source credentials and the public boundary. Keep #361 and #290 open.
+
+### Scheduled observation claim
+
+An authenticated scheduler integration can call
+`AdmissionLedger.admitStudyObservation(scheduledAtMs, nowMs)` after verifying
+the dispatch signature. The ledger derives a request key from the bound
+seven-day policy and the nominated UTC minute-17 timestamp. It accepts only
+an in-window timestamp and a start before the end of that hour. The existing
+transaction persists the claim before any work starts. A repeated claim stays
+refused after the first claimant confirms closure.
+
+The offline tests share one real SQLite file between two connections and
+exercise duplicate, early, invalid, and expired submissions. The method has
+no RPC route and remains an offline contract. A reviewed live integration
+must place its control state outside the SELECT-only measurement target.
