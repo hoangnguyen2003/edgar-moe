@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: Verify, diagnose, start, or stop the separate one-day delivery test
+        description: Verify, diagnose, check GitHub credentials, start, or stop the separate one-day delivery test
         required: true
         type: choice
         default: VERIFY
-        options: [VERIFY, DIAGNOSE, START, STOP]
+        options: [VERIFY, DIAGNOSE, CHECK_GITHUB, START, STOP]
 
 permissions:
   contents: read
 
 concurrency:
-  group: manage-issue290-external-delivery
+  group: ${{ inputs.stage == 'CHECK_GITHUB' && 'check-issue290-github-credential' || 'manage-issue290-external-delivery' }}
   cancel-in-progress: false
 
 jobs:
@@ -34,9 +34,9 @@ jobs:
       - name: Manage only the dedicated delivery Worker
         env:
           STUDY_DELIVERY_STAGE: ${{ inputs.stage }}
-          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
-          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ inputs.stage != 'CHECK_GITHUB' && secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN || '' }}
+          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ inputs.stage != 'CHECK_GITHUB' && secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID || '' }}
           STUDY_DELIVERY_STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
           STUDY_DELIVERY_SIGNING_KEY: ${{ inputs.stage == 'START' && secrets.STUDY_DELIVERY_SIGNING_KEY || '' }}
-          STUDY_DELIVERY_GITHUB_TOKEN: ${{ inputs.stage == 'START' && secrets.STUDY_DELIVERY_GITHUB_TOKEN || '' }}
+          STUDY_DELIVERY_GITHUB_TOKEN: ${{ (inputs.stage == 'START' || inputs.stage == 'CHECK_GITHUB') && secrets.STUDY_DELIVERY_GITHUB_TOKEN || '' }}
         run: node ops/scheduler/manage-study-delivery.mjs

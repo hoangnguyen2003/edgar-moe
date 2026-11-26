@@ -10,8 +10,40 @@ const CRON = "17 * * * *";
 const MINUTE = 60_000;
 const CREDENTIALS = ["STUDY_DELIVERY_GITHUB_TOKEN", "STUDY_DELIVERY_SIGNING_KEY"];
 
+async function checkGitHub(token, send) {
+  if (!/^[A-Za-z0-9_]{20,512}$/.test(token || "")) {
+    throw new Error("delivery_github_configuration_refused");
+  }
+  const url = "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/study-external-delivery.yml/dispatches";
+  const response = await send(url, {
+    method: "POST",
+    redirect: "error",
+    signal: AbortSignal.timeout(15_000),
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2026-03-10",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ ref: "main", inputs: {
+      check_credentials: true,
+      scheduled_at: "credential-check",
+      signature: "credential-check",
+    } }),
+  });
+  if (response.status !== 200) throw new Error(`delivery_github_http_${response.status}`);
+  const text = await response.text();
+  if (Buffer.byteLength(text) > 4096) throw new Error("delivery_github_response_refused");
+  const result = JSON.parse(text);
+  if (!Number.isSafeInteger(result?.workflow_run_id) || result.workflow_run_id <= 0) {
+    throw new Error("delivery_github_response_refused");
+  }
+  return { stage: "CHECK_GITHUB", workflow_run_id: result.workflow_run_id };
+}
+
 export async function manage({ stage, env, source, send = fetch, now = Date.now,
   observe = observeScheduledEvent, sleep = wait }) {
+  if (stage === "CHECK_GITHUB") return checkGitHub(env.STUDY_DELIVERY_GITHUB_TOKEN, send);
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
   if (!["VERIFY", "DIAGNOSE", "START", "STOP"].includes(stage) ||
