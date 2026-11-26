@@ -204,6 +204,68 @@ def test_only_flat_hash_verified_artifacts_are_accepted():
             final.archive_files(zip_bytes(files | alteration))
 
 
+@pytest.mark.parametrize("first_artifact", [True, False])
+def test_collector_uses_first_attempt_status_and_artifact(tmp_path, monkeypatch, first_artifact):
+    row = record(0)
+    initial = row["run"] | {
+        "conclusion": "failure",
+        "created_at": START.isoformat(),
+        "workflow_id": 42,
+    }
+    latest = initial | {"run_attempt": 2, "conclusion": "success"}
+    raw = json.dumps(row["receipt"]).encode()
+    archive = zip_bytes(
+        {
+            "observation.json": raw,
+            "SHA256SUMS": (
+                hashlib.sha256(raw).hexdigest() + "  reports/private-read-study/observation.json\n"
+            ).encode(),
+        }
+    )
+    artifacts = [{"name": "private-read-study-1000-2", "id": 11, "expired": False}]
+    if first_artifact:
+        artifacts.append({"name": "private-read-study-1000-1", "id": 12, "expired": False})
+
+    prefix = f"repos/{final.REPOSITORY}/actions"
+
+    def fetch(command, endpoint, *args):
+        assert command == "api"
+        if endpoint == "--method":
+            assert f"{prefix}/workflows/{final.WORKFLOW}/runs" in args
+            return json.dumps({"workflow_runs": [latest]}).encode()
+        if endpoint == f"{prefix}/runs/1000/attempts/1":
+            return json.dumps(initial).encode()
+        if endpoint == f"{prefix}/runs/1000/artifacts?per_page=100":
+            return json.dumps({"artifacts": artifacts}).encode()
+        if endpoint == f"{prefix}/artifacts/12/zip" and first_artifact:
+            return archive
+        pytest.fail(f"Unexpected request {endpoint}")
+
+    monkeypatch.setattr(final, "gh", fetch)
+    records, missing = final.collect(environment(), tmp_path)
+    if first_artifact:
+        assert not missing
+        assert records[0]["run"]["conclusion"] == "failure"
+        assert records[0]["run"]["run_attempt"] == 1
+        assert (tmp_path / "1000" / "observation.json").read_bytes() == raw
+    else:
+        assert not records and not list(tmp_path.iterdir())
+        assert missing == [
+            {"run_id": 1000, "conclusion": "failure", "reason": "retained_artifact_missing"}
+        ]
+
+
+def test_original_attempt_must_match_the_listed_run_identity():
+    listed = record(0)["run"] | {
+        "run_attempt": 2,
+        "created_at": START.isoformat(),
+        "workflow_id": 42,
+    }
+    foreign = listed | {"run_attempt": 1, "head_sha": "d" * 40}
+    with pytest.raises(final.Refusal, match="first_attempt_provenance_refused"):
+        final.first_attempt(listed, lambda *_: json.dumps(foreign).encode())
+
+
 def test_before_expiry_finalizer_performs_no_actions_query_or_download(tmp_path, monkeypatch):
     class FrozenDatetime(datetime):
         @classmethod

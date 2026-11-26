@@ -18,6 +18,7 @@ def run(run_id, slot=0, *, attempt=1, conclusion="success"):
         "head_branch": "main",
         "head_repository": {"full_name": report.REPOSITORY},
         "head_sha": "a" * 40,
+        "workflow_id": 789,
         "run_attempt": attempt,
         "status": "completed",
         "conclusion": conclusion,
@@ -62,8 +63,12 @@ def test_report_reconciles_slots_without_guessing_failed_run_identity(monkeypatc
         run(3, 1, conclusion="failure"),
         run(4, 1, attempt=2),
         run(5, 2),
-        run(6, 2),
+        run(6, 2, attempt=3, conclusion="failure"),
     ]
+    originals = {
+        f"{root}/4/attempts/1": run(4, 1, conclusion="failure"),
+        f"{root}/6/attempts/1": run(6, 2),
+    }
     responses = {
         f"{root}/1/attempts/1/jobs?per_page=10": [probe(items[0])],
         f"{root}/2/attempts/1/jobs?per_page=10": [probe(items[1])],
@@ -79,6 +84,8 @@ def test_report_reconciles_slots_without_guessing_failed_run_identity(monkeypatc
             assert "event=workflow_dispatch" in args and "branch=main" in args
             return json.dumps({"total_count": len(items), "workflow_runs": items}).encode()
         endpoint = args[1]
+        if endpoint in originals:
+            return json.dumps(originals[endpoint]).encode()
         if endpoint in responses:
             jobs = responses[endpoint]
             return json.dumps({"total_count": len(jobs), "jobs": jobs}).encode()
@@ -100,9 +107,13 @@ def test_report_reconciles_slots_without_guessing_failed_run_identity(monkeypatc
     assert result["slots"][2]["receipts"][0]["scheduled_to_github_seconds"] == 2
     assert result["slots"][2]["receipts"][0]["job_to_receipt_seconds"] == 3
     assert "must never be retained" not in json.dumps(result)
+    assert result["reruns_excluded"] == [
+        {"run_id": 4, "latest_attempt": 2},
+        {"run_id": 6, "latest_attempt": 3},
+    ]
     assert result["unverified_runs"] == [
         {"run_id": 3, "reason": "run_without_success"},
-        {"run_id": 4, "reason": "rerun_excluded"},
+        {"run_id": 4, "reason": "run_without_success"},
     ]
 
 

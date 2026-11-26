@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from time import sleep
 from typing import Any
 
-from scripts.finalize_private_read_study import REPOSITORY, Refusal, gh
+from scripts.finalize_private_read_study import REPOSITORY, Refusal, first_attempt, gh
 from scripts.observe_external_study_delivery import FORMAT
 
 WORKFLOW = "study-external-delivery.yml"
@@ -105,6 +105,7 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
         raise Refusal("run_inventory_refused")
     receipts: list[list[dict[str, Any]]] = [[] for _ in range(24)]
     unverified = []
+    reruns = []
     setup_checks = 0
     for run in runs:
         run_id = run["id"]
@@ -118,9 +119,10 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
             raise Refusal("run_provenance_refused")
         if not start <= utc(run["created_at"]) < min(end, now):
             continue
-        if run["run_attempt"] != 1:
-            unverified.append({"run_id": run_id, "reason": "rerun_excluded"})
-            continue
+        original = first_attempt(run, gh)
+        if run["run_attempt"] > 1:
+            reruns.append({"run_id": run_id, "latest_attempt": run["run_attempt"]})
+        run = original
         if run["status"] != "completed" or run["conclusion"] != "success":
             unverified.append({"run_id": run_id, "reason": "run_without_success"})
             continue
@@ -191,6 +193,7 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
         "slots": slots,
         "counts": counts,
         "setup_checks_excluded": setup_checks,
+        "reruns_excluded": sorted(reruns, key=lambda item: item["run_id"]),
         "unverified_runs": sorted(unverified, key=lambda item: item["run_id"]),
         **COUNTERS,
     }
