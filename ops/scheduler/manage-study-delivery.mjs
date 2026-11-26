@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import { setTimeout as wait } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
+import { observeScheduledEvent } from "./study-delivery-tail.mjs";
 
 const WORKER = "edgar-moe-study-delivery";
 const MODULE = "study-delivery-worker.mjs";
@@ -8,10 +10,11 @@ const CRON = "17 * * * *";
 const MINUTE = 60_000;
 const CREDENTIALS = ["STUDY_DELIVERY_GITHUB_TOKEN", "STUDY_DELIVERY_SIGNING_KEY"];
 
-export async function manage({ stage, env, source, send = fetch, now = Date.now }) {
+export async function manage({ stage, env, source, send = fetch, now = Date.now,
+  observe = observeScheduledEvent, sleep = wait }) {
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
-  if (!["VERIFY", "START", "STOP"].includes(stage) ||
+  if (!["VERIFY", "DIAGNOSE", "START", "STOP"].includes(stage) ||
       !/^[a-f0-9]{32}$/.test(account || "") || !/^[A-Za-z0-9_-]{20,512}$/.test(token || "")) {
     throw new Error("delivery_configuration_refused");
   }
@@ -57,10 +60,36 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now 
   }
   await privateUrls();
   if (stage === "VERIFY") return { stage, cron_active: wasActive, worker: WORKER };
-  if (wasActive) throw new Error("delivery_worker_already_active");
-
   const stamp = env.STUDY_DELIVERY_STARTS_AT;
   const start = Date.parse(stamp);
+  if (stage === "DIAGNOSE") {
+    const hour = 60 * MINUTE;
+    if (!wasActive || !Number.isFinite(start) || start % hour !== 0 ||
+        new Date(start).toISOString() !== stamp) {
+      throw new Error("delivery_diagnostic_inactive");
+    }
+    const current = now();
+    const scheduled = Math.max(start, Math.ceil((current + 15_000 - 17 * MINUTE) / hour) * hour) + 17 * MINUTE;
+    const ends = scheduled + 6 * MINUTE;
+    if (scheduled >= start + 24 * hour || scheduled - current > hour + 15_000) {
+      throw new Error("delivery_diagnostic_outside_window");
+    }
+    await sleep(Math.max(0, scheduled - current - 90_000));
+    const tail = await request("/tails", "POST", JSON.stringify({ filters: [] }), true);
+    if (!/^[a-f0-9]{32}$/.test(tail?.id || "")) {
+      throw new Error("delivery_tail_identity_refused");
+    }
+    try {
+      if (Date.parse(tail.expires_at) < ends || !Number.isFinite(Date.parse(tail.expires_at))) {
+        throw new Error("delivery_tail_expiry_refused");
+      }
+      const event = await observe({ url: tail.url, scheduled, ends, cron: CRON, worker: WORKER });
+      return { stage, worker: WORKER, scheduled_at: new Date(scheduled).toISOString(), ...event };
+    } finally {
+      await request(`/tails/${tail.id}`, "DELETE");
+    }
+  }
+  if (wasActive) throw new Error("delivery_worker_already_active");
   if (!Number.isFinite(start) || start % (60 * MINUTE) !== 0 ||
       new Date(start).toISOString() !== stamp || start - now() < 20 * MINUTE ||
       start - now() > 48 * 60 * MINUTE ||
