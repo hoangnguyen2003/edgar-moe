@@ -1,18 +1,25 @@
 const CRON = "17 * * * *";
 const WORKFLOW = "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/study-external-delivery.yml/dispatches";
 const HOUR = 3_600_000;
+const SLOT_OFFSET = 17 * 60_000;
+const MAX_DELAY = 5 * 60_000;
 const DOMAIN = "edgar-moe/study-external-delivery/v1";
 
 export async function deliver(controller, env, now = Date.now(), send = fetch) {
   const start = Date.parse(env.STUDY_DELIVERY_STARTS_AT);
-  const scheduled = controller.scheduledTime;
+  const reported = controller.scheduledTime;
   if (!Number.isFinite(start) || start % HOUR !== 0 ||
       new Date(start).toISOString() !== env.STUDY_DELIVERY_STARTS_AT) {
     throw new Error("External delivery window refused");
   }
-  if (controller.cron !== CRON || !Number.isSafeInteger(scheduled) ||
-      scheduled < start || scheduled >= start + 24 * HOUR ||
-      scheduled % HOUR !== 17 * 60_000 || now < scheduled || now - scheduled >= 5 * 60_000) {
+  if (controller.cron !== CRON || !Number.isFinite(reported) ||
+      !Number.isSafeInteger(now) || reported < start || now < Math.floor(reported)) {
+    return "skipped";
+  }
+  // Cloudflare may deliver a timestamp with seconds inside the scheduled hour.
+  // Sign the canonical slot so scheduler delay never changes its identity.
+  const scheduled = Math.floor((reported - SLOT_OFFSET) / HOUR) * HOUR + SLOT_OFFSET;
+  if (scheduled < start || scheduled >= start + 24 * HOUR || now - scheduled >= MAX_DELAY) {
     return "skipped";
   }
   if (!/^[a-f0-9]{64}$/.test(env.STUDY_DELIVERY_SIGNING_KEY || "") ||
@@ -48,7 +55,8 @@ export async function deliver(controller, env, now = Date.now(), send = fetch) {
 export default {
   async scheduled(controller, env) {
     controller.noRetry();
-    await deliver(controller, env);
+    const status = await deliver(controller, env);
+    console.log(`study_delivery_${status}`);
   },
   async fetch() {
     return new Response("Not found", {status: 404});

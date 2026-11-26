@@ -141,13 +141,20 @@ test("tail receipts omit arbitrary exception text, raw logs and unrelated events
     logs: [{ message: ["private log"] }],
   };
   assert.deepEqual(summarizeScheduledEvent(JSON.stringify(event), expected), {
-    event_observed: true, scheduled_time_matches: true, delivery_delay_ms: 500,
+    event_observed: true, scheduled_time_matches: true, reported_offset_ms: 0,
+    dispatch_status: null, delivery_delay_ms: 500,
     outcome: "failed", error: "github_declined",
   });
   for (const scriptName of [undefined, null]) {
     const workerScopedFrame = new TextEncoder().encode(JSON.stringify({ ...event, scriptName })).buffer;
     assert.equal(summarizeScheduledEvent(workerScopedFrame, expected).error, "github_declined");
   }
+  const shifted = summarizeScheduledEvent(JSON.stringify({
+    ...event, event: { ...event.event, scheduledTime: scheduled + 52_855.25 },
+    logs: [{ message: ["study_delivery_dispatched"] }],
+  }), expected);
+  assert.equal(shifted.reported_offset_ms, 52_855);
+  assert.equal(shifted.dispatch_status, "dispatched");
   event.exceptions[0].message = "GitHub declined external delivery (HTTP 403)";
   assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "github_http_403");
   event.exceptions[0].message = "another private value";
