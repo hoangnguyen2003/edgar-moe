@@ -30,11 +30,32 @@ test("signs and sends a single fixed dispatch", async () => {
   assert.deepEqual(JSON.parse(options.body), { ref: "main", inputs: { scheduled_at: stamp, signature } });
 });
 
+test("a delayed provider timestamp signs the original minute-17 slot", async () => {
+  for (const delay of [52_855, 52_855.25, 299_999]) {
+    const reported = event.scheduledTime + delay;
+    let requests = 0;
+    const status = await deliver({ ...event, scheduledTime: reported }, env, Math.floor(reported),
+      async (_url, { body }) => {
+        requests += 1;
+        const { inputs } = JSON.parse(body);
+        const signature = createHmac("sha256", env.STUDY_DELIVERY_SIGNING_KEY)
+          .update(`edgar-moe/study-external-delivery/v1\n${start}\n${stamp}`).digest("hex");
+        assert.deepEqual(inputs, { scheduled_at: stamp, signature });
+        return { status: 200 };
+      });
+    assert.equal(status, "dispatched");
+    assert.equal(requests, 1);
+  }
+});
+
 test("refuses stale, future, foreign and expired triggers without a network call", async () => {
   const fail = () => assert.fail("unexpected request");
   for (const [candidate, now] of [
     [event, event.scheduledTime - 1],
     [event, event.scheduledTime + 300_000],
+    [{ ...event, scheduledTime: event.scheduledTime - 1 }, event.scheduledTime],
+    [{ ...event, scheduledTime: event.scheduledTime + 52_855 }, event.scheduledTime + 300_000],
+    [{ ...event, scheduledTime: event.scheduledTime / 1000 }, event.scheduledTime],
     [{ ...event, cron: "* * * * *" }, event.scheduledTime],
     [{ ...event, scheduledTime: event.scheduledTime + 86_400_000 }, event.scheduledTime + 86_400_000],
   ]) {

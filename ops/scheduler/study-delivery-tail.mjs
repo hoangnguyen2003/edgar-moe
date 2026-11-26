@@ -27,9 +27,16 @@ export function summarizeScheduledEvent(data, { scheduled, ends, cron, worker })
   const githubStatus = typeof exception?.message === "string"
     ? /^GitHub declined external delivery \(HTTP ([1-5][0-9]{2})\)$/.exec(exception.message)
     : null;
+  const reported = message.event.scheduledTime;
+  const offset = Number.isFinite(reported) ? Math.floor(reported - scheduled) : null;
+  const logs = Array.isArray(message.logs) ? message.logs : [];
+  const dispatch = logs.find((entry) => Array.isArray(entry?.message) &&
+    ["study_delivery_dispatched", "study_delivery_skipped"].includes(entry.message[0]));
   return {
     event_observed: true,
-    scheduled_time_matches: message.event.scheduledTime === scheduled,
+    scheduled_time_matches: reported === scheduled,
+    reported_offset_ms: offset !== null && Math.abs(offset) < 3_600_000 ? offset : null,
+    dispatch_status: dispatch ? dispatch.message[0].slice("study_delivery_".length) : null,
     delivery_delay_ms: message.eventTimestamp - scheduled,
     outcome: message.outcome === "ok" ? "ok" : "failed",
     error: githubStatus ? `github_http_${githubStatus[1]}` :

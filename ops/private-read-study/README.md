@@ -432,3 +432,10 @@ token and reports whether it exposes a scheduled handler and the expected
 bindings. It prints booleans only for the bindings and makes no deployment
 or scheduling changes. A successful metadata check establishes deployment
 configuration. Delivery still requires a real scheduled receipt.
+
+Cloudflare may report a trigger timestamp later than the nominal Cron
+minute. The Worker accepts in-window timestamps within five minutes of
+the slot and signs the canonical minute-17 time. A late trigger beyond
+that bound, or one received before its reported time, still makes zero
+dispatch requests. Tail diagnostics record the bounded time offset and
+the dispatch outcome when available.
