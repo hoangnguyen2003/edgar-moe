@@ -17,7 +17,7 @@ export function summarizeScheduledEvent(data, { scheduled, ends, cron, worker })
   } catch {
     return undefined;
   }
-  if (!message || (message.scriptName !== undefined && message.scriptName !== worker) ||
+  if (!message || (message.scriptName != null && message.scriptName !== worker) ||
       message.event?.cron !== cron ||
       !Number.isSafeInteger(message.eventTimestamp) ||
       message.eventTimestamp < scheduled || message.eventTimestamp >= ends) {
