@@ -1,3 +1,4 @@
+const MAX_FRAME_BYTES = 65_536;
 const knownErrors = new Map([
   ["External delivery window refused", "window_refused"],
   ["External delivery credentials refused", "credentials_refused"],
@@ -7,14 +8,17 @@ const knownErrors = new Map([
 
 // The tail can contain logs and stack traces. Return only a fixed receipt.
 export function summarizeScheduledEvent(data, { scheduled, ends, cron, worker }) {
-  if (typeof data !== "string" || Buffer.byteLength(data) > 65_536) return undefined;
+  const text = data instanceof ArrayBuffer && data.byteLength <= MAX_FRAME_BYTES
+    ? Buffer.from(data).toString("utf8") : data;
+  if (typeof text !== "string" || Buffer.byteLength(text) > MAX_FRAME_BYTES) return undefined;
   let message;
   try {
-    message = JSON.parse(data);
+    message = JSON.parse(text);
   } catch {
     return undefined;
   }
-  if (message?.scriptName !== worker || message.event?.cron !== cron ||
+  if (!message || (message.scriptName != null && message.scriptName !== worker) ||
+      message.event?.cron !== cron ||
       !Number.isSafeInteger(message.eventTimestamp) ||
       message.eventTimestamp < scheduled || message.eventTimestamp >= ends) {
     return undefined;
@@ -39,21 +43,24 @@ export async function observeScheduledEvent({ url, scheduled, ends, cron, worker
     throw new Error("delivery_tail_url_refused");
   }
   const socket = new WebSocket(url, "trace-v1");
+  socket.binaryType = "arraybuffer";
   let open = false;
+  let framesSeen = 0;
   let timer;
   let connectTimer;
   try {
     return await new Promise((resolve, reject) => {
       connectTimer = setTimeout(() => reject(new Error("delivery_tail_connect_timeout")), 15_000);
-      timer = setTimeout(() => resolve({ event_observed: false }), Math.max(0, ends - Date.now()));
+      timer = setTimeout(() => resolve({ event_observed: false, frames_seen: framesSeen }), Math.max(0, ends - Date.now()));
       socket.addEventListener("open", () => {
         clearTimeout(connectTimer);
         open = true;
         socket.send(JSON.stringify({ debug: false }));
       }, { once: true });
       socket.addEventListener("message", ({ data }) => {
+        framesSeen += 1;
         const event = summarizeScheduledEvent(data, { scheduled, ends, cron, worker });
-        if (event) resolve(event);
+        if (event) resolve({ ...event, frames_seen: framesSeen });
       });
       socket.addEventListener("error", () => reject(new Error("delivery_tail_connection_failed")),
         { once: true });

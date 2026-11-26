@@ -47,7 +47,7 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
   if (stage === "CHECK_GITHUB") return checkGitHub(env.STUDY_DELIVERY_GITHUB_TOKEN, send);
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
-  if (!["VERIFY", "DIAGNOSE", "START", "STOP"].includes(stage) ||
+  if (!["VERIFY", "VERIFY_ACTIVE", "DIAGNOSE", "START", "STOP"].includes(stage) ||
       !/^[a-f0-9]{32}$/.test(account || "") || !/^[A-Za-z0-9_-]{20,512}$/.test(token || "")) {
     throw new Error("delivery_configuration_refused");
   }
@@ -95,6 +95,29 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
   if (stage === "VERIFY") return { stage, cron_active: wasActive, worker: WORKER };
   const stamp = env.STUDY_DELIVERY_STARTS_AT;
   const start = Date.parse(stamp);
+  if (stage === "VERIFY_ACTIVE") {
+    if (!wasActive || !Number.isFinite(start) || new Date(start).toISOString() !== stamp) {
+      throw new Error("delivery_active_configuration_refused");
+    }
+    const { deployments } = await request("/deployments?per_page=1");
+    const [active, ...other] = deployments?.[0]?.versions ?? [];
+    if (active?.percentage !== 100 || other.length ||
+        !/^[a-f0-9-]{36}$/.test(active.version_id ?? "")) {
+      throw new Error("delivery_active_deployment_refused");
+    }
+    const { resources } = await request(`/versions/${active.version_id}`);
+    const handlers = resources?.script?.handlers;
+    const bindings = resources?.bindings;
+    return {
+      stage, worker: WORKER, cron_active: true,
+      scheduled_handler_present: Array.isArray(handlers) && handlers.includes("scheduled"),
+      start_matches: Array.isArray(bindings) && bindings.some((binding) =>
+        binding?.name === "STUDY_DELIVERY_STARTS_AT" && binding.type === "plain_text" &&
+        binding.text === stamp),
+      expected_secret_bindings_present: Array.isArray(bindings) && CREDENTIALS.every((name) =>
+        bindings.some((binding) => binding?.name === name && binding.type === "secret_text")),
+    };
+  }
   if (stage === "DIAGNOSE") {
     const hour = 60 * MINUTE;
     if (!wasActive || !Number.isFinite(start) || start % hour !== 0 ||
@@ -163,15 +186,27 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
     source_sha256: createHash("sha256").update(source).digest("hex") };
 }
 
+// A peer can leave Node's native WebSocket close handshake pending. This CLI
+// has already awaited the Cloudflare DELETE before finishing a diagnostic.
+export function writeDiagnosticResult(output, line, exitCode, exit = process.exit) {
+  output.write(`${line}\n`, () => exit(exitCode));
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const stage = process.env.STUDY_DELIVERY_STAGE;
   try {
-    const report = await manage({ stage: process.env.STUDY_DELIVERY_STAGE, env: process.env,
+    const report = await manage({ stage, env: process.env,
       source: readFileSync(new URL(MODULE, import.meta.url), "utf8") });
-    console.log(JSON.stringify(report));
+    const line = JSON.stringify(report);
+    if (stage === "DIAGNOSE") writeDiagnosticResult(process.stdout, line, 0);
+    else console.log(line);
   } catch (error) {
     const message = error instanceof Error && /^delivery_[a-z0-9_]+$/.test(error.message)
       ? error.message : "delivery_management_failed";
-    console.error(message);
-    process.exitCode = 1;
+    if (stage === "DIAGNOSE") writeDiagnosticResult(process.stderr, message, 1);
+    else {
+      console.error(message);
+      process.exitCode = 1;
+    }
   }
 }

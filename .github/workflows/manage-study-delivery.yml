@@ -8,7 +8,7 @@ on:
         required: true
         type: choice
         default: VERIFY
-        options: [VERIFY, DIAGNOSE, CHECK_GITHUB, START, STOP]
+        options: [VERIFY, VERIFY_ACTIVE, DIAGNOSE, CHECK_GITHUB, START, STOP]
 
 permissions:
   contents: read

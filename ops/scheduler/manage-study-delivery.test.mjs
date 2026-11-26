@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { manage } from "./manage-study-delivery.mjs";
+import { manage, writeDiagnosticResult } from "./manage-study-delivery.mjs";
 import { summarizeScheduledEvent } from "./study-delivery-tail.mjs";
 
 const account = "a".repeat(32);
@@ -144,6 +144,10 @@ test("tail receipts omit arbitrary exception text, raw logs and unrelated events
     event_observed: true, scheduled_time_matches: true, delivery_delay_ms: 500,
     outcome: "failed", error: "github_declined",
   });
+  for (const scriptName of [undefined, null]) {
+    const workerScopedFrame = new TextEncoder().encode(JSON.stringify({ ...event, scriptName })).buffer;
+    assert.equal(summarizeScheduledEvent(workerScopedFrame, expected).error, "github_declined");
+  }
   event.exceptions[0].message = "GitHub declined external delivery (HTTP 403)";
   assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "github_http_403");
   event.exceptions[0].message = "another private value";
@@ -177,4 +181,47 @@ test("check GitHub dispatches only a credential check with the supplied token", 
     env: githubOnly,
     send: async () => new Response("never logged", { status: 403 }),
   }), /delivery_github_http_403/);
+});
+
+test("checks active version metadata with the Worker-scoped token and no writes", async () => {
+  const { send: fixed, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
+  const versionId = "023e105f-2a42-4f8b-a1c1-73f6a2a30c0f";
+  const result = await manage({
+    stage: "VERIFY_ACTIVE", env,
+    send: async (url, options) => {
+      assert.equal(options.method, "GET");
+      if (url === BASE + "/deployments?per_page=1") {
+        return response({ deployments: [{ versions: [{ version_id: versionId, percentage: 100 }] }] });
+      }
+      if (url === BASE + `/versions/${versionId}`) {
+        return response({ resources: {
+          script: { handlers: ["fetch", "scheduled"] },
+          bindings: [
+            { name: "STUDY_DELIVERY_STARTS_AT", type: "plain_text", text: env.STUDY_DELIVERY_STARTS_AT },
+            { name: "STUDY_DELIVERY_GITHUB_TOKEN", type: "secret_text", text: "sensitive" },
+            { name: "STUDY_DELIVERY_SIGNING_KEY", type: "secret_text" },
+          ],
+        } });
+      }
+      return fixed(url, options);
+    },
+  });
+  assert.deepEqual(result, {
+    stage: "VERIFY_ACTIVE", cron_active: true, worker: "edgar-moe-study-delivery",
+    scheduled_handler_present: true, start_matches: true, expected_secret_bindings_present: true,
+  });
+  assert.deepEqual(writes, []);
+});
+
+test("diagnostic CLI exits only after the final report has been flushed", () => {
+  let drained;
+  const exits = [];
+  const output = { write(line, callback) {
+    assert.equal(line, "diagnostic output\n");
+    drained = callback;
+  } };
+  writeDiagnosticResult(output, "diagnostic output", 0, (code) => exits.push(code));
+  assert.deepEqual(exits, []);
+  drained();
+  assert.deepEqual(exits, [0]);
 });

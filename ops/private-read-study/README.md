@@ -426,3 +426,9 @@ The offline [admission ledger](../private-read-admission/README.md) includes an
 atomic slot-claim contract for a future seven-day observer. Live use requires
 the previously planned protected target, a fresh window, and a trusted
 integration that verifies the signed dispatch before acquiring the claim.
+
+`VERIFY_ACTIVE` reads the active Worker version with the existing scoped
+token and reports whether it exposes a scheduled handler and the expected
+bindings. It prints booleans only for the bindings and makes no deployment
+or scheduling changes. A successful metadata check establishes deployment
+configuration. Delivery still requires a real scheduled receipt.
