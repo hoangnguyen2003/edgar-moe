@@ -1,0 +1,75 @@
+name: Finalize independent hosted study delivery
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "29 * * * *"
+
+permissions: {}
+
+concurrency:
+  group: manage-issue290-external-delivery
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    if: ${{ github.repository == 'hoangnguyen2003/edgar-moe' && github.ref == 'refs/heads/main' && !github.event.repository.private && vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      starts_at: ${{ steps.window.outputs.starts_at }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Check the delivery window before reading receipts
+        id: window
+        env:
+          STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+        run: python3 -m scripts.report_study_delivery --starts-at "$STARTS_AT" --check-closeout >> "$GITHUB_OUTPUT"
+      - name: Record the redacted result including missing or duplicate slots
+        if: ${{ steps.window.outputs.starts_at != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STARTS_AT: ${{ steps.window.outputs.starts_at }}
+        run: python3 -m scripts.report_study_delivery --starts-at "$STARTS_AT"
+
+  stop-cron:
+    needs: reconcile
+    if: ${{ needs.reconcile.result == 'success' && needs.reconcile.outputs.starts_at != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: hosted-study-delivery
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Remove and verify the expired trial Cron
+        env:
+          STUDY_DELIVERY_STAGE: STOP_EXPIRED
+          STUDY_DELIVERY_STARTS_AT: ${{ needs.reconcile.outputs.starts_at }}
+          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
+        run: node ops/scheduler/manage-study-delivery.mjs
+
+  disable-finalizer:
+    needs: stop-cron
+    if: ${{ needs.stop-cron.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions:
+      actions: write
+    steps:
+      - name: Disable only this delivery finalizer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow disable finalize-study-delivery.yml --repo "$GITHUB_REPOSITORY"

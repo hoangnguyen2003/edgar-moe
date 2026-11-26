@@ -1,7 +1,10 @@
 import json
+import sys
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
+import yaml
 
 from scripts import report_study_delivery as report
 
@@ -132,3 +135,43 @@ def test_truncated_actions_inventory_fails_instead_of_reporting_missing(monkeypa
     monkeypatch.setattr(report, "gh", lambda *_args: b'{"total_count":1,"workflow_runs":[]}')
     with pytest.raises(report.Refusal, match="run_inventory"):
         report.collect(START, START + timedelta(minutes=20))
+
+
+@pytest.mark.parametrize("minutes", [0, 9, 10, 30])
+def test_closeout_gate_has_no_api_access_and_waits_for_grace(monkeypatch, capsys, minutes):
+    class Clock(datetime):
+        @classmethod
+        def now(cls, tz):
+            return START + timedelta(days=1, minutes=minutes)
+
+    monkeypatch.setattr(report, "datetime", Clock)
+    monkeypatch.setattr(report, "gh", lambda *_args: pytest.fail("unexpected API access"))
+    monkeypatch.setattr(
+        sys, "argv", ["report", "--starts-at", START.strftime(report.FORMAT), "--check-closeout"]
+    )
+    assert report.main() == 0
+    assert capsys.readouterr().out == (
+        f"starts_at={START.strftime(report.FORMAT)}\n" if minutes >= 10 else ""
+    )
+
+
+def test_closeout_workflow_keeps_reporting_and_shutdown_credentials_separate():
+    workflow = yaml.safe_load(Path(".github/workflows/finalize-study-delivery.yml").read_text())
+    manager = yaml.safe_load(Path(".github/workflows/manage-study-delivery.yml").read_text())
+    reconcile, stop, disable = (
+        workflow["jobs"][job] for job in ("reconcile", "stop-cron", "disable-finalizer")
+    )
+    assert workflow["concurrency"]["group"] in manager["concurrency"]["group"]
+    assert reconcile["permissions"] == {"actions": "read", "contents": "read"}
+    assert "secrets." not in json.dumps(reconcile)
+    assert "needs.reconcile.outputs.starts_at != ''" in stop["if"]
+    stop_env = stop["steps"][-1]["env"]
+    assert stop_env["STUDY_DELIVERY_STAGE"] == "STOP_EXPIRED"
+    assert stop_env["STUDY_DELIVERY_STARTS_AT"] == "${{ needs.reconcile.outputs.starts_at }}"
+    assert {key for key, val in stop_env.items() if "secrets." in val} == {
+        "STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID",
+        "STUDY_DELIVERY_CLOUDFLARE_TOKEN",
+    }
+    assert disable["permissions"] == {"actions": "write"}
+    assert disable["needs"] == "stop-cron"
+    assert "gh workflow disable finalize-study-delivery.yml" in disable["steps"][0]["run"]

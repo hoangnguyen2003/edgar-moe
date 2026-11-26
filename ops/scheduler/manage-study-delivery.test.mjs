@@ -77,6 +77,40 @@ test("verify is read-only and stop only removes the known cron", async () => {
   assert.equal(writes.length, 1);
 });
 
+test("automatic shutdown requires an expired window bound to the active Worker", async () => {
+  const { send: fixed, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
+  const version = "023e105f-2a42-4f8b-a1c1-73f6a2a30c0f";
+  const cutoff = Date.parse("2026-11-27T05:10:00Z");
+  const cloudflareOnly = Object.fromEntries(Object.entries(env).filter(([key]) =>
+    !key.includes("GITHUB_TOKEN") && !key.includes("SIGNING_KEY")));
+  const parameters = { stage: "STOP_EXPIRED", env: cloudflareOnly };
+  await assert.rejects(manage({ ...parameters, now: () => cutoff - 1,
+    send: async () => assert.fail("unexpected API call") }), /stop_window_refused/);
+
+  let activeStart = "2026-11-27T06:00:00.000Z";
+  const send = async (url, options) => {
+    if (url === BASE + "/deployments?per_page=1") {
+      return response({ deployments: [{ versions: [{ version_id: version, percentage: 100 }] }] });
+    }
+    if (url === BASE + `/versions/${version}`) {
+      return response({ resources: { bindings: [
+        { name: "STUDY_DELIVERY_STARTS_AT", type: "plain_text", text: activeStart },
+      ] } });
+    }
+    return fixed(url, options);
+  };
+  const expired = { ...parameters, now: () => cutoff, send };
+  await assert.rejects(manage(expired), /stop_active_window_mismatch/);
+  assert.deepEqual(writes, []);
+
+  activeStart = env.STUDY_DELIVERY_STARTS_AT;
+  assert.deepEqual(await manage(expired), {
+    stage: "STOP_EXPIRED", cron_active: false, worker: "edgar-moe-study-delivery",
+  });
+  await manage(expired);
+  assert.deepEqual(writes, [{ path: "/schedules", body: "[]" }]);
+});
+
 test("diagnose observes one existing event and deletes its temporary tail", async () => {
   const { send: manageRequest, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
   const tailId = "c".repeat(32);

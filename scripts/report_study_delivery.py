@@ -16,6 +16,7 @@ WORKFLOW = "study-external-delivery.yml"
 SCOPE = "issue290_external_scheduler_delivery"
 HOUR = timedelta(hours=1)
 OFFSET = timedelta(minutes=17)
+CLOSEOUT_GRACE = timedelta(minutes=10)
 RUNS = f"repos/{REPOSITORY}/actions/runs"
 LINE = re.compile(r"^\ufeff?\d{4}-\S+Z study290_external_delivery (\{[^\r\n]+\})$", re.MULTILINE)
 COUNTERS = {"application_requests": 0, "provider_requests": 0, "measurement_pairs": 0}
@@ -197,9 +198,15 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--starts-at", required=True, type=trial_start)
+    parser.add_argument("--check-closeout", action="store_true")
     args = parser.parse_args()
+    now = datetime.now(UTC)
+    if args.check_closeout:
+        if now >= args.starts_at + 24 * HOUR + CLOSEOUT_GRACE:
+            print(f"starts_at={args.starts_at.strftime(FORMAT)}")
+        return 0
     try:
-        report = collect(args.starts_at, datetime.now(UTC))
+        report = collect(args.starts_at, now)
     except (OSError, subprocess.TimeoutExpired, KeyError, TypeError, ValueError):
         print(json.dumps({"status": "delivery_report_refused", **COUNTERS}))
         return 1
