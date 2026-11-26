@@ -7,6 +7,7 @@ import json
 import re
 import subprocess
 from datetime import UTC, datetime, timedelta
+from time import sleep
 from typing import Any
 
 from scripts.finalize_private_read_study import REPOSITORY, Refusal, gh
@@ -198,11 +199,22 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--starts-at", required=True, type=trial_start)
-    parser.add_argument("--check-closeout", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check-closeout", action="store_true")
+    mode.add_argument("--wait-for-closeout-after-receipt", type=utc, metavar="CREATED_AT")
     args = parser.parse_args()
     now = datetime.now(UTC)
+    end = args.starts_at + 24 * HOUR
     if args.check_closeout:
-        if now >= args.starts_at + 24 * HOUR + CLOSEOUT_GRACE:
+        if now >= end + CLOSEOUT_GRACE:
+            print(f"starts_at={args.starts_at.strftime(FORMAT)}")
+        return 0
+    if args.wait_for_closeout_after_receipt is not None:
+        created = args.wait_for_closeout_after_receipt
+        if end - HOUR + OFFSET <= created < end and created <= now:
+            remaining = (end + CLOSEOUT_GRACE - now).total_seconds()
+            if remaining > 0:
+                sleep(remaining)
             print(f"starts_at={args.starts_at.strftime(FORMAT)}")
         return 0
     try:

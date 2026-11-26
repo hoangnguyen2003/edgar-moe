@@ -1,0 +1,67 @@
+name: Queue study delivery closeout after the final slot
+
+on:
+  workflow_run:
+    workflows: ["Hosted study external delivery preflight"]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  wait-for-expiry:
+    if: >-
+      github.repository == 'hoangnguyen2003/edgar-moe' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.repository.private == false &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      github.event.workflow_run.path == '.github/workflows/study-external-delivery.yml' &&
+      github.event.workflow_run.event == 'workflow_dispatch' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.run_attempt == 1 &&
+      vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+    outputs:
+      starts_at: ${{ steps.window.outputs.starts_at }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Wait for the trial to end only after its final delivery slot
+        id: window
+        env:
+          STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+          RECEIPT_CREATED_AT: ${{ github.event.workflow_run.created_at }}
+        run: >-
+          python3 -m scripts.report_study_delivery --starts-at "$STARTS_AT"
+          --wait-for-closeout-after-receipt "$RECEIPT_CREATED_AT" >> "$GITHUB_OUTPUT"
+
+  dispatch:
+    needs: wait-for-expiry
+    if: ${{ needs.wait-for-expiry.outputs.starts_at != '' && needs.wait-for-expiry.outputs.starts_at == vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    permissions:
+      actions: write
+    concurrency:
+      group: issue290-delivery-closeout-dispatch
+      cancel-in-progress: false
+    steps:
+      - name: Queue only the existing study delivery finalizer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          workflow=finalize-study-delivery.yml
+          endpoint="repos/$GITHUB_REPOSITORY/actions/workflows/$workflow"
+          state=$(gh api "$endpoint" --jq '.state')
+          if [ "$state" = active ]; then
+            if gh workflow run "$workflow" --ref main --repo "$GITHUB_REPOSITORY"; then
+              exit 0
+            fi
+            state=$(gh api "$endpoint" --jq '.state')
+          fi
+          test "$state" = disabled_manually

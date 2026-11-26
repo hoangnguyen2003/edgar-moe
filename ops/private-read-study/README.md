@@ -403,6 +403,13 @@ produce a report and follow the same shutdown path. If the report or Worker
 check fails, the finalizer remains enabled for the next attempt. Enable this
 workflow again before a future trial.
 
+GitHub can delay or miss scheduled workflow runs. The [completion-triggered
+backup](../../.github/workflows/trigger-study-delivery-closeout.yml) uses a
+successful receiver run created during the final slot to queue the same
+finalizer after its grace period. Earlier completions exit promptly. If the
+last receiver run is missing or fails, the scheduled and manual closeout
+paths remain available.
+
 If the schedule is active but GitHub receives no signed receipt, run
 `DIAGNOSE` during the configured trial. It observes the next existing
 scheduled invocation through a temporary Worker tail, then deletes the tail.
