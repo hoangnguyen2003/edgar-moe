@@ -20,12 +20,16 @@ export function summarizeScheduledEvent(data, { scheduled, ends, cron, worker })
     return undefined;
   }
   const exception = Array.isArray(message.exceptions) ? message.exceptions[0] : undefined;
+  const githubStatus = typeof exception?.message === "string"
+    ? /^GitHub declined external delivery \(HTTP ([1-5][0-9]{2})\)$/.exec(exception.message)
+    : null;
   return {
     event_observed: true,
     scheduled_time_matches: message.event.scheduledTime === scheduled,
     delivery_delay_ms: message.eventTimestamp - scheduled,
     outcome: message.outcome === "ok" ? "ok" : "failed",
-    error: exception ? knownErrors.get(exception.message) ?? "other" : null,
+    error: githubStatus ? `github_http_${githubStatus[1]}` :
+      exception ? knownErrors.get(exception.message) ?? "other" : null,
   };
 }
 

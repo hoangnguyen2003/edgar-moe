@@ -144,10 +144,37 @@ test("tail receipts omit arbitrary exception text, raw logs and unrelated events
     event_observed: true, scheduled_time_matches: true, delivery_delay_ms: 500,
     outcome: "failed", error: "github_declined",
   });
+  event.exceptions[0].message = "GitHub declined external delivery (HTTP 403)";
+  assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "github_http_403");
   event.exceptions[0].message = "another private value";
   assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "other");
   assert.equal(summarizeScheduledEvent(JSON.stringify({ ...event, scriptName: "other" }), expected),
     undefined);
   assert.equal(summarizeScheduledEvent(JSON.stringify({ ...event, eventTimestamp: expected.ends }),
     expected), undefined);
+});
+
+test("check GitHub dispatches only a credential check with the supplied token", async () => {
+  const githubOnly = { STUDY_DELIVERY_GITHUB_TOKEN: env.STUDY_DELIVERY_GITHUB_TOKEN };
+  const result = await manage({
+    stage: "CHECK_GITHUB",
+    env: githubOnly,
+    send: async (url, options) => {
+      assert.equal(url, "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/study-external-delivery.yml/dispatches");
+      assert.equal(options.method, "POST");
+      assert.equal(options.redirect, "error");
+      assert.equal(options.headers.Authorization, `Bearer ${githubOnly.STUDY_DELIVERY_GITHUB_TOKEN}`);
+      assert.deepEqual(JSON.parse(options.body), {
+        ref: "main",
+        inputs: { check_credentials: true, scheduled_at: "credential-check", signature: "credential-check" },
+      });
+      return new Response(JSON.stringify({ workflow_run_id: 1234, private: "omit" }));
+    },
+  });
+  assert.deepEqual(result, { stage: "CHECK_GITHUB", workflow_run_id: 1234 });
+  await assert.rejects(manage({
+    stage: "CHECK_GITHUB",
+    env: githubOnly,
+    send: async () => new Response("never logged", { status: 403 }),
+  }), /delivery_github_http_403/);
 });

@@ -399,3 +399,8 @@ scheduled invocation through a temporary Worker tail, then deletes the tail.
 The run reports only event timing, outcome, and a predefined error category.
 It needs no GitHub dispatch token or signing key and does not redeploy the
 Worker, modify its Cron, or trigger any application or database reads.
+
+`CHECK_GITHUB` isolates the dispatch credential from the Cloudflare runtime.
+It uses that credential to request a setup-only receipt from the existing
+receiver on main. The setup job reads no secrets, records zero study requests,
+and contributes no scheduled slot.

@@ -23,7 +23,8 @@ test("signs and sends a single fixed dispatch", async () => {
   const [url, options] = calls[0];
   assert.equal(url, "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/study-external-delivery.yml/dispatches");
   assert.equal(options.method, "POST");
-  assert.equal(options.redirect, "error");
+  assert.equal(options.redirect, "manual");
+  assert.equal(options.headers["User-Agent"], "edgar-moe-study-delivery");
   const signature = createHmac("sha256", env.STUDY_DELIVERY_SIGNING_KEY)
     .update(`edgar-moe/study-external-delivery/v1\n${start}\n${stamp}`).digest("hex");
   assert.deepEqual(JSON.parse(options.body), { ref: "main", inputs: { scheduled_at: stamp, signature } });
@@ -42,11 +43,13 @@ test("refuses stale, future, foreign and expired triggers without a network call
   assert.equal((await worker.fetch()).status, 404);
 });
 
-test("a rejected dispatch is never retried", async () => {
-  let attempts = 0;
-  await assert.rejects(deliver(event, env, event.scheduledTime, async () => {
-    attempts += 1;
-    return { status: 403 };
-  }), /declined/);
-  assert.equal(attempts, 1);
+test("a redirected or rejected dispatch is never followed or retried", async () => {
+  for (const status of [302, 403]) {
+    let attempts = 0;
+    await assert.rejects(deliver(event, env, event.scheduledTime, async () => {
+      attempts += 1;
+      return { status };
+    }), new RegExp(`GitHub declined external delivery \\(HTTP ${status}\\)`));
+    assert.equal(attempts, 1);
+  }
 });
