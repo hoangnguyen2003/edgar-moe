@@ -1,16 +1,18 @@
 # Separate personal-portfolio hosted read study (#290)
 
-Latest status (November 15): **a separate restart is active; hosted and CI setup
-verification passed**. The new policy is bound to November 15, 15:00 UTC
-through November 22, 15:00 UTC (22:00 Vietnam time). The November 6–13 study
-remains closed and incomplete; its twelve pairs are not carried into this window.
-See the [restart packet](evidence/restart-20261115/) and its distinct policy hash.
-Four post-start hosted routes passed with matching provider traces and an
-idle-to-active database transition across that setup group. Observer setup run
-[`43727492668`](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/43727492668)
-passed with two further reads and a verified body-free artifact. Both bounded
-workflows are enabled. None of these setup requests count as measurement days;
-#290 remains open pending the real week and evidence-quality review.
+The November 15–22 measurement window ended with 17 of 168 scheduled pairs.
+The observer and finalizer workflows are disabled. The [November 22
+closeout](#november-22-final-result) preserves the measured coverage and
+separate latency cohorts. The [restart packet](evidence/restart-20261115/)
+retains setup verification and 15 redacted query plans for the isolated
+representative fixture.
+
+A dedicated Worker is testing delivery to GitHub Actions in a separate
+24-hour window beginning November 26 at 10:00 UTC. Its receipts verify
+scheduling and carry zero hosted read samples. Issue #290 still requires a
+fresh observation week and review of its timing and error cohorts.
+See the [deployment receipt](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45792069675)
+and [delivery reconciliation](#reconcile-delivery-receipts).
 
 The earlier setup chronology below describes the original November study.
 See [the November 6 free-plan recovery](FREE-PLAN-RECOVERY.md) for the verified
