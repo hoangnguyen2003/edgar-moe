@@ -34,7 +34,7 @@ jobs:
         run: node ops/scheduler/manage-private-scheduler.mjs VERIFY_ACTIVE reports/private-scheduler-inspection/state.json
       - name: Inspect replacement delivery probe events once
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_ANALYTICS_READ_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node ops/scheduler/inspect-private-cron-events.mjs reports/private-scheduler-inspection/events.json replacement-20261114
       - name: Validate and hash body-free receipts including refusals
