@@ -79,6 +79,8 @@ def test_report_reconciles_slots_without_guessing_failed_run_identity(monkeypatc
         if endpoint in responses:
             jobs = responses[endpoint]
             return json.dumps({"total_count": len(jobs), "jobs": jobs}).encode()
+        if endpoint.endswith("/logs"):
+            assert args[2:] == ("--allow-escape-sequences",)
         if endpoint.endswith("/101/logs"):
             return log(items[0], optional_private="must never be retained")
         if endpoint.endswith("/102/logs"):

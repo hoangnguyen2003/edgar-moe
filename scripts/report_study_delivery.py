@@ -144,7 +144,16 @@ def collect(start: datetime, now: datetime) -> dict[str, Any]:
             raise Refusal("job_provenance_refused")
         try:
             slot, value = parse_receipt(
-                run, probe, gh("api", f"repos/{REPOSITORY}/actions/jobs/{job_id}/logs"), start
+                run,
+                probe,
+                # GitHub decorates other job lines with ANSI codes. The raw log
+                # stays inside this parser, which retains only fixed fields.
+                gh(
+                    "api",
+                    f"repos/{REPOSITORY}/actions/jobs/{job_id}/logs",
+                    "--allow-escape-sequences",
+                ),
+                start,
             )
         except (KeyError, TypeError, ValueError):
             unverified.append({"run_id": run_id, "reason": "receipt_unverified"})
