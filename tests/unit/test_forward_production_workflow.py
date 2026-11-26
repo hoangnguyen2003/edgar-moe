@@ -14,14 +14,21 @@ def test_provider_hold_exits_before_runtime(tmp_path: Path) -> None:
     summary = tmp_path / "summary.md"
     result = subprocess.run(
         ["/bin/bash", "-e", "-c", jobs["provider-use-review"]["steps"][0]["run"]],
-        env={"GITHUB_STEP_SUMMARY": str(summary)},
+        env={
+            "GITHUB_STEP_SUMMARY": str(summary),
+            "GITHUB_SERVER_URL": "https://github.com",
+            "GITHUB_REPOSITORY": "owner/repository",
+        },
         cwd=tmp_path,
         check=False,
         capture_output=True,
         text=True,
     )
     assert result.returncode == 1
-    assert "issue #280" in summary.read_text(encoding="utf-8")
+    message = summary.read_text(encoding="utf-8")
+    assert "pending a recorded source-use decision" in message
+    assert "https://github.com/owner/repository/blob/main/docs/source-rights-review.md" in message
+    assert "The issue #280 closeout left clearance pending." in message
 
 
 @pytest.mark.parametrize(

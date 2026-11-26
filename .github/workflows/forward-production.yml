@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   provider-use-review:
-    name: Provider use held pending issue 280
+    name: Provider-use review required
     runs-on: ubuntu-24.04
     timeout-minutes: 1
     permissions: {}
@@ -36,7 +36,10 @@ jobs:
       - name: Enforce the documented provider-use hold
         shell: bash
         run: |
-          printf '%s\n' 'Provider-backed forward cycles are on hold pending source-rights issue #280. Reopening requires a reviewed PR after clearance.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s %s %s\n' \
+            'Provider-backed forward cycles are held pending a recorded source-use decision.' \
+            'The issue #280 closeout left clearance pending. Reopening requires a reviewed PR.' \
+            "[Source-rights review]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/blob/main/docs/source-rights-review.md)" >> "$GITHUB_STEP_SUMMARY"
           exit 1
 
   forecast-and-settle:
