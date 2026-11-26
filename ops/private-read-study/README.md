@@ -380,8 +380,8 @@ repository-scoped GitHub Actions dispatch token and a newly generated
 A one-day trial uses `17 * * * *` after configuration and allows time for
 Cron propagation. The Worker sends one signed dispatch per invocation and
 rejects timestamps outside the window. Review one authenticated receipt per
-hour, with duplicates and missing hours visible. Remove the Cron after the
-trial. The receiver has no application, hosting or database credential and
+hour, with duplicates and missing hours visible. The receiver has no
+application, hosting or database credential and
 each receipt records zero study measurements.
 
 For GitHub-managed setup, the
@@ -394,6 +394,14 @@ dedicated Worker first and scope the Cloudflare token to that Worker.
 same GitHub start variable as the receiver and requires at least 20 minutes
 before the selected start to allow Cron propagation. It refuses an already
 active Worker. `STOP` removes the known Cron and verifies the result.
+
+The [delivery finalizer](../../.github/workflows/finalize-study-delivery.yml)
+records the 24-slot result in its Actions log after the trial and a ten-minute
+grace period. It then verifies the active Worker's start matches the recorded
+window, removes that Cron, and disables its own schedule. Incomplete trials
+produce a report and follow the same shutdown path. If the report or Worker
+check fails, the finalizer remains enabled for the next attempt. Enable this
+workflow again before a future trial.
 
 If the schedule is active but GitHub receives no signed receipt, run
 `DIAGNOSE` during the configured trial. It observes the next existing

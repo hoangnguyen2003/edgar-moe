@@ -8,6 +8,7 @@ const WORKER = "edgar-moe-study-delivery";
 const MODULE = "study-delivery-worker.mjs";
 const CRON = "17 * * * *";
 const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 const CREDENTIALS = ["STUDY_DELIVERY_GITHUB_TOKEN", "STUDY_DELIVERY_SIGNING_KEY"];
 
 async function checkGitHub(token, send) {
@@ -47,7 +48,7 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
   if (stage === "CHECK_GITHUB") return checkGitHub(env.STUDY_DELIVERY_GITHUB_TOKEN, send);
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
-  if (!["VERIFY", "VERIFY_ACTIVE", "DIAGNOSE", "START", "STOP"].includes(stage) ||
+  if (!["VERIFY", "VERIFY_ACTIVE", "DIAGNOSE", "START", "STOP", "STOP_EXPIRED"].includes(stage) ||
       !/^[a-f0-9]{32}$/.test(account || "") || !/^[A-Za-z0-9_-]{20,512}$/.test(token || "")) {
     throw new Error("delivery_configuration_refused");
   }
@@ -85,20 +86,7 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
     }
   }
 
-  const wasActive = await schedule();
-  if (stage === "STOP") {
-    if (wasActive) await request("/schedules", "PUT", "[]", true);
-    if (await schedule()) throw new Error("delivery_stop_not_verified");
-    return { stage, cron_active: false, worker: WORKER };
-  }
-  await privateUrls();
-  if (stage === "VERIFY") return { stage, cron_active: wasActive, worker: WORKER };
-  const stamp = env.STUDY_DELIVERY_STARTS_AT;
-  const start = Date.parse(stamp);
-  if (stage === "VERIFY_ACTIVE") {
-    if (!wasActive || !Number.isFinite(start) || new Date(start).toISOString() !== stamp) {
-      throw new Error("delivery_active_configuration_refused");
-    }
+  async function activeResources() {
     const { deployments } = await request("/deployments?per_page=1");
     const [active, ...other] = deployments?.[0]?.versions ?? [];
     if (active?.percentage !== 100 || other.length ||
@@ -106,14 +94,44 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
       throw new Error("delivery_active_deployment_refused");
     }
     const { resources } = await request(`/versions/${active.version_id}`);
+    return resources;
+  }
+
+  const stamp = env.STUDY_DELIVERY_STARTS_AT;
+  const start = Date.parse(stamp);
+  function matchesStart(bindings) {
+    return Array.isArray(bindings) && bindings.some((binding) =>
+      binding?.name === "STUDY_DELIVERY_STARTS_AT" && binding.type === "plain_text" &&
+      binding.text === stamp);
+  }
+  if (stage === "STOP_EXPIRED" && (!Number.isFinite(start) || start % HOUR !== 0 ||
+      new Date(start).toISOString() !== stamp || now() < start + 24 * HOUR + 10 * MINUTE)) {
+    throw new Error("delivery_stop_window_refused");
+  }
+  const wasActive = await schedule();
+  if (stage === "STOP" || stage === "STOP_EXPIRED") {
+    if (wasActive) {
+      if (stage === "STOP_EXPIRED" && !matchesStart((await activeResources())?.bindings)) {
+        throw new Error("delivery_stop_active_window_mismatch");
+      }
+      await request("/schedules", "PUT", "[]", true);
+    }
+    if (await schedule()) throw new Error("delivery_stop_not_verified");
+    return { stage, cron_active: false, worker: WORKER };
+  }
+  await privateUrls();
+  if (stage === "VERIFY") return { stage, cron_active: wasActive, worker: WORKER };
+  if (stage === "VERIFY_ACTIVE") {
+    if (!wasActive || !Number.isFinite(start) || new Date(start).toISOString() !== stamp) {
+      throw new Error("delivery_active_configuration_refused");
+    }
+    const resources = await activeResources();
     const handlers = resources?.script?.handlers;
     const bindings = resources?.bindings;
     return {
       stage, worker: WORKER, cron_active: true,
       scheduled_handler_present: Array.isArray(handlers) && handlers.includes("scheduled"),
-      start_matches: Array.isArray(bindings) && bindings.some((binding) =>
-        binding?.name === "STUDY_DELIVERY_STARTS_AT" && binding.type === "plain_text" &&
-        binding.text === stamp),
+      start_matches: matchesStart(bindings),
       expected_secret_bindings_present: Array.isArray(bindings) && CREDENTIALS.every((name) =>
         bindings.some((binding) => binding?.name === name && binding.type === "secret_text")),
     };
