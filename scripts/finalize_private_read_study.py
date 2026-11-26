@@ -18,6 +18,7 @@ import stat
 import subprocess
 import zipfile
 from collections import Counter, defaultdict
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,27 @@ def gh(*args: str) -> bytes:
     if run.returncode != 0:
         raise Refusal("actions_metadata_or_download_refused")
     return run.stdout
+
+
+def first_attempt(run: dict[str, Any], fetch: Callable[..., bytes]) -> dict[str, Any]:
+    """Recover original metadata when the run listing points to a later attempt."""
+    run_id, attempt = run["id"], run["run_attempt"]
+    if type(run_id) is not int or run_id <= 0 or type(attempt) is not int or attempt < 1:
+        raise Refusal("run_provenance_refused")
+    if attempt == 1:
+        return run
+    original: dict[str, Any] = json.loads(
+        fetch("api", f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/1")
+    )
+    identity = ("id", "event", "workflow_id", "head_branch", "head_sha", "created_at")
+    if (
+        not isinstance(original, dict)
+        or type(original.get("run_attempt")) is not int
+        or original["run_attempt"] != 1
+        or any(original.get(key) != run[key] for key in identity)
+    ):
+        raise Refusal("first_attempt_provenance_refused")
+    return original
 
 
 def archive_files(raw: bytes) -> dict[str, bytes]:
@@ -479,12 +501,9 @@ def collect(
         )
         runs = json.loads(raw)["workflow_runs"]
         for run in runs:
-            if (
-                run["event"] != "schedule"
-                or run["head_branch"] != "main"
-                or run["run_attempt"] != 1
-            ):
+            if run["event"] != "schedule" or run["head_branch"] != "main":
                 raise Refusal("run_provenance_refused")
+            run = first_attempt(run, gh)
             name = f"private-read-study-{run['id']}-1"
             artifacts = json.loads(
                 gh("api", f"repos/{REPOSITORY}/actions/runs/{run['id']}/artifacts?per_page=100")

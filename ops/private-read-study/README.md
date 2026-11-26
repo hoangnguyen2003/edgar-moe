@@ -274,7 +274,8 @@ miss a slot; actual counts and errors take precedence over this model.
 application, Postgres or either hosting provider. After the window and a
 five-minute in-flight grace, it uses a read-only Actions credential to collect
 **scheduled, main-branch, attempt-one** artifacts from this repository. It
-validates ZIP paths and each receipt hash, excludes manual setup runs, retains
+retrieves original attempt metadata if a run has been rerun. It validates ZIP
+paths and each receipt hash, excludes manual setup runs, retains
 failed/missing/duplicate hours, and separates collector commit, route, pair
 phase, cache, provider startup, database-pair state and process cohorts.
 
@@ -432,6 +433,7 @@ python3 -m scripts.report_study_delivery --starts-at 2026-11-26T05:00:00.000Z
 ```
 
 Each of the 24 slots has a confirmed, duplicate, missing, or pending status.
+The report records rerun IDs and keeps the evidence from the original attempt.
 For a verified receipt the report joins the nominated time to GitHub's run
 creation, job start, and verification times. It lists runs without usable
 proof by run ID and excludes setup checks. An elapsed hour without a receipt
