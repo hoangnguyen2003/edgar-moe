@@ -25,6 +25,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode, urlsplit
 
+if __name__ == "__main__" and not __package__:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from scripts.admit_study_observation import AdmissionError, active_slot  # noqa: E402
+
 ROUTES = ("status", "forecasts", "ticker-filter", "performance")
 CACHE = {"HIT", "MISS", "BYPASS", "STALE", "PRERENDER", "REVALIDATED"}
 TIMINGS = {
@@ -586,20 +591,32 @@ def request(
 
 
 def observe(
-    config: Configuration, *, now: datetime | None = None, trace: ProviderTrace | None = None
+    config: Configuration,
+    *,
+    now: datetime | None = None,
+    trace: ProviderTrace | None = None,
+    scheduled_at: str = "",
 ) -> dict[str, Any]:
     now = now or datetime.now(UTC)
     if not config.starts_at <= now < config.expires_at:
         raise Refusal("outside_absolute_study_window")
+    deadline = config.expires_at
+    if scheduled_at:
+        try:
+            deadline = active_slot(config.starts_at, config.expires_at, scheduled_at, now)
+        except AdmissionError as error:
+            raise Refusal(str(error)) from None
     slot = int((now - config.starts_at).total_seconds() // 3600)
     route = ROUTES[slot % len(ROUTES)]
     cookie = trace.session_cookie(config.origin) if trace else None
+    if scheduled_at and datetime.now(UTC) >= deadline:
+        raise Refusal("study_observation_slot_refused")
     first = request(config, route, trace_cookie=cookie) if trace else request(config, route)
     first["phase"] = "first"
     samples = [first]
     if first["status"] == "passed":
         time.sleep(30)
-        if datetime.now(UTC) < config.expires_at:
+        if datetime.now(UTC) < deadline:
             paired = (
                 request(config, route, trace_cookie=cookie) if trace else request(config, route)
             )
@@ -614,7 +631,7 @@ def observe(
                 sample["platform_start_type"] = evidence["classification"]
             except Refusal as error:
                 sample["provider_trace"] = {"status": "refused", "reason": str(error)}
-    return {
+    report = {
         "schema_version": 2,
         "scope": "separate_portfolio_study290_observation",
         "observed_at": now.isoformat(),
@@ -639,6 +656,9 @@ def observe(
         "seven_day_evidence_proven": False,
         "slo_established": False,
     }
+    if scheduled_at:
+        report["scheduled_at"] = scheduled_at
+    return report
 
 
 def main() -> int:
@@ -655,7 +675,13 @@ def main() -> int:
             except Refusal as error:
                 print(str(error), file=sys.stderr)
                 return 1
-            eligible = start <= datetime.now(UTC) < end
+            now = datetime.now(UTC)
+            eligible = start <= now < end
+            if stamp := os.environ.get("STUDY_SCHEDULED_AT"):
+                try:
+                    active_slot(start, end, stamp, now)
+                except AdmissionError:
+                    eligible = False
         print(f"eligible={str(eligible).lower()}")
         return 0
 
@@ -664,7 +690,9 @@ def main() -> int:
             raise Refusal("rerun_refused")
         env = dict(os.environ)
         trace = ProviderTrace.load(env) if env.get("STUDY_TRACE_ENABLED") == "true" else None
-        report = observe(Configuration.load(env), trace=trace)
+        report = observe(
+            Configuration.load(env), trace=trace, scheduled_at=env.get("STUDY_SCHEDULED_AT", "")
+        )
     except Exception as error:
         report = {
             "schema_version": 1,

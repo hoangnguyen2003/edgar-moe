@@ -111,6 +111,26 @@ def test_dispatch_is_excluded_and_missing_duplicate_and_unelapsed_windows_remain
     )
 
 
+def test_signed_delivery_mode_counts_only_evidence_bound_to_the_nominated_hour():
+    start = START.replace(minute=0)
+    end = start + timedelta(days=7)
+    env = environment() | {
+        "STUDY_STARTS_AT": start.isoformat(),
+        "STUDY_EXPIRES_AT": end.isoformat(),
+        "STUDY_DELIVERY_MODE": "cloudflare",
+    }
+    manual = record(0)
+    signed = record(1)
+    signed["run"]["event"] = "workflow_dispatch"
+    signed["receipt"]["scheduled_at"] = "2026-11-06T09:17:00.000Z"
+    report = final.summarize([manual, signed], env, end, baseline())
+    assert report["observed_pairs"] == 1
+    assert 0 in report["missing_slots"] and 1 not in report["missing_slots"]
+    signed["receipt"]["scheduled_at"] = "2026-11-06T08:17:00.000Z"
+    with pytest.raises(final.Refusal, match="signed_observation_slot_refused"):
+        final.summarize([signed], env, end, baseline())
+
+
 @pytest.mark.parametrize(
     "key,value",
     [
@@ -294,6 +314,7 @@ def test_finalizer_receives_no_provider_secret_and_stops_only_the_study_workflow
         "STUDY_EXPIRES_AT",
         "STUDY_POLICY_SHA256",
         "STUDY_DEPLOYMENT_HOST_SHA256",
+        "STUDY_DELIVERY_MODE",
     }
     assert "secrets." not in json.dumps(doc)
     stop = doc["jobs"]["stop-finished-study"]
