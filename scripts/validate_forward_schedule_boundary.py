@@ -4,7 +4,7 @@ The Cloudflare scheduler is intentionally dormant until a separate reviewed
 cutover. This contract keeps the existing GitHub schedule and manual dispatch
 available together, so an accidental workflow edit cannot silently remove the
 rollback trigger or change the point-in-time filing window.
-Provider-backed execution is separately held pending issue #280; the trigger
+Provider-backed execution is separately held pending a recorded source-use decision; the trigger
 contract remains intact so the eventual reviewed reopening preserves timing.
 """
 
@@ -21,8 +21,11 @@ WORKFLOW = Path(".github/workflows/forward-production.yml")
 EXPECTED_CRON = "17 7 * * 2-6"
 EXPECTED_CONCURRENCY = "edgar-moe-forward-production"
 PROVIDER_HOLD_SCRIPT = (
-    "printf '%s\\n' 'Provider-backed forward cycles are on hold pending source-rights "
-    'issue #280. Reopening requires a reviewed PR after clearance.\' >> "$GITHUB_STEP_SUMMARY"\n'
+    "printf '%s %s %s\\n' \\\n"
+    "  'Provider-backed forward cycles are held pending a recorded source-use decision.' \\\n"
+    "  'The issue #280 closeout left clearance pending. Reopening requires a reviewed PR.' \\\n"
+    '  "[Source-rights review]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/'
+    'blob/main/docs/source-rights-review.md)" >> "$GITHUB_STEP_SUMMARY"\n'
     "exit 1\n"
 )
 EXPECTED_CACHE_CONDITION = (
@@ -76,7 +79,7 @@ def validate_forward_schedule_boundary(path: Path = WORKFLOW) -> list[str]:
 def _validate_provider_hold(jobs: dict[str, Any]) -> list[str]:
     errors: list[str] = []
     expected_hold = {
-        "name": "Provider use held pending issue 280",
+        "name": "Provider-use review required",
         "runs-on": "ubuntu-24.04",
         "timeout-minutes": 1,
         "permissions": {},
