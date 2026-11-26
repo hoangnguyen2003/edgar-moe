@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { manage } from "./manage-study-delivery.mjs";
+import { summarizeScheduledEvent } from "./study-delivery-tail.mjs";
 
 const account = "a".repeat(32);
 const env = {
@@ -74,4 +75,79 @@ test("verify is read-only and stop only removes the known cron", async () => {
   assert.deepEqual(writes, [{ path: "/schedules", body: "[]" }]);
   await manage({ stage: "STOP", env: cloudflareOnly, send });
   assert.equal(writes.length, 1);
+});
+
+test("diagnose observes one existing event and deletes its temporary tail", async () => {
+  const { send: manageRequest, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
+  const tailId = "c".repeat(32);
+  const url = `wss://tail.developers.workers.dev/${tailId}`;
+  const scheduled = Date.parse("2026-11-26T05:17:00Z");
+  const calls = [];
+  const send = async (requestUrl, options) => {
+    const path = requestUrl.slice(BASE.length);
+    if (path.startsWith("/tails")) {
+      calls.push([path, options.method]);
+      return response({ id: tailId, url, expires_at: "2026-11-26T05:25:00Z" });
+    }
+    return manageRequest(requestUrl, options);
+  };
+  const parameters = {
+    stage: "DIAGNOSE",
+    env: Object.fromEntries(Object.entries(env).filter(([key]) =>
+      !key.includes("GITHUB_TOKEN") && !key.includes("SIGNING_KEY"))),
+    send,
+    now: () => scheduled - 10 * 60_000,
+    sleep: async (ms) => assert.equal(ms, 510_000),
+  };
+  const result = await manage({
+    ...parameters,
+    observe: async (options) => {
+      assert.deepEqual(options, { url, scheduled, ends: scheduled + 360_000,
+        cron: "17 * * * *", worker: "edgar-moe-study-delivery" });
+      return { event_observed: true, outcome: "ok" };
+    },
+  });
+  assert.equal(result.event_observed, true);
+  assert.deepEqual(calls, [["/tails", "POST"], [`/tails/${tailId}`, "DELETE"]]);
+  assert.deepEqual(writes, []);
+  assert.ok(!JSON.stringify(result).includes(url));
+
+  calls.length = 0;
+  await assert.rejects(manage({
+    ...parameters,
+    observe: async () => { throw new Error("delivery_tail_connection_failed"); },
+  }), /delivery_tail_connection_failed/);
+  assert.deepEqual(calls, [["/tails", "POST"], [`/tails/${tailId}`, "DELETE"]]);
+
+  calls.length = 0;
+  await assert.rejects(manage({
+    ...parameters,
+    now: () => scheduled + 24 * 3_600_000,
+    observe: async () => assert.fail("unexpected observation"),
+  }), /delivery_diagnostic_outside_window/);
+  assert.deepEqual(calls, []);
+});
+
+test("tail receipts omit arbitrary exception text, raw logs and unrelated events", () => {
+  const scheduled = Date.parse("2026-11-26T05:17:00Z");
+  const expected = { scheduled, ends: scheduled + 360_000,
+    cron: "17 * * * *", worker: "edgar-moe-study-delivery" };
+  const event = {
+    scriptName: expected.worker,
+    event: { cron: expected.cron, scheduledTime: scheduled },
+    eventTimestamp: scheduled + 500,
+    outcome: "exception",
+    exceptions: [{ message: "GitHub declined external delivery", stack: "private stack" }],
+    logs: [{ message: ["private log"] }],
+  };
+  assert.deepEqual(summarizeScheduledEvent(JSON.stringify(event), expected), {
+    event_observed: true, scheduled_time_matches: true, delivery_delay_ms: 500,
+    outcome: "failed", error: "github_declined",
+  });
+  event.exceptions[0].message = "another private value";
+  assert.equal(summarizeScheduledEvent(JSON.stringify(event), expected).error, "other");
+  assert.equal(summarizeScheduledEvent(JSON.stringify({ ...event, scriptName: "other" }), expected),
+    undefined);
+  assert.equal(summarizeScheduledEvent(JSON.stringify({ ...event, eventTimestamp: expected.ends }),
+    expected), undefined);
 });

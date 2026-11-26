@@ -392,3 +392,10 @@ dedicated Worker first and scope the Cloudflare token to that Worker.
 same GitHub start variable as the receiver and requires at least 20 minutes
 before the selected start to allow Cron propagation. It refuses an already
 active Worker. `STOP` removes the known Cron and verifies the result.
+
+If the schedule is active but GitHub receives no signed receipt, run
+`DIAGNOSE` during the configured trial. It observes the next existing
+scheduled invocation through a temporary Worker tail, then deletes the tail.
+The run reports only event timing, outcome, and a predefined error category.
+It needs no GitHub dispatch token or signing key and does not redeploy the
+Worker, modify its Cron, or trigger any application or database reads.

@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: Verify, start, or stop the separate one-day delivery test
+        description: Verify, diagnose, start, or stop the separate one-day delivery test
         required: true
         type: choice
         default: VERIFY
-        options: [VERIFY, START, STOP]
+        options: [VERIFY, DIAGNOSE, START, STOP]
 
 permissions:
   contents: read
@@ -21,7 +21,7 @@ jobs:
   manage:
     if: ${{ github.ref == 'refs/heads/main' && github.event.repository.private == false }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: ${{ inputs.stage == 'DIAGNOSE' && 70 || 5 }}
     environment: hosted-study-delivery
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
