@@ -288,3 +288,24 @@ order. The replay verifies the processed assets and their source manifest.
 The receipt covers the recorded selection and dataset lineage. Evidence of
 market continuity across the study, source rights, and the publication decision
 remain separate.
+
+## Historical archive availability review, November 26, 2026
+
+The fixed cohort has 503 independently verified share-class identities. A market
+archive still has to join all of them to dated listings and account for the
+lookback price and volume series. The screening input needs source-version
+evidence for the exact observations known by the cutoff and checked permission
+to retain and replay the selected export privately.
+
+| Source checked | What the source documents | Remaining gap |
+| --- | --- | --- |
+| [NYSE Daily TAQ](https://www.nyse.com/data-products/catalog/daily-taq/) | Consolidated trades and a daily security master with published timing in the [client specification](https://www.nyse.com/publicdocs/nyse/data/Daily_TAQ_Client_Spec_v4.3.pdf). | The [public sample directory](https://ftp.nyse.com/Historical%20Data%20Samples/DAILY%20TAQ/) lists July 2026 master and trade samples and selected 2022 administrative files. The complete historical trade and master files require licensed access. |
+| [CRSP US Stock Databases](https://www.crsp.org/research__trashed/crsp-us-stock-databases/) | Permanent identifiers, delistings, corporate actions, prices and volume across listed and inactive securities. | An authorized export and documentation for the relevant source releases and revisions are still needed. A recent extract alone does not date the version of its rows. |
+| [Kibot daily guest API](https://www.kibot.com/api/history-request.html) | Ticker-keyed historical daily bars with an unadjusted-price option. | The API documentation does not establish the cohort's archived listing identity joins or bar-version availability. |
+| [SEC market activity data](https://www.sec.gov/data-research/market-structure-data) | Historical trade-volume and activity metrics by ticker and day. | The [published fields](https://www.sec.gov/opa/data/market-structure/market-structure-data-security-and-exchange.html) include price ranks and volume. The replay requires the prices and dated identifiers themselves. |
+| [QuantConnect US Equities](https://www.quantconnect.com/data/algoseek-us-equities) | Free cloud backtesting access and separate local download licensing. | The cloud offering does not establish permission to retain this study's reproducible local source package or supply its pre-cutoff release evidence. |
+
+This review used product documentation and public file listings. A suitable
+archive remains unverified within the zero-cost project budget. Keep the
+historical membership and publication gates pending until an authorized source
+can supply the required files and release evidence.
