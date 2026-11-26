@@ -412,3 +412,65 @@ test("candidate Durable Object surface exposes no initialization, reset or compl
   assert.equal(response.headers.get("Cache-Control"), "private, no-store");
   assert.equal(fixture.ledger.summary().admitted, 1);
 });
+
+test("a scheduled study slot is claimed once across two SQLite connections and closure", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "edgar-study-slot-"));
+  const filename = join(directory, "ledger.sqlite");
+  const left = openFixture(filename, { policy });
+  const right = openFixture(filename, { create: false, policy });
+  t.after(left.close);
+  t.after(right.close);
+  const scheduled = START + 17 * 60_000;
+  const results = await Promise.all([
+    left.ledger.admitStudyObservation(scheduled, scheduled + 1000),
+    right.ledger.admitStudyObservation(scheduled, scheduled + 1000),
+  ]);
+  const winners = results.filter(item => item.status === "admitted");
+  assert.equal(winners.length, 1);
+  assert.equal(results.find(item => item.status === "refused").reason, "request_replayed");
+  const [{ requestId, sequence }] = winners;
+  assert.equal(left.ledger.confirmClosed(requestId, sequence).status, "closed");
+  assert.equal((await right.ledger.admitStudyObservation(scheduled, scheduled + 2000)).reason,
+    "request_replayed");
+  assert.equal(left.ledger.summary().admitted, 1);
+});
+
+test("scheduled admission refuses stale, early and wrong-minute jobs without opening a read", async t => {
+  const fixture = openFixture(undefined, { policy });
+  t.after(fixture.close);
+  const scheduled = START + 17 * 60_000;
+  for (const [when, now] of [
+    [scheduled, scheduled - 1000],
+    [scheduled, START + 60 * 60_000],
+    [scheduled + 60_000, scheduled + 60_000],
+    [policy.expiresAtMs + 17 * 60_000, policy.expiresAtMs + 17 * 60_000],
+    [scheduled - LIMITS.lifetimeMs, scheduled],
+  ]) {
+    assert.equal((await fixture.ledger.admitStudyObservation(when, now)).reason,
+      "observation_slot_invalid");
+  }
+  assert.equal(fixture.ledger.summary().admitted, 0);
+});
+
+test("restart with unconfirmed completion refuses both the original and the next slot", async t => {
+  const directory = mkdtempSync(join(tmpdir(), "edgar-study-unknown-"));
+  const filename = join(directory, "ledger.sqlite");
+  const scheduled = START + 17 * 60_000;
+  const before = openFixture(filename, { policy });
+  try {
+    assert.equal((await before.ledger.admitStudyObservation(scheduled, scheduled)).status,
+      "admitted");
+  } finally {
+    before.close();
+  }
+  const restarted = openFixture(filename, { create: false, policy });
+  t.after(restarted.close);
+  assert.equal((await restarted.ledger.admitStudyObservation(scheduled, scheduled + 1000)).reason,
+    "request_replayed");
+  const next = scheduled + 60 * 60_000;
+  assert.equal((await restarted.ledger.admitStudyObservation(next, next)).reason,
+    "completion_unconfirmed");
+  assert.deepEqual(restarted.ledger.summary(), {
+    status: "observed", admitted: 1, active: true, stopped: false, totalRemaining: 359,
+  });
+});

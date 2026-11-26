@@ -151,6 +151,27 @@ export class AdmissionLedger {
     });
   }
 
+  // The caller must have verified the scheduler signature and invocation provenance.
+  // Derive the key inside the policy-bound ledger so reruns cannot select a new ID.
+  async admitStudyObservation(scheduledAtMs, nowMs) {
+    const hour = 60 * 60 * 1000;
+    const offset = 17 * 60 * 1000;
+    if (!validTime(scheduledAtMs) || !validTime(nowMs)) return result("observation_slot_invalid");
+    const slotStart = scheduledAtMs - offset;
+    if (this.#policy.startsAtMs % hour !== 0 ||
+        slotStart % hour !== 0 || slotStart < this.#policy.startsAtMs ||
+        scheduledAtMs >= this.#policy.expiresAtMs ||
+        nowMs < scheduledAtMs || nowMs >= slotStart + hour) {
+      return result("observation_slot_invalid");
+    }
+    const message = `edgar-moe/study-observation-slot/v1\n${this.#policy.pilotId}\n${scheduledAtMs}`;
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(message));
+    const requestId = Array.from(new Uint8Array(digest), byte =>
+      byte.toString(16).padStart(2, "0")).join("");
+    const admission = this.admit(requestId, nowMs);
+    return admission.status === "admitted" ? { ...admission, requestId } : admission;
+  }
+
   // Trusted executor calls only after result settlement AND backend-close proof.
   confirmClosed(requestId, sequence) {
     if (typeof requestId !== "string" || !HEX.test(requestId) || !Number.isSafeInteger(sequence)) {

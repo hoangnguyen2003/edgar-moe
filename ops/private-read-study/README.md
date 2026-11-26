@@ -404,3 +404,25 @@ Worker, modify its Cron, or trigger any application or database reads.
 It uses that credential to request a setup-only receipt from the existing
 receiver on main. The setup job reads no secrets, records zero study requests,
 and contributes no scheduled slot.
+
+#### Reconcile delivery receipts
+
+Run the report from the repository after authenticating `gh` with Actions read
+access. Use the exact start from the management receipt.
+
+```sh
+python3 -m scripts.report_study_delivery --starts-at 2026-11-26T05:00:00.000Z
+```
+
+Each of the 24 slots has a confirmed, duplicate, missing, or pending status.
+For a verified receipt the report joins the nominated time to GitHub's run
+creation, job start, and verification times. It lists runs without usable
+proof by run ID and excludes setup checks. An elapsed hour without a receipt
+is missing evidence. Provider-side trigger timing still requires a Worker
+trace. The report retains only selected identifiers and timing fields. Each
+receipt contributes zero hosted-read samples.
+
+The offline [admission ledger](../private-read-admission/README.md) includes an
+atomic slot-claim contract for a future seven-day observer. Live use requires
+the previously planned protected target, a fresh window, and a trusted
+integration that verifies the signed dispatch before acquiring the claim.
