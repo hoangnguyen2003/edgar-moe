@@ -83,12 +83,15 @@ def first_attempt(run: dict[str, Any], fetch: Callable[..., bytes]) -> dict[str,
         raise Refusal("run_provenance_refused")
     if attempt == 1:
         return run
-    original = json.loads(fetch("api", f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/1"))
+    original: dict[str, Any] = json.loads(
+        fetch("api", f"repos/{REPOSITORY}/actions/runs/{run_id}/attempts/1")
+    )
     identity = ("id", "event", "workflow_id", "head_branch", "head_sha", "created_at")
     if (
-        type(original["run_attempt"]) is not int
+        not isinstance(original, dict)
+        or type(original.get("run_attempt")) is not int
         or original["run_attempt"] != 1
-        or any(original[key] != run[key] for key in identity)
+        or any(original.get(key) != run[key] for key in identity)
     ):
         raise Refusal("first_attempt_provenance_refused")
     return original
