@@ -374,3 +374,26 @@ and omit securities without such a balance. They provide dated point
 observations. The remaining work includes market-archive identifier
 intervals, availability and revision evidence for the daily closes and
 traded volumes, and the resulting screen-to-dataset binding.
+
+## Additional settlement archives and exchange coverage, November 27, 2026
+
+The SEC files for November 1–14 and October 17–31 add six exact ticker
+and CUSIP matches. Across the three archives, **499 of 503** candidates
+have an exact match and **501 of 503** have a matching CUSIP. The comparison
+checks each archive hash and record-count trailer and uses the same fixed
+cohort as the initial review. A second offline replay reproduced the counts.
+The SEC file for December 1–15 reports a December 30 last-modified date.
+The December 28 cutoff excludes that file, which was checked via HEAD only.
+[Aggregate receipts and archive hashes](../ops/issue292/sec-settlement-coverage-20261127.json)
+
+Three additional exchange sources leave the historical screen incomplete.
+
+| Source | Availability check | Remaining gap |
+| --- | --- | --- |
+| [IEX HIST](https://www.iex.io/products/equities/market-data-connectivity) | IEX describes next-trading-day publication and a rolling 12-month direct history. Its [download page](https://iextrading.com/trading/market-data/index.html) currently says the PCAPs are unavailable for direct download. A request to the historical catalog returned HTTP 403. | No 2022 files or exact release receipts were verified. The feed covers trades executed on IEX, so a replay also needs to validate comparability to the intended screen inputs. [IEX feed details](https://iextrading.com/trading/alerts/2017/014/) |
+| [Cboe historical volume](https://www.cboe.com/us/equities/market_statistics/historical_market_volume/) | The public 2022 files provide market-volume statistics. Cboe lists daily per-security closes and volume as an [Equity EOD Summary product](https://datashop.cboe.com/equity-eod-summary). | The public files lack the per-security bars and listing identifiers required by the replay. Access to the full historical product within the project budget remains unverified. |
+| [Nasdaq Daily List](https://m.nasdaqtrader.com/Trader.aspx?id=DailyListPD) | The historical subscription describes listing changes, delistings and an option to include CUSIPs. | The subscription supplies corporate actions for Nasdaq-listed securities. It does not supply the fixed cohort's daily bars or establish zero-cost access to the CUSIP edition. |
+
+The new matches corroborate discrete identities on settlement dates. The
+verified listing intervals and as-of daily close and traded-volume series
+needed for the historical replay remain outstanding.

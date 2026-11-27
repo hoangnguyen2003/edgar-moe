@@ -1,0 +1,87 @@
+{
+  "archives": [
+    {
+      "additional_exact_candidates": 493,
+      "archive_record_count": 62696,
+      "archive_sha256": "2196fe3b335db71730e92f945a2485a7362633d327923f8acdf862a71f09f707",
+      "exact_cusip_and_ticker_candidates": 493,
+      "first_settlement_date": "2022-11-15",
+      "http_last_modified": "Thu, 15 Dec 2022 13:44:28 GMT",
+      "label": "202211b",
+      "last_settlement_date": "2022-11-30",
+      "record_count_trailer": true,
+      "retrieved_at": "2026-11-27T17:16:30.360164+00:00",
+      "settlement_date_count": 11,
+      "source": "https://www.sec.gov/files/data/fails-deliver-data/cnsfails202211b.zip",
+      "zip_member_timestamp_timezone_unspecified": [
+        2022,
+        12,
+        15,
+        8,
+        14,
+        12
+      ]
+    },
+    {
+      "additional_exact_candidates": 5,
+      "archive_record_count": 49596,
+      "archive_sha256": "6821e301fad424a6371eb0ae248382a653c2d91b9e9bd28309567178cfa8e74d",
+      "exact_cusip_and_ticker_candidates": 489,
+      "first_settlement_date": "2022-11-01",
+      "http_last_modified": "Wed, 30 Nov 2022 14:41:12 GMT",
+      "label": "202211a",
+      "last_settlement_date": "2022-11-14",
+      "record_count_trailer": true,
+      "retrieved_at": "2026-11-27T17:37:36.607139+00:00",
+      "settlement_date_count": 9,
+      "source": "https://www.sec.gov/files/data/fails-deliver-data/cnsfails202211a.zip",
+      "zip_member_timestamp_timezone_unspecified": [
+        2022,
+        11,
+        30,
+        6,
+        55,
+        42
+      ]
+    },
+    {
+      "additional_exact_candidates": 1,
+      "archive_record_count": 60746,
+      "archive_sha256": "f9d2ecf49b08376d0a3b0195df88bfc43db945f4a9fe28906ef18bd0faa3286e",
+      "exact_cusip_and_ticker_candidates": 489,
+      "first_settlement_date": "2022-10-17",
+      "http_last_modified": "Tue, 15 Nov 2022 15:47:48 GMT",
+      "label": "202210b",
+      "last_settlement_date": "2022-10-31",
+      "record_count_trailer": true,
+      "retrieved_at": "2026-11-27T17:37:37.903808+00:00",
+      "settlement_date_count": 11,
+      "source": "https://www.sec.gov/files/data/fails-deliver-data/cnsfails202210b.zip",
+      "zip_member_timestamp_timezone_unspecified": [
+        2022,
+        11,
+        15,
+        7,
+        6,
+        0
+      ]
+    }
+  ],
+  "assessment": "extended_private_settlement_identity_corroboration",
+  "cohort_cusips_in_any_archive": 501,
+  "exact_candidates_in_any_archive": 499,
+  "excluded_archive": {
+    "downloaded": false,
+    "http_last_modified": "Fri, 30 Dec 2022 14:53:42 GMT",
+    "method": "HEAD",
+    "reason": "reported_modification_after_cutoff",
+    "source": "https://www.sec.gov/files/data/fails-deliver-data/cnsfails202212a.zip",
+    "status": 200
+  },
+  "fixed_cohort_count": 503,
+  "historical_market_continuity_verified": false,
+  "identity_result_sha256": "98e0230e9fa0c430799e53e7101da0ebc273c30d664029709b3516fcedc415c3",
+  "independent_archive_publication_verified": false,
+  "market_price_or_volume_values_used": false,
+  "screen_cutoff": "2022-12-28T23:23:50Z"
+}
