@@ -83,3 +83,24 @@ binds the new scope, verified predecessor shutdown and a private 17-file packet.
 Offline validation passed 2,585 Python tests (36 skips, 85.87% coverage), 45
 scheduler Node tests and 124 focused/documentation checks. Those synthetic
 checks establish the contracts, not live delivery or forecast-margin evidence.
+
+## Timestamp mismatch reproduced, November 27, 2026
+
+The separate hosted-read delivery Worker received its November 26 slot with
+Cloudflare's reported timestamp **20 seconds after** the nominal time. Its
+bounded normalization still dispatched the canonical slot successfully.
+[Provider diagnostic](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45792316354)
+
+An offline replay applied that observed offset to the November 17 forecast
+probe's configured time. The expired forecast adapter returned `null`
+before reading dispatch credentials because its initial match requires
+the timestamp to equal the nominal time exactly. The offset is a plausible
+explanation for missed delivery. The diagnostic came from a different
+Worker, and the retired probe's controller timestamp remains unavailable.
+
+A replacement forecast scope can use the proven bounded normalization with
+its reviewed nominal slot, retain the real Actions start and completion
+times, and measure the margin from actual forecast recording. Canonical
+slot identity preserves the 07:17 UTC schedule. Earlier actual runs can see
+fewer filings that arrive later in the morning. The source-use decision and
+three live qualifying forecasts are still required.
