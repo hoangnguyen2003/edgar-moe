@@ -479,7 +479,11 @@ recorded timestamp against its slot.
 The [observation schedule manager](../../.github/workflows/manage-study-observation.yml)
 reuses the isolated delivery Worker after the 24-slot pilot closes. The start
 job verifies complete pilot coverage, disabled pilot closeout, enabled study
-workflows and present signing and claim credentials. It uploads both Worker
+workflows and working claim credentials. `CHECK_CLAIM_STORE` can test the
+same two conditional writes on a scratch key before the study is configured.
+The first write must succeed and the duplicate must be refused. The check
+retains one small setup object and uses no preview, database or Worker
+credential. The start job then uploads both Worker
 modules with Cron absent and checks the active window and target commitments
 before enabling the hourly trigger. The finalizer removes that Cron after
 retaining the seven-day report and verifying the same expired bindings.
