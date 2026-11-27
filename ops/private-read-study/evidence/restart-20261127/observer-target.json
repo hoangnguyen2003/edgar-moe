@@ -1,0 +1,20 @@
+{
+  "activation_run_id": 46038925028,
+  "claim_store_verification_run_id": 46037838828,
+  "database_credentials_in_observer": false,
+  "delivery_mode": "cloudflare",
+  "delivery_pilot_closeout_run_id": 45979796196,
+  "expires_at": "2026-12-04T20:00:00+00:00",
+  "host_sha256": "724cd7b275e37590b730f0f4f7987ca1095954431574eef208a9aecffe5a9a1c",
+  "issue": 290,
+  "measurement_samples": 0,
+  "platform_protection_verified": true,
+  "policy_sha256": "69a7d722f06fe8385e6de2085e98d1fc4638f6b2e32d3c743b4e332764087960",
+  "prewindow_refusal_verified": true,
+  "prewindow_trace_verified": true,
+  "reader_expiry_matches_window": true,
+  "reader_select_only": true,
+  "setup_http_requests": 3,
+  "starts_at": "2026-11-27T20:00:00+00:00",
+  "status": "passed"
+}

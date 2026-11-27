@@ -1,18 +1,23 @@
 # Separate personal-portfolio hosted read study (#290)
 
-The November 15–22 measurement window ended with 17 of 168 scheduled pairs.
-The observer and finalizer workflows are disabled. The [November 22
-closeout](#november-22-final-result) preserves the measured coverage and
-separate latency cohorts. The [restart packet](evidence/restart-20261115/)
-retains setup verification and 15 redacted query plans for the isolated
-representative fixture.
+The new signed observation window runs from **November 27 at 20:00 UTC**
+through **December 4 at 20:00 UTC**. The dedicated Worker was verified with
+hourly Cron active and the first observation is scheduled for November 27 at
+20:17 UTC. The protected Hobby preview uses a newly verified SELECT-only
+reader that expires at the end of this window. Setup captured four native
+query paths, 15 redacted query plans and a pre-start HTTP trace. Those setup
+requests contribute zero measurement samples. [Activation run](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/46038925028) · [Setup evidence](evidence/restart-20261127/)
 
-A dedicated Worker is testing delivery to GitHub Actions in a separate
-24-hour window beginning November 26 at 10:00 UTC. Its receipts verify
-scheduling and carry zero hosted read samples. Issue #290 still requires a
-fresh observation week and review of its timing and error cohorts.
-See the [deployment receipt](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45792069675)
-and [delivery reconciliation](#reconcile-delivery-receipts).
+The 24-hour delivery pilot closed with 24 confirmed slots and zero duplicates
+or missing slots. Its finalizer verified Cron removal and then disabled
+itself. The new observer uses a dedicated GitHub branch for atomic slot
+claims. GitHub confirmed that the first setup write succeeded and preserved
+its contents when the duplicate was refused. [Delivery closeout](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/45979796196) · [Ledger verification](https://github.com/hoangnguyen2003/edgar-moe/actions/runs/46037838828)
+
+The November 15–22 measurement window ended with 17 of 168 scheduled pairs.
+The [November 22 closeout](#november-22-final-result) preserves that window's
+coverage and latency cohorts. Its [restart packet](evidence/restart-20261115/)
+retains the previous setup verification and query plans.
 
 The earlier setup chronology below describes the original November study.
 See [the November 6 free-plan recovery](FREE-PLAN-RECOVERY.md) for the verified
