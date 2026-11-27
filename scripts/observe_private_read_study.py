@@ -42,6 +42,7 @@ TIMINGS = {
     "lifecycle_us",
 }
 MAX_BODY = 262144
+TRANSIENT_TRACE_REASONS = {"trace_not_ready", "trace_temporarily_unavailable"}
 
 
 class Refusal(ValueError):
@@ -240,10 +241,7 @@ class ProviderTrace:
                     normalize_project_trace(self.api(url)), self, request_id, route
                 )
             except Refusal as error:
-                if (
-                    str(error) not in {"trace_not_ready", "trace_temporarily_unavailable"}
-                    or attempt == 2
-                ):
+                if str(error) not in TRANSIENT_TRACE_REASONS or attempt == 2:
                     raise
                 time.sleep(10)
         raise Refusal("trace_not_ready")
@@ -661,6 +659,23 @@ def observe(
     return report
 
 
+def collection_may_continue(report: dict[str, Any]) -> bool:
+    if report["status"] == "passed":
+        return True
+    samples = report.get("samples", [])
+    if report["status"] != "degraded" or not report.get("scheduled_at") or len(samples) != 2:
+        return False
+    for sample in samples:
+        trace = sample.get("provider_trace", {})
+        if sample["status"] != "passed":
+            return False
+        if trace.get("status") == "passed":
+            continue
+        if trace.get("status") != "refused" or trace.get("reason") not in TRANSIENT_TRACE_REASONS:
+            return False
+    return True
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -712,8 +727,17 @@ def main() -> int:
         with args.output.open("x") as stream:
             json.dump(report, stream, indent=2)
             stream.write("\n")
-        print(json.dumps({"status": report["status"], "samples": len(report.get("samples", []))}))
-        return 0 if report["status"] == "passed" else 1
+        proceed = collection_may_continue(report)
+        print(
+            json.dumps(
+                {
+                    "status": report["status"],
+                    "samples": len(report.get("samples", [])),
+                    "collection_continues": proceed,
+                }
+            )
+        )
+        return 0 if proceed else 1
     except Exception as error:
         print(
             json.dumps(
