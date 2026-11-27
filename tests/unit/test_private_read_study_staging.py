@@ -80,11 +80,11 @@ def test_external_observer_requires_a_claim_before_provider_credentials():
     )
     claim_step = admission["steps"][-1]
     assert "inputs.signature" not in json.dumps(admission)
+    assert admission["permissions"] == {"contents": "write"}
+    assert workflow["permissions"] == {"contents": "read"}
+    assert claim_step["env"]["GH_TOKEN"] == "${{ github.token }}"
     assert {name for name, value in claim_step["env"].items() if "secrets." in value} == {
         "STUDY_OBSERVATION_SIGNING_KEY",
-        "STUDY_CLAIM_R2_ACCOUNT_ID",
-        "STUDY_CLAIM_R2_ACCESS_KEY_ID",
-        "STUDY_CLAIM_R2_SECRET_ACCESS_KEY",
     }
 
 

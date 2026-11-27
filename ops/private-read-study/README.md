@@ -471,23 +471,25 @@ SHA-256, the deployment host SHA-256, and the nominal minute-17 timestamp.
 Use UTC timestamps in `YYYY-MM-DDTHH:mm:ss.000Z` form and the UTF-8 text of
 the dedicated 64-character lowercase hex `STUDY_OBSERVATION_SIGNING_KEY`.
 
-The admission job uses its own bucket-scoped credentials for the private
-`edgar-moe-study-observation-claims` R2 bucket. A conditional write reserves
-one key per policy, target, window and slot. That job must succeed before the
-observer can access its hosted endpoint or provider metadata. A reserved slot
-stays spent if work fails or returns late. Keep the claim objects until after
-the window and closeout. The SELECT-only data target stores no claim state.
-The finalizer selects first-attempt signed-observer runs and checks each
-recorded timestamp against its slot.
+The admission job uses its short-lived GitHub Actions token to add a file to
+the dedicated `ops/study-observation-claims` branch. The filename is a hash
+of the policy, target, window and slot commitments. The file records only the
+run ID and nominal time. The GitHub Contents API requires an existing blob
+SHA for updates. Admission sends a create request without a blob SHA and
+accepts only a newly created file. The observer can access its hosted endpoint
+or provider metadata after admission succeeds. A reserved slot stays spent if
+work fails or returns late. Retain the ledger branch through closeout. The
+finalizer selects first-attempt signed-observer runs and checks each recorded
+timestamp against its slot. [GitHub Contents API](https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents)
 
 The [observation schedule manager](../../.github/workflows/manage-study-observation.yml)
 reuses the isolated delivery Worker after the 24-slot pilot closes. The start
 job verifies complete pilot coverage, disabled pilot closeout, enabled study
-workflows and working claim credentials. `CHECK_CLAIM_STORE` can test the
-same two conditional writes on a scratch key before the study is configured.
-The first write must succeed and the duplicate must be refused. The check
-retains one small setup object and uses no preview, database or Worker
-credential. The start job then uploads both Worker
+workflows and a working claim ledger. `CHECK_CLAIM_STORE` creates the ledger
+branch if needed and tests a scratch claim before the study is configured. The
+first write must succeed, the second must be refused, and readback must match
+the first record. The check retains the setup record and uses only the GitHub
+Actions token. The start job then uploads both Worker
 modules with Cron absent and checks the active window and target commitments
 before enabling the hourly trigger. The finalizer removes that Cron after
 retaining the seven-day report and verifying the same expired bindings.

@@ -25,6 +25,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     environment: hosted-read-study
+    permissions:
+      contents: write
     outputs:
       scheduled_at: ${{ steps.claim.outputs.scheduled_at }}
       starts_at: ${{ steps.claim.outputs.starts_at }}
@@ -43,9 +45,7 @@ jobs:
           STUDY_POLICY_SHA256: ${{ vars.STUDY_POLICY_SHA256 }}
           STUDY_DEPLOYMENT_HOST_SHA256: ${{ vars.STUDY_DEPLOYMENT_HOST_SHA256 }}
           STUDY_OBSERVATION_SIGNING_KEY: ${{ secrets.STUDY_OBSERVATION_SIGNING_KEY }}
-          STUDY_CLAIM_R2_ACCOUNT_ID: ${{ secrets.STUDY_CLAIM_R2_ACCOUNT_ID }}
-          STUDY_CLAIM_R2_ACCESS_KEY_ID: ${{ secrets.STUDY_CLAIM_R2_ACCESS_KEY_ID }}
-          STUDY_CLAIM_R2_SECRET_ACCESS_KEY: ${{ secrets.STUDY_CLAIM_R2_SECRET_ACCESS_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: python3 -m scripts.admit_study_observation >> "$GITHUB_OUTPUT"
 
   observe:

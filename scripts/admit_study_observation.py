@@ -3,22 +3,25 @@
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import hmac
+import http.client
 import json
 import os
 import re
-import subprocess
 import sys
+from contextlib import closing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from tempfile import TemporaryDirectory
+from urllib.parse import urlencode
 
 from scripts.observe_external_study_delivery import FORMAT
 
 DOMAIN = "edgar-moe/private-study-observation/v1"
 REPOSITORY = "hoangnguyen2003/edgar-moe"
-CLAIM_BUCKET = "edgar-moe-study-observation-claims"
+CLAIM_BRANCH = "ops/study-observation-claims"
+CLAIM_REF = f"refs/heads/{CLAIM_BRANCH}"
 HOUR = timedelta(hours=1)
 
 
@@ -92,71 +95,97 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
     expected = hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(signature, expected):
         raise AdmissionError("study_dispatch_signature_refused")
-    object_key = f"issue290/{policy}/{target}/{start_text}/{stamp}.json"
-    return stamp if put_once(env, object_key, {"run_id": run_id, "scheduled_at": stamp}) else None
+    claim = hashlib.sha256(message).hexdigest()
+    return stamp if put_once(env, claim, {"run_id": run_id, "scheduled_at": stamp}) else None
 
 
-def put_once(env: dict[str, str], object_key: str, contents: dict[str, str | int]) -> bool:
-    account = env["STUDY_CLAIM_R2_ACCOUNT_ID"]
-    access_key = env["STUDY_CLAIM_R2_ACCESS_KEY_ID"]
-    access_secret = env["STUDY_CLAIM_R2_SECRET_ACCESS_KEY"]
-    if (
-        not re.fullmatch(r"[a-f0-9]{32}", account)
-        or not re.fullmatch(r"[A-Za-z0-9]{20,64}", access_key)
-        or not re.fullmatch(r"[A-Za-z0-9]{32,128}", access_secret)
-    ):
+def github_request(
+    env: dict[str, str], method: str, path: str, payload: dict[str, str] | None = None
+) -> tuple[int, bytes]:
+    token = env["GH_TOKEN"]
+    if not re.fullmatch(r"[!-~]{1,1024}", token):
         raise AdmissionError("study_claim_configuration_refused")
-    with TemporaryDirectory() as directory:
-        body = Path(directory) / "claim.json"
-        body.write_text(json.dumps(contents))
-        outcome = subprocess.run(
-            [
-                "aws",
-                "s3api",
-                "put-object",
-                "--bucket",
-                CLAIM_BUCKET,
-                "--key",
-                object_key,
-                "--body",
-                str(body),
-                "--content-type",
-                "application/json",
-                "--if-none-match",
-                "*",
-                "--endpoint-url",
-                f"https://{account}.r2.cloudflarestorage.com",
-                "--region",
-                "auto",
-            ],
-            env={
-                "PATH": env["PATH"],
-                "AWS_ACCESS_KEY_ID": access_key,
-                "AWS_SECRET_ACCESS_KEY": access_secret,
-                "AWS_CONFIG_FILE": "/dev/null",
-                "AWS_SHARED_CREDENTIALS_FILE": "/dev/null",
-                "AWS_EC2_METADATA_DISABLED": "true",
-                "AWS_MAX_ATTEMPTS": "1",
-                "AWS_PAGER": "",
+    with closing(http.client.HTTPSConnection("api.github.com", timeout=10)) as connection:
+        connection.request(
+            method,
+            f"/repos/{REPOSITORY}/{path}",
+            body=json.dumps(payload) if payload is not None else None,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "User-Agent": "edgar-moe-study-claim",
+                "X-GitHub-Api-Version": "2022-11-28",
             },
-            capture_output=True,
-            timeout=15,
         )
-    if outcome.returncode == 0:
+        response = connection.getresponse()
+        limit = 16 * 1024
+        body = response.read(limit + 1)
+        if len(body) > limit:
+            raise AdmissionError("study_claim_response_too_large")
+        return response.status, body
+
+
+def claim_contents(claim: str) -> str:
+    return f"contents/study-observation-claims/{claim}.json"
+
+
+def read_claim(env: dict[str, str], claim: str) -> bytes:
+    path = claim_contents(claim)
+    status, body = github_request(env, "GET", f"{path}?{urlencode({'ref': CLAIM_BRANCH})}")
+    if status != 200:
+        raise AdmissionError("study_slot_claim_failed")
+    record = json.loads(body)
+    if (
+        record["type"] != "file"
+        or record["encoding"] != "base64"
+        or record["path"] != path.removeprefix("contents/")
+    ):
+        raise AdmissionError("study_slot_claim_failed")
+    return base64.b64decode(record["content"].replace("\n", ""), validate=True)
+
+
+def put_once(env: dict[str, str], claim: str, contents: dict[str, str | int]) -> bool:
+    # The Contents API requires a blob SHA to replace an existing file.
+    status, _ = github_request(
+        env,
+        "PUT",
+        claim_contents(claim),
+        {
+            "branch": CLAIM_BRANCH,
+            "message": "Record hosted study claim",
+            "content": base64.b64encode(json.dumps(contents).encode()).decode(),
+        },
+    )
+    if status == 201:
         return True
-    if b"(PreconditionFailed) when calling the PutObject operation" in outcome.stderr:
+    if status in (409, 422):
+        read_claim(env, claim)
         return False
     raise AdmissionError("study_slot_claim_failed")
 
 
 def check_store(env: dict[str, str]) -> None:
     run_id = dispatch_run_id(env)
-    key = f"issue290/setup/{run_id}.json"
+    status, _ = github_request(env, "GET", f"git/ref/{CLAIM_REF.removeprefix('refs/')}")
+    if status == 404:
+        sha = env["GITHUB_SHA"]
+        if not re.fullmatch(r"[a-f0-9]{40}", sha):
+            raise AdmissionError("study_claim_configuration_refused")
+        status, _ = github_request(env, "POST", "git/refs", {"ref": CLAIM_REF, "sha": sha})
+        if status != 201:
+            raise AdmissionError("study_claim_branch_setup_failed")
+    elif status != 200:
+        raise AdmissionError("study_claim_branch_setup_failed")
+    key = hashlib.sha256(f"issue290/setup/{run_id}".encode()).hexdigest()
     body: dict[str, str | int] = {"scope": "study_claim_store_setup", "run_id": run_id}
     if not put_once(env, key, body):
         raise AdmissionError("study_claim_store_setup_key_exists")
-    if put_once(env, key, body):
+    duplicate = body | {"scope": "duplicate_probe"}
+    if put_once(env, key, duplicate):
         raise AdmissionError("study_claim_store_duplicate_accepted")
+    if json.loads(read_claim(env, key)) != body:
+        raise AdmissionError("study_claim_store_readback_mismatch")
 
 
 def main() -> int:
@@ -167,9 +196,7 @@ def main() -> int:
     try:
         if args.check_store:
             check_store(env)
-            print(
-                '{"status":"conditional_claim_verified","storage_requests":2,"measurement_pairs":0}'
-            )
+            print('{"status":"conditional_claim_verified","store":"github","measurement_pairs":0}')
             return 0
         start = datetime.fromisoformat(env["STUDY_STARTS_AT"])
         end = datetime.fromisoformat(env["STUDY_EXPIRES_AT"])
@@ -177,7 +204,7 @@ def main() -> int:
     except AdmissionError as error:
         print(str(error), file=sys.stderr)
         return 1
-    except (KeyError, OSError, TypeError, ValueError, subprocess.TimeoutExpired):
+    except (KeyError, OSError, TypeError, ValueError, http.client.HTTPException):
         print("Study observation admission refused.", file=sys.stderr)
         return 1
     if stamp is not None:
