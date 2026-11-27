@@ -309,3 +309,42 @@ This review used product documentation and public file listings. A suitable
 archive remains unverified within the zero-cost project budget. Keep the
 historical membership and publication gates pending until an authorized source
 can supply the required files and release evidence.
+
+## DoltHub archive metadata check, November 27, 2026
+
+[DoltHub's public stocks database](https://www.dolthub.com/repositories/post-no-preference/stocks)
+is a zero-cost candidate for versioned daily prices and volumes. Its public
+commit log returned `0cl0kenipoa5uapcenohfi6rc9q3r5bj` with a recorded commit
+time of `2022-12-28 09:46:44.872` and the message `ohlcv 2022-12-27 update`.
+The hash pins what DoltHub serves for that revision today. The recorded
+commit time still needs independent evidence of when this exact revision
+became available. DoltHub's retrospective account describes daily publication
+since 2021. [DoltHub publication history](https://www.dolthub.com/blog/2024-09-27-dolt-post-no-preference/)
+
+Two metadata queries returned the archived column definitions and zero data
+rows. At the pinned revision, `ohlcv` stores daily close and volume by date
+and `act_symbol`. The corresponding `symbol` schema has a security name,
+exchange, ticker aliases and a last-seen date. Both schemas lack a permanent
+security identifier. The archive still needs a verified dated join from those
+tickers to the 503 retained share-class identities and evidence that bars
+follow the required close, volume and revision conventions.
+
+To reproduce the metadata check, send these queries to the public
+[`master` SQL endpoint](https://www.dolthub.com/api/v1alpha1/post-no-preference/stocks/master)
+using the [documented `q` parameter](https://www.dolthub.com/docs/products/dolthub/api/v1alpha1/sql/).
+
+```sql
+SELECT commit_hash, date, message FROM dolt_log
+WHERE date >= '2022-12-26 00:00:00' AND date <= '2022-12-28 23:23:50'
+LIMIT 12;
+SELECT * FROM symbol AS OF '0cl0kenipoa5uapcenohfi6rc9q3r5bj' LIMIT 0;
+SELECT * FROM ohlcv AS OF '0cl0kenipoa5uapcenohfi6rc9q3r5bj' LIMIT 0;
+```
+
+The current repository includes a CC BY-SA 4.0 license. The publisher's
+description applies it to the database's selection and arrangement and
+describes the underlying facts as public domain. A query for `LICENSE.md` and
+`README.md` at the pinned 2022 revision returned no entries. Upstream bar
+provenance and permission for private retention and replay still need review
+before an export can enter the historical screen.
+[Publisher description](https://www.dolthub.com/api/v2/databases/post-no-preference/stocks)
