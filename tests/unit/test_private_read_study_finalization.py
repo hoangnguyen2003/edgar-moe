@@ -337,13 +337,17 @@ def test_signed_scheduler_uses_the_isolated_manager_after_a_retained_report():
     cleanup = finalizer["jobs"]["stop-observation-cron"]
     assert cleanup["needs"] == "report"
     assert "needs.report.outputs.finished == 'true'" in cleanup["if"]
-    assert cleanup["uses"] == f"./{manager_path}"
-    assert cleanup["with"] == {"stage": "STOP_OBSERVATION_EXPIRED"}
-    assert set(cleanup["secrets"]) == {
+    assert cleanup["environment"] == "hosted-study-delivery"
+    cleanup_env = cleanup["steps"][-1]["env"]
+    assert cleanup_env["STUDY_DELIVERY_STAGE"] == "STOP_OBSERVATION_EXPIRED"
+    assert cleanup_env["STUDY_OBSERVATION_STARTS_AT"] == "${{ needs.report.outputs.starts_at }}"
+    assert cleanup_env["STUDY_OBSERVATION_HOST_SHA256"] == "${{ needs.report.outputs.host_sha256 }}"
+    assert {name for name, expression in cleanup_env.items() if "secrets." in expression} == {
         "STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID",
         "STUDY_DELIVERY_CLOUDFLARE_TOKEN",
     }
     assert manager["concurrency"]["group"] in first["concurrency"]["group"]
+    assert cleanup["concurrency"]["group"] == manager["concurrency"]["group"]
     window_job = manager["jobs"]["reviewed-window"]
     apply_job = manager["jobs"]["manage"]
     assert window_job["environment"] == "hosted-read-study"
@@ -443,8 +447,17 @@ def test_elapsed_window_builds_redacted_readable_report_and_references(tmp_path,
     monkeypatch.setattr(final, "collect", lambda *a: ([record(0)], []))
     monkeypatch.setattr(final, "gh", lambda *a: pytest.fail("No provider or extra metadata calls"))
     output = tmp_path / "packet"
+    action_outputs = tmp_path / "action_outputs"
+    monkeypatch.setenv("GITHUB_OUTPUT", str(action_outputs))
     monkeypatch.setattr(sys, "argv", ["finalizer", "--output-dir", str(output)])
     assert final.main() == 0
+    assert action_outputs.read_text().splitlines() == [
+        "finished=true",
+        "starts_at=2026-11-06T08:15:00.000Z",
+        "expires_at=2026-11-13T08:15:00.000Z",
+        "policy_sha256=" + "a" * 64,
+        "host_sha256=" + "b" * 64,
+    ]
     report = json.loads((output / "summary.json").read_text())
     assert report["status"] == "incomplete" and len(report["missing_slots"]) == 167
     assert report["edge_hit_count"] == 0 and report["platform_counts"] == {"warm": 2}

@@ -22,6 +22,10 @@ jobs:
       name: hosted-read-study
     outputs:
       finished: ${{ steps.report.outputs.finished }}
+      starts_at: ${{ steps.report.outputs.starts_at }}
+      expires_at: ${{ steps.report.outputs.expires_at }}
+      policy_sha256: ${{ steps.report.outputs.policy_sha256 }}
+      host_sha256: ${{ steps.report.outputs.host_sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -53,12 +57,32 @@ jobs:
   stop-observation-cron:
     needs: report
     if: ${{ needs.report.result == 'success' && needs.report.outputs.finished == 'true' && vars.ISSUE290_STUDY_DELIVERY_MODE == 'cloudflare' }}
-    uses: ./.github/workflows/manage-study-observation.yml
-    with:
-      stage: STOP_OBSERVATION_EXPIRED
-    secrets:
-      STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
-      STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: hosted-study-delivery
+    concurrency:
+      group: manage-issue290-external-delivery
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Remove Cron only for the retained study window
+        env:
+          STUDY_DELIVERY_STAGE: STOP_OBSERVATION_EXPIRED
+          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
+          STUDY_OBSERVATION_STARTS_AT: ${{ needs.report.outputs.starts_at }}
+          STUDY_OBSERVATION_EXPIRES_AT: ${{ needs.report.outputs.expires_at }}
+          STUDY_OBSERVATION_POLICY_SHA256: ${{ needs.report.outputs.policy_sha256 }}
+          STUDY_OBSERVATION_HOST_SHA256: ${{ needs.report.outputs.host_sha256 }}
+        run: node ops/scheduler/manage-study-delivery.mjs
 
   stop-finished-study:
     if: ${{ !cancelled() && needs.report.result == 'success' && needs.report.outputs.finished == 'true' && (vars.ISSUE290_STUDY_DELIVERY_MODE == '' || needs.stop-observation-cron.result == 'success') }}

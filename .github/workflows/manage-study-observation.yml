@@ -9,17 +9,6 @@ on:
         type: choice
         default: START_OBSERVATION
         options: [START_OBSERVATION, STOP_OBSERVATION_EXPIRED]
-  workflow_call:
-    inputs:
-      stage:
-        required: true
-        type: string
-    secrets:
-      STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID:
-        required: false
-      STUDY_DELIVERY_CLOUDFLARE_TOKEN:
-        required: false
-
 permissions:
   contents: read
   actions: read
