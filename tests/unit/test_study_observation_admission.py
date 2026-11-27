@@ -110,3 +110,33 @@ def test_ambiguous_storage_error_refuses_and_does_not_retry(monkeypatch, environ
     with pytest.raises(gate.AdmissionError, match="^study_slot_claim_failed$"):
         gate.admit(environment, START, END, NOW)
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("outcomes", "error"),
+    [
+        ([True, False], None),
+        ([True, True], "study_claim_store_duplicate_accepted"),
+        ([False], "study_claim_store_setup_key_exists"),
+    ],
+)
+def test_live_preflight_uses_a_separate_key_and_requires_duplicate_rejection(
+    monkeypatch, environment, outcomes, error
+):
+    calls = []
+    results = iter(outcomes)
+
+    def put(_env, key, contents):
+        calls.append((key, contents))
+        return next(results)
+
+    monkeypatch.setattr(gate, "put_once", put)
+    env = {key: value for key, value in environment.items() if key.startswith("GITHUB_")}
+    if error:
+        with pytest.raises(gate.AdmissionError, match=error):
+            gate.check_store(env)
+    else:
+        gate.check_store(env)
+    assert calls == [
+        ("issue290/setup/42.json", {"scope": "study_claim_store_setup", "run_id": 42})
+    ] * len(outcomes)

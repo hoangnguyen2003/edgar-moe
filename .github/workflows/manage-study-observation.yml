@@ -4,11 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: Prepare the signed schedule or remove its expired Cron
+        description: Verify isolated R2 claims, start the signed schedule, or remove expired Cron
         required: true
         type: choice
         default: START_OBSERVATION
-        options: [START_OBSERVATION, STOP_OBSERVATION_EXPIRED]
+        options: [CHECK_CLAIM_STORE, START_OBSERVATION, STOP_OBSERVATION_EXPIRED]
 permissions:
   contents: read
   actions: read
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   reviewed-window:
-    if: ${{ github.repository == 'hoangnguyen2003/edgar-moe' && github.ref == 'refs/heads/main' && github.event.repository.private == false && vars.ISSUE290_STUDY_DELIVERY_MODE == 'cloudflare' && (inputs.stage == 'START_OBSERVATION' || inputs.stage == 'STOP_OBSERVATION_EXPIRED') }}
+    if: ${{ github.repository == 'hoangnguyen2003/edgar-moe' && github.ref == 'refs/heads/main' && github.event.repository.private == false && (inputs.stage == 'CHECK_CLAIM_STORE' || (vars.ISSUE290_STUDY_DELIVERY_MODE == 'cloudflare' && (inputs.stage == 'START_OBSERVATION' || inputs.stage == 'STOP_OBSERVATION_EXPIRED'))) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: hosted-read-study
@@ -38,18 +38,26 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PILOT_STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
           STUDY_ENABLED: ${{ vars.ISSUE290_STUDY_ENABLED }}
-          CLAIM_CONFIGURATION_PRESENT: ${{ secrets.STUDY_OBSERVATION_SIGNING_KEY != '' && secrets.STUDY_CLAIM_R2_ACCOUNT_ID != '' && secrets.STUDY_CLAIM_R2_ACCESS_KEY_ID != '' && secrets.STUDY_CLAIM_R2_SECRET_ACCESS_KEY != '' }}
+          SIGNING_KEY_PRESENT: ${{ secrets.STUDY_OBSERVATION_SIGNING_KEY != '' }}
         run: |
           set -o pipefail
           test "$STUDY_ENABLED" = true
-          test "$CLAIM_CONFIGURATION_PRESENT" = true
+          test "$SIGNING_KEY_PRESENT" = true
           test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/finalize-study-delivery.yml" --jq '.state')" = disabled_manually
           for workflow in observe-private-read-study.yml finalize-private-read-study.yml; do
             test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')" = active
           done
           python3 -m scripts.report_study_delivery --starts-at "$PILOT_STARTS_AT" |
             jq -e '.status == "complete" and .counts.confirmed == 24' >/dev/null
+      - name: Verify a scratch claim and reject its duplicate
+        if: ${{ inputs.stage == 'CHECK_CLAIM_STORE' || inputs.stage == 'START_OBSERVATION' }}
+        env:
+          STUDY_CLAIM_R2_ACCOUNT_ID: ${{ secrets.STUDY_CLAIM_R2_ACCOUNT_ID }}
+          STUDY_CLAIM_R2_ACCESS_KEY_ID: ${{ secrets.STUDY_CLAIM_R2_ACCESS_KEY_ID }}
+          STUDY_CLAIM_R2_SECRET_ACCESS_KEY: ${{ secrets.STUDY_CLAIM_R2_SECRET_ACCESS_KEY }}
+        run: python3 -m scripts.admit_study_observation --check-store
       - name: Bind the hosted study window without loading access credentials
+        if: ${{ inputs.stage != 'CHECK_CLAIM_STORE' }}
         id: window
         env:
           STUDY_STARTS_AT: ${{ vars.STUDY_STARTS_AT }}

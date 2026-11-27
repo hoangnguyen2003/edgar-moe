@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import hmac
 import json
@@ -55,8 +56,7 @@ def active_slot(start: datetime, end: datetime, stamp: str, now: datetime) -> da
     return hour + HOUR
 
 
-def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) -> str | None:
-    """Return the admitted timestamp, or None when a previous run owns the slot."""
+def dispatch_run_id(env: dict[str, str]) -> int:
     if (
         env.get("GITHUB_REPOSITORY") != REPOSITORY
         or env.get("GITHUB_REF") != "refs/heads/main"
@@ -64,11 +64,18 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
         or env.get("GITHUB_RUN_ATTEMPT") != "1"
     ):
         raise AdmissionError("study_dispatch_provenance_refused")
+    run_id = env.get("GITHUB_RUN_ID", "")
+    if not re.fullmatch(r"[1-9][0-9]{0,19}", run_id):
+        raise AdmissionError("study_dispatch_provenance_refused")
+    return int(run_id)
 
+
+def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) -> str | None:
+    """Return the admitted timestamp, or None when a previous run owns the slot."""
+    run_id = dispatch_run_id(env)
     policy = env["STUDY_POLICY_SHA256"]
     target = env["STUDY_DEPLOYMENT_HOST_SHA256"]
     secret = env["STUDY_OBSERVATION_SIGNING_KEY"]
-    run_id = env["GITHUB_RUN_ID"]
     inputs = json.loads(Path(env["GITHUB_EVENT_PATH"]).read_text())["inputs"]
     stamp, signature = inputs["scheduled_at"], inputs["signature"]
     if (
@@ -77,7 +84,6 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
         or not all(
             re.fullmatch(r"[a-f0-9]{64}", field) for field in (policy, target, secret, signature)
         )
-        or not re.fullmatch(r"[1-9][0-9]{0,19}", run_id)
     ):
         raise AdmissionError("study_dispatch_configuration_refused")
     active_slot(start, end, stamp, now)
@@ -86,7 +92,11 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
     expected = hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
     if not hmac.compare_digest(signature, expected):
         raise AdmissionError("study_dispatch_signature_refused")
+    object_key = f"issue290/{policy}/{target}/{start_text}/{stamp}.json"
+    return stamp if put_once(env, object_key, {"run_id": run_id, "scheduled_at": stamp}) else None
 
+
+def put_once(env: dict[str, str], object_key: str, contents: dict[str, str | int]) -> bool:
     account = env["STUDY_CLAIM_R2_ACCOUNT_ID"]
     access_key = env["STUDY_CLAIM_R2_ACCESS_KEY_ID"]
     access_secret = env["STUDY_CLAIM_R2_SECRET_ACCESS_KEY"]
@@ -96,10 +106,9 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
         or not re.fullmatch(r"[A-Za-z0-9]{32,128}", access_secret)
     ):
         raise AdmissionError("study_claim_configuration_refused")
-    object_key = f"issue290/{policy}/{target}/{start_text}/{stamp}.json"
     with TemporaryDirectory() as directory:
         body = Path(directory) / "claim.json"
-        body.write_text(json.dumps({"run_id": int(run_id), "scheduled_at": stamp}))
+        body.write_text(json.dumps(contents))
         outcome = subprocess.run(
             [
                 "aws",
@@ -134,15 +143,34 @@ def admit(env: dict[str, str], start: datetime, end: datetime, now: datetime) ->
             timeout=15,
         )
     if outcome.returncode == 0:
-        return stamp
+        return True
     if b"(PreconditionFailed) when calling the PutObject operation" in outcome.stderr:
-        return None
+        return False
     raise AdmissionError("study_slot_claim_failed")
 
 
+def check_store(env: dict[str, str]) -> None:
+    run_id = dispatch_run_id(env)
+    key = f"issue290/setup/{run_id}.json"
+    body = {"scope": "study_claim_store_setup", "run_id": run_id}
+    if not put_once(env, key, body):
+        raise AdmissionError("study_claim_store_setup_key_exists")
+    if put_once(env, key, body):
+        raise AdmissionError("study_claim_store_duplicate_accepted")
+
+
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check-store", action="store_true")
+    args = parser.parse_args()
     env = dict(os.environ)
     try:
+        if args.check_store:
+            check_store(env)
+            print(
+                '{"status":"conditional_claim_verified","storage_requests":2,"measurement_pairs":0}'
+            )
+            return 0
         start = datetime.fromisoformat(env["STUDY_STARTS_AT"])
         end = datetime.fromisoformat(env["STUDY_EXPIRES_AT"])
         stamp = admit(env, start, end, datetime.now(UTC))
