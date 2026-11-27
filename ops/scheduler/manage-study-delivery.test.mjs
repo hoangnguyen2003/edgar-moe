@@ -305,6 +305,57 @@ test("check GitHub dispatches only a credential check with the supplied token", 
   }), /delivery_github_http_403/);
 });
 
+test("reports expiry metadata with separate credentials and only two reads", async () => {
+  const calls = [];
+  const result = await manage({
+    stage: "CHECK_EXPIRY",
+    env,
+    send: async (url, options) => {
+      calls.push(url);
+      assert.equal(options.method, "GET");
+      assert.equal(options.redirect, "error");
+      assert.equal(options.body, undefined);
+      if (url.startsWith("https://api.github.com/")) {
+        assert.equal(options.headers.Authorization, `Bearer ${env.STUDY_DELIVERY_GITHUB_TOKEN}`);
+        return new Response("discarded", {
+          headers: { "GitHub-Authentication-Token-Expiration": "2026-12-07 08:12:00 UTC" },
+        });
+      }
+      assert.equal(options.headers.Authorization, `Bearer ${env.STUDY_DELIVERY_CLOUDFLARE_TOKEN}`);
+      return Response.json({
+        success: true,
+        result: { id: "omitted", status: "active", expires_on: "2026-12-07T09:12:00+01:00" },
+      });
+    },
+  });
+  assert.deepEqual(calls, [
+    "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/observe-private-read-study.yml",
+    `https://api.cloudflare.com/client/v4/accounts/${env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID}/tokens/verify`,
+  ]);
+  assert.deepEqual(result, {
+    stage: "CHECK_EXPIRY",
+    github: { http_status: 200, expires_at: "2026-12-07T08:12:00.000Z" },
+    cloudflare: { http_status: 200, token_status: "active", expires_at: "2026-12-07T08:12:00.000Z" },
+  });
+});
+
+test("provider refusal or absent expiry stays unverified", async () => {
+  let requests = 0;
+  const result = await manage({
+    stage: "CHECK_EXPIRY",
+    env,
+    send: async () => ++requests === 1
+      ? new Response("discarded")
+      : new Response("private error", { status: 403 }),
+  });
+  assert.equal(requests, 2);
+  assert.deepEqual(result, {
+    stage: "CHECK_EXPIRY",
+    github: { http_status: 200, expires_at: null },
+    cloudflare: { http_status: 403, token_status: null, expires_at: null },
+  });
+});
+
 test("checks active version metadata with the Worker-scoped token and no writes", async () => {
   const { send: fixed, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
   const versionId = "023e105f-2a42-4f8b-a1c1-73f6a2a30c0f";
