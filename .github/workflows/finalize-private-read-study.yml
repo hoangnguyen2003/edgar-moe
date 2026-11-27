@@ -56,6 +56,9 @@ jobs:
     uses: ./.github/workflows/manage-study-observation.yml
     with:
       stage: STOP_OBSERVATION_EXPIRED
+    secrets:
+      STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+      STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
 
   stop-finished-study:
     if: ${{ !cancelled() && needs.report.result == 'success' && needs.report.outputs.finished == 'true' && (vars.ISSUE290_STUDY_DELIVERY_MODE == '' || needs.stop-observation-cron.result == 'success') }}

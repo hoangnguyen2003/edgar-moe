@@ -316,9 +316,10 @@ def test_finalizer_receives_no_provider_secret_and_stops_only_the_study_workflow
         "STUDY_DEPLOYMENT_HOST_SHA256",
         "STUDY_DELIVERY_MODE",
     }
-    assert "secrets." not in json.dumps(doc)
+    assert "secrets." not in json.dumps(report)
     stop = doc["jobs"]["stop-finished-study"]
     assert stop["permissions"] == {"actions": "write"}
+    assert "secrets." not in json.dumps(stop)
     assert stop["needs"] == ["report", "stop-observation-cron"]
     assert "needs.stop-observation-cron.result == 'success'" in stop["if"]
     run = stop["steps"][0]["run"]
@@ -338,6 +339,10 @@ def test_signed_scheduler_uses_the_isolated_manager_after_a_retained_report():
     assert "needs.report.outputs.finished == 'true'" in cleanup["if"]
     assert cleanup["uses"] == f"./{manager_path}"
     assert cleanup["with"] == {"stage": "STOP_OBSERVATION_EXPIRED"}
+    assert set(cleanup["secrets"]) == {
+        "STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID",
+        "STUDY_DELIVERY_CLOUDFLARE_TOKEN",
+    }
     assert manager["concurrency"]["group"] in first["concurrency"]["group"]
     window_job = manager["jobs"]["reviewed-window"]
     apply_job = manager["jobs"]["manage"]
