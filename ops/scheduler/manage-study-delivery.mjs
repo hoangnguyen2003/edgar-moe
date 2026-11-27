@@ -6,10 +6,16 @@ import { observeScheduledEvent } from "./study-delivery-tail.mjs";
 
 const WORKER = "edgar-moe-study-delivery";
 const MODULE = "study-delivery-worker.mjs";
+const OBSERVATION_MODULE = "study-observation-worker.mjs";
 const CRON = "17 * * * *";
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const CREDENTIALS = ["STUDY_DELIVERY_GITHUB_TOKEN", "STUDY_DELIVERY_SIGNING_KEY"];
+const OBSERVATION_CREDENTIALS = ["STUDY_OBSERVATION_GITHUB_TOKEN", "STUDY_OBSERVATION_SIGNING_KEY"];
+const OBSERVATION_COMMITMENTS = [
+  "STUDY_OBSERVATION_STARTS_AT", "STUDY_OBSERVATION_EXPIRES_AT",
+  "STUDY_OBSERVATION_POLICY_SHA256", "STUDY_OBSERVATION_HOST_SHA256",
+];
 
 async function checkGitHub(token, send) {
   if (!/^[A-Za-z0-9_]{20,512}$/.test(token || "")) {
@@ -43,12 +49,15 @@ async function checkGitHub(token, send) {
   return { stage: "CHECK_GITHUB", workflow_run_id: result.workflow_run_id };
 }
 
-export async function manage({ stage, env, source, send = fetch, now = Date.now,
+export async function manage({ stage, env, source, observationSource, send = fetch, now = Date.now,
   observe = observeScheduledEvent, sleep = wait }) {
   if (stage === "CHECK_GITHUB") return checkGitHub(env.STUDY_DELIVERY_GITHUB_TOKEN, send);
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
-  if (!["VERIFY", "VERIFY_ACTIVE", "DIAGNOSE", "START", "STOP", "STOP_EXPIRED"].includes(stage) ||
+  const startingObservation = stage === "START_OBSERVATION";
+  const stoppingObservation = stage === "STOP_OBSERVATION_EXPIRED";
+  if (!["VERIFY", "VERIFY_ACTIVE", "DIAGNOSE", "START", "STOP", "STOP_EXPIRED",
+    "START_OBSERVATION", "STOP_OBSERVATION_EXPIRED"].includes(stage) ||
       !/^[a-f0-9]{32}$/.test(account || "") || !/^[A-Za-z0-9_-]{20,512}$/.test(token || "")) {
     throw new Error("delivery_configuration_refused");
   }
@@ -104,14 +113,36 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
       binding?.name === "STUDY_DELIVERY_STARTS_AT" && binding.type === "plain_text" &&
       binding.text === stamp);
   }
+  const observationStart = Date.parse(env.STUDY_OBSERVATION_STARTS_AT);
+  const observationEnd = Date.parse(env.STUDY_OBSERVATION_EXPIRES_AT);
+  if (startingObservation || stoppingObservation) {
+    if (!Number.isFinite(observationStart) || observationStart % HOUR !== 0 ||
+        observationEnd - observationStart !== 168 * HOUR ||
+        new Date(observationStart).toISOString() !== env.STUDY_OBSERVATION_STARTS_AT ||
+        new Date(observationEnd).toISOString() !== env.STUDY_OBSERVATION_EXPIRES_AT ||
+        !OBSERVATION_COMMITMENTS.slice(2).every(name => /^[a-f0-9]{64}$/.test(env[name] || ""))) {
+      throw new Error("delivery_observation_window_refused");
+    }
+    if (stoppingObservation && now() < observationEnd + 5 * MINUTE) {
+      throw new Error("delivery_stop_window_refused");
+    }
+  }
+  function matchesObservation(bindings) {
+    return Array.isArray(bindings) && OBSERVATION_COMMITMENTS.every(name =>
+      bindings.some(binding => binding?.name === name && binding.type === "plain_text" &&
+        binding.text === env[name]));
+  }
   if (stage === "STOP_EXPIRED" && (!Number.isFinite(start) || start % HOUR !== 0 ||
       new Date(start).toISOString() !== stamp || now() < start + 24 * HOUR + 10 * MINUTE)) {
     throw new Error("delivery_stop_window_refused");
   }
   const wasActive = await schedule();
-  if (stage === "STOP" || stage === "STOP_EXPIRED") {
+  if (stage === "STOP" || stage === "STOP_EXPIRED" || stoppingObservation) {
     if (wasActive) {
       if (stage === "STOP_EXPIRED" && !matchesStart((await activeResources())?.bindings)) {
+        throw new Error("delivery_stop_active_window_mismatch");
+      }
+      if (stoppingObservation && !matchesObservation((await activeResources())?.bindings)) {
         throw new Error("delivery_stop_active_window_mismatch");
       }
       await request("/schedules", "PUT", "[]", true);
@@ -164,6 +195,61 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
     }
   }
   if (wasActive) throw new Error("delivery_worker_already_active");
+  async function upload(mainModule, bindings, files) {
+    const metadata = {
+      main_module: mainModule, compatibility_date: "2026-11-25", bindings,
+      logpush: false, observability: { enabled: false }, tail_consumers: [],
+    };
+    const body = new FormData();
+    body.set("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
+    for (const [name, content] of Object.entries(files)) {
+      body.set(name, new Blob([content], { type: "application/javascript+module" }), name);
+    }
+    await request("", "PUT", body);
+    await privateUrls();
+  }
+
+  async function activate(startsAt) {
+    if (await schedule() || startsAt - now() < 20 * MINUTE) {
+      throw new Error("delivery_activation_boundary_refused");
+    }
+    await request("/schedules", "PUT", JSON.stringify([{ cron: CRON }]), true);
+    if (!(await schedule())) throw new Error("delivery_activation_not_verified");
+  }
+
+  if (startingObservation) {
+    if (observationStart - now() < 20 * MINUTE || observationStart - now() > 48 * HOUR ||
+        !/^[a-f0-9]{64}$/.test(env.STUDY_OBSERVATION_SIGNING_KEY || "") ||
+        !/^[A-Za-z0-9_]{20,512}$/.test(env.STUDY_OBSERVATION_GITHUB_TOKEN || "") ||
+        ![source, observationSource].every(file => file && Buffer.byteLength(file) <= 32_768)) {
+      throw new Error("delivery_start_bindings_refused");
+    }
+    const settings = await request("/settings");
+    const vars = ["STUDY_DELIVERY_STARTS_AT", ...OBSERVATION_COMMITMENTS];
+    const credentials = [...CREDENTIALS, ...OBSERVATION_CREDENTIALS];
+    if (!Array.isArray(settings?.bindings) || settings.bindings.some(binding =>
+      vars.includes(binding?.name) ? binding.type !== "plain_text" :
+        !credentials.includes(binding?.name) || binding.type !== "secret_text")) {
+      throw new Error("delivery_unexpected_worker_bindings");
+    }
+    const bindings = [
+      ...OBSERVATION_COMMITMENTS.map(name => ({ name, type: "plain_text", text: env[name] })),
+      ...OBSERVATION_CREDENTIALS.map(name => ({ name, type: "secret_text", text: env[name] })),
+    ];
+    const files = { [OBSERVATION_MODULE]: observationSource, [MODULE]: source };
+    await upload(OBSERVATION_MODULE, bindings, files);
+    const resources = await activeResources();
+    const handlers = resources?.script?.handlers;
+    if (!Array.isArray(handlers) || !handlers.includes("scheduled") || !matchesObservation(resources.bindings) ||
+        !OBSERVATION_CREDENTIALS.every(name => resources.bindings.some(binding =>
+          binding?.name === name && binding.type === "secret_text"))) {
+      throw new Error("delivery_observation_deployment_refused");
+    }
+    await activate(observationStart);
+    return { stage, cron_active: true, worker: WORKER, starts_at: env.STUDY_OBSERVATION_STARTS_AT,
+      expires_at: env.STUDY_OBSERVATION_EXPIRES_AT,
+      source_sha256: createHash("sha256").update(JSON.stringify(files)).digest("hex") };
+  }
   if (!Number.isFinite(start) || start % (60 * MINUTE) !== 0 ||
       new Date(start).toISOString() !== stamp || start - now() < 20 * MINUTE ||
       start - now() > 48 * 60 * MINUTE ||
@@ -178,27 +264,11 @@ export async function manage({ stage, env, source, send = fetch, now = Date.now,
       !CREDENTIALS.includes(binding?.name) || binding.type !== "secret_text")) {
     throw new Error("delivery_unexpected_worker_bindings");
   }
-  const metadata = {
-    main_module: MODULE,
-    compatibility_date: "2026-11-25",
-    bindings: [
-      { name: "STUDY_DELIVERY_STARTS_AT", type: "plain_text", text: stamp },
-      ...CREDENTIALS.map((name) => ({ name, type: "secret_text", text: env[name] })),
-    ],
-    logpush: false,
-    observability: { enabled: false },
-    tail_consumers: [],
-  };
-  const body = new FormData();
-  body.set("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
-  body.set(MODULE, new Blob([source], { type: "application/javascript+module" }), MODULE);
-  await request("", "PUT", body);
-  await privateUrls();
-  if (await schedule() || start - now() < 20 * MINUTE) {
-    throw new Error("delivery_activation_boundary_refused");
-  }
-  await request("/schedules", "PUT", JSON.stringify([{ cron: CRON }]), true);
-  if (!(await schedule())) throw new Error("delivery_activation_not_verified");
+  await upload(MODULE, [
+    { name: "STUDY_DELIVERY_STARTS_AT", type: "plain_text", text: stamp },
+    ...CREDENTIALS.map((name) => ({ name, type: "secret_text", text: env[name] })),
+  ], { [MODULE]: source });
+  await activate(start);
   return { stage, cron_active: true, worker: WORKER, starts_at: stamp,
     expires_at: new Date(start + 24 * 60 * MINUTE).toISOString(),
     source_sha256: createHash("sha256").update(source).digest("hex") };
@@ -214,6 +284,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const stage = process.env.STUDY_DELIVERY_STAGE;
   try {
     const report = await manage({ stage, env: process.env,
+      observationSource: stage === "START_OBSERVATION" ?
+        readFileSync(new URL(OBSERVATION_MODULE, import.meta.url), "utf8") : undefined,
       source: readFileSync(new URL(MODULE, import.meta.url), "utf8") });
     const line = JSON.stringify(report);
     if (stage === "DIAGNOSE") writeDiagnosticResult(process.stdout, line, 0);

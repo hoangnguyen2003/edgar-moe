@@ -1,0 +1,98 @@
+name: Manage signed hosted study scheduling
+
+on:
+  workflow_dispatch:
+    inputs:
+      stage:
+        description: Prepare the signed schedule or remove its expired Cron
+        required: true
+        type: choice
+        default: START_OBSERVATION
+        options: [START_OBSERVATION, STOP_OBSERVATION_EXPIRED]
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: manage-issue290-external-delivery
+  cancel-in-progress: false
+
+jobs:
+  reviewed-window:
+    if: ${{ github.repository == 'hoangnguyen2003/edgar-moe' && github.ref == 'refs/heads/main' && github.event.repository.private == false && vars.ISSUE290_STUDY_DELIVERY_MODE == 'cloudflare' && (inputs.stage == 'START_OBSERVATION' || inputs.stage == 'STOP_OBSERVATION_EXPIRED') }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: hosted-read-study
+    outputs:
+      starts_at: ${{ steps.window.outputs.starts_at }}
+      expires_at: ${{ steps.window.outputs.expires_at }}
+      policy_sha256: ${{ steps.window.outputs.policy_sha256 }}
+      host_sha256: ${{ steps.window.outputs.host_sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Require a complete, closed delivery trial before enabling study Cron
+        if: ${{ inputs.stage == 'START_OBSERVATION' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PILOT_STARTS_AT: ${{ vars.ISSUE290_EXTERNAL_DELIVERY_STARTS_AT }}
+          STUDY_ENABLED: ${{ vars.ISSUE290_STUDY_ENABLED }}
+          CLAIM_CONFIGURATION_PRESENT: ${{ secrets.STUDY_OBSERVATION_SIGNING_KEY != '' && secrets.STUDY_CLAIM_R2_ACCOUNT_ID != '' && secrets.STUDY_CLAIM_R2_ACCESS_KEY_ID != '' && secrets.STUDY_CLAIM_R2_SECRET_ACCESS_KEY != '' }}
+        run: |
+          set -o pipefail
+          test "$STUDY_ENABLED" = true
+          test "$CLAIM_CONFIGURATION_PRESENT" = true
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/finalize-study-delivery.yml" --jq '.state')" = disabled_manually
+          for workflow in observe-private-read-study.yml finalize-private-read-study.yml; do
+            test "$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/$workflow" --jq '.state')" = active
+          done
+          python3 -m scripts.report_study_delivery --starts-at "$PILOT_STARTS_AT" |
+            jq -e '.status == "complete" and .counts.confirmed == 24' >/dev/null
+      - name: Bind the hosted study window without loading access credentials
+        id: window
+        env:
+          STUDY_STARTS_AT: ${{ vars.STUDY_STARTS_AT }}
+          STUDY_EXPIRES_AT: ${{ vars.STUDY_EXPIRES_AT }}
+          STUDY_POLICY_SHA256: ${{ vars.STUDY_POLICY_SHA256 }}
+          STUDY_DEPLOYMENT_HOST_SHA256: ${{ vars.STUDY_DEPLOYMENT_HOST_SHA256 }}
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os
+          from scripts.finalize_private_read_study import window
+          from scripts.observe_external_study_delivery import FORMAT
+          start, end = window(dict(os.environ))
+          if start.minute or start.second or start.microsecond:
+              raise SystemExit("Observation window must be aligned to a UTC hour")
+          print(f"starts_at={start.strftime(FORMAT)}")
+          print(f"expires_at={end.strftime(FORMAT)}")
+          print("policy_sha256=" + os.environ["STUDY_POLICY_SHA256"])
+          print("host_sha256=" + os.environ["STUDY_DEPLOYMENT_HOST_SHA256"])
+          PY
+
+  manage:
+    needs: reviewed-window
+    if: ${{ needs.reviewed-window.outputs.starts_at != '' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    environment: hosted-study-delivery
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          package-manager-cache: false
+      - name: Manage only the existing isolated study Worker
+        env:
+          STUDY_DELIVERY_STAGE: ${{ inputs.stage }}
+          STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID }}
+          STUDY_DELIVERY_CLOUDFLARE_TOKEN: ${{ secrets.STUDY_DELIVERY_CLOUDFLARE_TOKEN }}
+          STUDY_OBSERVATION_STARTS_AT: ${{ needs.reviewed-window.outputs.starts_at }}
+          STUDY_OBSERVATION_EXPIRES_AT: ${{ needs.reviewed-window.outputs.expires_at }}
+          STUDY_OBSERVATION_POLICY_SHA256: ${{ needs.reviewed-window.outputs.policy_sha256 }}
+          STUDY_OBSERVATION_HOST_SHA256: ${{ needs.reviewed-window.outputs.host_sha256 }}
+          STUDY_OBSERVATION_SIGNING_KEY: ${{ inputs.stage == 'START_OBSERVATION' && secrets.STUDY_OBSERVATION_SIGNING_KEY || '' }}
+          STUDY_OBSERVATION_GITHUB_TOKEN: ${{ inputs.stage == 'START_OBSERVATION' && secrets.STUDY_DELIVERY_GITHUB_TOKEN || '' }}
+        run: node ops/scheduler/manage-study-delivery.mjs

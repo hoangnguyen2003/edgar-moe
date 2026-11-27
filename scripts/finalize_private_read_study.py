@@ -32,6 +32,7 @@ from scripts.admit_study_observation import (  # noqa: E402
     active_slot,
     observation_event,
 )
+from scripts.observe_external_study_delivery import FORMAT  # noqa: E402
 
 REPOSITORY = "hoangnguyen2003/edgar-moe"
 WORKFLOW = "observe-private-read-study.yml"
@@ -569,7 +570,7 @@ def main() -> int:
     args = parser.parse_args()
     env = dict(os.environ)
     try:
-        _, end = window(env)
+        start, end = window(env)
         now = datetime.now(UTC)
         if now < end + timedelta(minutes=5):
             print(json.dumps({"status": "collecting", "application_requests": 0}))
@@ -600,6 +601,10 @@ def main() -> int:
         if output:
             with Path(output).open("a") as stream:
                 stream.write("finished=true\n")
+                stream.write(f"starts_at={start.strftime(FORMAT)}\n")
+                stream.write(f"expires_at={end.strftime(FORMAT)}\n")
+                stream.write(f"policy_sha256={env['STUDY_POLICY_SHA256']}\n")
+                stream.write(f"host_sha256={env['STUDY_DEPLOYMENT_HOST_SHA256']}\n")
         print(
             json.dumps(
                 {"status": report["status"], "application_requests": 0, "issue_closed": False}
