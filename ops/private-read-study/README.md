@@ -505,6 +505,13 @@ bindings. It prints booleans only for the bindings and makes no deployment
 or scheduling changes. A successful metadata check establishes deployment
 configuration. Delivery still requires a real scheduled receipt.
 
+`CHECK_EXPIRY` reads GitHub's dispatch-token expiration header and
+Cloudflare's account-token verification metadata. Its result retains only
+HTTP status, the enumerated Cloudflare token status, and any provider-reported
+expiration timestamps. Both requests use read-only metadata endpoints.
+An absent expiration is shown as unknown.
+[Cloudflare token verification](https://developers.cloudflare.com/api/resources/accounts/subresources/tokens/methods/verify/)
+
 Cloudflare may report a trigger timestamp later than the nominal Cron
 minute. The Worker accepts in-window timestamps within five minutes of
 the slot and signs the canonical minute-17 time. A late trigger beyond

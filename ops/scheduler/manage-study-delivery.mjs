@@ -17,6 +17,79 @@ const OBSERVATION_COMMITMENTS = [
   "STUDY_OBSERVATION_POLICY_SHA256", "STUDY_OBSERVATION_HOST_SHA256",
 ];
 
+function expiryTimestamp(value) {
+  if (typeof value !== "string") return null;
+  const normalized = value.replace(
+    /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2}) UTC$/,
+    "$1T$2Z",
+  );
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:\d{2})$/.test(normalized)) {
+    return null;
+  }
+  const instant = Date.parse(normalized);
+  return Number.isFinite(instant) ? new Date(instant).toISOString() : null;
+}
+
+async function checkExpiry(env, send) {
+  const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
+  const cloudflare = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
+  const github = env.STUDY_DELIVERY_GITHUB_TOKEN;
+  if (!/^[a-f0-9]{32}$/.test(account || "") ||
+      !/^[A-Za-z0-9_-]{20,512}$/.test(cloudflare || "") ||
+      !/^[A-Za-z0-9_]{20,512}$/.test(github || "")) {
+    throw new Error("delivery_configuration_refused");
+  }
+
+  const githubRequest = send(
+    "https://api.github.com/repos/hoangnguyen2003/edgar-moe/actions/workflows/observe-private-read-study.yml",
+    {
+      method: "GET", redirect: "error", signal: AbortSignal.timeout(10_000),
+      headers: {
+        Authorization: `Bearer ${github}`, Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2026-03-10", "User-Agent": "edgar-moe-study-delivery-check",
+      },
+    },
+  ).then(async response => {
+    if (response.body) await response.body.cancel();
+    return {
+      http_status: response.status,
+      expires_at: response.ok
+        ? expiryTimestamp(response.headers.get("github-authentication-token-expiration")) : null,
+    };
+  });
+
+  const cloudflareRequest = send(
+    `https://api.cloudflare.com/client/v4/accounts/${account}/tokens/verify`,
+    {
+      method: "GET", redirect: "error", signal: AbortSignal.timeout(10_000),
+      headers: { Authorization: `Bearer ${cloudflare}` },
+    },
+  ).then(async response => {
+    const result = { http_status: response.status, token_status: null, expires_at: null };
+    if (!response.ok) {
+      if (response.body) await response.body.cancel();
+      return result;
+    }
+    const body = await response.text();
+    if (Buffer.byteLength(body) > 4096) throw new Error("delivery_expiry_response_refused");
+    const document = JSON.parse(body);
+    if (document.success !== true || !["active", "disabled", "expired"].includes(document.result?.status)) {
+      throw new Error("delivery_expiry_response_refused");
+    }
+    return {
+      ...result,
+      token_status: document.result.status,
+      expires_at: expiryTimestamp(document.result.expires_on),
+    };
+  });
+  const [githubResult, cloudflareResult] = await Promise.allSettled([githubRequest, cloudflareRequest]);
+  return {
+    stage: "CHECK_EXPIRY",
+    github: githubResult.status === "fulfilled" ? githubResult.value : null,
+    cloudflare: cloudflareResult.status === "fulfilled" ? cloudflareResult.value : null,
+  };
+}
+
 async function checkGitHub(token, send) {
   if (!/^[A-Za-z0-9_]{20,512}$/.test(token || "")) {
     throw new Error("delivery_github_configuration_refused");
@@ -52,6 +125,7 @@ async function checkGitHub(token, send) {
 export async function manage({ stage, env, source, observationSource, send = fetch, now = Date.now,
   observe = observeScheduledEvent, sleep = wait }) {
   if (stage === "CHECK_GITHUB") return checkGitHub(env.STUDY_DELIVERY_GITHUB_TOKEN, send);
+  if (stage === "CHECK_EXPIRY") return checkExpiry(env, send);
   const account = env.STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID;
   const token = env.STUDY_DELIVERY_CLOUDFLARE_TOKEN;
   const startingObservation = stage === "START_OBSERVATION";
