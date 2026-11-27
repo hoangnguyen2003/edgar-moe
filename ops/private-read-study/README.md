@@ -206,8 +206,12 @@ without requiring that internal header. See [Vercel's cache contract](https://ve
 with request-time boot/init distinguished from complete invocations without
 startup. Neon endpoint metadata is captured in separate steps before/after the
 read pair; its idle-to-active label is pair-level evidence. Missing evidence
-remains `unobserved` and failed metadata stops this observer. Do not infer cold/resume from latency or
-the 30-second pause. The existing public synthetic cache baseline is a separate
+remains `unobserved`. The signed observer keeps collecting after an exhausted
+transient trace lookup only when both admitted HTTP reads pass and each trace
+is either valid or refused for delayed ingestion or temporary unavailability.
+It retains the degraded receipt in the final report. Authorization, trace
+integrity, HTTP or database-state validation failures still stop the observer.
+The existing public synthetic cache baseline is a separate
 environment/cohort and cannot supply missing private database-read days.
 
 After seven actual consecutive dates, retain all failed/missing/duplicate slots,
@@ -291,8 +295,8 @@ The packet is redaction-checked and retained for 90 days.
 Only after successful packet upload does a separate job disable these two study
 workflows. It cannot affect #156 and receives no provider or database secret.
 The app's absolute window and reader password expiry independently stop reads.
-Failures before the end retain their receipts and stop the observer; the final
-report still records incomplete coverage without backfilling it.
+Failures that stop collection retain their receipts. The final report records
+incomplete coverage without backfilling it.
 
 This automation neither asserts acceptance nor closes the issue prematurely.
 Coverage and metadata quality require review after seven real days; no alert

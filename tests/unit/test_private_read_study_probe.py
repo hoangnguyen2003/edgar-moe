@@ -204,6 +204,47 @@ def test_signed_hour_cannot_be_spent_in_the_next_slot(monkeypatch):
     assert report["status"] == "degraded"
 
 
+@pytest.mark.parametrize(
+    ("signed", "reason", "http_status", "pair_size", "exit_code"),
+    [
+        (True, "trace_temporarily_unavailable", "passed", 2, 0),
+        (True, "trace_not_ready", "passed", 2, 0),
+        (False, "trace_temporarily_unavailable", "passed", 2, 1),
+        (True, "trace_api_refused", "passed", 2, 1),
+        (True, "trace_request_identity_refused", "passed", 2, 1),
+        (True, "trace_temporarily_unavailable", "failed", 2, 1),
+        (True, "trace_temporarily_unavailable", "passed", 1, 1),
+    ],
+)
+def test_signed_observer_continues_only_after_transient_metadata_loss(
+    tmp_path, monkeypatch, capsys, signed, reason, http_status, pair_size, exit_code
+):
+    report = {
+        "status": "degraded",
+        "samples": [
+            {"status": http_status, "provider_trace": {"status": "refused", "reason": reason}},
+            {"status": "passed", "provider_trace": {"status": "passed"}},
+        ][:pair_size],
+    }
+    if signed:
+        report["scheduled_at"] = "2026-11-06T00:17:00.000Z"
+    for key, value in environment().items():
+        monkeypatch.setenv(key, value)
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+    monkeypatch.delenv("STUDY_TRACE_ENABLED", raising=False)
+    monkeypatch.setattr(probe, "observe", lambda *a, **kw: report)
+    output = tmp_path / "observation.json"
+    monkeypatch.setattr(sys, "argv", ["probe", "--output", str(output)])
+
+    assert probe.main() == exit_code
+    assert json.loads(output.read_text()) == report
+    assert json.loads(capsys.readouterr().out) == {
+        "status": "degraded",
+        "samples": pair_size,
+        "collection_continues": exit_code == 0,
+    }
+
+
 def test_missing_origin_timing_cannot_be_counted_as_successful_measurement(monkeypatch):
     response = Response({"available": True})
     del response.headers["x-study-read-timing"]
