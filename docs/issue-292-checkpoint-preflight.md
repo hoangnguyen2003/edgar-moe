@@ -348,3 +348,29 @@ describes the underlying facts as public domain. A query for `LICENSE.md` and
 provenance and permission for private retention and replay still need review
 before an export can enter the historical screen.
 [Publisher description](https://www.dolthub.com/api/v2/databases/post-no-preference/stocks)
+
+## SEC settlement identity cross-check, November 27, 2026
+
+An offline comparison of the SEC file for the second half of November 2022
+corroborated **493 of the 503** retained identities by literal ticker and
+CUSIP. On November 30 alone, 221 retained pairs appear. Across the file,
+495 retained CUSIPs appear, including two without the exact cohort ticker.
+Two cohort tickers also appear with a different CUSIP. The audit retains
+those differences and makes no ticker alias substitutions.
+[SEC source and field definitions](https://www.sec.gov/data-research/sec-markets-data/fails-deliver-data)
+
+The hash-bound file has 62,696 data records across 11 settlement dates from
+November 15 through November 30. The SEC response reports a December 15,
+2022 last-modified timestamp, consistent with the ZIP member's local date
+and the SEC's release cadence. These metadata were retrieved in 2026.
+Independent evidence for the original publication of these exact bytes
+remains unavailable. [Public release metadata and aggregate results](../ops/issue292/sec-settlement-corroboration-20261127.json)
+
+The comparison verifies the two input hashes, matches only the settlement
+date, ticker and CUSIP fields against the retained identity result, and
+checks the file's record-count trailer. An offline rerun reproduced the
+aggregate report. Settlement rows record outstanding delivery failures
+and omit securities without such a balance. They provide dated point
+observations. The remaining work includes market-archive identifier
+intervals, availability and revision evidence for the daily closes and
+traded volumes, and the resulting screen-to-dataset binding.

@@ -1,0 +1,33 @@
+{
+  "archive_record_count": 62696,
+  "archive_sha256": "2196fe3b335db71730e92f945a2485a7362633d327923f8acdf862a71f09f707",
+  "assessment": "private_settlement_identity_corroboration",
+  "cusip_seen_with_another_ticker": 2,
+  "cusip_seen_without_exact_ticker": 2,
+  "exact_candidates_on_last_settlement_date": 221,
+  "exact_cusip_and_ticker_candidates": 493,
+  "fixed_cohort_count": 503,
+  "historical_market_continuity_verified": false,
+  "http_last_modified": "Thu, 15 Dec 2022 13:44:28 GMT",
+  "identity_result_sha256": "98e0230e9fa0c430799e53e7101da0ebc273c30d664029709b3516fcedc415c3",
+  "independent_archive_publication_verified": false,
+  "market_price_or_volume_values_used": false,
+  "retained_cusip_seen_candidates": 495,
+  "retrieved_at": "2026-11-27T17:16:30.360164+00:00",
+  "settlement_dates": {
+    "count": 11,
+    "first": "2022-11-15",
+    "last": "2022-11-30"
+  },
+  "source": "https://www.sec.gov/files/data/fails-deliver-data/cnsfails202211b.zip",
+  "ticker_seen_candidates": 495,
+  "ticker_seen_with_another_cusip": 2,
+  "zip_member_timestamp_timezone_unspecified": [
+    2022,
+    12,
+    15,
+    8,
+    14,
+    12
+  ]
+}
