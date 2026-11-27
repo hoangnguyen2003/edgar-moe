@@ -152,7 +152,7 @@ def put_once(env: dict[str, str], object_key: str, contents: dict[str, str | int
 def check_store(env: dict[str, str]) -> None:
     run_id = dispatch_run_id(env)
     key = f"issue290/setup/{run_id}.json"
-    body = {"scope": "study_claim_store_setup", "run_id": run_id}
+    body: dict[str, str | int] = {"scope": "study_claim_store_setup", "run_id": run_id}
     if not put_once(env, key, body):
         raise AdmissionError("study_claim_store_setup_key_exists")
     if put_once(env, key, body):
