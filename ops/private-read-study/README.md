@@ -476,6 +476,14 @@ the window and closeout. The SELECT-only data target stores no claim state.
 The finalizer selects first-attempt signed-observer runs and checks each
 recorded timestamp against its slot.
 
+The [observation schedule manager](../../.github/workflows/manage-study-observation.yml)
+reuses the isolated delivery Worker after the 24-slot pilot closes. The start
+job verifies complete pilot coverage, disabled pilot closeout, enabled study
+workflows and present signing and claim credentials. It uploads both Worker
+modules with Cron absent and checks the active window and target commitments
+before enabling the hourly trigger. The finalizer removes that Cron after
+retaining the seven-day report and verifying the same expired bindings.
+
 `VERIFY_ACTIVE` reads the active Worker version with the existing scoped
 token and reports whether it exposes a scheduled handler and the expected
 bindings. It prints booleans only for the bindings and makes no deployment

@@ -319,9 +319,41 @@ def test_finalizer_receives_no_provider_secret_and_stops_only_the_study_workflow
     assert "secrets." not in json.dumps(doc)
     stop = doc["jobs"]["stop-finished-study"]
     assert stop["permissions"] == {"actions": "write"}
+    assert stop["needs"] == ["report", "stop-observation-cron"]
+    assert "needs.stop-observation-cron.result == 'success'" in stop["if"]
     run = stop["steps"][0]["run"]
     assert "observe-private-read-study.yml" in run and "finalize-private-read-study.yml" in run
     assert "156" not in run
+
+
+def test_signed_scheduler_uses_the_isolated_manager_after_a_retained_report():
+    finalizer = yaml.safe_load(
+        Path(".github/workflows/finalize-private-read-study.yml").read_text()
+    )
+    manager_path = ".github/workflows/manage-study-observation.yml"
+    manager = yaml.safe_load(Path(manager_path).read_text())
+    first = yaml.safe_load(Path(".github/workflows/manage-study-delivery.yml").read_text())
+    cleanup = finalizer["jobs"]["stop-observation-cron"]
+    assert cleanup["needs"] == "report"
+    assert "needs.report.outputs.finished == 'true'" in cleanup["if"]
+    assert cleanup["uses"] == f"./{manager_path}"
+    assert cleanup["with"] == {"stage": "STOP_OBSERVATION_EXPIRED"}
+    assert manager["concurrency"]["group"] in first["concurrency"]["group"]
+    window_job = manager["jobs"]["reviewed-window"]
+    apply_job = manager["jobs"]["manage"]
+    assert window_job["environment"] == "hosted-read-study"
+    assert apply_job["environment"] == "hosted-study-delivery"
+    gate = window_job["steps"][1]
+    assert gate["if"] == "${{ inputs.stage == 'START_OBSERVATION' }}"
+    assert ".counts.confirmed == 24" in gate["run"]
+    assert "disabled_manually" in gate["run"]
+    apply_env = apply_job["steps"][-1]["env"]
+    assert {name for name, expression in apply_env.items() if "secrets." in expression} == {
+        "STUDY_DELIVERY_CLOUDFLARE_ACCOUNT_ID",
+        "STUDY_DELIVERY_CLOUDFLARE_TOKEN",
+        "STUDY_OBSERVATION_GITHUB_TOKEN",
+        "STUDY_OBSERVATION_SIGNING_KEY",
+    }
 
 
 @pytest.mark.parametrize(

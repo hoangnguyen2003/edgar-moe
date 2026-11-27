@@ -111,6 +111,87 @@ test("automatic shutdown requires an expired window bound to the active Worker",
   assert.deepEqual(writes, [{ path: "/schedules", body: "[]" }]);
 });
 
+const observationEnv = {
+  ...env,
+  STUDY_OBSERVATION_STARTS_AT: "2026-12-01T00:00:00.000Z",
+  STUDY_OBSERVATION_EXPIRES_AT: "2026-12-08T00:00:00.000Z",
+  STUDY_OBSERVATION_POLICY_SHA256: "a".repeat(64),
+  STUDY_OBSERVATION_HOST_SHA256: "b".repeat(64),
+  STUDY_OBSERVATION_SIGNING_KEY: "c".repeat(64),
+  STUDY_OBSERVATION_GITHUB_TOKEN: "synthetic_observation_token",
+};
+const observationBindings = Object.entries(observationEnv).filter(([name]) =>
+  name.startsWith("STUDY_OBSERVATION_")).map(([name, text]) =>
+  ({ name, type: /TOKEN|SIGNING_KEY/.test(name) ? "secret_text" : "plain_text", text }));
+const version = "023e105f-2a42-4f8b-a1c1-73f6a2a30c0f";
+
+test("stages both measurement modules and verifies the deployed commitments before Cron", async () => {
+  const { send: fixed, writes } = fixture();
+  let bindingsMatch = false;
+  const parameters = {
+    stage: "START_OBSERVATION",
+    env: observationEnv,
+    source: "export const sample = 1;",
+    observationSource: "export default {};",
+    now: () => Date.parse("2026-11-30T23:30:00Z"),
+    send: async (url, options) => {
+      if (url === BASE + "/deployments?per_page=1") {
+        return response({ deployments: [{ versions: [{ version_id: version, percentage: 100 }] }] });
+      }
+      if (url === BASE + `/versions/${version}`) {
+        return response({ resources: {
+          script: { handlers: ["scheduled"] },
+          bindings: bindingsMatch ? observationBindings : [],
+        } });
+      }
+      return fixed(url, options);
+    },
+  };
+  await assert.rejects(manage(parameters), /observation_deployment_refused/);
+  assert.deepEqual(writes.map(call => call.path), [""]);
+  const form = writes[0].body;
+  const metadata = JSON.parse(await form.get("metadata").text());
+  assert.equal(metadata.main_module, "study-observation-worker.mjs");
+  const byName = (left, right) => left.name.localeCompare(right.name);
+  assert.deepEqual(metadata.bindings.toSorted(byName), observationBindings.toSorted(byName));
+  assert.equal(await form.get("study-observation-worker.mjs").text(), parameters.observationSource);
+  assert.equal(await form.get("study-delivery-worker.mjs").text(), parameters.source);
+
+  bindingsMatch = true;
+  const result = await manage(parameters);
+  assert.deepEqual(writes.map(call => call.path), ["", "", "/schedules"]);
+  assert.equal(result.expires_at, observationEnv.STUDY_OBSERVATION_EXPIRES_AT);
+  assert.equal(result.cron_active, true);
+  assert.ok(!JSON.stringify(result).includes(observationEnv.STUDY_OBSERVATION_GITHUB_TOKEN));
+  await assert.rejects(manage(parameters), /already_active/);
+  assert.equal(writes.length, 3);
+});
+
+test("measurement shutdown refuses before expiry and preserves a different target", async () => {
+  const { send: fixed, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
+  const stopAt = Date.parse("2026-12-08T00:05:00Z");
+  const env = Object.fromEntries(Object.entries(observationEnv).filter(([name]) =>
+    !/SIGNING_KEY|GITHUB_TOKEN/.test(name)));
+  const parameters = { stage: "STOP_OBSERVATION_EXPIRED", env };
+  await assert.rejects(manage({ ...parameters, now: () => stopAt - 1,
+    send: async () => assert.fail("unexpected API call") }), /stop_window_refused/);
+  let current = observationBindings.map(binding => binding.name === "STUDY_OBSERVATION_HOST_SHA256" ?
+    { ...binding, text: "f".repeat(64) } : binding);
+  const expired = { ...parameters, now: () => stopAt, send: async (url, options) => {
+    if (url === BASE + "/deployments?per_page=1") {
+      return response({ deployments: [{ versions: [{ version_id: version, percentage: 100 }] }] });
+    }
+    if (url === BASE + `/versions/${version}`) return response({ resources: { bindings: current } });
+    return fixed(url, options);
+  }};
+  await assert.rejects(manage(expired), /stop_active_window_mismatch/);
+  assert.deepEqual(writes, []);
+  current = observationBindings;
+  assert.equal((await manage(expired)).cron_active, false);
+  assert.equal((await manage(expired)).cron_active, false);
+  assert.deepEqual(writes, [{ path: "/schedules", body: "[]" }]);
+});
+
 test("diagnose observes one existing event and deletes its temporary tail", async () => {
   const { send: manageRequest, writes } = fixture({ cron: [{ cron: "17 * * * *" }] });
   const tailId = "c".repeat(32);
