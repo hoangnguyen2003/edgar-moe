@@ -359,11 +359,8 @@ def test_signed_scheduler_uses_the_isolated_manager_after_a_retained_report():
     probe = window_job["steps"][2]
     assert "CHECK_CLAIM_STORE" in probe["if"] and "START_OBSERVATION" in probe["if"]
     assert "--check-store" in probe["run"]
-    assert set(probe["env"]) == {
-        "STUDY_CLAIM_R2_ACCOUNT_ID",
-        "STUDY_CLAIM_R2_ACCESS_KEY_ID",
-        "STUDY_CLAIM_R2_SECRET_ACCESS_KEY",
-    }
+    assert window_job["permissions"] == {"contents": "write", "actions": "read"}
+    assert probe["env"] == {"GH_TOKEN": "${{ github.token }}"}
     assert window_job["steps"][3]["if"] == "${{ inputs.stage != 'CHECK_CLAIM_STORE' }}"
     apply_env = apply_job["steps"][-1]["env"]
     assert {name for name, expression in apply_env.items() if "secrets." in expression} == {

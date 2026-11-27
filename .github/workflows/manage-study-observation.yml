@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       stage:
-        description: Verify isolated R2 claims, start the signed schedule, or remove expired Cron
+        description: Verify the claim ledger, start the signed schedule, or remove expired Cron
         required: true
         type: choice
         default: START_OBSERVATION
@@ -23,6 +23,9 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     environment: hosted-read-study
+    permissions:
+      contents: write
+      actions: read
     outputs:
       starts_at: ${{ steps.window.outputs.starts_at }}
       expires_at: ${{ steps.window.outputs.expires_at }}
@@ -52,9 +55,7 @@ jobs:
       - name: Verify a scratch claim and reject its duplicate
         if: ${{ inputs.stage == 'CHECK_CLAIM_STORE' || inputs.stage == 'START_OBSERVATION' }}
         env:
-          STUDY_CLAIM_R2_ACCOUNT_ID: ${{ secrets.STUDY_CLAIM_R2_ACCOUNT_ID }}
-          STUDY_CLAIM_R2_ACCESS_KEY_ID: ${{ secrets.STUDY_CLAIM_R2_ACCESS_KEY_ID }}
-          STUDY_CLAIM_R2_SECRET_ACCESS_KEY: ${{ secrets.STUDY_CLAIM_R2_SECRET_ACCESS_KEY }}
+          GH_TOKEN: ${{ github.token }}
         run: python3 -m scripts.admit_study_observation --check-store
       - name: Bind the hosted study window without loading access credentials
         if: ${{ inputs.stage != 'CHECK_CLAIM_STORE' }}
